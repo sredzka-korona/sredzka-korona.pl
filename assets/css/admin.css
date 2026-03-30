@@ -6,7 +6,7 @@
   --gold-rgb: 200, 170, 120;
   --line: rgba(200, 170, 120, 0.3);
   --gold: #c8aa78;
-  --gold-strong: #e8d8b8;
+  --gold-strong: #8b6530;
   --text: #1f1712;
   --muted: #7a6b5a;
   --danger: #e56e5e;
@@ -27,6 +27,7 @@ body {
   margin: 0;
   min-height: 100vh;
   font-family: "Manrope", sans-serif;
+  line-height: 1.5;
   color: var(--text);
   background:
     radial-gradient(circle at top right, rgba(200, 170, 120, 0.08), transparent 22%),
@@ -54,6 +55,10 @@ select {
 
 a {
   color: inherit;
+}
+
+#admin-app {
+  min-height: 100vh;
 }
 
 .admin-shell {
@@ -109,12 +114,32 @@ a {
 }
 
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
   border: 1px solid rgba(200, 170, 120, 0.5);
   border-radius: 999px;
   padding: 0.85rem 1.2rem;
   background: linear-gradient(135deg, rgba(230, 222, 205, 0.95), rgba(225, 215, 195, 0.92));
   color: #2a241c;
   cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(95, 70, 35, 0.12);
+}
+
+.button:focus-visible {
+  outline: 2px solid rgba(139, 101, 48, 0.36);
+  outline-offset: 3px;
 }
 
 .button.secondary {
@@ -148,10 +173,21 @@ a {
   grid-template-columns: repeat(12, 1fr);
   gap: 1rem;
   margin-top: 1rem;
+  align-items: start;
 }
 
 .panel {
-  padding: 1.2rem;
+  min-width: 0;
+  padding: clamp(1rem, 2vw, 1.45rem);
+  overflow: hidden;
+}
+
+.panel > :first-child {
+  margin-top: 0;
+}
+
+.panel > :last-child {
+  margin-bottom: 0;
 }
 
 .col-12 {
@@ -190,6 +226,7 @@ a {
 .field textarea,
 .field select,
 .field-full input,
+.field-full select,
 .field-full textarea {
   width: 100%;
   border: 1px solid rgba(200, 170, 120, 0.3);
@@ -208,6 +245,7 @@ a {
 .helper {
   color: var(--muted);
   font-size: 0.94rem;
+  margin: 0;
 }
 
 .section-intro {
@@ -238,7 +276,9 @@ a {
 
 .status {
   min-height: 1.2rem;
+  margin: 0;
   color: var(--gold-strong);
+  font-weight: 600;
 }
 
 .pill {
@@ -247,9 +287,11 @@ a {
   gap: 0.45rem;
   border-radius: 999px;
   padding: 0.35rem 0.7rem;
-  background: rgba(200, 170, 120, 0.2);
-  color: var(--gold-strong);
+  background: rgba(200, 170, 120, 0.22);
+  color: #6f5125;
   font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
 }
 
 .submission-meta,
@@ -281,6 +323,19 @@ a {
   object-fit: cover;
   border-radius: 12px;
   margin-bottom: 0.6rem;
+}
+
+.brand-row > div,
+.panel,
+.hotel-subpanel,
+.hotel-template-card,
+.list-item,
+.repeater-item {
+  min-width: 0;
+}
+
+.admin-topbar .inline-actions {
+  justify-content: flex-end;
 }
 
 .empty {
@@ -350,6 +405,8 @@ a {
 }
 
 .admin-hotel-wrap {
+  display: grid;
+  gap: 1rem;
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1.5rem 2rem;
@@ -362,49 +419,184 @@ a {
   margin: 1rem 0;
 }
 
+.hotel-subpanel {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(200, 170, 120, 0.22);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.hotel-subpanel + .hotel-subpanel {
+  margin-top: 1rem;
+}
+
+.hotel-subpanel h3,
+.hotel-subpanel p {
+  margin: 0;
+}
+
 .hotel-filters {
   display: flex;
   align-items: center;
   gap: 1rem;
   margin-bottom: 1rem;
   flex-wrap: wrap;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(200, 170, 120, 0.18);
+  border-radius: 16px;
+  background: rgba(250, 247, 241, 0.72);
+}
+
+.hotel-subpanel form label,
+.hotel-template-card label,
+.hotel-filters label {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+  color: #443224;
+  font-weight: 600;
+}
+
+.hotel-subpanel input,
+.hotel-subpanel select,
+.hotel-subpanel textarea,
+.hotel-template-card input,
+.hotel-template-card textarea,
+.hotel-filters select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(200, 170, 120, 0.34);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--text);
+  padding: 0.78rem 0.9rem;
+}
+
+.hotel-subpanel textarea,
+.hotel-template-card textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 101, 48, 0.55) rgba(200, 170, 120, 0.12);
+}
+
+.table-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.table-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(139, 101, 48, 0.5);
+}
+
+.table-scroll::-webkit-scrollbar-track {
+  background: rgba(200, 170, 120, 0.12);
 }
 
 .hotel-table {
   width: 100%;
+  min-width: max(100%, 780px);
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
 }
 
 .hotel-table th,
 .hotel-table td {
   border-bottom: 1px solid var(--line);
-  padding: 0.5rem 0.4rem;
+  padding: 0.75rem 0.5rem;
   text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.hotel-table th {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.hotel-table tbody tr:hover {
+  background: rgba(200, 170, 120, 0.08);
 }
 
 .hotel-template-card {
-  margin-bottom: 1rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  padding: 0.75rem 1rem;
+  padding: 0.9rem 1rem 1rem;
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .hotel-template-card summary {
   cursor: pointer;
   font-weight: 600;
+  color: #453124;
 }
 
 .hotel-template-card label {
-  display: block;
   margin-top: 0.75rem;
 }
 
-.hotel-template-card input,
-.hotel-template-card textarea {
-  width: 100%;
-  margin-top: 0.25rem;
-  padding: 0.5rem;
-  border-radius: 8px;
-  border: 1px solid var(--line);
+.hotel-template-card .button,
+.hotel-subpanel .button {
+  justify-self: start;
+}
+
+@media (max-width: 980px) {
+  .admin-shell {
+    width: min(100vw - 1rem, 1320px);
+    padding-top: 0.75rem;
+  }
+
+  .admin-main-tabs,
+  .admin-hotel-wrap {
+    padding-inline: 0;
+  }
+
+  .brand-row {
+    align-items: flex-start;
+  }
+
+  .brand-row img {
+    width: 56px;
+    height: 56px;
+  }
+
+  .admin-topbar .inline-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .admin-topbar .inline-actions > * {
+    flex: 1 1 180px;
+  }
+
+  .admin-main-tabs .button,
+  .hotel-nav .button {
+    flex: 1 1 220px;
+  }
+
+  .hotel-filters {
+    align-items: stretch;
+  }
+
+  .hotel-filters > * {
+    width: 100%;
+  }
+
+  .hotel-template-card .button,
+  .hotel-subpanel .button {
+    width: 100%;
+    justify-self: stretch;
+  }
 }

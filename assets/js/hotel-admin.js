@@ -108,7 +108,7 @@
       <div class="hotel-subpanel">
         <h3>Pokoje (${roomsData.length})</h3>
         <p class="helper">Ceny i parametry zapisują się w Firestore — wpływają na nowe rezerwacje.</p>
-        <div style="overflow-x:auto">
+        <div class="table-scroll">
           <table class="hotel-table">
             <thead><tr><th>Nazwa</th><th>Cena / noc</th><th>Aktywny</th><th></th></tr></thead>
             <tbody>${body || "<tr><td colspan='4'>Brak danych — uruchom seed pokoi.</td></tr>"}</tbody>
@@ -150,7 +150,7 @@
           </select></label>
           <button type="button" class="button" id="hotel-res-refresh">Odśwież</button>
         </div>
-        <div style="overflow-x:auto">
+        <div class="table-scroll">
           <table class="hotel-table">
             <thead><tr><th>Nr</th><th>Klient</th><th>Status</th><th>Termin</th><th>Kwota</th><th>Pozostały czas</th><th></th></tr></thead>
             <tbody>${rows || "<tr><td colspan='7'>Brak</td></tr>"}</tbody>

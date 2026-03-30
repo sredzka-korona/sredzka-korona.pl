@@ -115,7 +115,7 @@
       <div class="hotel-subpanel">
         <h3>Sale (${hallsData.length})</h3>
         <p class="helper">Pojemność, bufor między rezerwacjami i próg pełnej blokacji (duża sala) wpływają na dostępność.</p>
-        <div style="overflow-x:auto">
+        <div class="table-scroll">
           <table class="hotel-table">
             <thead><tr><th>Nazwa</th><th>Pojemność</th><th>Typ</th><th>Aktywna</th><th>Bufor (min)</th><th>Próg 100+</th><th></th></tr></thead>
             <tbody>${body || "<tr><td colspan='7'>Brak</td></tr>"}</tbody>
@@ -184,7 +184,7 @@
           </select></label>
           <button type="button" class="button" id="hall-res-refresh">Odśwież</button>
         </div>
-        <div style="overflow-x:auto">
+        <div class="table-scroll">
           <table class="hotel-table">
             <thead><tr><th>Nr</th><th>Sala</th><th>Data</th><th>Od</th><th>Do</th><th>h</th><th>Goś.</th><th>Impreza</th><th>Wył.</th><th>100+</th><th>Współdz.</th><th>Imię</th><th>E-mail</th><th>Tel</th><th>Uwagi</th><th>Admin</th><th>Status</th><th>Czas</th><th>Przedł.</th><th>Utw.</th><th></th></tr></thead>
             <tbody>${rows || "<tr><td colspan='21'>Brak</td></tr>"}</tbody>

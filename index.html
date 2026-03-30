@@ -962,38 +962,50 @@
         .main-split-overlay,
         .main-split-section:hover .main-split-overlay {
           opacity: 1;
-          align-items: flex-end;
-          background: linear-gradient(to bottom, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.62));
+          background: linear-gradient(to bottom, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.58));
         }
 
         .main-split-section:nth-child(1) .main-split-overlay {
-          justify-content: flex-start;
-          padding: 0 0 1.35rem 1rem;
+          padding: 0;
         }
 
         .main-split-section:nth-child(2) .main-split-overlay {
-          justify-content: center;
-          padding: 0 1rem 1.35rem;
+          padding: 0;
         }
 
         .main-split-section:nth-child(3) .main-split-overlay {
-          justify-content: flex-end;
-          padding: 0 1rem 1.35rem 0;
+          padding: 0;
         }
 
         .main-split-label {
-          max-width: 9ch;
+          position: absolute;
+          left: 50%;
+          display: inline-block;
+          max-width: min(72vw, 10ch);
           font-size: clamp(1.45rem, 5.8vw, 2.2rem);
           white-space: normal;
-          padding: 0 0.25rem;
-          transform: none;
+          padding: 0.2rem 0.45rem;
+          text-align: center;
+          transform: translate(-50%, -50%);
           transition: none;
+        }
+
+        .main-split-section:nth-child(1) .main-split-label {
+          top: 20%;
+        }
+
+        .main-split-section:nth-child(2) .main-split-label {
+          top: 49%;
+        }
+
+        .main-split-section:nth-child(3) .main-split-label {
+          top: 76%;
         }
 
         .main-split-soon,
         .main-split-section.is-blocked:hover .main-split-soon {
           opacity: 1;
-          bottom: 9%;
+          bottom: 7%;
           font-size: 0.68rem;
           line-height: 1.35;
         }
@@ -1450,10 +1462,10 @@
         }
 
         .floating-contact-button {
-          right: 1rem !important;
-          bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
-          width: 56px;
-          height: 56px;
+          right: 0.9rem !important;
+          bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px)) !important;
+          width: 52px;
+          height: 52px;
         }
       }
 

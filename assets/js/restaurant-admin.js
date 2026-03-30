@@ -139,7 +139,7 @@
       <div class="hotel-subpanel">
         <h3>Stoliki (${tablesData.length})</h3>
         <p class="helper">Ukryte stoliki nie biorą udziału w automatycznym przydziale. Zwiększenie liczby stolików w ustawieniach tworzy brakujące numery.</p>
-        <div style="overflow-x:auto">
+        <div class="table-scroll">
           <table class="hotel-table">
             <thead><tr><th>Nr</th><th>Strefa</th><th>Aktywny</th><th>Widoczność</th><th>Opis</th><th></th></tr></thead>
             <tbody>${body || "<tr><td colspan='6'>Brak</td></tr>"}</tbody>
@@ -188,7 +188,7 @@
           </select></label>
           <button type="button" class="button" id="rest-res-refresh">Odśwież</button>
         </div>
-        <div style="overflow-x:auto">
+        <div class="table-scroll">
           <table class="hotel-table">
             <thead><tr><th>Nr</th><th>Data</th><th>Od</th><th>Do</th><th>h</th><th>Stol.</th><th>Przydział</th><th>Goś.</th><th>Łącz.</th><th>Imię</th><th>E-mail</th><th>Tel</th><th>Czas</th><th>Status</th><th>Utw.</th><th></th></tr></thead>
             <tbody>${rows || "<tr><td colspan='16'>Brak</td></tr>"}</tbody>
