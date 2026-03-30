@@ -15,6 +15,6 @@
   "vars": {
     "ALLOWED_ORIGIN": "https://sredzka-korona.pl",
     "FIREBASE_PROJECT_ID": "sredzka-korona",
-    "FIREBASE_ADMIN_EMAILS": "admin@twoja-domena.pl"
+    "FIREBASE_ADMIN_EMAILS": "kontakt@sredzka-korona.pl"
   }
 }

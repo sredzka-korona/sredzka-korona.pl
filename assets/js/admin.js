@@ -456,40 +456,58 @@
           <div class="repeater-head">
             <div>
               <h3>Strona glowna</h3>
-              <p class="helper">Wlasciciel, personel i opinie.</p>
+              <p class="helper">Blokady podstron i przelaczniki rezerwacji.</p>
             </div>
           </div>
-          <div class="stack" style="margin-bottom: 1rem;">
-            <p class="helper" style="margin: 0 0 0.5rem;">Kafelki na stronie startowej (wyszarzenie, brak wejscia na podstrone)</p>
-            <label class="field-full" style="display: flex; align-items: flex-start; gap: 0.6rem;">
-              <input type="checkbox" id="section-block-hotel" ${content.home.sectionBlocks?.hotel ? "checked" : ""} style="margin-top: 0.2rem;" />
-              <span>Zablokuj Hotel (przekierowanie z adresu /Hotel/)</span>
+          <div class="admin-toggle-group" style="margin-bottom: 1rem;">
+            <p class="helper">Kafelki na stronie startowej i wejscie na podstrony.</p>
+            <label class="checkbox-field">
+              <input type="checkbox" id="section-block-hotel" ${content.home.sectionBlocks?.hotel ? "checked" : ""} />
+              <span class="checkbox-copy">
+                <strong>Zablokuj Hotel</strong>
+                <span>Wyszarza kafelek i blokuje wejscie na `/Hotel/`.</span>
+              </span>
             </label>
-            <label class="field-full" style="display: flex; align-items: flex-start; gap: 0.6rem;">
-              <input type="checkbox" id="section-block-restaurant" ${content.home.sectionBlocks?.restaurant ? "checked" : ""} style="margin-top: 0.2rem;" />
-              <span>Zablokuj Restauracje (przekierowanie z /Restauracja/)</span>
+            <label class="checkbox-field">
+              <input type="checkbox" id="section-block-restaurant" ${content.home.sectionBlocks?.restaurant ? "checked" : ""} />
+              <span class="checkbox-copy">
+                <strong>Zablokuj Restauracje</strong>
+                <span>Wyszarza kafelek i blokuje wejscie na `/Restauracja/`.</span>
+              </span>
             </label>
-            <label class="field-full" style="display: flex; align-items: flex-start; gap: 0.6rem;">
-              <input type="checkbox" id="section-block-events" ${content.home.sectionBlocks?.events ? "checked" : ""} style="margin-top: 0.2rem;" />
-              <span>Zablokuj Przyjecia (przekierowanie z /Przyjec/)</span>
+            <label class="checkbox-field">
+              <input type="checkbox" id="section-block-events" ${content.home.sectionBlocks?.events ? "checked" : ""} />
+              <span class="checkbox-copy">
+                <strong>Zablokuj Przyjecia</strong>
+                <span>Wyszarza kafelek i blokuje wejscie na `/Przyjec/`.</span>
+              </span>
             </label>
           </div>
-          <div class="stack" style="margin-bottom: 1rem; padding-top: 0.75rem; border-top: 1px solid rgba(200, 170, 120, 0.25);">
-            <p class="helper" style="margin: 0 0 0.5rem;">Rezerwacje online (formularze na stronach — bez blokady podstron)</p>
+          <div class="admin-toggle-group" style="margin-bottom: 1rem; padding-top: 0.75rem; border-top: 1px solid rgba(200, 170, 120, 0.25);">
+            <p class="helper">Rezerwacje online na stronach publicznych.</p>
             ${onlineBookingsEnabled
               ? ""
-              : '<p class="helper" style="margin: 0 0 0.75rem;">W tej konfiguracji rezerwacje online sa celowo wylaczone. Strona korzysta z Cloudflare Worker i Firebase Auth, bez Firebase Functions.</p>'}
-            <label class="field-full" style="display: flex; align-items: flex-start; gap: 0.6rem;">
-              <input type="checkbox" id="booking-enable-restaurant" ${content.booking?.restaurant !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} style="margin-top: 0.2rem;" />
-              <span>Restauracja — rezerwacja stolika wlaczona</span>
+              : '<p class="helper">W tej konfiguracji rezerwacje online sa celowo wylaczone. Strona korzysta z Cloudflare Worker i Firebase Auth, bez Firebase Functions.</p>'}
+            <label class="checkbox-field">
+              <input type="checkbox" id="booking-enable-restaurant" ${content.booking?.restaurant !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} />
+              <span class="checkbox-copy">
+                <strong>Restauracja</strong>
+                <span>Wlacza formularz rezerwacji stolika.</span>
+              </span>
             </label>
-            <label class="field-full" style="display: flex; align-items: flex-start; gap: 0.6rem;">
-              <input type="checkbox" id="booking-enable-hotel" ${content.booking?.hotel !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} style="margin-top: 0.2rem;" />
-              <span>Hotel — rezerwacja pokoi wlaczona</span>
+            <label class="checkbox-field">
+              <input type="checkbox" id="booking-enable-hotel" ${content.booking?.hotel !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} />
+              <span class="checkbox-copy">
+                <strong>Hotel</strong>
+                <span>Wlacza formularz rezerwacji pokoi.</span>
+              </span>
             </label>
-            <label class="field-full" style="display: flex; align-items: flex-start; gap: 0.6rem;">
-              <input type="checkbox" id="booking-enable-events" ${content.booking?.events !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} style="margin-top: 0.2rem;" />
-              <span>Przyjecia / sale — rezerwacja sal wlaczona</span>
+            <label class="checkbox-field">
+              <input type="checkbox" id="booking-enable-events" ${content.booking?.events !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} />
+              <span class="checkbox-copy">
+                <strong>Przyjecia / sale</strong>
+                <span>Wlacza formularz zapytania o sale i rezerwacje.</span>
+              </span>
             </label>
             <p class="helper" style="margin: 0.75rem 0 0.35rem;">Tymczasowe wstrzymanie rezerwacji (dni wlacznie; puste pola = brak przerwy)</p>
             <div class="field-grid">
@@ -500,6 +518,9 @@
               <label class="field"><span>Przyjecia / sale — od</span><input type="date" id="booking-events-pause-from" value="${escapeAttribute(content.booking?.eventsPauseFrom || "")}" ${onlineBookingsEnabled ? "" : "disabled"} /></label>
               <label class="field"><span>do</span><input type="date" id="booking-events-pause-to" value="${escapeAttribute(content.booking?.eventsPauseTo || "")}" ${onlineBookingsEnabled ? "" : "disabled"} /></label>
             </div>
+          </div>
+          <div class="panel-note">
+            <strong>Uwaga:</strong> czesc pol tresci nizej pochodzi ze starszej wersji panelu. Aktualny front korzysta glownie z blokad sekcji, rezerwacji online, godzin otwarcia, menu, galerii, dokumentow, kalendarza i modala „Oferta”.
           </div>
           <div class="field-grid">
             <label class="field-full"><span>Opis sekcji</span><textarea id="home-about-text">${escapeHtml(content.home.aboutText)}</textarea></label>

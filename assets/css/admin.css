@@ -222,10 +222,10 @@ a {
   grid-column: 1 / -1;
 }
 
-.field input,
+.field input:not([type="checkbox"]):not([type="radio"]),
 .field textarea,
 .field select,
-.field-full input,
+.field-full input:not([type="checkbox"]):not([type="radio"]),
 .field-full select,
 .field-full textarea {
   width: 100%;
@@ -246,6 +246,18 @@ a {
   color: var(--muted);
   font-size: 0.94rem;
   margin: 0;
+}
+
+.panel-note {
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(200, 170, 120, 0.22);
+  border-radius: 16px;
+  background: rgba(248, 244, 236, 0.86);
+  color: #5a4230;
+}
+
+.panel-note strong {
+  color: #38271c;
 }
 
 .section-intro {
@@ -336,6 +348,47 @@ a {
 
 .admin-topbar .inline-actions {
   justify-content: flex-end;
+}
+
+.admin-toggle-group {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(200, 170, 120, 0.22);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+}
+
+.checkbox-field input[type="checkbox"],
+.checkbox-field input[type="radio"] {
+  flex: 0 0 auto;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin: 0.15rem 0 0;
+  accent-color: #8b6530;
+}
+
+.checkbox-copy {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.checkbox-copy strong {
+  font-size: 1rem;
+}
+
+.checkbox-copy span:last-child {
+  color: var(--muted);
+  font-size: 0.94rem;
 }
 
 .empty {
@@ -550,6 +603,24 @@ a {
 .hotel-template-card .button,
 .hotel-subpanel .button {
   justify-self: start;
+}
+
+.legacy-group {
+  border: 1px solid rgba(200, 170, 120, 0.24);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 0.3rem 1rem 1rem;
+}
+
+.legacy-group summary {
+  cursor: pointer;
+  padding: 0.8rem 0;
+  font-weight: 700;
+  color: #4d3728;
+}
+
+.legacy-group[open] summary {
+  margin-bottom: 0.5rem;
 }
 
 @media (max-width: 980px) {
