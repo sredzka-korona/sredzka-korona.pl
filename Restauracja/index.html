@@ -1155,7 +1155,7 @@
         }
 
         .restaurant-content {
-          padding: calc(var(--nav-height) + 1rem) 1rem 1rem;
+          padding: calc(var(--nav-height) + 1rem) 1rem calc(6rem + env(safe-area-inset-bottom, 0px));
         }
 
         .restaurant-title {
@@ -1179,7 +1179,9 @@
 
         .floating-contact-button {
           right: 1rem !important;
-          bottom: 1rem !important;
+          bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
+          width: 56px;
+          height: 56px;
         }
 
         .menu-categories {
@@ -1252,6 +1254,11 @@
         .modal-body {
           padding: 1rem;
           max-height: calc(100vh - 2rem);
+        }
+
+        .reservation-info {
+          margin-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+          padding: 1.2rem;
         }
         
         .menu-container {

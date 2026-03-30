@@ -242,9 +242,9 @@ window.SREDZKA_DEFAULT_CONTENT = {
 <p>Zapraszamy do kontaktu w celu omówienia szczegółów i przygotowania indywidualnej wyceny dla Twojego wydarzenia.</p>`,
   },
   booking: {
-    restaurant: true,
-    hotel: true,
-    events: true,
+    restaurant: false,
+    hotel: false,
+    events: false,
     restaurantPauseFrom: "",
     restaurantPauseTo: "",
     hotelPauseFrom: "",

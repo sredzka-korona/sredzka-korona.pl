@@ -1186,11 +1186,17 @@
         const status = document.querySelector("#form-status");
         const submitBtn = document.querySelector("#submit-btn");
         
-        // Konfiguracja - można załadować z config.js
-        const config = window.SREDZKA_CONFIG || {
-          turnstileSiteKey: "",
-          apiBase: "",
-        };
+        const hostname =
+          window.location.hostname;
+        const isLocalPreview =
+          window.location.protocol === "file:" || hostname === "127.0.0.1" || hostname === "localhost";
+        const isGithubPages = hostname.endsWith("github.io");
+        const config = window.SREDZKA_CONFIG || {};
+        const apiBase = config.apiBase
+          ? String(config.apiBase).replace(/\/$/, "")
+          : !isLocalPreview && hostname && !isGithubPages
+            ? "https://api." + hostname.replace(/^www\./, "")
+            : "";
 
         // Obsługa scrollowania nav
         const handleScroll = () => {
@@ -1321,57 +1327,29 @@
           }
 
           try {
-            // Jeśli jest skonfigurowane API, użyj go
-            if (config.apiBase) {
-              const response = await fetch(config.apiBase + "/api/public/contact", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-              });
+            if (!apiBase) {
+              throw new Error("Brak konfiguracji API. Ustaw apiBase na adres Workera Cloudflare.");
+            }
+            const response = await fetch(apiBase + "/api/public/contact", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
 
-              if (!response.ok) {
-                throw new Error("Nie udało się wysłać formularza.");
-              }
+            if (!response.ok) {
+              throw new Error("Nie udało się wysłać formularza.");
+            }
 
-              form.reset();
-              // Reset wyboru tematu
-              topicButtons.forEach(btn => btn.classList.remove("selected"));
-              topicInput.value = "";
-              topicSelection.classList.remove("error");
-              
-              status.textContent = "Dziękujemy! Wiadomość została wysłana.";
-              status.className = "form-status success";
-              status.style.display = "block";
-              
-              // Reset Turnstile
-              if (window.turnstile) {
-                window.turnstile.reset();
-              }
-            } else {
-              // Fallback: wyślij do forms.un-static.com
-              const response = await fetch(form.action, {
-                method: "POST",
-                body: formData,
-              });
+            form.reset();
+            topicButtons.forEach(btn => btn.classList.remove("selected"));
+            topicInput.value = "";
+            topicSelection.classList.remove("error");
+            status.textContent = "Dziękujemy! Wiadomość została wysłana.";
+            status.className = "form-status success";
+            status.style.display = "block";
 
-              if (!response.ok) {
-                throw new Error("Nie udało się wysłać formularza.");
-              }
-
-              form.reset();
-              // Reset wyboru tematu
-              topicButtons.forEach(btn => btn.classList.remove("selected"));
-              topicInput.value = "";
-              topicSelection.classList.remove("error");
-              
-              status.textContent = "Dziękujemy! Wiadomość została wysłana.";
-              status.className = "form-status success";
-              status.style.display = "block";
-              
-              // Reset Turnstile
-              if (window.turnstile) {
-                window.turnstile.reset();
-              }
+            if (window.turnstile) {
+              window.turnstile.reset();
             }
           } catch (error) {
             status.textContent = error.message || "Wystąpił błąd podczas wysyłania formularza. Spróbuj ponownie.";

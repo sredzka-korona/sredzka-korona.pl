@@ -247,9 +247,9 @@ export const DEFAULT_CONTENT = {
   },
   /** Rezerwacje online: false = komunikat „wstrzymane” zamiast formularza */
   booking: {
-    restaurant: true,
-    hotel: true,
-    events: true,
+    restaurant: false,
+    hotel: false,
+    events: false,
     restaurantPauseFrom: "",
     restaurantPauseTo: "",
     hotelPauseFrom: "",

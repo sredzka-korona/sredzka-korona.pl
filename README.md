@@ -1,6 +1,6 @@
 # Sredzka Korona
 
-Statyczny frontend typu one-page pod GitHub Pages oraz backend i storage pod Cloudflare Workers + D1 + R2.
+Statyczny frontend pod GitHub Pages oraz panel/API pod Cloudflare Worker + D1 + R2. Logowanie administratora dziala przez Firebase Authentication bez potrzeby wdrazania Firebase Functions.
 
 ## Najwazniejsze katalogi
 
@@ -10,6 +10,7 @@ Statyczny frontend typu one-page pod GitHub Pages oraz backend i storage pod Clo
 - [assets/js](/Users/janicki/myApps/Sredzka-Korona/assets/js) - frontend i panel
 - [worker](/Users/janicki/myApps/Sredzka-Korona/worker) - API Cloudflare
 - [WDROZENIE-CLOUDFLARE-GITHUB.md](/Users/janicki/myApps/Sredzka-Korona/WDROZENIE-CLOUDFLARE-GITHUB.md) - instrukcja wdrozenia
+- [WDROZENIE-BEZ-KARTY.md](/Users/janicki/myApps/sredzka-korona.pl/WDROZENIE-BEZ-KARTY.md) - wariant GitHub Pages + Cloudflare Free + Firebase Auth
 
 ## Test lokalny
 
@@ -32,5 +33,10 @@ W tym trybie publiczna strona dziala na lokalnych danych startowych. Formularz k
 ## Panel administratora (Firebase)
 
 Logowanie do panelu odbywa sie przez **Firebase Authentication** (e-mail i haslo). Konto tworzysz w konsoli Firebase; Worker weryfikuje token i sprawdza, czy adres e-mail jest na liscie `FIREBASE_ADMIN_EMAILS` w Cloudflare.
+
+Domyslna konfiguracja w repo jest ustawiona pod wariant bez karty klienta:
+- publiczna strona i kontakt dzialaja przez Cloudflare Worker,
+- panel admina dziala przez Cloudflare Worker + Firebase Auth,
+- rezerwacje online hotel/restauracja/sale sa domyslnie wylaczone.
 
 Szczegoly konfiguracji: [WDROZENIE-CLOUDFLARE-GITHUB.md](WDROZENIE-CLOUDFLARE-GITHUB.md).

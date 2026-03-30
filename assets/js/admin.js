@@ -5,6 +5,7 @@
   const isLocalPreview =
     window.location.protocol === "file:" || hostname === "127.0.0.1" || hostname === "localhost";
   const isGithubPages = hostname.endsWith("github.io");
+  const onlineBookingsEnabled = config.enableOnlineBookings === true;
   const fallbackApiBase = isLocalPreview
     ? ""
     : hostname && !isGithubPages
@@ -243,9 +244,12 @@
         </header>
         <nav class="admin-main-tabs" aria-label="Moduły panelu">
           <button type="button" class="button" id="admin-tab-btn-content">Treści, galeria, dokumenty</button>
+          ${onlineBookingsEnabled
+            ? `
           <button type="button" class="button secondary" id="admin-tab-btn-hotel">Hotel — rezerwacje</button>
           <button type="button" class="button secondary" id="admin-tab-btn-restaurant">Restauracja</button>
-          <button type="button" class="button secondary" id="admin-tab-btn-hall">Sale</button>
+          <button type="button" class="button secondary" id="admin-tab-btn-hall">Sale</button>`
+            : ""}
         </nav>
         <div id="admin-panel-main">
         <div class="grid">
@@ -376,26 +380,29 @@
           </div>
           <div class="stack" style="margin-bottom: 1rem; padding-top: 0.75rem; border-top: 1px solid rgba(200, 170, 120, 0.25);">
             <p class="helper" style="margin: 0 0 0.5rem;">Rezerwacje online (formularze na stronach — bez blokady podstron)</p>
+            ${onlineBookingsEnabled
+              ? ""
+              : '<p class="helper" style="margin: 0 0 0.75rem;">W tej konfiguracji rezerwacje online sa celowo wylaczone. Strona korzysta z Cloudflare Worker i Firebase Auth, bez Firebase Functions.</p>'}
             <label class="field-full" style="display: flex; align-items: flex-start; gap: 0.6rem;">
-              <input type="checkbox" id="booking-enable-restaurant" ${content.booking?.restaurant !== false ? "checked" : ""} style="margin-top: 0.2rem;" />
+              <input type="checkbox" id="booking-enable-restaurant" ${content.booking?.restaurant !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} style="margin-top: 0.2rem;" />
               <span>Restauracja — rezerwacja stolika wlaczona</span>
             </label>
             <label class="field-full" style="display: flex; align-items: flex-start; gap: 0.6rem;">
-              <input type="checkbox" id="booking-enable-hotel" ${content.booking?.hotel !== false ? "checked" : ""} style="margin-top: 0.2rem;" />
+              <input type="checkbox" id="booking-enable-hotel" ${content.booking?.hotel !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} style="margin-top: 0.2rem;" />
               <span>Hotel — rezerwacja pokoi wlaczona</span>
             </label>
             <label class="field-full" style="display: flex; align-items: flex-start; gap: 0.6rem;">
-              <input type="checkbox" id="booking-enable-events" ${content.booking?.events !== false ? "checked" : ""} style="margin-top: 0.2rem;" />
+              <input type="checkbox" id="booking-enable-events" ${content.booking?.events !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} style="margin-top: 0.2rem;" />
               <span>Przyjecia / sale — rezerwacja sal wlaczona</span>
             </label>
             <p class="helper" style="margin: 0.75rem 0 0.35rem;">Tymczasowe wstrzymanie rezerwacji (dni wlacznie; puste pola = brak przerwy)</p>
             <div class="field-grid">
-              <label class="field"><span>Restauracja — od</span><input type="date" id="booking-restaurant-pause-from" value="${escapeAttribute(content.booking?.restaurantPauseFrom || "")}" /></label>
-              <label class="field"><span>do</span><input type="date" id="booking-restaurant-pause-to" value="${escapeAttribute(content.booking?.restaurantPauseTo || "")}" /></label>
-              <label class="field"><span>Hotel — od</span><input type="date" id="booking-hotel-pause-from" value="${escapeAttribute(content.booking?.hotelPauseFrom || "")}" /></label>
-              <label class="field"><span>do</span><input type="date" id="booking-hotel-pause-to" value="${escapeAttribute(content.booking?.hotelPauseTo || "")}" /></label>
-              <label class="field"><span>Przyjecia / sale — od</span><input type="date" id="booking-events-pause-from" value="${escapeAttribute(content.booking?.eventsPauseFrom || "")}" /></label>
-              <label class="field"><span>do</span><input type="date" id="booking-events-pause-to" value="${escapeAttribute(content.booking?.eventsPauseTo || "")}" /></label>
+              <label class="field"><span>Restauracja — od</span><input type="date" id="booking-restaurant-pause-from" value="${escapeAttribute(content.booking?.restaurantPauseFrom || "")}" ${onlineBookingsEnabled ? "" : "disabled"} /></label>
+              <label class="field"><span>do</span><input type="date" id="booking-restaurant-pause-to" value="${escapeAttribute(content.booking?.restaurantPauseTo || "")}" ${onlineBookingsEnabled ? "" : "disabled"} /></label>
+              <label class="field"><span>Hotel — od</span><input type="date" id="booking-hotel-pause-from" value="${escapeAttribute(content.booking?.hotelPauseFrom || "")}" ${onlineBookingsEnabled ? "" : "disabled"} /></label>
+              <label class="field"><span>do</span><input type="date" id="booking-hotel-pause-to" value="${escapeAttribute(content.booking?.hotelPauseTo || "")}" ${onlineBookingsEnabled ? "" : "disabled"} /></label>
+              <label class="field"><span>Przyjecia / sale — od</span><input type="date" id="booking-events-pause-from" value="${escapeAttribute(content.booking?.eventsPauseFrom || "")}" ${onlineBookingsEnabled ? "" : "disabled"} /></label>
+              <label class="field"><span>do</span><input type="date" id="booking-events-pause-to" value="${escapeAttribute(content.booking?.eventsPauseTo || "")}" ${onlineBookingsEnabled ? "" : "disabled"} /></label>
             </div>
           </div>
           <div class="field-grid">
@@ -697,9 +704,15 @@
     const br = document.querySelector("#booking-enable-restaurant");
     const bh = document.querySelector("#booking-enable-hotel");
     const be = document.querySelector("#booking-enable-events");
-    content.booking.restaurant = br ? br.checked : content.booking.restaurant !== false;
-    content.booking.hotel = bh ? bh.checked : content.booking.hotel !== false;
-    content.booking.events = be ? be.checked : content.booking.events !== false;
+    if (onlineBookingsEnabled) {
+      content.booking.restaurant = br ? br.checked : content.booking.restaurant !== false;
+      content.booking.hotel = bh ? bh.checked : content.booking.hotel !== false;
+      content.booking.events = be ? be.checked : content.booking.events !== false;
+    } else {
+      content.booking.restaurant = false;
+      content.booking.hotel = false;
+      content.booking.events = false;
+    }
 
     function normalizePausePair(fromId, toId) {
       let f = document.querySelector(fromId)?.value?.trim() || "";
@@ -714,12 +727,12 @@
     const pr = normalizePausePair("#booking-restaurant-pause-from", "#booking-restaurant-pause-to");
     const ph = normalizePausePair("#booking-hotel-pause-from", "#booking-hotel-pause-to");
     const pe = normalizePausePair("#booking-events-pause-from", "#booking-events-pause-to");
-    content.booking.restaurantPauseFrom = pr.from;
-    content.booking.restaurantPauseTo = pr.to;
-    content.booking.hotelPauseFrom = ph.from;
-    content.booking.hotelPauseTo = ph.to;
-    content.booking.eventsPauseFrom = pe.from;
-    content.booking.eventsPauseTo = pe.to;
+    content.booking.restaurantPauseFrom = onlineBookingsEnabled ? pr.from : "";
+    content.booking.restaurantPauseTo = onlineBookingsEnabled ? pr.to : "";
+    content.booking.hotelPauseFrom = onlineBookingsEnabled ? ph.from : "";
+    content.booking.hotelPauseTo = onlineBookingsEnabled ? ph.to : "";
+    content.booking.eventsPauseFrom = onlineBookingsEnabled ? pe.from : "";
+    content.booking.eventsPauseTo = onlineBookingsEnabled ? pe.to : "";
 
     content.home.staff = Array.from(document.querySelectorAll("[data-staff-index]"))
       .map((element) => element.value.trim())

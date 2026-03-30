@@ -1,12 +1,15 @@
 /**
  * Ustawienia rezerwacji online z Worker API (/api/public/bootstrap).
- * Bez apiBase / poza domeną — domyślnie wszystkie moduły włączone (np. lokalny podgląd).
+ * Bez włączonego backendu rezerwacji wszystkie moduły są wyłączone.
  */
 (function () {
-  const DEFAULTS = { restaurant: true, hotel: true, events: true };
+  const DEFAULTS = { restaurant: false, hotel: false, events: false };
 
   function publicApiBase() {
     const cfg = window.SREDZKA_CONFIG || {};
+    if (cfg.enableOnlineBookings !== true) {
+      return "";
+    }
     if (cfg.apiBase) {
       return String(cfg.apiBase).replace(/\/$/, "");
     }
@@ -59,6 +62,10 @@
   }
 
   window.SREDZKA_fetchBookingSettings = async function fetchBookingSettings() {
+    const cfg = window.SREDZKA_CONFIG || {};
+    if (cfg.enableOnlineBookings !== true) {
+      return { ...DEFAULTS };
+    }
     const base = publicApiBase();
     if (!base) {
       return { ...DEFAULTS };

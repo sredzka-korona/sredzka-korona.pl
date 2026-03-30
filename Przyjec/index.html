@@ -2171,7 +2171,7 @@
         }
 
         .events-content {
-          padding: calc(var(--nav-height) + 1rem) 1rem 1rem;
+          padding: calc(var(--nav-height) + 1rem) 1rem calc(6rem + env(safe-area-inset-bottom, 0px));
         }
 
         .events-title {
@@ -2216,9 +2216,16 @@
           font-size: clamp(1.5rem, 4vw, 2rem);
         }
 
+        .reservation-info {
+          margin-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+          padding: 1.2rem;
+        }
+
         .floating-contact-button {
           right: 1rem !important;
-          bottom: 1rem !important;
+          bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
+          width: 56px;
+          height: 56px;
         }
 
         .calendar-controls {
