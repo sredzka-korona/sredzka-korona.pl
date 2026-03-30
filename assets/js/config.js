@@ -11,9 +11,9 @@ window.SREDZKA_CONFIG = {
   enableOnlineBookings: false,
   turnstileSiteKey: "",
   /** Konfiguracja Firebase Authentication (panel admina) — z konsoli Firebase: Project settings */
-  firebaseApiKey: "",
-  firebaseAuthDomain: "",
-  firebaseProjectId: "",
+  firebaseApiKey: "AIzaSyDvKjj2Lu_aGBFIOId5KU4rONguQMj2sxc",
+  firebaseAuthDomain: "sredzka-korona.firebaseapp.com",
+  firebaseProjectId: "sredzka-korona",
   /**
    * Pełny URL funkcji hotelApi (Cloud Functions). Jeśli pusty, budowany jest z firebaseProjectId:
    * https://europe-west1-PROJECT_ID.cloudfunctions.net/hotelApi

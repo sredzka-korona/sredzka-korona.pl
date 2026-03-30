@@ -7,19 +7,12 @@
     {
       "binding": "DB",
       "database_name": "sredzka-korona",
-      "database_id": "WKLEJ_TUTAJ_DATABASE_ID"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "MEDIA_BUCKET",
-      "bucket_name": "sredzka-korona-media"
+      "database_id": "1ecf0dda-088f-44f0-90a7-64b54325a4d7"
     }
   ],
   "vars": {
     "ALLOWED_ORIGIN": "https://twoja-domena.pl",
-    "FIREBASE_PROJECT_ID": "twoj-projekt-firebase",
+    "FIREBASE_PROJECT_ID": "sredzka-korona",
     "FIREBASE_ADMIN_EMAILS": "admin@twoja-domena.pl"
   }
 }
-

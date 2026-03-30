@@ -62,6 +62,9 @@ export default {
             galleryAlbums,
             calendarBlocks,
             submissions: submissions.results || [],
+            capabilities: {
+              mediaStorageEnabled: hasMediaStorage(env),
+            },
           },
           200,
           request,
@@ -173,6 +176,9 @@ async function getPublicBootstrap(env, url) {
     content,
     documents: await listDocuments(env, url),
     galleryAlbums: await listGalleryAlbums(env, url),
+    capabilities: {
+      mediaStorageEnabled: hasMediaStorage(env),
+    },
   };
 }
 
@@ -196,6 +202,9 @@ async function saveContent(env, content) {
 }
 
 async function listDocuments(env, url) {
+  if (!hasMediaStorage(env)) {
+    return [];
+  }
   const result = await env.DB.prepare(
     "SELECT id, title, description, mime_type AS mimeType, file_name AS fileName FROM documents ORDER BY created_at DESC"
   ).all();
@@ -212,6 +221,9 @@ async function listDocuments(env, url) {
 }
 
 async function listGalleryAlbums(env, url) {
+  if (!hasMediaStorage(env)) {
+    return [];
+  }
   const albumResult = await env.DB.prepare(
     "SELECT id, slug, title, description, cover_image_id AS coverImageId FROM gallery_albums ORDER BY created_at DESC"
   ).all();
@@ -333,6 +345,7 @@ async function requireFirebaseAdmin(request, env) {
 }
 
 async function uploadGalleryImages(albumId, request, env) {
+  requireMediaStorage(env);
   const album = await env.DB.prepare(
     "SELECT id, slug, cover_image_id AS coverImageId FROM gallery_albums WHERE id = ?"
   )
@@ -371,6 +384,7 @@ async function uploadGalleryImages(albumId, request, env) {
 }
 
 async function setAlbumCover(imageId, env) {
+  requireMediaStorage(env);
   const image = await env.DB.prepare(
     "SELECT id, album_id AS albumId FROM gallery_images WHERE id = ?"
   )
@@ -385,6 +399,7 @@ async function setAlbumCover(imageId, env) {
 }
 
 async function deleteGalleryImage(imageId, env) {
+  requireMediaStorage(env);
   const image = await env.DB.prepare(
     "SELECT id, album_id AS albumId, object_key AS objectKey FROM gallery_images WHERE id = ?"
   )
@@ -406,6 +421,7 @@ async function deleteGalleryImage(imageId, env) {
 }
 
 async function uploadDocument(request, env) {
+  requireMediaStorage(env);
   const formData = await request.formData();
   const title = String(formData.get("title") || "").trim();
   const description = String(formData.get("description") || "").trim();
@@ -434,6 +450,7 @@ async function uploadDocument(request, env) {
 }
 
 async function deleteDocument(documentId, env) {
+  requireMediaStorage(env);
   const documentEntry = await env.DB.prepare(
     "SELECT object_key AS objectKey FROM documents WHERE id = ?"
   )
@@ -471,6 +488,9 @@ async function createCalendarBlock(payload, env) {
 }
 
 async function streamGalleryImage(imageId, env, request) {
+  if (!hasMediaStorage(env)) {
+    return jsonResponse({ error: "Magazyn mediow nie jest wlaczony." }, 503, request, env);
+  }
   const image = await env.DB.prepare(
     "SELECT object_key AS objectKey, mime_type AS mimeType FROM gallery_images WHERE id = ?"
   )
@@ -487,6 +507,9 @@ async function streamGalleryImage(imageId, env, request) {
 }
 
 async function streamDocument(documentId, download, env, request) {
+  if (!hasMediaStorage(env)) {
+    return jsonResponse({ error: "Magazyn mediow nie jest wlaczony." }, 503, request, env);
+  }
   const documentEntry = await env.DB.prepare(
     "SELECT object_key AS objectKey, mime_type AS mimeType, file_name AS fileName FROM documents WHERE id = ?"
   )
@@ -575,6 +598,16 @@ function sanitizeContent(content) {
       eventsPauseTo,
     },
   };
+}
+
+function hasMediaStorage(env) {
+  return Boolean(env.MEDIA_BUCKET && typeof env.MEDIA_BUCKET.get === "function");
+}
+
+function requireMediaStorage(env) {
+  if (!hasMediaStorage(env)) {
+    throw badRequest("Uploady galerii i dokumentow sa wylaczone, bo magazyn mediow nie jest skonfigurowany.");
+  }
 }
 
 function jsonResponse(data, status, request, env, extraHeaders = {}) {

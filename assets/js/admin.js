@@ -20,6 +20,9 @@
     galleryAlbums: [],
     calendarBlocks: [],
     submissions: [],
+    capabilities: {
+      mediaStorageEnabled: false,
+    },
   };
   const missingApiConfiguration = !state.apiBase && isGithubPages;
 
@@ -940,19 +943,21 @@
 
   function renderGalleryPanel(statusMessage = "") {
     const panel = document.querySelector("#gallery-panel");
+    const mediaEnabled = state.capabilities?.mediaStorageEnabled === true;
     panel.innerHTML = `
       <p class="pill">Galeria</p>
       <h2>Albumy i zdjecia</h2>
       <p class="section-intro">Dodaj album, potem wgraj zdjecia i ustaw okladke widoczna na stronie.</p>
+      ${mediaEnabled ? "" : '<p class="status">Upload galerii jest obecnie wylaczony, bo Cloudflare R2 nie jest skonfigurowane.</p>'}
       <div class="grid">
         <div class="col-4">
           <div class="repeater-item">
             <h3>Nowy album</h3>
             <form id="album-form" class="stack">
-              <label class="field-full"><span>Tytul</span><input name="title" required /></label>
-              <label class="field-full"><span>Slug</span><input name="slug" placeholder="np-wesele-anna-piotr" required /></label>
-              <label class="field-full"><span>Opis</span><textarea name="description"></textarea></label>
-              <button class="button" type="submit">Dodaj album</button>
+              <label class="field-full"><span>Tytul</span><input name="title" required ${mediaEnabled ? "" : "disabled"} /></label>
+              <label class="field-full"><span>Slug</span><input name="slug" placeholder="np-wesele-anna-piotr" required ${mediaEnabled ? "" : "disabled"} /></label>
+              <label class="field-full"><span>Opis</span><textarea name="description" ${mediaEnabled ? "" : "disabled"}></textarea></label>
+              <button class="button" type="submit" ${mediaEnabled ? "" : "disabled"}>Dodaj album</button>
               <p class="status">${escapeHtml(statusMessage)}</p>
             </form>
           </div>
@@ -975,9 +980,9 @@
                           <form class="stack" data-upload-album="${album.id}">
                             <label class="field-full">
                               <span>Dodaj zdjecia do albumu</span>
-                              <input type="file" name="images" accept="image/*" multiple />
+                              <input type="file" name="images" accept="image/*" multiple ${mediaEnabled ? "" : "disabled"} />
                             </label>
-                            <button class="button secondary" type="submit">Wgraj zdjecia</button>
+                            <button class="button secondary" type="submit" ${mediaEnabled ? "" : "disabled"}>Wgraj zdjecia</button>
                           </form>
                           <div class="thumb-grid">
                             ${
@@ -988,8 +993,8 @@
                                         <article class="thumb-card">
                                           <img src="${escapeAttribute(image.url)}" alt="${escapeAttribute(image.alt || album.title)}" />
                                           <div class="inline-actions">
-                                            <button class="button secondary" type="button" data-cover-image="${image.id}">Ustaw jako glowne</button>
-                                            <button class="button danger" type="button" data-delete-image="${image.id}">Usun</button>
+                                            <button class="button secondary" type="button" data-cover-image="${image.id}" ${mediaEnabled ? "" : "disabled"}>Ustaw jako glowne</button>
+                                            <button class="button danger" type="button" data-delete-image="${image.id}" ${mediaEnabled ? "" : "disabled"}>Usun</button>
                                           </div>
                                         </article>`
                                     )
@@ -2158,6 +2163,7 @@
   function renderDocumentsPanel(statusMessage = "") {
     const panel = document.querySelector("#documents-panel");
     const documentsMenu = state.content.documentsMenu || { title: "", intro: "", sections: [] };
+    const mediaEnabled = state.capabilities?.mediaStorageEnabled === true;
     panel.innerHTML = `
       <p class="pill">Dokumenty</p>
       <h2>Menu i pliki</h2>
@@ -2179,13 +2185,14 @@
             <button class="button" type="button" id="save-documents-menu">Zapisz menu</button>
           </div>
         </div>
+        ${mediaEnabled ? "" : '<p class="status">Upload plikow jest obecnie wylaczony, bo Cloudflare R2 nie jest skonfigurowane.</p>'}
         <form id="document-form" class="repeater-item">
           <div class="field-grid">
-            <label class="field"><span>Tytul</span><input name="title" required /></label>
-            <label class="field"><span>Plik</span><input name="file" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required /></label>
-            <label class="field-full"><span>Opis</span><textarea name="description"></textarea></label>
+            <label class="field"><span>Tytul</span><input name="title" required ${mediaEnabled ? "" : "disabled"} /></label>
+            <label class="field"><span>Plik</span><input name="file" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required ${mediaEnabled ? "" : "disabled"} /></label>
+            <label class="field-full"><span>Opis</span><textarea name="description" ${mediaEnabled ? "" : "disabled"}></textarea></label>
           </div>
-          <button class="button" type="submit">Wgraj dokument</button>
+          <button class="button" type="submit" ${mediaEnabled ? "" : "disabled"}>Wgraj dokument</button>
           <p class="status">${escapeHtml(statusMessage)}</p>
         </form>
         ${
@@ -2201,7 +2208,7 @@
                       <p>${escapeHtml(documentEntry.description || "")}</p>
                       <div class="inline-actions">
                         <a class="button secondary" href="${escapeAttribute(documentEntry.downloadUrl)}" target="_blank" rel="noreferrer">Sprawdz plik</a>
-                        <button class="button danger" type="button" data-delete-document="${documentEntry.id}">Usun</button>
+                        <button class="button danger" type="button" data-delete-document="${documentEntry.id}" ${mediaEnabled ? "" : "disabled"}>Usun</button>
                       </div>
                     </article>`
                 )
@@ -2419,6 +2426,7 @@
     state.galleryAlbums = data.galleryAlbums;
     state.calendarBlocks = data.calendarBlocks;
     state.submissions = data.submissions;
+    state.capabilities = data.capabilities || { mediaStorageEnabled: false };
     renderDashboard();
     if (message) {
       renderContentPanel(message);

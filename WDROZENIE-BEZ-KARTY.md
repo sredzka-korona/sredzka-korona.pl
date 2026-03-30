@@ -4,12 +4,18 @@ Wariant: `GitHub Pages + Cloudflare Free + Firebase Authentication`.
 
 Ten wariant nie uzywa Firebase Functions. Panel admina loguje sie przez Firebase Auth, a API publiczne i adminowe dziala na Cloudflare Worker.
 
-## Co dziala
+Repo jest teraz przygotowane do startu bez `R2`. To oznacza:
+
+- nie potrzebujesz karty, zeby uruchomic kontakt, panel, tresci i kalendarz,
+- upload galerii i dokumentow z panelu bedzie wylaczony,
+- jesli kiedys dodasz `R2`, uploady da sie wlaczyc bez duzej przebudowy.
+
+## Co dziala bez karty
 
 - strona publiczna na GitHub Pages,
 - panel admina,
 - edycja tresci,
-- galerie i dokumenty,
+- galerie i dokumenty jako sekcje panelu, ale bez uploadu plikow,
 - kalendarz,
 - formularz kontaktowy,
 - logowanie admina przez Firebase.
@@ -30,9 +36,9 @@ window.SREDZKA_CONFIG = {
   apiBase: "https://api.twoja-domena.pl",
   enableOnlineBookings: false,
   turnstileSiteKey: "WKLEJ_TUTAJ_SITE_KEY",
-  firebaseApiKey: "WKLEJ_Z_FIREBASE",
-  firebaseAuthDomain: "twoj-projekt.firebaseapp.com",
-  firebaseProjectId: "twoj-projekt",
+  firebaseApiKey: "AIzaSyDvKjj2Lu_aGBFIOId5KU4rONguQMj2sxc",
+  firebaseAuthDomain: "sredzka-korona.firebaseapp.com",
+  firebaseProjectId: "sredzka-korona",
   hotelApiBase: "",
   restaurantApiBase: "",
   hallApiBase: "",
@@ -67,7 +73,7 @@ window.SREDZKA_CONFIG = {
     - `projectId`
 18. Wklej te wartosci do `assets/js/config.js`.
 
-## 2. Cloudflare - API, baza i pliki
+## 2. Cloudflare - API i baza
 
 1. Wejdz do [Cloudflare Dashboard](https://dash.cloudflare.com/).
 2. Dodaj domene do Cloudflare i wybierz plan `Free`.
@@ -78,14 +84,11 @@ window.SREDZKA_CONFIG = {
 7. Otworz `worker/wrangler.jsonc` i wklej `database_id`.
 8. W D1 otworz zakladke SQL.
 9. Uruchom SQL z pliku `worker/schema.sql`.
-10. Wroc do `Storage & Databases` -> `R2`.
-11. Kliknij `Create bucket`.
-12. Nazwij bucket `sredzka-korona-media`.
-13. Wejdz do `Turnstile`.
-14. Kliknij `Add site`.
-15. Dodaj domene strony.
-16. Skopiuj `site key` i `secret key`.
-17. `site key` wklej do `assets/js/config.js` jako `turnstileSiteKey`.
+10. Wejdz do `Turnstile`.
+11. Kliknij `Add site`.
+12. Dodaj domene strony.
+13. Skopiuj `site key` i `secret key`.
+14. `site key` wklej do `assets/js/config.js` jako `turnstileSiteKey`.
 
 ## 3. Cloudflare - Worker
 
@@ -93,12 +96,11 @@ window.SREDZKA_CONFIG = {
 2. Kliknij `Create`.
 3. Wybierz `Import a repository` albo utworz pustego Workera i podmien pliki z katalogu `worker/`.
 4. Ustaw `root directory` na `worker`, jesli importujesz repo.
-5. W ustawieniach Workera dodaj bindings:
+5. W ustawieniach Workera dodaj binding:
     - `D1 database binding`: `DB`
-    - `R2 bucket binding`: `MEDIA_BUCKET`
 6. Dodaj `Variables`:
     - `ALLOWED_ORIGIN=https://twoja-domena.pl`
-    - `FIREBASE_PROJECT_ID=twoj-projekt-firebase`
+    - `FIREBASE_PROJECT_ID=sredzka-korona`
     - `FIREBASE_ADMIN_EMAILS=twoj-admin@domena.pl`
 7. Dodaj `Secrets`:
     - `TURNSTILE_SECRET`
@@ -123,9 +125,17 @@ window.SREDZKA_CONFIG = {
 3. Sprawdz:
     - zapis tresci,
     - wysylke formularza kontaktowego,
-    - upload dokumentu,
-    - upload zdjec,
     - edycje kalendarza.
+
+## Kiedy bedzie potrzebne R2
+
+R2 jest potrzebne dopiero wtedy, gdy chcesz z panelu:
+
+- wgrywac dokumenty PDF/DOC/DOCX,
+- wgrywac galerie zdjec,
+- serwowac pliki binarne z bucketu.
+
+Jesli Cloudflare pokazuje ekran billingowy dla `R2`, po prostu pomin ten krok na razie.
 
 ## Uwaga
 
