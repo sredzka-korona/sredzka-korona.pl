@@ -1,0 +1,1406 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="canonical" href="https://www.sredzkakorona.pl/kontakt/" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../ikony/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../ikony/favicon-16x16.png" />
+    <link rel="shortcut icon" href="../favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../ikony/favicon-180x180.png" />
+    <link rel="manifest" href="../site.webmanifest" />
+    <meta name="theme-color" content="#fefcf9" />
+    <meta name="robots" content="index,follow" />
+    <meta name="geo.region" content="PL-DS" />
+    <meta name="geo.placename" content="Środa Śląska" />
+    <title>Sredzka Korona - Hotel | Restauracja | Imprezy</title>
+    <meta
+      name="description"
+      content="Kontakt do Średzkiej Korony w Środzie Śląskiej: telefon, e-mail, adres. Rezerwacje hotelu, restauracji i sal na imprezy okolicznościowe."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pl_PL" />
+    <meta property="og:url" content="https://www.sredzkakorona.pl/kontakt/" />
+    <meta property="og:title" content="Kontakt — Średzka Korona, Środa Śląska" />
+    <meta
+      property="og:description"
+      content="Adres, telefon i formularz kontaktowy — Średzka Korona, ul. Wrocławska 11, Środa Śląska."
+    />
+    <meta property="og:image" content="https://www.sredzkakorona.pl/ikony/logo-korona.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "ContactPage",
+            "@id": "https://www.sredzkakorona.pl/kontakt/#contactpage",
+            "url": "https://www.sredzkakorona.pl/kontakt/",
+            "name": "Kontakt — Średzka Korona",
+            "isPartOf": { "@id": "https://www.sredzkakorona.pl/#website" },
+            "mainEntity": { "@id": "https://www.sredzkakorona.pl/#organization" },
+            "inLanguage": "pl-PL"
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Strona główna",
+                "item": "https://www.sredzkakorona.pl/"
+              },
+              { "@type": "ListItem", "position": 2, "name": "Kontakt", "item": "https://www.sredzkakorona.pl/kontakt/" }
+            ]
+          }
+        ]
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="dns-prefetch" href="https://images.unsplash.com" />
+    <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
+    <style>
+      :root {
+        --bg: #fefcf9;
+        --bg-elevated: rgba(255, 255, 255, 0.98);
+        --bg-panel: rgba(250, 248, 245, 0.95);
+        --text: #1f1712;
+        --muted: #6b5d4f;
+        --gold-rgb: 200, 170, 120;
+        --gold: #c8aa78;
+        --gold-strong: #e8d8b8;
+        --line: rgba(200, 170, 120, 0.2);
+        --shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        --radius-xl: 28px;
+        --nav-height: 80px;
+        --content-width: min(1200px, calc(100vw - 4rem));
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        scrollbar-width: none;
+        overflow: hidden;
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        height: 100vh;
+        overflow: hidden;
+        font-family: "Manrope", sans-serif;
+        color: var(--text);
+        background: #fefcf9;
+      }
+
+      html::-webkit-scrollbar,
+      body::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+        display: none;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(36, 27, 20, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(184, 139, 47, 0.05) 1px, transparent 1px);
+        background-size: 70px 70px;
+        pointer-events: none;
+        mask-image: radial-gradient(circle at center, black 35%, transparent 90%);
+        z-index: 0;
+      }
+
+      img {
+        max-width: 100%;
+        display: block;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      .shell {
+        position: relative;
+        min-height: 100vh;
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .contact-background {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        background-image: url('https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1920&q=80');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+      }
+
+      .contact-background::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+      }
+
+      .contact-content {
+        position: relative;
+        z-index: 1;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        padding: calc(var(--nav-height) + 1rem) 1rem 1rem;
+        text-align: center;
+        color: white;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+        overflow-y: visible;
+        overflow-x: hidden;
+        width: 100%;
+        box-sizing: border-box;
+        min-height: 0;
+      }
+
+      .contact-title {
+        font-family: "Cormorant Garamond", serif;
+        font-size: clamp(2.5rem, 5vw, 4rem);
+        font-weight: 700;
+        margin: 0.5rem 0 1.5rem 0;
+        color: white;
+        text-align: center;
+        width: 100%;
+        flex-shrink: 0;
+      }
+
+      .contact-container {
+        max-width: 1200px;
+        width: 100%;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        align-items: stretch;
+        padding: 0 1rem;
+        box-sizing: border-box;
+        flex: 1;
+        min-height: 0;
+        overflow: visible;
+      }
+
+      .contact-info-section {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+
+      .contact-card {
+        padding: 1.5rem;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.3s ease;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow-y: visible;
+        min-height: 0;
+      }
+
+      .contact-card h3 {
+        font-family: "Cormorant Garamond", serif;
+        font-size: clamp(1.5rem, 2.5vw, 2rem);
+        margin: 0 0 1rem;
+        color: var(--gold-strong);
+      }
+
+      .contact-header {
+        margin-bottom: 1.5rem;
+      }
+
+      .contact-company-name {
+        font-family: "Cormorant Garamond", serif;
+        font-size: clamp(1.8rem, 3vw, 2.5rem);
+        font-weight: 600;
+        color: var(--gold-strong);
+        margin: 0 0 0.5rem;
+      }
+
+      .contact-address {
+        font-size: 1rem;
+        color: rgba(255, 255, 255, 0.9);
+        line-height: 1.6;
+        margin: 0;
+      }
+
+      .contact-icons-row {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        margin-bottom: 1.5rem;
+      }
+
+      .contact-icon-link {
+        width: 56px;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
+        color: var(--gold-strong);
+        transition: all 0.3s ease;
+        text-decoration: none;
+      }
+
+      .contact-icon-link:hover {
+        background: rgba(255, 255, 255, 0.3);
+        color: white;
+        transform: translateY(-2px);
+      }
+
+      .contact-icon-link svg {
+        width: 28px;
+        height: 28px;
+      }
+
+      .contact-separator {
+        height: 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        margin: 1.5rem 0;
+        width: 100%;
+      }
+
+      .action-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        margin-top: auto;
+      }
+
+      .action-button {
+        padding: 0.75rem 1rem;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        text-align: center;
+        color: white;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+
+      .action-button:hover {
+        background: rgba(255, 255, 255, 0.25);
+        border-color: rgba(255, 255, 255, 0.4);
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      }
+
+      .action-button svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .social-media {
+        display: flex;
+        gap: 0.75rem;
+        margin: 0;
+        justify-content: center;
+      }
+
+      .social-link {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        color: var(--gold-strong);
+        transition: all 0.3s ease;
+        text-decoration: none;
+      }
+
+      .social-link:hover {
+        background: rgba(255, 255, 255, 0.3);
+        color: white;
+        transform: translateY(-2px);
+      }
+
+      .social-link svg {
+        width: 24px;
+        height: 24px;
+      }
+
+      .form-section {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 1.5rem;
+        transition: all 0.3s ease;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow-y: visible;
+        overflow-x: hidden;
+        min-height: 0;
+        box-sizing: border-box;
+      }
+
+      .form-section h3 {
+        font-family: "Cormorant Garamond", serif;
+        font-size: clamp(1.5rem, 2.5vw, 2rem);
+        margin: 0 0 1rem;
+        color: var(--gold-strong);
+      }
+
+      .form-section form {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      .form-group:has(#message) {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 0.5rem;
+      }
+
+      #message {
+        flex: 1;
+        min-height: 250px;
+        margin-bottom: 0;
+      }
+
+      .form-group {
+        margin-bottom: 0.75rem;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+
+      .form-separator {
+        height: 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        margin: 0.75rem 0;
+        width: 100%;
+        border-bottom: none;
+        border-left: none;
+        border-right: none;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.95);
+        font-size: 0.95rem;
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .form-group.error input,
+      .form-group.error textarea {
+        border-color: #ef4444;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+      }
+
+      .topic-selection {
+        margin-bottom: 0.75rem;
+      }
+
+      .topic-selection label {
+        display: block;
+        margin-bottom: 0.75rem;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.95);
+        font-size: 0.95rem;
+      }
+
+      .topic-buttons {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.75rem;
+      }
+
+      .topic-button {
+        padding: 0.75rem 1rem;
+        background: rgba(255, 255, 255, 0.1);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-align: center;
+        font-family: "Manrope", sans-serif;
+      }
+
+      .topic-button:hover {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.4);
+      }
+
+      .topic-button.selected {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: var(--gold-strong);
+        color: rgba(255, 255, 255, 0.95);
+        font-weight: 600;
+        box-shadow: 0 0 0 3px rgba(232, 216, 184, 0.2);
+      }
+
+      .topic-selection.error .topic-buttons {
+        border: 2px solid #ef4444;
+        border-radius: 12px;
+        padding: 0.5rem;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+      }
+
+      .form-group input,
+      .form-group textarea {
+        width: 100%;
+        max-width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        font-size: 0.95rem;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+      }
+
+      .form-group input::placeholder,
+      .form-group textarea::placeholder {
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .form-group input:focus,
+      .form-group textarea:focus {
+        outline: none;
+        border-color: var(--gold-strong);
+        background: rgba(255, 255, 255, 0.15);
+        box-shadow: 0 0 0 3px rgba(232, 216, 184, 0.2);
+      }
+
+      .form-group textarea {
+        min-height: 250px;
+        resize: vertical;
+      }
+
+      .form-submit {
+        width: 100%;
+        max-width: 100%;
+        padding: 0.875rem 1.25rem;
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin: 0.5rem 0 0 0;
+        box-sizing: border-box;
+      }
+
+      .form-submit:hover {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: var(--gold-strong);
+        box-shadow: 0 0 0 3px rgba(232, 216, 184, 0.2);
+        transform: translateY(-2px);
+      }
+
+      .form-submit:active {
+        transform: translateY(0);
+      }
+
+      .form-submit:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .form-status {
+        margin-top: 1rem;
+        padding: 1rem;
+        border-radius: 12px;
+        text-align: center;
+        font-weight: 500;
+      }
+
+      .form-status.success {
+        background: rgba(34, 197, 94, 0.2);
+        color: #86efac;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+      }
+
+      .form-status.error {
+        background: rgba(239, 68, 68, 0.2);
+        color: #fca5a5;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+      }
+
+      .form-status.info {
+        background: rgba(200, 170, 120, 0.2);
+        color: var(--gold-strong);
+        border: 1px solid rgba(200, 170, 120, 0.3);
+      }
+
+      #turnstile-slot {
+        margin: 0.75rem 0;
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow: hidden;
+      }
+
+      #turnstile-slot > * {
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+
+      .floating-nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: var(--nav-height);
+        background: rgba(254, 252, 249, 1);
+        backdrop-filter: blur(20px) saturate(180%);
+        border-bottom: 1px solid rgba(200, 170, 120, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 2rem;
+        z-index: 100;
+        transition: box-shadow 0.3s ease, background 0.3s ease;
+      }
+
+      .floating-nav.scrolled {
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+        background: rgba(254, 252, 249, 1);
+      }
+
+      .floating-nav-brand {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 1.5rem;
+        text-decoration: none;
+        position: relative;
+        flex-shrink: 0;
+        width: auto;
+        height: auto;
+        background: transparent !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        outline: none !important;
+        border: none !important;
+        transition: none !important;
+      }
+
+      .floating-nav-brand::before {
+        content: "";
+        width: clamp(40px, 8vw, 100px);
+        height: 1px;
+        background: var(--gold);
+        flex-shrink: 0;
+        display: block;
+        order: 1;
+      }
+
+      .floating-nav-brand .floating-nav-brand-text:first-of-type {
+        order: 2;
+      }
+
+      .floating-nav-brand .brand-logo {
+        order: 3;
+      }
+
+      .floating-nav-brand .floating-nav-brand-text:last-of-type {
+        order: 4;
+      }
+
+      .floating-nav-brand::after {
+        content: "";
+        width: clamp(40px, 8vw, 100px);
+        height: 1px;
+        background: var(--gold);
+        flex-shrink: 0;
+        display: block;
+        order: 5;
+      }
+
+      .floating-nav .brand-logo {
+        width: 50px !important;
+        height: 50px !important;
+        object-fit: contain !important;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+        padding: 0 !important;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        display: block !important;
+        flex-shrink: 0;
+        margin: 0 !important;
+      }
+
+      .floating-nav-brand-text {
+        font-family: "Cormorant Garamond", serif;
+        font-size: clamp(1rem, 2vw, 1.5rem);
+        font-weight: 600;
+        color: #a8895a;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        flex-shrink: 0;
+        display: inline-block !important;
+        line-height: 1;
+        margin: 0;
+      }
+
+      .floating-nav > a:not(.floating-nav-brand) {
+        display: block;
+        padding: 0.6rem 1.2rem;
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        position: relative;
+        text-decoration: none;
+      }
+
+      .floating-nav > a:not(.floating-nav-brand):hover {
+        color: var(--gold);
+        background: rgba(200, 170, 120, 0.08);
+      }
+
+      .floating-nav > a.floating-nav-brand:hover,
+      .floating-nav > a.floating-nav-brand:focus,
+      .floating-nav > a.floating-nav-brand:active,
+      .floating-nav > a.floating-nav-brand:visited,
+      a.floating-nav-brand:hover,
+      a.floating-nav-brand:focus,
+      a.floating-nav-brand:active,
+      a.floating-nav-brand:visited {
+        background: transparent !important;
+        box-shadow: none !important;
+        outline: none !important;
+        border: none !important;
+        transform: none !important;
+        transition: none !important;
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(4px);
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        overflow-y: auto;
+      }
+
+      .modal.open {
+        display: flex;
+      }
+
+      .modal-body {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 2rem;
+        max-width: 600px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        color: var(--text);
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+      }
+
+      .modal-header h2 {
+        font-family: "Cormorant Garamond", serif;
+        font-size: 2rem;
+        margin: 0;
+        color: var(--text);
+      }
+
+      .modal-close {
+        background: none;
+        border: none;
+        font-size: 2rem;
+        line-height: 1;
+        cursor: pointer;
+        color: var(--text);
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: color 0.2s;
+      }
+
+      .modal-close:hover {
+        color: var(--gold);
+      }
+
+      .modal-content h3 {
+        font-family: "Cormorant Garamond", serif;
+        font-size: 1.5rem;
+        margin: 1.5rem 0 1rem 0;
+        color: var(--text);
+      }
+
+      .modal-content h3:first-child {
+        margin-top: 0;
+      }
+
+      .modal-content p {
+        margin: 0.75rem 0;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+
+      .info-row {
+        display: flex;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      }
+
+      .info-row:last-child {
+        border-bottom: none;
+      }
+
+      .info-label {
+        font-weight: 600;
+        min-width: 120px;
+        color: var(--text);
+      }
+
+      .info-value {
+        color: var(--muted);
+        flex: 1;
+      }
+
+      @media (max-width: 1080px) {
+        :root {
+          --content-width: min(100vw - 2rem, 1200px);
+        }
+
+        .floating-nav {
+          padding: 0 1.5rem;
+        }
+
+        .contact-container {
+          grid-template-columns: 1fr;
+          gap: 1rem;
+          max-height: none;
+          padding: 0;
+        }
+
+        .contact-content {
+          padding: calc(var(--nav-height) + 0.5rem) 0.75rem 0.75rem;
+          overflow-y: auto;
+          overflow-x: hidden;
+          justify-content: flex-start;
+        }
+      }
+
+        @media (max-width: 780px) {
+        .floating-nav-brand {
+          gap: 0.75rem !important;
+          flex-direction: row !important;
+        }
+
+        .floating-nav-brand::before,
+        .floating-nav-brand::after {
+          width: clamp(20px, 5vw, 60px);
+        }
+
+        .floating-nav-brand-text {
+          font-size: clamp(0.85rem, 3vw, 1.2rem) !important;
+        }
+
+        .floating-nav .brand-logo {
+          width: 40px !important;
+          height: 40px !important;
+        }
+
+        .contact-title {
+          font-size: clamp(2rem, 5vw, 3.5rem);
+        }
+
+        .contact-card,
+        .form-section {
+          padding: 1rem;
+          max-height: none;
+        }
+
+        .contact-container {
+          max-height: none;
+          gap: 1rem;
+        }
+
+        .form-row {
+          grid-template-columns: 1fr;
+          gap: 0.75rem;
+        }
+
+        .topic-buttons {
+          grid-template-columns: repeat(2, 1fr);
+          gap: 0.5rem;
+        }
+
+        .form-group {
+          margin-bottom: 0.75rem;
+        }
+
+        .topic-selection {
+          margin-bottom: 0.75rem;
+        }
+
+        .form-separator {
+          margin: 1rem 0;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .form-submit {
+          margin-top: 0.5rem;
+          padding: 0.75rem 1rem;
+        }
+
+        .contact-card h3,
+        .form-section h3 {
+          font-size: clamp(1.3rem, 2vw, 1.8rem);
+          margin-bottom: 0.75rem;
+        }
+
+        .contact-header {
+          margin-bottom: 1rem;
+        }
+
+        .contact-company-name {
+          font-size: clamp(1.5rem, 4vw, 2rem);
+        }
+
+        .contact-icons-row {
+          gap: 0.75rem;
+          margin-bottom: 1rem;
+        }
+
+        .contact-icon-link {
+          width: 48px;
+          height: 48px;
+        }
+
+        .contact-icon-link svg {
+          width: 24px;
+          height: 24px;
+        }
+
+        .contact-separator {
+          margin: 1rem 0;
+        }
+
+        .action-buttons {
+          margin-top: 0;
+          gap: 0.5rem;
+        }
+
+        .social-media {
+          margin: 0;
+          gap: 0.5rem;
+        }
+
+        .modal-body {
+          padding: 1.5rem;
+          margin-top: 1rem;
+        }
+
+        #message {
+          min-height: 100px;
+        }
+
+        .action-buttons {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .admin-corner-link {
+        position: fixed;
+        right: 0.65rem;
+        bottom: 0.4rem;
+        z-index: 60;
+        font-size: 0.65rem;
+        font-weight: 400;
+        color: rgba(107, 93, 79, 0.22);
+        text-decoration: none;
+        letter-spacing: 0.04em;
+        transition: color 0.15s ease;
+      }
+
+      .admin-corner-link:hover {
+        color: rgba(107, 93, 79, 0.42);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="contact-background"></div>
+    <div class="shell">
+      <nav class="floating-nav" id="floating-nav">
+        <a href="../index.html" class="floating-nav-brand">
+          <span class="floating-nav-brand-text">ŚREDZKA</span>
+          <img class="brand-logo" src="../ikony/logo-korona.png" alt="Korona Sredzka Korona" />
+          <span class="floating-nav-brand-text">KORONA</span>
+        </a>
+      </nav>
+      <div class="contact-content">
+        <div class="contact-container">
+          <div class="form-section">
+            <h3>Formularz kontaktowy</h3>
+            <form id="contact-form" method="POST" action="https://forms.un-static.com/forms/YOUR_FORM_ID">
+              <div class="form-row">
+                <div class="form-group">
+                  <input type="text" id="name" name="name" required placeholder="Imię i nazwisko">
+                </div>
+
+                <div class="form-group">
+                  <input type="tel" id="phone" name="phone" required placeholder="Telefon">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <input type="email" id="email" name="email" required placeholder="Email">
+              </div>
+
+              <div class="form-separator"></div>
+
+              <div class="topic-selection" id="topic-selection">
+                <div class="topic-buttons">
+                  <button type="button" class="topic-button" data-topic="Hotel">Hotel</button>
+                  <button type="button" class="topic-button" data-topic="Restauracja">Restauracja</button>
+                  <button type="button" class="topic-button" data-topic="Przyjecia">Przyjęcia</button>
+                  <button type="button" class="topic-button" data-topic="Inne">Inne</button>
+                </div>
+                <input type="hidden" id="topic" name="topic" required>
+              </div>
+
+              <div class="form-group">
+                <textarea id="message" name="message" required placeholder="Twoja wiadomość..."></textarea>
+              </div>
+
+              <div id="turnstile-slot"></div>
+
+              <button type="submit" class="form-submit" id="submit-btn">Wyślij wiadomość</button>
+
+              <div id="form-status" class="form-status" style="display: none;"></div>
+            </form>
+          </div>
+
+          <div class="contact-info-section">
+            <div class="contact-card">
+              <div class="contact-header">
+                <h2 class="contact-company-name">Średzka Korona</h2>
+                <p class="contact-address">ul. Wrocławska 11<br>55-300 Sroda Śląska</p>
+              </div>
+
+              <div class="contact-separator"></div>
+
+              <div class="contact-icons-row">
+                <a href="tel:+48600700800" class="contact-icon-link" aria-label="Zadzwoń">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                  </svg>
+                </a>
+                <a href="mailto:kontakt@sredzkakorona.pl" class="contact-icon-link" aria-label="Wyślij email">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                    <polyline points="22,6 12,13 2,6"></polyline>
+                  </svg>
+                </a>
+                <a href="https://www.google.com/maps/search/?api=1&amp;query=%C5%9Aredzka%20Korona%2C%20Wroc%C5%82awska%2011%2C%2055-300%20%C5%9Aroda%20%C5%9Al%C4%85ska" target="_blank" rel="noopener noreferrer" class="contact-icon-link" aria-label="Zobacz na mapie">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                  </svg>
+                </a>
+              </div>
+
+              <div class="contact-separator"></div>
+
+              <div class="social-media">
+                <a href="https://www.facebook.com/SredzkaKorona/?locale=pl_PL" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="Facebook">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                </a>
+                <a href="https://www.instagram.com/sredzka_korona/" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="Instagram">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162 0 3.403 2.759 6.162 6.162 6.162 3.403 0 6.162-2.759 6.162-6.162 0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4 2.209 0 4 1.791 4 4 0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                  </svg>
+                </a>
+                <a href="https://www.tiktok.com/@bartoszh10?_r=1&amp;_t=ZN-95422OweVdr" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="TikTok">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
+                  </svg>
+                </a>
+              </div>
+
+              <div class="contact-separator"></div>
+
+              <div class="action-buttons">
+                <button type="button" class="action-button" id="info-button">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                  </svg>
+                  Informacje
+                </button>
+                <a href="../dokumenty/index.html" class="action-button">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14,2 14,8 20,8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10,9 9,9 8,9"></polyline>
+                  </svg>
+                  Dokumenty
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal" id="info-modal">
+        <div class="modal-body">
+          <div class="modal-header">
+            <h2>Informacje o firmie</h2>
+            <button class="modal-close" id="close-info-modal" aria-label="Zamknij">×</button>
+          </div>
+          <div class="modal-content">
+            <h3>Dane firmy</h3>
+            <div class="info-row">
+              <span class="info-label">Nazwa:</span>
+              <span class="info-value">Średzka Korona</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Adres:</span>
+              <span class="info-value">ul. Wrocławska 11, 55-300 Środa Śląska</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">NIP:</span>
+              <span class="info-value">9131513928</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">REGON:</span>
+              <span class="info-value">522050940</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Telefon:</span>
+              <span class="info-value">+48 600 700 800</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Email:</span>
+              <span class="info-value">kontakt@sredzkakorona.pl</span>
+            </div>
+            <h3>O właścicielu</h3>
+            <p>Średzka Korona, to firma rodzinna, prowadzona przez polskiego przedsiębiorcę. Od 2 lat oferuje Państwu usługi restauracyjne i hotelowe.</p>
+            <p>Właściciel odpowiada za standard obiektu, rozwój oferty oraz kontakt z klientami biznesowymi i prywatnymi.</p>
+          </div>
+        </div>
+      </div>
+        </div>
+      </div>
+    </div>
+    <a href="../admin/index.html" class="admin-corner-link">Panel</a>
+    <script>
+      (() => {
+        const nav = document.querySelector("#floating-nav");
+        const form = document.querySelector("#contact-form");
+        const status = document.querySelector("#form-status");
+        const submitBtn = document.querySelector("#submit-btn");
+        
+        // Konfiguracja - można załadować z config.js
+        const config = window.SREDZKA_CONFIG || {
+          turnstileSiteKey: "",
+          apiBase: "",
+        };
+
+        // Obsługa scrollowania nav
+        const handleScroll = () => {
+          if (window.scrollY > 50) {
+            nav.classList.add("scrolled");
+          } else {
+            nav.classList.remove("scrolled");
+          }
+        };
+        window.addEventListener("scroll", handleScroll, { passive: true });
+
+        // Obsługa modala z informacjami
+        const infoModal = document.querySelector("#info-modal");
+        const infoButton = document.querySelector("#info-button");
+        const closeInfoModal = document.querySelector("#close-info-modal");
+
+        function openInfoModal() {
+          infoModal.classList.add("open");
+        }
+
+        function closeInfoModalFunc() {
+          infoModal.classList.remove("open");
+        }
+
+        if (infoButton) {
+          infoButton.addEventListener("click", openInfoModal);
+        }
+
+        if (closeInfoModal) {
+          closeInfoModal.addEventListener("click", closeInfoModalFunc);
+        }
+
+        if (infoModal) {
+          infoModal.addEventListener("click", (e) => {
+            if (e.target === infoModal) {
+              closeInfoModalFunc();
+            }
+          });
+        }
+
+        // Inicjalizacja Cloudflare Turnstile
+        if (config.turnstileSiteKey) {
+          const script = document.createElement("script");
+          script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+          script.async = true;
+          script.defer = true;
+          document.head.appendChild(script);
+          
+          script.onload = () => {
+            const turnstileSlot = document.querySelector("#turnstile-slot");
+            if (turnstileSlot) {
+              turnstileSlot.innerHTML = `<div class="cf-turnstile" data-sitekey="${config.turnstileSiteKey}"></div>`;
+            }
+          };
+        }
+
+        // Obsługa wyboru tematu
+        const topicButtons = document.querySelectorAll(".topic-button");
+        const topicInput = document.querySelector("#topic");
+        const topicSelection = document.querySelector("#topic-selection");
+
+        topicButtons.forEach(button => {
+          button.addEventListener("click", () => {
+            // Usuń zaznaczenie z wszystkich przycisków
+            topicButtons.forEach(btn => btn.classList.remove("selected"));
+            // Zaznacz kliknięty przycisk
+            button.classList.add("selected");
+            // Ustaw wartość w ukrytym polu
+            topicInput.value = button.dataset.topic;
+            // Usuń błąd jeśli był
+            topicSelection.classList.remove("error");
+          });
+        });
+
+        // Obsługa parametrów URL z kalendarza
+        const urlParams = new URLSearchParams(window.location.search);
+        const topicParam = urlParams.get("topic");
+        const messageParam = urlParams.get("message");
+
+        if (topicParam) {
+          const topicButton = Array.from(topicButtons).find(btn => btn.dataset.topic === topicParam);
+          if (topicButton) {
+            topicButton.click();
+          } else {
+            topicInput.value = topicParam;
+          }
+        }
+
+        if (messageParam) {
+          const messageTextarea = document.querySelector("#message");
+          if (messageTextarea) {
+            messageTextarea.value = decodeURIComponent(messageParam);
+          }
+        }
+
+        // Obsługa formularza
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          
+          // Walidacja tematu
+          if (!topicInput.value) {
+            topicSelection.classList.add("error");
+            status.textContent = "Proszę wybrać temat.";
+            status.className = "form-status error";
+            status.style.display = "block";
+            return;
+          }
+
+          // Usuń błędy z pól
+          document.querySelectorAll(".form-group").forEach(group => {
+            group.classList.remove("error");
+          });
+          topicSelection.classList.remove("error");
+          
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Wysyłanie...";
+          status.style.display = "none";
+
+          const formData = new FormData(form);
+          const payload = Object.fromEntries(formData.entries());
+          
+          // Pobierz token Turnstile jeśli jest dostępny
+          if (config.turnstileSiteKey) {
+            const turnstileResponse = form.querySelector("[name='cf-turnstile-response']");
+            if (turnstileResponse) {
+              payload.turnstileToken = turnstileResponse.value;
+            }
+          }
+
+          try {
+            // Jeśli jest skonfigurowane API, użyj go
+            if (config.apiBase) {
+              const response = await fetch(config.apiBase + "/api/public/contact", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              });
+
+              if (!response.ok) {
+                throw new Error("Nie udało się wysłać formularza.");
+              }
+
+              form.reset();
+              // Reset wyboru tematu
+              topicButtons.forEach(btn => btn.classList.remove("selected"));
+              topicInput.value = "";
+              topicSelection.classList.remove("error");
+              
+              status.textContent = "Dziękujemy! Wiadomość została wysłana.";
+              status.className = "form-status success";
+              status.style.display = "block";
+              
+              // Reset Turnstile
+              if (window.turnstile) {
+                window.turnstile.reset();
+              }
+            } else {
+              // Fallback: wyślij do forms.un-static.com
+              const response = await fetch(form.action, {
+                method: "POST",
+                body: formData,
+              });
+
+              if (!response.ok) {
+                throw new Error("Nie udało się wysłać formularza.");
+              }
+
+              form.reset();
+              // Reset wyboru tematu
+              topicButtons.forEach(btn => btn.classList.remove("selected"));
+              topicInput.value = "";
+              topicSelection.classList.remove("error");
+              
+              status.textContent = "Dziękujemy! Wiadomość została wysłana.";
+              status.className = "form-status success";
+              status.style.display = "block";
+              
+              // Reset Turnstile
+              if (window.turnstile) {
+                window.turnstile.reset();
+              }
+            }
+          } catch (error) {
+            status.textContent = error.message || "Wystąpił błąd podczas wysyłania formularza. Spróbuj ponownie.";
+            status.className = "form-status error";
+            status.style.display = "block";
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Wyślij wiadomość";
+          }
+        });
+
+        // Walidacja pól formularza przy blur
+        form.querySelectorAll("input[required], textarea[required]").forEach(field => {
+          field.addEventListener("blur", () => {
+            if (!field.value.trim()) {
+              field.closest(".form-group").classList.add("error");
+            } else {
+              field.closest(".form-group").classList.remove("error");
+            }
+          });
+
+          field.addEventListener("input", () => {
+            if (field.value.trim()) {
+              field.closest(".form-group").classList.remove("error");
+            }
+          });
+        });
+      })();
+    </script>
+    <script src="../assets/js/config.js"></script>
+  </body>
+</html>

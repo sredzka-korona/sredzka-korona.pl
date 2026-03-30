@@ -1,0 +1,2465 @@
+(function () {
+  const config = window.SREDZKA_CONFIG || {};
+  const defaultContent = structuredClone(window.SREDZKA_DEFAULT_CONTENT || {});
+  const hostname = window.location.hostname;
+  const isLocalPreview =
+    window.location.protocol === "file:" || hostname === "127.0.0.1" || hostname === "localhost";
+  const isGithubPages = hostname.endsWith("github.io");
+  const fallbackApiBase = isLocalPreview
+    ? ""
+    : hostname && !isGithubPages
+      ? "https://api." + hostname.replace(/^www\./, "")
+      : "";
+
+  const state = {
+    apiBase: config.apiBase || fallbackApiBase,
+    loggedIn: false,
+    content: defaultContent,
+    documents: [],
+    galleryAlbums: [],
+    calendarBlocks: [],
+    submissions: [],
+  };
+  const missingApiConfiguration = !state.apiBase && isGithubPages;
+
+  const app = document.querySelector("#admin-app");
+  let scrollIndicator = null;
+  let scrollIndicatorThumb = null;
+  let scrollIndicatorFrame = 0;
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function escapeAttribute(value) {
+    return escapeHtml(value).replaceAll("`", "&#96;");
+  }
+
+  function ensureScrollIndicator() {
+    if (scrollIndicator && scrollIndicatorThumb) {
+      return;
+    }
+
+    scrollIndicator = document.createElement("div");
+    scrollIndicator.className = "scroll-indicator";
+    scrollIndicator.setAttribute("aria-hidden", "true");
+    scrollIndicator.innerHTML = `<div class="scroll-indicator-thumb"></div>`;
+    document.body.appendChild(scrollIndicator);
+    scrollIndicatorThumb = scrollIndicator.querySelector(".scroll-indicator-thumb");
+  }
+
+  function updateScrollIndicator() {
+    const viewportHeight = window.innerHeight;
+    const scrollHeight = document.documentElement.scrollHeight;
+    const maxScroll = Math.max(scrollHeight - viewportHeight, 0);
+
+    if (!scrollIndicator || !scrollIndicatorThumb) {
+      return;
+    }
+
+    if (maxScroll <= 0) {
+      scrollIndicator.style.opacity = "0";
+      scrollIndicatorThumb.style.transform = "translateY(0)";
+      return;
+    }
+
+    scrollIndicator.style.opacity = "1";
+
+    const trackHeight = scrollIndicator.clientHeight;
+    const thumbHeight = Math.max((viewportHeight / scrollHeight) * trackHeight, 44);
+    const maxThumbOffset = Math.max(trackHeight - thumbHeight, 0);
+    const scrollRatio = Math.min(Math.max(window.scrollY / maxScroll, 0), 1);
+    const thumbOffset = maxThumbOffset * scrollRatio;
+
+    scrollIndicatorThumb.style.height = `${thumbHeight}px`;
+    scrollIndicatorThumb.style.transform = `translateY(${thumbOffset}px)`;
+  }
+
+  function scheduleScrollIndicatorUpdate() {
+    if (scrollIndicatorFrame) {
+      return;
+    }
+    scrollIndicatorFrame = window.requestAnimationFrame(() => {
+      scrollIndicatorFrame = 0;
+      updateScrollIndicator();
+    });
+  }
+
+  function initCustomScrollbar() {
+    ensureScrollIndicator();
+
+    const resizeObserver = new ResizeObserver(() => {
+      scheduleScrollIndicatorUpdate();
+    });
+    resizeObserver.observe(document.body);
+    resizeObserver.observe(document.documentElement);
+
+    const mutationObserver = new MutationObserver(() => {
+      scheduleScrollIndicatorUpdate();
+    });
+    mutationObserver.observe(document.body, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+    });
+
+    window.addEventListener("scroll", scheduleScrollIndicatorUpdate, { passive: true });
+    window.addEventListener("resize", scheduleScrollIndicatorUpdate);
+    window.addEventListener("load", scheduleScrollIndicatorUpdate);
+    scheduleScrollIndicatorUpdate();
+  }
+
+  function getConnectionErrorMessage() {
+    if (window.location.protocol === "file:") {
+      return "Panel admina nie dziala z file://. Uruchom lokalny podglad przez npm run preview.";
+    }
+
+    if (missingApiConfiguration) {
+      return "Brak konfiguracji API. Ustaw apiBase w assets/js/config.js na adres Workera Cloudflare.";
+    }
+
+    if (isLocalPreview && !config.apiBase) {
+      return "Nie mozna polaczyc z lokalnym API. Uruchom worker na http://127.0.0.1:8787 albo ustaw apiBase w assets/js/config.js.";
+    }
+
+    return "Nie mozna polaczyc z API panelu administratora.";
+  }
+
+  async function getFirebaseAuthHeaders() {
+    if (typeof firebase === "undefined" || !firebase.apps?.length) {
+      return {};
+    }
+    const user = firebase.auth().currentUser;
+    if (!user) {
+      return {};
+    }
+    const token = await user.getIdToken();
+    return { Authorization: `Bearer ${token}` };
+  }
+
+  async function api(path, options = {}) {
+    let response;
+    const authHeaders = await getFirebaseAuthHeaders();
+
+    try {
+      response = await fetch(state.apiBase + path, {
+        ...options,
+        credentials: "include",
+        headers: {
+          ...authHeaders,
+          ...(options.headers || {}),
+        },
+      });
+    } catch (error) {
+      throw new Error(getConnectionErrorMessage());
+    }
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Operacja nie powiodla sie.");
+    }
+
+    if (response.status === 204) {
+      return null;
+    }
+
+    return response.json().catch(() => null);
+  }
+
+  function mapFirebaseError(err) {
+    const code = err?.code || "";
+    if (code === "auth/invalid-email") {
+      return "Nieprawidlowy adres e-mail.";
+    }
+    if (code === "auth/user-disabled") {
+      return "To konto zostalo wylaczone.";
+    }
+    if (
+      code === "auth/user-not-found" ||
+      code === "auth/wrong-password" ||
+      code === "auth/invalid-credential"
+    ) {
+      return "Nieprawidlowy e-mail lub haslo.";
+    }
+    if (code === "auth/too-many-requests") {
+      return "Zbyt wiele prob logowania. Sprobuj pozniej.";
+    }
+    if (code === "auth/network-request-failed") {
+      return "Brak polaczenia z Firebase. Sprawdz siec.";
+    }
+    return err?.message || "Logowanie nie powiodlo sie.";
+  }
+
+  function renderLogin(errorMessage = "") {
+    app.innerHTML = `
+      <div class="login-wrap">
+        <div class="login-card">
+          <img src="../ikony/logo.png" alt="Logo" width="84" height="84" />
+          <p class="pill">Panel administratora</p>
+          <h1>Logowanie do zarzadzania obiektem</h1>
+          <p>Po zalogowaniu mozesz edytowac tresci, galerie, dokumenty, terminy sal i obslugiwac zgloszenia.</p>
+          <form id="login-form" class="stack">
+            <label class="field-full">
+              <span>E-mail</span>
+              <input name="email" type="email" autocomplete="username" required />
+            </label>
+            <label class="field-full">
+              <span>Haslo</span>
+              <input name="password" type="password" autocomplete="current-password" required />
+            </label>
+            <button class="button" type="submit">Zaloguj</button>
+            <p class="status">${escapeHtml(errorMessage)}</p>
+          </form>
+        </div>
+      </div>
+    `;
+
+    scheduleScrollIndicatorUpdate();
+    document.querySelector("#login-form").addEventListener("submit", handleLogin);
+  }
+
+  function renderDashboard() {
+    app.innerHTML = `
+      <div class="admin-shell">
+        <header class="admin-topbar">
+          <div class="brand-row">
+            <img src="../ikony/logo.png" alt="Logo" />
+            <div>
+              <p class="pill">Sredzka Korona</p>
+              <h1>Panel administracyjny</h1>
+              <p>Proste zarzadzanie tresciami, kalendarzem, dokumentami i galeria.</p>
+            </div>
+          </div>
+          <div class="inline-actions">
+            <a class="button secondary" href="../index.html">Zobacz strone</a>
+            <button class="button" id="save-content-button" type="button">Zapisz tresci</button>
+            <button class="button danger" id="logout-button" type="button">Wyloguj</button>
+          </div>
+        </header>
+        <nav class="admin-main-tabs" aria-label="Moduły panelu">
+          <button type="button" class="button" id="admin-tab-btn-content">Treści, galeria, dokumenty</button>
+          <button type="button" class="button secondary" id="admin-tab-btn-hotel">Hotel — rezerwacje</button>
+          <button type="button" class="button secondary" id="admin-tab-btn-restaurant">Restauracja</button>
+          <button type="button" class="button secondary" id="admin-tab-btn-hall">Sale</button>
+        </nav>
+        <div id="admin-panel-main">
+        <div class="grid">
+          <section class="panel col-8" id="content-panel"></section>
+          <section class="panel col-4" id="submissions-panel"></section>
+          <section class="panel col-12" id="restaurant-menu-panel"></section>
+          <section class="panel col-12" id="restaurant-gallery-panel"></section>
+          <section class="panel col-12" id="gallery-panel"></section>
+          <section class="panel col-12" id="hotel-room-galleries-panel"></section>
+          <section class="panel col-12" id="events-hall-galleries-panel"></section>
+          <section class="panel col-12" id="events-menu-panel"></section>
+          <section class="panel col-6" id="documents-panel"></section>
+          <section class="panel col-6" id="calendar-panel"></section>
+        </div>
+        </div>
+        <div id="admin-panel-hotel" class="admin-hotel-wrap" hidden></div>
+        <div id="admin-panel-restaurant" class="admin-hotel-wrap" hidden></div>
+        <div id="admin-panel-hall" class="admin-hotel-wrap" hidden></div>
+      </div>
+    `;
+
+    renderContentPanel();
+    renderSubmissionsPanel();
+    renderRestaurantMenuPanel();
+    renderRestaurantGalleryPanel();
+    renderGalleryPanel();
+    renderHotelRoomGalleriesPanel();
+    renderEventsHallGalleriesPanel();
+    renderEventsMenuPanel();
+    renderDocumentsPanel();
+    renderCalendarPanel();
+
+    scheduleScrollIndicatorUpdate();
+    document.querySelector("#save-content-button").addEventListener("click", saveContent);
+    document.querySelector("#logout-button").addEventListener("click", logout);
+
+    const btnContent = document.querySelector("#admin-tab-btn-content");
+    const btnHotel = document.querySelector("#admin-tab-btn-hotel");
+    const btnRestaurant = document.querySelector("#admin-tab-btn-restaurant");
+    const btnHall = document.querySelector("#admin-tab-btn-hall");
+    const panelMain = document.querySelector("#admin-panel-main");
+    const panelHotel = document.querySelector("#admin-panel-hotel");
+    const panelRestaurant = document.querySelector("#admin-panel-restaurant");
+    const panelHall = document.querySelector("#admin-panel-hall");
+    function switchAdminTab(tab) {
+      if (!panelMain || !panelHotel || !panelRestaurant || !panelHall) return;
+      panelMain.hidden = tab !== "content";
+      panelHotel.hidden = tab !== "hotel";
+      panelRestaurant.hidden = tab !== "restaurant";
+      panelHall.hidden = tab !== "hall";
+      btnContent?.classList.toggle("secondary", tab !== "content");
+      btnHotel?.classList.toggle("secondary", tab !== "hotel");
+      btnRestaurant?.classList.toggle("secondary", tab !== "restaurant");
+      btnHall?.classList.toggle("secondary", tab !== "hall");
+      if (tab === "hotel") {
+        if (typeof window.renderHotelAdminPanel === "function") {
+          window.renderHotelAdminPanel(panelHotel);
+        } else {
+          panelHotel.innerHTML =
+            "<p class=\"status\">Nie załadowano hotel-admin.js — dodaj skrypt w admin/index.html.</p>";
+        }
+      }
+      if (tab === "restaurant") {
+        if (typeof window.renderRestaurantAdminPanel === "function") {
+          window.renderRestaurantAdminPanel(panelRestaurant);
+        } else {
+          panelRestaurant.innerHTML =
+            "<p class=\"status\">Nie załadowano restaurant-admin.js — dodaj skrypt w admin/index.html.</p>";
+        }
+      }
+      if (tab === "hall") {
+        if (typeof window.renderHallAdminPanel === "function") {
+          window.renderHallAdminPanel(panelHall);
+        } else {
+          panelHall.innerHTML =
+            "<p class=\"status\">Nie załadowano hall-admin.js — dodaj skrypt w admin/index.html.</p>";
+        }
+      }
+    }
+    btnContent?.addEventListener("click", () => switchAdminTab("content"));
+    btnHotel?.addEventListener("click", () => switchAdminTab("hotel"));
+    btnRestaurant?.addEventListener("click", () => switchAdminTab("restaurant"));
+    btnHall?.addEventListener("click", () => switchAdminTab("hall"));
+  }
+
+  function renderContentPanel(statusMessage = "") {
+    const content = state.content;
+    const panel = document.querySelector("#content-panel");
+    panel.innerHTML = `
+      <p class="pill">Tresci strony</p>
+      <h2>Edycja glownej oferty</h2>
+      <p class="section-intro">Formularz zapisuje opis firmy, podstrony i sekcje glownych modulow. Pola z wieloma pozycjami obslugiwane sa jako proste karty z przyciskiem dodawania.</p>
+      <div class="stack">
+        <div class="repeater-item">
+          <h3>Dane firmy i hero</h3>
+          <div class="field-grid">
+            <label class="field"><span>Nazwa</span><input id="company-name" value="${escapeAttribute(content.company.name)}" /></label>
+            <label class="field"><span>Telefon</span><input id="company-phone" value="${escapeAttribute(content.company.phone)}" /></label>
+            <label class="field"><span>E-mail</span><input id="company-email" value="${escapeAttribute(content.company.email)}" /></label>
+            <label class="field"><span>Adres</span><input id="company-address" value="${escapeAttribute(content.company.address)}" /></label>
+            <label class="field-full"><span>Haslo pod logo</span><input id="company-tagline" value="${escapeAttribute(content.company.tagline)}" /></label>
+            <label class="field-full"><span>Naglowek hero</span><input id="company-hero-title" value="${escapeAttribute(content.company.heroTitle)}" /></label>
+            <label class="field-full"><span>Tekst hero</span><textarea id="company-hero-text">${escapeHtml(content.company.heroText)}</textarea></label>
+            <label class="field-full"><span>Godziny otwarcia (format: Dzień: Godziny, np. Poniedziałek: 12:00 - 22:00)</span><textarea id="company-opening-hours">${escapeHtml((content.company.openingHours || []).map(item => typeof item === 'object' ? `${item.day}: ${item.hours}` : item).join("\n"))}</textarea></label>
+          </div>
+        </div>
+        <div class="repeater-item">
+          <div class="repeater-head">
+            <div>
+              <h3>Strona glowna</h3>
+              <p class="helper">Wlasciciel, personel i opinie.</p>
+            </div>
+          </div>
+          <div class="stack" style="margin-bottom: 1rem;">
+            <p class="helper" style="margin: 0 0 0.5rem;">Kafelki na stronie startowej (wyszarzenie, brak wejscia na podstrone)</p>
+            <label class="field-full" style="display: flex; align-items: flex-start; gap: 0.6rem;">
+              <input type="checkbox" id="section-block-hotel" ${content.home.sectionBlocks?.hotel ? "checked" : ""} style="margin-top: 0.2rem;" />
+              <span>Zablokuj Hotel (przekierowanie z adresu /Hotel/)</span>
+            </label>
+            <label class="field-full" style="display: flex; align-items: flex-start; gap: 0.6rem;">
+              <input type="checkbox" id="section-block-restaurant" ${content.home.sectionBlocks?.restaurant ? "checked" : ""} style="margin-top: 0.2rem;" />
+              <span>Zablokuj Restauracje (przekierowanie z /Restauracja/)</span>
+            </label>
+            <label class="field-full" style="display: flex; align-items: flex-start; gap: 0.6rem;">
+              <input type="checkbox" id="section-block-events" ${content.home.sectionBlocks?.events ? "checked" : ""} style="margin-top: 0.2rem;" />
+              <span>Zablokuj Przyjecia (przekierowanie z /Przyjec/)</span>
+            </label>
+          </div>
+          <div class="stack" style="margin-bottom: 1rem; padding-top: 0.75rem; border-top: 1px solid rgba(200, 170, 120, 0.25);">
+            <p class="helper" style="margin: 0 0 0.5rem;">Rezerwacje online (formularze na stronach — bez blokady podstron)</p>
+            <label class="field-full" style="display: flex; align-items: flex-start; gap: 0.6rem;">
+              <input type="checkbox" id="booking-enable-restaurant" ${content.booking?.restaurant !== false ? "checked" : ""} style="margin-top: 0.2rem;" />
+              <span>Restauracja — rezerwacja stolika wlaczona</span>
+            </label>
+            <label class="field-full" style="display: flex; align-items: flex-start; gap: 0.6rem;">
+              <input type="checkbox" id="booking-enable-hotel" ${content.booking?.hotel !== false ? "checked" : ""} style="margin-top: 0.2rem;" />
+              <span>Hotel — rezerwacja pokoi wlaczona</span>
+            </label>
+            <label class="field-full" style="display: flex; align-items: flex-start; gap: 0.6rem;">
+              <input type="checkbox" id="booking-enable-events" ${content.booking?.events !== false ? "checked" : ""} style="margin-top: 0.2rem;" />
+              <span>Przyjecia / sale — rezerwacja sal wlaczona</span>
+            </label>
+            <p class="helper" style="margin: 0.75rem 0 0.35rem;">Tymczasowe wstrzymanie rezerwacji (dni wlacznie; puste pola = brak przerwy)</p>
+            <div class="field-grid">
+              <label class="field"><span>Restauracja — od</span><input type="date" id="booking-restaurant-pause-from" value="${escapeAttribute(content.booking?.restaurantPauseFrom || "")}" /></label>
+              <label class="field"><span>do</span><input type="date" id="booking-restaurant-pause-to" value="${escapeAttribute(content.booking?.restaurantPauseTo || "")}" /></label>
+              <label class="field"><span>Hotel — od</span><input type="date" id="booking-hotel-pause-from" value="${escapeAttribute(content.booking?.hotelPauseFrom || "")}" /></label>
+              <label class="field"><span>do</span><input type="date" id="booking-hotel-pause-to" value="${escapeAttribute(content.booking?.hotelPauseTo || "")}" /></label>
+              <label class="field"><span>Przyjecia / sale — od</span><input type="date" id="booking-events-pause-from" value="${escapeAttribute(content.booking?.eventsPauseFrom || "")}" /></label>
+              <label class="field"><span>do</span><input type="date" id="booking-events-pause-to" value="${escapeAttribute(content.booking?.eventsPauseTo || "")}" /></label>
+            </div>
+          </div>
+          <div class="field-grid">
+            <label class="field-full"><span>Opis sekcji</span><textarea id="home-about-text">${escapeHtml(content.home.aboutText)}</textarea></label>
+            <label class="field-full"><span>Opis wlasciciela</span><textarea id="home-owner">${escapeHtml(content.home.owner)}</textarea></label>
+          </div>
+          <div class="stack">
+            <div class="repeater-head">
+              <strong>Personel</strong>
+              <button class="button secondary" type="button" data-add-array="staff">Dodaj osobe/role</button>
+            </div>
+            <div id="staff-list" class="repeater-list"></div>
+            <div class="repeater-head">
+              <strong>Opinie</strong>
+              <button class="button secondary" type="button" data-add-array="testimonials">Dodaj opinie</button>
+            </div>
+            <div id="testimonials-list" class="repeater-list"></div>
+          </div>
+        </div>
+        <div class="repeater-item">
+          <div class="repeater-head">
+            <div>
+              <h3>Restauracja</h3>
+              <p class="helper">Sekcje menu i dodatki.</p>
+            </div>
+          </div>
+          <div class="field-grid">
+            <label class="field-full"><span>Naglowek</span><input id="restaurant-hero-title" value="${escapeAttribute(content.restaurant.heroTitle)}" /></label>
+            <label class="field-full"><span>Opis</span><textarea id="restaurant-hero-text">${escapeHtml(content.restaurant.heroText)}</textarea></label>
+            <label class="field-full"><span>Dodatki restauracji, jedna pozycja w linii</span><textarea id="restaurant-extras">${escapeHtml((content.restaurant.extras || []).join("\n"))}</textarea></label>
+          </div>
+          <div class="repeater-head">
+            <strong>Sekcje menu</strong>
+            <button class="button secondary" type="button" data-add-array="menuSections">Dodaj sekcje menu</button>
+          </div>
+          <div id="menu-sections-list" class="repeater-list"></div>
+        </div>
+        <div class="repeater-item">
+          <h3>Hotel</h3>
+          <div class="field-grid">
+            <label class="field-full"><span>Naglowek</span><input id="hotel-hero-title" value="${escapeAttribute(content.hotel.heroTitle)}" /></label>
+            <label class="field-full"><span>Opis</span><textarea id="hotel-hero-text">${escapeHtml(content.hotel.heroText)}</textarea></label>
+            <label class="field-full"><span>Udogodnienia hotelu, jedna pozycja w linii</span><textarea id="hotel-amenities">${escapeHtml((content.hotel.amenities || []).join("\n"))}</textarea></label>
+          </div>
+          <div class="repeater-head">
+            <strong>Pokoje</strong>
+            <button class="button secondary" type="button" data-add-array="rooms">Dodaj pokoj</button>
+          </div>
+          <div id="rooms-list" class="repeater-list"></div>
+        </div>
+        <div class="repeater-item">
+          <h3>Przyjecia</h3>
+          <div class="field-grid">
+            <label class="field-full"><span>Naglowek</span><input id="events-hero-title" value="${escapeAttribute(content.events.heroTitle)}" /></label>
+            <label class="field-full"><span>Opis</span><textarea id="events-hero-text">${escapeHtml(content.events.heroText)}</textarea></label>
+            <label class="field-full"><span>Pakiety i uslugi przyjec, jedna pozycja w linii</span><textarea id="events-packages">${escapeHtml((content.events.packages || []).join("\n"))}</textarea></label>
+            <label class="field-full"><span>Modal Oferta na stronie Przyjecia (HTML wewnatrz okna)</span><textarea id="events-oferta-modal-html" rows="18">${escapeHtml(content.events.ofertaModalBodyHtml || "")}</textarea></label>
+            <p class="helper">Dozwolone znaczniki jak na stronie: p, ul, li, strong, a. Pusty tekst przywraca domyslna tresc z szablonu.</p>
+          </div>
+          <div class="repeater-head">
+            <strong>Sale</strong>
+            <button class="button secondary" type="button" data-add-array="halls">Dodaj sale</button>
+          </div>
+          <div id="halls-list" class="repeater-list"></div>
+        </div>
+        <div class="repeater-item">
+          <div class="repeater-head">
+            <div>
+              <h3>Polecane uslugi</h3>
+              <p class="helper">Partnerzy i inni przedsiebiorcy.</p>
+            </div>
+            <button class="button secondary" type="button" data-add-array="services">Dodaj usluge</button>
+          </div>
+          <div id="services-list" class="repeater-list"></div>
+        </div>
+        <p class="status">${escapeHtml(statusMessage)}</p>
+      </div>
+    `;
+
+    bindRepeaterButtons();
+    renderRepeaters();
+  }
+
+  function renderRepeaters() {
+    renderStaffList();
+    renderTestimonialsList();
+    renderMenuSectionsList();
+    renderRoomsList();
+    renderHallsList();
+    renderServicesList();
+  }
+
+  function renderStaffList() {
+    const target = document.querySelector("#staff-list");
+    target.innerHTML = state.content.home.staff
+      .map(
+        (item, index) => `
+          <div class="repeater-item">
+            <div class="repeater-head">
+              <strong>Pozycja ${index + 1}</strong>
+              <button class="button danger" type="button" data-remove-array="staff" data-index="${index}">Usun</button>
+            </div>
+            <label class="field-full">
+              <span>Opis</span>
+              <textarea data-staff-index="${index}">${escapeHtml(item)}</textarea>
+            </label>
+          </div>`
+      )
+      .join("");
+  }
+
+  function renderTestimonialsList() {
+    const target = document.querySelector("#testimonials-list");
+    target.innerHTML = state.content.home.testimonials
+      .map(
+        (item, index) => `
+          <div class="repeater-item">
+            <div class="repeater-head">
+              <strong>Opinia ${index + 1}</strong>
+              <button class="button danger" type="button" data-remove-array="testimonials" data-index="${index}">Usun</button>
+            </div>
+            <div class="field-grid">
+              <label class="field"><span>Autor</span><input data-testimonial-author="${index}" value="${escapeAttribute(item.author)}" /></label>
+              <label class="field-full"><span>Tresc</span><textarea data-testimonial-text="${index}">${escapeHtml(item.text)}</textarea></label>
+            </div>
+          </div>`
+      )
+      .join("");
+  }
+
+  function renderMenuSectionsList() {
+    const target = document.querySelector("#menu-sections-list");
+    target.innerHTML = state.content.restaurant.menuSections
+      .map(
+        (section, index) => `
+          <div class="repeater-item">
+            <div class="repeater-head">
+              <strong>Sekcja menu ${index + 1}</strong>
+              <button class="button danger" type="button" data-remove-array="menuSections" data-index="${index}">Usun</button>
+            </div>
+            <div class="field-grid">
+              <label class="field"><span>Nazwa sekcji</span><input data-menu-title="${index}" value="${escapeAttribute(section.title)}" /></label>
+              <label class="field-full"><span>Pozycje, jedna w linii</span><textarea data-menu-items="${index}">${escapeHtml(section.items.join("\n"))}</textarea></label>
+            </div>
+          </div>`
+      )
+      .join("");
+  }
+
+  function renderRoomsList() {
+    const target = document.querySelector("#rooms-list");
+    target.innerHTML = state.content.hotel.rooms
+      .map(
+        (room, index) => `
+          <div class="repeater-item">
+            <div class="repeater-head">
+              <strong>Pokoj ${index + 1}</strong>
+              <button class="button danger" type="button" data-remove-array="rooms" data-index="${index}">Usun</button>
+            </div>
+            <div class="field-grid">
+              <label class="field"><span>Nazwa</span><input data-room-name="${index}" value="${escapeAttribute(room.name)}" /></label>
+              <label class="field"><span>Metraz</span><input data-room-size="${index}" value="${escapeAttribute(room.size)}" /></label>
+              <label class="field"><span>Dla kogo</span><input data-room-guests="${index}" value="${escapeAttribute(room.guests)}" /></label>
+              <label class="field-full"><span>Udogodnienia, jedna w linii</span><textarea data-room-features="${index}">${escapeHtml(room.features.join("\n"))}</textarea></label>
+            </div>
+          </div>`
+      )
+      .join("");
+  }
+
+  function renderHallsList() {
+    const target = document.querySelector("#halls-list");
+    target.innerHTML = state.content.events.halls
+      .map(
+        (hall, index) => `
+          <div class="repeater-item">
+            <div class="repeater-head">
+              <strong>Sala ${index + 1}</strong>
+              <button class="button danger" type="button" data-remove-array="halls" data-index="${index}">Usun</button>
+            </div>
+            <div class="field-grid">
+              <label class="field"><span>Klucz techniczny</span><input data-hall-key="${index}" value="${escapeAttribute(hall.key)}" /></label>
+              <label class="field"><span>Nazwa</span><input data-hall-name="${index}" value="${escapeAttribute(hall.name)}" /></label>
+              <label class="field"><span>Pojemnosc</span><input data-hall-capacity="${index}" value="${escapeAttribute(hall.capacity)}" /></label>
+              <label class="field-full"><span>Opis</span><textarea data-hall-description="${index}">${escapeHtml(hall.description)}</textarea></label>
+            </div>
+          </div>`
+      )
+      .join("");
+  }
+
+  function renderServicesList() {
+    const target = document.querySelector("#services-list");
+    target.innerHTML = state.content.services
+      .map(
+        (service, index) => `
+          <div class="repeater-item">
+            <div class="repeater-head">
+              <strong>Usluga ${index + 1}</strong>
+              <button class="button danger" type="button" data-remove-array="services" data-index="${index}">Usun</button>
+            </div>
+            <div class="field-grid">
+              <label class="field"><span>Nazwa</span><input data-service-title="${index}" value="${escapeAttribute(service.title)}" /></label>
+              <label class="field"><span>Kontakt</span><input data-service-contact="${index}" value="${escapeAttribute(service.contact)}" /></label>
+              <label class="field"><span>Link</span><input data-service-link="${index}" value="${escapeAttribute(service.link)}" /></label>
+              <label class="field-full"><span>Opis</span><textarea data-service-description="${index}">${escapeHtml(service.description)}</textarea></label>
+            </div>
+          </div>`
+      )
+      .join("");
+  }
+
+  function bindRepeaterButtons() {
+    document.querySelectorAll("[data-add-array]").forEach((button) => {
+      button.addEventListener("click", () => addArrayItem(button.dataset.addArray));
+    });
+    document.querySelectorAll("[data-remove-array]").forEach((button) => {
+      button.addEventListener("click", () => removeArrayItem(button.dataset.removeArray, Number(button.dataset.index)));
+    });
+  }
+
+  function addArrayItem(type) {
+    captureDraftIfPossible();
+    if (type === "staff") {
+      state.content.home.staff.push("");
+    } else if (type === "testimonials") {
+      state.content.home.testimonials.push({ author: "", text: "" });
+    } else if (type === "menuSections") {
+      state.content.restaurant.menuSections.push({ title: "", items: [] });
+    } else if (type === "rooms") {
+      state.content.hotel.rooms.push({ name: "", size: "", guests: "", features: [] });
+    } else if (type === "halls") {
+      state.content.events.halls.push({ key: "", name: "", capacity: "", description: "" });
+    } else if (type === "services") {
+      state.content.services.push({ title: "", description: "", contact: "", link: "" });
+    }
+    renderContentPanel();
+  }
+
+  function removeArrayItem(type, index) {
+    captureDraftIfPossible();
+    if (type === "staff") {
+      state.content.home.staff.splice(index, 1);
+    } else if (type === "testimonials") {
+      state.content.home.testimonials.splice(index, 1);
+    } else if (type === "menuSections") {
+      state.content.restaurant.menuSections.splice(index, 1);
+    } else if (type === "rooms") {
+      state.content.hotel.rooms.splice(index, 1);
+    } else if (type === "halls") {
+      state.content.events.halls.splice(index, 1);
+    } else if (type === "services") {
+      state.content.services.splice(index, 1);
+    }
+    renderContentPanel();
+  }
+
+  function collectContentFromForm() {
+    const content = structuredClone(state.content);
+    content.company.name = document.querySelector("#company-name").value.trim();
+    content.company.phone = document.querySelector("#company-phone").value.trim();
+    content.company.email = document.querySelector("#company-email").value.trim();
+    content.company.address = document.querySelector("#company-address").value.trim();
+    content.company.tagline = document.querySelector("#company-tagline").value.trim();
+    content.company.heroTitle = document.querySelector("#company-hero-title").value.trim();
+    content.company.heroText = document.querySelector("#company-hero-text").value.trim();
+    const openingHoursText = document
+      .querySelector("#company-opening-hours")
+      .value.split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    
+    // Konwertuj format tekstowy na obiekty {day, hours}
+    content.company.openingHours = openingHoursText.map((item) => {
+      const colonIndex = item.indexOf(':');
+      if (colonIndex > 0) {
+        return {
+          day: item.substring(0, colonIndex).trim(),
+          hours: item.substring(colonIndex + 1).trim()
+        };
+      }
+      return item; // Fallback dla starego formatu
+    });
+
+    content.home.aboutText = document.querySelector("#home-about-text").value.trim();
+    content.home.owner = document.querySelector("#home-owner").value.trim();
+    const prevBlocks = content.home.sectionBlocks || {};
+    const elH = document.querySelector("#section-block-hotel");
+    const elR = document.querySelector("#section-block-restaurant");
+    const elE = document.querySelector("#section-block-events");
+    content.home.sectionBlocks = {
+      hotel: elH ? elH.checked : Boolean(prevBlocks.hotel),
+      restaurant: elR ? elR.checked : Boolean(prevBlocks.restaurant),
+      events: elE ? elE.checked : Boolean(prevBlocks.events),
+    };
+    if (!content.booking) {
+      content.booking = {};
+    }
+    const br = document.querySelector("#booking-enable-restaurant");
+    const bh = document.querySelector("#booking-enable-hotel");
+    const be = document.querySelector("#booking-enable-events");
+    content.booking.restaurant = br ? br.checked : content.booking.restaurant !== false;
+    content.booking.hotel = bh ? bh.checked : content.booking.hotel !== false;
+    content.booking.events = be ? be.checked : content.booking.events !== false;
+
+    function normalizePausePair(fromId, toId) {
+      let f = document.querySelector(fromId)?.value?.trim() || "";
+      let t = document.querySelector(toId)?.value?.trim() || "";
+      if (f && t && f > t) {
+        const x = f;
+        f = t;
+        t = x;
+      }
+      return { from: f, to: t };
+    }
+    const pr = normalizePausePair("#booking-restaurant-pause-from", "#booking-restaurant-pause-to");
+    const ph = normalizePausePair("#booking-hotel-pause-from", "#booking-hotel-pause-to");
+    const pe = normalizePausePair("#booking-events-pause-from", "#booking-events-pause-to");
+    content.booking.restaurantPauseFrom = pr.from;
+    content.booking.restaurantPauseTo = pr.to;
+    content.booking.hotelPauseFrom = ph.from;
+    content.booking.hotelPauseTo = ph.to;
+    content.booking.eventsPauseFrom = pe.from;
+    content.booking.eventsPauseTo = pe.to;
+
+    content.home.staff = Array.from(document.querySelectorAll("[data-staff-index]"))
+      .map((element) => element.value.trim())
+      .filter(Boolean);
+    content.home.testimonials = Array.from(document.querySelectorAll("[data-testimonial-author]")).map(
+      (element, index) => ({
+        author: element.value.trim(),
+        text: document.querySelector(`[data-testimonial-text="${index}"]`).value.trim(),
+      })
+    );
+
+    content.restaurant.heroTitle = document.querySelector("#restaurant-hero-title")?.value.trim() || "";
+    content.restaurant.heroText = document.querySelector("#restaurant-hero-text")?.value.trim() || "";
+    content.restaurant.extras = (document.querySelector("#restaurant-extras")?.value || "")
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    
+    // Zbierz menu z panelu zarządzania menu
+    if (document.querySelector("#restaurant-menu-panel")) {
+      content.restaurant.menu = collectMenuFromPanel();
+    } else {
+      // Fallback dla starego formatu
+      content.restaurant.menuSections = Array.from(document.querySelectorAll("[data-menu-title]")).map(
+        (element, index) => ({
+          title: element.value.trim(),
+          items: document
+            .querySelector(`[data-menu-items="${index}"]`)
+            .value.split("\n")
+            .map((item) => item.trim())
+            .filter(Boolean),
+        })
+      );
+    }
+
+    content.hotel.heroTitle = document.querySelector("#hotel-hero-title").value.trim();
+    content.hotel.heroText = document.querySelector("#hotel-hero-text").value.trim();
+    content.hotel.amenities = document
+      .querySelector("#hotel-amenities")
+      .value.split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    content.hotel.rooms = Array.from(document.querySelectorAll("[data-room-name]")).map((element, index) => ({
+      name: element.value.trim(),
+      size: document.querySelector(`[data-room-size="${index}"]`).value.trim(),
+      guests: document.querySelector(`[data-room-guests="${index}"]`).value.trim(),
+      features: document
+        .querySelector(`[data-room-features="${index}"]`)
+        .value.split("\n")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    }));
+
+    content.events.heroTitle = document.querySelector("#events-hero-title").value.trim();
+    content.events.heroText = document.querySelector("#events-hero-text").value.trim();
+    content.events.packages = document
+      .querySelector("#events-packages")
+      .value.split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const ofertaEl = document.querySelector("#events-oferta-modal-html");
+    if (ofertaEl) {
+      content.events.ofertaModalBodyHtml = ofertaEl.value;
+    }
+    content.events.halls = Array.from(document.querySelectorAll("[data-hall-key]")).map((element, index) => ({
+      key: element.value.trim(),
+      name: document.querySelector(`[data-hall-name="${index}"]`).value.trim(),
+      capacity: document.querySelector(`[data-hall-capacity="${index}"]`).value.trim(),
+      description: document.querySelector(`[data-hall-description="${index}"]`).value.trim(),
+    }));
+
+    if (document.querySelector("#events-menu-panel")) {
+      if (!content.events) {
+        content.events = {};
+      }
+      content.events.menu = collectEventsMenuFromPanel();
+    }
+
+    content.services = Array.from(document.querySelectorAll("[data-service-title]")).map((element, index) => ({
+      title: element.value.trim(),
+      contact: document.querySelector(`[data-service-contact="${index}"]`).value.trim(),
+      link: document.querySelector(`[data-service-link="${index}"]`).value.trim(),
+      description: document.querySelector(`[data-service-description="${index}"]`).value.trim(),
+    }));
+
+    return content;
+  }
+
+  function captureDraftIfPossible() {
+    try {
+      if (document.querySelector("#content-panel")) {
+        state.content = collectContentFromForm();
+      }
+      // Zbierz menu z panelu menu restauracji
+      if (document.querySelector("#restaurant-menu-panel")) {
+        if (!state.content.restaurant) {
+          state.content.restaurant = {};
+        }
+        state.content.restaurant.menu = collectMenuFromPanel();
+      }
+      if (document.querySelector("#events-menu-panel")) {
+        if (!state.content.events) {
+          state.content.events = {};
+        }
+        state.content.events.menu = collectEventsMenuFromPanel();
+      }
+    } catch (error) {
+      // Ignore incomplete drafts while the panel is rerendering.
+    }
+  }
+
+  async function saveContent() {
+    try {
+      const content = collectContentFromForm();
+      // Zbierz menu z panelu zarządzania menu jeśli istnieje
+      if (document.querySelector("#restaurant-menu-panel")) {
+        if (!content.restaurant) {
+          content.restaurant = {};
+        }
+        content.restaurant.menu = collectMenuFromPanel();
+      }
+      if (document.querySelector("#events-menu-panel")) {
+        if (!content.events) {
+          content.events = {};
+        }
+        content.events.menu = collectEventsMenuFromPanel();
+      }
+      // Zbierz galerię restauracji jeśli istnieje
+      if (state.content.restaurant?.gallery) {
+        if (!content.restaurant) {
+          content.restaurant = {};
+        }
+        content.restaurant.gallery = state.content.restaurant.gallery;
+      }
+      const payload = { content };
+      const data = await api("/api/admin/content", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      state.content = data.content;
+      renderContentPanel("Tresci zostaly zapisane.");
+      if (document.querySelector("#restaurant-menu-panel")) {
+        renderRestaurantMenuPanel("Menu zostalo zapisane.");
+      }
+      if (document.querySelector("#events-menu-panel")) {
+        renderEventsMenuPanel("Menu okolicznosciowe zostalo zapisane.");
+      }
+      if (document.querySelector("#restaurant-gallery-panel")) {
+        renderRestaurantGalleryPanel("Galeria zostala zapisana.");
+      }
+    } catch (error) {
+      renderContentPanel(error.message);
+    }
+  }
+
+  function renderSubmissionsPanel() {
+    const panel = document.querySelector("#submissions-panel");
+    panel.innerHTML = `
+      <p class="pill">Formularz kontaktowy</p>
+      <h2>Zgloszenia</h2>
+      <p class="section-intro">Tutaj wpadaja wiadomosci wyslane przez formularz kontaktowy.</p>
+      <div class="stack">
+        ${
+          state.submissions.length
+            ? state.submissions
+                .map(
+                  (submission) => `
+                    <article class="list-item">
+                      <div class="list-head">
+                        <strong>${escapeHtml(submission.fullName)}</strong>
+                        <span class="pill">${escapeHtml(submission.status)}</span>
+                      </div>
+                      <div class="submission-meta">
+                        <span>${escapeHtml(submission.email)}</span>
+                        <span>${escapeHtml(submission.phone || "")}</span>
+                        <span>${escapeHtml(submission.eventType || "")}</span>
+                      </div>
+                      <p>${escapeHtml(submission.message)}</p>
+                      <p class="helper">${escapeHtml(submission.preferredDate || "")} | ${escapeHtml(submission.createdAt || "")}</p>
+                      <div class="inline-actions">
+                        <button class="button secondary" type="button" data-submission-status="${submission.id}" data-status="new">Oznacz jako nowe</button>
+                        <button class="button" type="button" data-submission-status="${submission.id}" data-status="processed">Oznacz jako obsluzone</button>
+                      </div>
+                    </article>`
+                )
+                .join("")
+            : `<p class="empty">Brak zgloszen.</p>`
+        }
+      </div>
+    `;
+    panel.querySelectorAll("[data-submission-status]").forEach((button) => {
+      button.addEventListener("click", () => updateSubmissionStatus(button.dataset.submissionStatus, button.dataset.status));
+    });
+  }
+
+  async function updateSubmissionStatus(id, status) {
+    await api(`/api/admin/submissions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    await loadDashboard();
+  }
+
+  function renderGalleryPanel(statusMessage = "") {
+    const panel = document.querySelector("#gallery-panel");
+    panel.innerHTML = `
+      <p class="pill">Galeria</p>
+      <h2>Albumy i zdjecia</h2>
+      <p class="section-intro">Dodaj album, potem wgraj zdjecia i ustaw okladke widoczna na stronie.</p>
+      <div class="grid">
+        <div class="col-4">
+          <div class="repeater-item">
+            <h3>Nowy album</h3>
+            <form id="album-form" class="stack">
+              <label class="field-full"><span>Tytul</span><input name="title" required /></label>
+              <label class="field-full"><span>Slug</span><input name="slug" placeholder="np-wesele-anna-piotr" required /></label>
+              <label class="field-full"><span>Opis</span><textarea name="description"></textarea></label>
+              <button class="button" type="submit">Dodaj album</button>
+              <p class="status">${escapeHtml(statusMessage)}</p>
+            </form>
+          </div>
+        </div>
+        <div class="col-8">
+          <div class="stack">
+            ${
+              state.galleryAlbums.length
+                ? state.galleryAlbums
+                    .map(
+                      (album) => `
+                        <article class="repeater-item">
+                          <div class="repeater-head">
+                            <div>
+                              <h3>${escapeHtml(album.title)}</h3>
+                              <p class="helper">${escapeHtml(album.description || "")}</p>
+                            </div>
+                            <span class="pill">${escapeHtml(album.slug)}</span>
+                          </div>
+                          <form class="stack" data-upload-album="${album.id}">
+                            <label class="field-full">
+                              <span>Dodaj zdjecia do albumu</span>
+                              <input type="file" name="images" accept="image/*" multiple />
+                            </label>
+                            <button class="button secondary" type="submit">Wgraj zdjecia</button>
+                          </form>
+                          <div class="thumb-grid">
+                            ${
+                              album.images && album.images.length
+                                ? album.images
+                                    .map(
+                                      (image) => `
+                                        <article class="thumb-card">
+                                          <img src="${escapeAttribute(image.url)}" alt="${escapeAttribute(image.alt || album.title)}" />
+                                          <div class="inline-actions">
+                                            <button class="button secondary" type="button" data-cover-image="${image.id}">Ustaw jako glowne</button>
+                                            <button class="button danger" type="button" data-delete-image="${image.id}">Usun</button>
+                                          </div>
+                                        </article>`
+                                    )
+                                    .join("")
+                                : `<p class="empty">Brak zdjec w albumie.</p>`
+                            }
+                          </div>
+                        </article>`
+                    )
+                    .join("")
+                : `<p class="empty">Nie ma jeszcze albumow.</p>`
+            }
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.querySelector("#album-form").addEventListener("submit", createAlbum);
+    panel.querySelectorAll("[data-upload-album]").forEach((form) => {
+      form.addEventListener("submit", uploadAlbumImages);
+    });
+    panel.querySelectorAll("[data-cover-image]").forEach((button) => {
+      button.addEventListener("click", () => setCoverImage(button.dataset.coverImage));
+    });
+    panel.querySelectorAll("[data-delete-image]").forEach((button) => {
+      button.addEventListener("click", () => deleteImage(button.dataset.deleteImage));
+    });
+  }
+
+  async function createAlbum(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const payload = Object.fromEntries(new FormData(form).entries());
+    try {
+      await api("/api/admin/gallery/albums", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      await loadDashboard("Album zostal dodany.");
+    } catch (error) {
+      renderGalleryPanel(error.message);
+    }
+  }
+
+  async function uploadAlbumImages(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const albumId = form.dataset.uploadAlbum;
+    const formData = new FormData(form);
+    try {
+      await fetch(state.apiBase + `/api/admin/gallery/albums/${albumId}/images`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      }).then(async (response) => {
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || "Nie udalo sie wgrac zdjec.");
+        }
+      });
+      await loadDashboard("Zdjecia zostaly wgrane.");
+    } catch (error) {
+      renderGalleryPanel(error.message);
+    }
+  }
+
+  async function setCoverImage(imageId) {
+    await api(`/api/admin/gallery/images/${imageId}/cover`, { method: "POST" });
+    await loadDashboard("Okladka albumu zostala zaktualizowana.");
+  }
+
+  async function deleteImage(imageId) {
+    await api(`/api/admin/gallery/images/${imageId}`, { method: "DELETE" });
+    await loadDashboard("Zdjecie zostalo usuniete.");
+  }
+
+  function renderRestaurantMenuPanel(statusMessage = "") {
+    const panel = document.querySelector("#restaurant-menu-panel");
+    const menu = state.content.restaurant?.menu || [];
+
+    panel.innerHTML = `
+      <p class="pill">Restauracja</p>
+      <h2>Menu Restauracji</h2>
+      <p class="section-intro">Zarzadzaj menu restauracji. Mozesz dodawac kategorie (np. Przystawki, Zupy, Dania glowne), pozycje menu z cenami i skladnikami, oraz zmieniac kolejnosc.</p>
+      <p class="status">${escapeHtml(statusMessage)}</p>
+      <div class="stack">
+        <div class="repeater-head">
+          <strong>Kategorie menu</strong>
+          <button class="button secondary" type="button" id="add-menu-section">Dodaj kategorie</button>
+        </div>
+        <div id="menu-sections-list" class="repeater-list"></div>
+      </div>
+    `;
+
+    renderMenuSectionsList();
+    panel.querySelector("#add-menu-section").addEventListener("click", addMenuSection);
+  }
+
+  function renderMenuSectionsList() {
+    const target = document.querySelector("#menu-sections-list");
+    if (!target) return;
+    
+    const menu = state.content.restaurant?.menu || [];
+    target.innerHTML = menu
+      .map(
+        (section, sectionIndex) => `
+          <div class="repeater-item">
+            <div class="repeater-head">
+              <strong>Kategoria ${sectionIndex + 1}: ${escapeHtml(section.section || "")}</strong>
+              <div class="inline-actions">
+                <button class="button secondary" type="button" data-move-menu-section-up="${sectionIndex}" ${sectionIndex === 0 ? 'disabled' : ''}>↑</button>
+                <button class="button secondary" type="button" data-move-menu-section-down="${sectionIndex}" ${sectionIndex === menu.length - 1 ? 'disabled' : ''}>↓</button>
+                <button class="button danger" type="button" data-remove-menu-section="${sectionIndex}">Usun kategorie</button>
+              </div>
+            </div>
+            <div class="field-grid">
+              <label class="field-full"><span>Nazwa kategorii</span><input data-menu-section-name="${sectionIndex}" value="${escapeAttribute(section.section || "")}" placeholder="np. Przystawki, Zupy, Dania główne" /></label>
+            </div>
+            <div class="repeater-head">
+              <strong>Podkategorie</strong>
+              <button class="button secondary" type="button" data-add-menu-subcategory="${sectionIndex}">Dodaj podkategorie</button>
+            </div>
+            <div class="repeater-list" data-menu-section-subcategories="${sectionIndex}">
+              ${(() => {
+                const subcategories = new Set();
+                (section.items || []).forEach(item => {
+                  if (item.subcategory) {
+                    subcategories.add(item.subcategory);
+                  }
+                });
+                return Array.from(subcategories).map((subcat, subcatIndex) => `
+                  <div class="repeater-item">
+                    <div class="repeater-head">
+                      <strong>Podkategoria ${subcatIndex + 1}: ${escapeHtml(subcat)}</strong>
+                      <div class="inline-actions">
+                        <button class="button secondary" type="button" data-move-menu-subcategory-up="${sectionIndex}" data-subcategory="${escapeAttribute(subcat)}" ${subcatIndex === 0 ? 'disabled' : ''}>↑</button>
+                        <button class="button secondary" type="button" data-move-menu-subcategory-down="${sectionIndex}" data-subcategory="${escapeAttribute(subcat)}" ${subcatIndex === subcategories.size - 1 ? 'disabled' : ''}>↓</button>
+                        <button class="button danger" type="button" data-remove-menu-subcategory="${sectionIndex}" data-subcategory="${escapeAttribute(subcat)}">Usun podkategorie</button>
+                      </div>
+                    </div>
+                    <div class="field-grid">
+                      <label class="field-full"><span>Nazwa podkategorii</span><input data-menu-subcategory-name="${sectionIndex}-${subcatIndex}" data-subcategory-old="${escapeAttribute(subcat)}" value="${escapeAttribute(subcat)}" placeholder="np. Na zimno, Na ciepło, Alkohole" /></label>
+                    </div>
+                  </div>
+                `).join('');
+              })()}
+            </div>
+            <div class="repeater-head">
+              <strong>Pozycje menu</strong>
+              <button class="button secondary" type="button" data-add-menu-item="${sectionIndex}">Dodaj pozycje</button>
+            </div>
+            <div class="repeater-list" data-menu-section-items="${sectionIndex}">
+              ${(section.items || []).map((item, itemIndex) => `
+                <div class="repeater-item">
+                  <div class="repeater-head">
+                    <strong>Pozycja ${itemIndex + 1}</strong>
+                    <div class="inline-actions">
+                      <button class="button secondary" type="button" data-move-menu-item-up="${sectionIndex}" data-item-index="${itemIndex}" ${itemIndex === 0 ? 'disabled' : ''}>↑</button>
+                      <button class="button secondary" type="button" data-move-menu-item-down="${sectionIndex}" data-item-index="${itemIndex}" ${itemIndex === section.items.length - 1 ? 'disabled' : ''}>↓</button>
+                      <button class="button danger" type="button" data-remove-menu-item="${sectionIndex}" data-item-index="${itemIndex}">Usun</button>
+                    </div>
+                  </div>
+                  <div class="field-grid">
+                    <label class="field"><span>Nazwa dania</span><input data-menu-item-name="${sectionIndex}-${itemIndex}" value="${escapeAttribute(item.name || "")}" /></label>
+                    <label class="field"><span>Cena</span><input data-menu-item-price="${sectionIndex}-${itemIndex}" value="${escapeAttribute(item.price || "")}" placeholder="np. 45 zł" /></label>
+                    <label class="field"><span>Podkategoria (opcjonalnie)</span>
+                      <select data-menu-item-subcategory="${sectionIndex}-${itemIndex}">
+                        <option value="">Brak podkategorii</option>
+                        ${(() => {
+                          const subcategories = new Set();
+                          (section.items || []).forEach(i => {
+                            if (i.subcategory) {
+                              subcategories.add(i.subcategory);
+                            }
+                          });
+                          return Array.from(subcategories).map(subcat => 
+                            `<option value="${escapeAttribute(subcat)}" ${item.subcategory === subcat ? 'selected' : ''}>${escapeHtml(subcat)}</option>`
+                          ).join('');
+                        })()}
+                      </select>
+                    </label>
+                    <label class="field-full"><span>Opis</span><textarea data-menu-item-description="${sectionIndex}-${itemIndex}">${escapeHtml(item.description || "")}</textarea></label>
+                    <label class="field-full"><span>Skladniki (jeden w linii)</span><textarea data-menu-item-ingredients="${sectionIndex}-${itemIndex}">${escapeHtml((item.ingredients || []).join("\n"))}</textarea></label>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>`
+      )
+      .join("");
+
+    target.querySelectorAll("[data-add-menu-item]").forEach((button) => {
+      button.addEventListener("click", () => addMenuItem(Number(button.dataset.addMenuItem)));
+    });
+    target.querySelectorAll("[data-remove-menu-item]").forEach((button) => {
+      button.addEventListener("click", () => removeMenuItem(Number(button.dataset.removeMenuItem), Number(button.dataset.itemIndex)));
+    });
+    target.querySelectorAll("[data-move-menu-item-up]").forEach((button) => {
+      button.addEventListener("click", () => moveMenuItem(Number(button.dataset.moveMenuItemUp), Number(button.dataset.itemIndex), -1));
+    });
+    target.querySelectorAll("[data-move-menu-item-down]").forEach((button) => {
+      button.addEventListener("click", () => moveMenuItem(Number(button.dataset.moveMenuItemDown), Number(button.dataset.itemIndex), 1));
+    });
+    target.querySelectorAll("[data-remove-menu-section]").forEach((button) => {
+      button.addEventListener("click", () => removeMenuSection(Number(button.dataset.removeMenuSection)));
+    });
+    target.querySelectorAll("[data-move-menu-section-up]").forEach((button) => {
+      button.addEventListener("click", () => moveMenuSection(Number(button.dataset.moveMenuSectionUp), -1));
+    });
+    target.querySelectorAll("[data-move-menu-section-down]").forEach((button) => {
+      button.addEventListener("click", () => moveMenuSection(Number(button.dataset.moveMenuSectionDown), 1));
+    });
+    target.querySelectorAll("[data-add-menu-subcategory]").forEach((button) => {
+      button.addEventListener("click", () => addMenuSubcategory(Number(button.dataset.addMenuSubcategory)));
+    });
+    target.querySelectorAll("[data-remove-menu-subcategory]").forEach((button) => {
+      button.addEventListener("click", () => removeMenuSubcategory(Number(button.dataset.removeMenuSubcategory), button.dataset.subcategory));
+    });
+    target.querySelectorAll("[data-move-menu-subcategory-up]").forEach((button) => {
+      button.addEventListener("click", () => moveMenuSubcategory(Number(button.dataset.moveMenuSubcategoryUp), button.dataset.subcategory, -1));
+    });
+    target.querySelectorAll("[data-move-menu-subcategory-down]").forEach((button) => {
+      button.addEventListener("click", () => moveMenuSubcategory(Number(button.dataset.moveMenuSubcategoryDown), button.dataset.subcategory, 1));
+    });
+  }
+
+  function addMenuSection() {
+    captureDraftIfPossible();
+    if (!state.content.restaurant) {
+      state.content.restaurant = {};
+    }
+    if (!state.content.restaurant.menu) {
+      state.content.restaurant.menu = [];
+    }
+    state.content.restaurant.menu.push({ section: "", items: [] });
+    renderRestaurantMenuPanel();
+  }
+
+  function removeMenuSection(index) {
+    captureDraftIfPossible();
+    if (state.content.restaurant?.menu) {
+      state.content.restaurant.menu.splice(index, 1);
+    }
+    renderRestaurantMenuPanel();
+  }
+
+  function moveMenuSection(index, direction) {
+    captureDraftIfPossible();
+    if (!state.content.restaurant?.menu) return;
+    const menu = state.content.restaurant.menu;
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= menu.length) return;
+    [menu[index], menu[newIndex]] = [menu[newIndex], menu[index]];
+    renderRestaurantMenuPanel();
+  }
+
+  function addMenuItem(sectionIndex) {
+    captureDraftIfPossible();
+    if (!state.content.restaurant?.menu?.[sectionIndex]) return;
+    if (!state.content.restaurant.menu[sectionIndex].items) {
+      state.content.restaurant.menu[sectionIndex].items = [];
+    }
+    state.content.restaurant.menu[sectionIndex].items.push({
+      name: "",
+      price: "",
+      description: "",
+      ingredients: []
+    });
+    renderRestaurantMenuPanel();
+  }
+
+  function removeMenuItem(sectionIndex, itemIndex) {
+    captureDraftIfPossible();
+    if (state.content.restaurant?.menu?.[sectionIndex]?.items) {
+      state.content.restaurant.menu[sectionIndex].items.splice(itemIndex, 1);
+    }
+    renderRestaurantMenuPanel();
+  }
+
+  function moveMenuItem(sectionIndex, itemIndex, direction) {
+    captureDraftIfPossible();
+    if (!state.content.restaurant?.menu?.[sectionIndex]?.items) return;
+    const items = state.content.restaurant.menu[sectionIndex].items;
+    const newIndex = itemIndex + direction;
+    if (newIndex < 0 || newIndex >= items.length) return;
+    [items[itemIndex], items[newIndex]] = [items[newIndex], items[itemIndex]];
+    renderRestaurantMenuPanel();
+  }
+
+  function collectMenuFromPanel() {
+    const root = document.querySelector("#restaurant-menu-panel");
+    if (!root) return [];
+    const menu = [];
+    const sections = root.querySelectorAll("[data-menu-section-name]");
+    sections.forEach((sectionInput, sectionIndex) => {
+      const sectionName = sectionInput.value.trim();
+      if (!sectionName) return;
+
+      const subcategoryMapping = {};
+      root.querySelectorAll(`[data-menu-subcategory-name^="${sectionIndex}-"]`).forEach((input) => {
+        const oldName = input.dataset.subcategoryOld;
+        const newName = input.value.trim();
+        if (oldName && newName && oldName !== newName) {
+          subcategoryMapping[oldName] = newName;
+        }
+      });
+
+      const items = [];
+      const itemInputs = root.querySelectorAll(`[data-menu-item-name^="${sectionIndex}-"]`);
+      itemInputs.forEach((itemInput) => {
+        const [secIdx, itemIdx] = itemInput.dataset.menuItemName.split("-").map(Number);
+        if (secIdx !== sectionIndex) return;
+
+        const name = itemInput.value.trim();
+        if (!name) return;
+
+        const price = root.querySelector(`[data-menu-item-price="${sectionIndex}-${itemIdx}"]`)?.value.trim() || "";
+        const description = root.querySelector(`[data-menu-item-description="${sectionIndex}-${itemIdx}"]`)?.value.trim() || "";
+        let subcategory = root.querySelector(`[data-menu-item-subcategory="${sectionIndex}-${itemIdx}"]`)?.value.trim() || "";
+
+        if (subcategory && subcategoryMapping[subcategory]) {
+          subcategory = subcategoryMapping[subcategory];
+        }
+
+        const ingredientsText = root.querySelector(`[data-menu-item-ingredients="${sectionIndex}-${itemIdx}"]`)?.value || "";
+        const ingredients = ingredientsText.split("\n").map((i) => i.trim()).filter(Boolean);
+
+        const item = { name, price, description, ingredients };
+        if (subcategory) {
+          item.subcategory = subcategory;
+        }
+        items.push(item);
+      });
+
+      menu.push({ section: sectionName, items });
+    });
+    return menu;
+  }
+
+  function collectEventsMenuFromPanel() {
+    const root = document.querySelector("#events-menu-panel");
+    if (!root) return [];
+    const menu = [];
+    const sections = root.querySelectorAll("[data-ev-menu-section-name]");
+    sections.forEach((sectionInput, sectionIndex) => {
+      const sectionName = sectionInput.value.trim();
+      if (!sectionName) return;
+
+      const subcategoryMapping = {};
+      root.querySelectorAll(`[data-ev-menu-subcategory-name^="${sectionIndex}-"]`).forEach((input) => {
+        const oldName = input.getAttribute("data-ev-subcategory-old");
+        const newName = input.value.trim();
+        if (oldName && newName && oldName !== newName) {
+          subcategoryMapping[oldName] = newName;
+        }
+      });
+
+      const items = [];
+      const itemInputs = root.querySelectorAll(`[data-ev-menu-item-name^="${sectionIndex}-"]`);
+      itemInputs.forEach((itemInput) => {
+        const key = itemInput.getAttribute("data-ev-menu-item-name") || "";
+        const [secIdx, itemIdx] = key.split("-").map(Number);
+        if (secIdx !== sectionIndex) return;
+
+        const name = itemInput.value.trim();
+        if (!name) return;
+
+        const description = root.querySelector(`[data-ev-menu-item-description="${sectionIndex}-${itemIdx}"]`)?.value.trim() || "";
+        let subcategory = root.querySelector(`[data-ev-menu-item-subcategory="${sectionIndex}-${itemIdx}"]`)?.value.trim() || "";
+
+        if (subcategory && subcategoryMapping[subcategory]) {
+          subcategory = subcategoryMapping[subcategory];
+        }
+
+        const ingredientsText = root.querySelector(`[data-ev-menu-item-ingredients="${sectionIndex}-${itemIdx}"]`)?.value || "";
+        const ingredients = ingredientsText.split("\n").map((i) => i.trim()).filter(Boolean);
+
+        const item = { name, description, ingredients };
+        if (subcategory) {
+          item.subcategory = subcategory;
+        }
+        items.push(item);
+      });
+
+      menu.push({ section: sectionName, items });
+    });
+    return menu;
+  }
+
+  function addMenuSubcategory(sectionIndex) {
+    captureDraftIfPossible();
+    if (!state.content.restaurant?.menu?.[sectionIndex]) return;
+    if (!state.content.restaurant.menu[sectionIndex].items) {
+      state.content.restaurant.menu[sectionIndex].items = [];
+    }
+    // Dodaj pustą pozycję z nową podkategorią
+    state.content.restaurant.menu[sectionIndex].items.push({
+      name: "",
+      price: "",
+      description: "",
+      ingredients: [],
+      subcategory: "Nowa podkategoria"
+    });
+    renderRestaurantMenuPanel();
+  }
+
+  function removeMenuSubcategory(sectionIndex, subcategoryName) {
+    captureDraftIfPossible();
+    if (!state.content.restaurant?.menu?.[sectionIndex]?.items) return;
+    // Usuń wszystkie pozycje z tą podkategorią
+    state.content.restaurant.menu[sectionIndex].items = state.content.restaurant.menu[sectionIndex].items.filter(
+      item => item.subcategory !== subcategoryName
+    );
+    renderRestaurantMenuPanel();
+  }
+
+  function moveMenuSubcategory(sectionIndex, subcategoryName, direction) {
+    captureDraftIfPossible();
+    if (!state.content.restaurant?.menu?.[sectionIndex]?.items) return;
+    
+    const items = state.content.restaurant.menu[sectionIndex].items;
+    const subcategories = Array.from(new Set(items.map(item => item.subcategory).filter(Boolean)));
+    const currentIndex = subcategories.indexOf(subcategoryName);
+    if (currentIndex === -1) return;
+    
+    const newIndex = currentIndex + direction;
+    if (newIndex < 0 || newIndex >= subcategories.length) return;
+    
+    const targetSubcategory = subcategories[newIndex];
+    
+    // Zamień podkategorie we wszystkich pozycjach
+    items.forEach(item => {
+      if (item.subcategory === subcategoryName) {
+        item.subcategory = targetSubcategory + "_temp";
+      } else if (item.subcategory === targetSubcategory) {
+        item.subcategory = subcategoryName;
+      }
+    });
+    
+    // Przywróć tymczasową nazwę
+    items.forEach(item => {
+      if (item.subcategory === targetSubcategory + "_temp") {
+        item.subcategory = targetSubcategory;
+      }
+    });
+    
+    renderRestaurantMenuPanel();
+  }
+
+  function renderEventsMenuPanel(statusMessage = "") {
+    const panel = document.querySelector("#events-menu-panel");
+    if (!panel) return;
+    const menu = state.content.events?.menu || [];
+
+    panel.innerHTML = `
+      <p class="pill">Przyjecia</p>
+      <h2>Menu okolicznosciowe</h2>
+      <p class="section-intro">Menu okolicznosciowe: kategorie, pozycje (nazwy dań), opisy, skladniki, podkategorie i kolejnosc — <strong>bez cen</strong> na stronie (wycena indywidualnie).</p>
+      <p class="status">${escapeHtml(statusMessage)}</p>
+      <div class="stack">
+        <div class="repeater-head">
+          <strong>Kategorie menu</strong>
+          <button class="button secondary" type="button" id="add-ev-menu-section">Dodaj kategorie</button>
+        </div>
+        <div id="ev-menu-sections-list" class="repeater-list"></div>
+      </div>
+    `;
+
+    renderEventsMenuSectionsList();
+    panel.querySelector("#add-ev-menu-section").addEventListener("click", addEventsMenuSection);
+  }
+
+  function renderEventsMenuSectionsList() {
+    const target = document.querySelector("#ev-menu-sections-list");
+    if (!target) return;
+
+    const menu = state.content.events?.menu || [];
+    target.innerHTML = menu
+      .map(
+        (section, sectionIndex) => `
+          <div class="repeater-item">
+            <div class="repeater-head">
+              <strong>Kategoria ${sectionIndex + 1}: ${escapeHtml(section.section || "")}</strong>
+              <div class="inline-actions">
+                <button class="button secondary" type="button" data-ev-move-menu-section-up="${sectionIndex}" ${sectionIndex === 0 ? "disabled" : ""}>↑</button>
+                <button class="button secondary" type="button" data-ev-move-menu-section-down="${sectionIndex}" ${sectionIndex === menu.length - 1 ? "disabled" : ""}>↓</button>
+                <button class="button danger" type="button" data-ev-remove-menu-section="${sectionIndex}">Usun kategorie</button>
+              </div>
+            </div>
+            <div class="field-grid">
+              <label class="field-full"><span>Nazwa kategorii</span><input data-ev-menu-section-name="${sectionIndex}" value="${escapeAttribute(section.section || "")}" placeholder="np. Przystawki, Zupy, Dania główne" /></label>
+            </div>
+            <div class="repeater-head">
+              <strong>Podkategorie</strong>
+              <button class="button secondary" type="button" data-ev-add-menu-subcategory="${sectionIndex}">Dodaj podkategorie</button>
+            </div>
+            <div class="repeater-list" data-ev-menu-section-subcategories="${sectionIndex}">
+              ${(() => {
+                const subcategories = new Set();
+                (section.items || []).forEach((item) => {
+                  if (item.subcategory) {
+                    subcategories.add(item.subcategory);
+                  }
+                });
+                return Array.from(subcategories)
+                  .map(
+                    (subcat, subcatIndex) => `
+                  <div class="repeater-item">
+                    <div class="repeater-head">
+                      <strong>Podkategoria ${subcatIndex + 1}: ${escapeHtml(subcat)}</strong>
+                      <div class="inline-actions">
+                        <button class="button secondary" type="button" data-ev-move-menu-subcategory-up="${sectionIndex}" data-subcategory="${escapeAttribute(subcat)}" ${subcatIndex === 0 ? "disabled" : ""}>↑</button>
+                        <button class="button secondary" type="button" data-ev-move-menu-subcategory-down="${sectionIndex}" data-subcategory="${escapeAttribute(subcat)}" ${subcatIndex === subcategories.size - 1 ? "disabled" : ""}>↓</button>
+                        <button class="button danger" type="button" data-ev-remove-menu-subcategory="${sectionIndex}" data-subcategory="${escapeAttribute(subcat)}">Usun podkategorie</button>
+                      </div>
+                    </div>
+                    <div class="field-grid">
+                      <label class="field-full"><span>Nazwa podkategorii</span><input data-ev-menu-subcategory-name="${sectionIndex}-${subcatIndex}" data-ev-subcategory-old="${escapeAttribute(subcat)}" value="${escapeAttribute(subcat)}" placeholder="np. Na zimno, Na ciepło, Alkohole" /></label>
+                    </div>
+                  </div>
+                `
+                  )
+                  .join("");
+              })()}
+            </div>
+            <div class="repeater-head">
+              <strong>Pozycje menu</strong>
+              <button class="button secondary" type="button" data-ev-add-menu-item="${sectionIndex}">Dodaj pozycje</button>
+            </div>
+            <div class="repeater-list" data-ev-menu-section-items="${sectionIndex}">
+              ${(section.items || [])
+                .map(
+                  (item, itemIndex) => `
+                <div class="repeater-item">
+                  <div class="repeater-head">
+                    <strong>Pozycja ${itemIndex + 1}</strong>
+                    <div class="inline-actions">
+                      <button class="button secondary" type="button" data-ev-move-menu-item-up="${sectionIndex}" data-item-index="${itemIndex}" ${itemIndex === 0 ? "disabled" : ""}>↑</button>
+                      <button class="button secondary" type="button" data-ev-move-menu-item-down="${sectionIndex}" data-item-index="${itemIndex}" ${itemIndex === section.items.length - 1 ? "disabled" : ""}>↓</button>
+                      <button class="button danger" type="button" data-ev-remove-menu-item="${sectionIndex}" data-item-index="${itemIndex}">Usun</button>
+                    </div>
+                  </div>
+                  <div class="field-grid">
+                    <label class="field"><span>Nazwa dania</span><input data-ev-menu-item-name="${sectionIndex}-${itemIndex}" value="${escapeAttribute(item.name || "")}" /></label>
+                    <label class="field"><span>Podkategoria (opcjonalnie)</span>
+                      <select data-ev-menu-item-subcategory="${sectionIndex}-${itemIndex}">
+                        <option value="">Brak podkategorii</option>
+                        ${(() => {
+                          const subcategories = new Set();
+                          (section.items || []).forEach((i) => {
+                            if (i.subcategory) {
+                              subcategories.add(i.subcategory);
+                            }
+                          });
+                          return Array.from(subcategories)
+                            .map(
+                              (subcat) =>
+                                `<option value="${escapeAttribute(subcat)}" ${item.subcategory === subcat ? "selected" : ""}>${escapeHtml(subcat)}</option>`
+                            )
+                            .join("");
+                        })()}
+                      </select>
+                    </label>
+                    <label class="field-full"><span>Opis</span><textarea data-ev-menu-item-description="${sectionIndex}-${itemIndex}">${escapeHtml(item.description || "")}</textarea></label>
+                    <label class="field-full"><span>Skladniki (jeden w linii)</span><textarea data-ev-menu-item-ingredients="${sectionIndex}-${itemIndex}">${escapeHtml((item.ingredients || []).join("\n"))}</textarea></label>
+                  </div>
+                </div>
+              `
+                )
+                .join("")}
+            </div>
+          </div>`
+      )
+      .join("");
+
+    target.querySelectorAll("[data-ev-add-menu-item]").forEach((button) => {
+      button.addEventListener("click", () => addEventsMenuItem(Number(button.getAttribute("data-ev-add-menu-item"))));
+    });
+    target.querySelectorAll("[data-ev-remove-menu-item]").forEach((button) => {
+      button.addEventListener("click", () =>
+        removeEventsMenuItem(Number(button.getAttribute("data-ev-remove-menu-item")), Number(button.getAttribute("data-item-index")))
+      );
+    });
+    target.querySelectorAll("[data-ev-move-menu-item-up]").forEach((button) => {
+      button.addEventListener("click", () =>
+        moveEventsMenuItem(Number(button.getAttribute("data-ev-move-menu-item-up")), Number(button.getAttribute("data-item-index")), -1)
+      );
+    });
+    target.querySelectorAll("[data-ev-move-menu-item-down]").forEach((button) => {
+      button.addEventListener("click", () =>
+        moveEventsMenuItem(Number(button.getAttribute("data-ev-move-menu-item-down")), Number(button.getAttribute("data-item-index")), 1)
+      );
+    });
+    target.querySelectorAll("[data-ev-remove-menu-section]").forEach((button) => {
+      button.addEventListener("click", () => removeEventsMenuSection(Number(button.getAttribute("data-ev-remove-menu-section"))));
+    });
+    target.querySelectorAll("[data-ev-move-menu-section-up]").forEach((button) => {
+      button.addEventListener("click", () => moveEventsMenuSection(Number(button.getAttribute("data-ev-move-menu-section-up")), -1));
+    });
+    target.querySelectorAll("[data-ev-move-menu-section-down]").forEach((button) => {
+      button.addEventListener("click", () => moveEventsMenuSection(Number(button.getAttribute("data-ev-move-menu-section-down")), 1));
+    });
+    target.querySelectorAll("[data-ev-add-menu-subcategory]").forEach((button) => {
+      button.addEventListener("click", () => addEventsMenuSubcategory(Number(button.getAttribute("data-ev-add-menu-subcategory"))));
+    });
+    target.querySelectorAll("[data-ev-remove-menu-subcategory]").forEach((button) => {
+      button.addEventListener("click", () =>
+        removeEventsMenuSubcategory(Number(button.getAttribute("data-ev-remove-menu-subcategory")), button.getAttribute("data-subcategory"))
+      );
+    });
+    target.querySelectorAll("[data-ev-move-menu-subcategory-up]").forEach((button) => {
+      button.addEventListener("click", () =>
+        moveEventsMenuSubcategory(Number(button.getAttribute("data-ev-move-menu-subcategory-up")), button.getAttribute("data-subcategory"), -1)
+      );
+    });
+    target.querySelectorAll("[data-ev-move-menu-subcategory-down]").forEach((button) => {
+      button.addEventListener("click", () =>
+        moveEventsMenuSubcategory(Number(button.getAttribute("data-ev-move-menu-subcategory-down")), button.getAttribute("data-subcategory"), 1)
+      );
+    });
+  }
+
+  function addEventsMenuSection() {
+    captureDraftIfPossible();
+    if (!state.content.events) {
+      state.content.events = {};
+    }
+    if (!state.content.events.menu) {
+      state.content.events.menu = [];
+    }
+    state.content.events.menu.push({ section: "", items: [] });
+    renderEventsMenuPanel();
+  }
+
+  function removeEventsMenuSection(index) {
+    captureDraftIfPossible();
+    if (state.content.events?.menu) {
+      state.content.events.menu.splice(index, 1);
+    }
+    renderEventsMenuPanel();
+  }
+
+  function moveEventsMenuSection(index, direction) {
+    captureDraftIfPossible();
+    if (!state.content.events?.menu) return;
+    const menu = state.content.events.menu;
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= menu.length) return;
+    [menu[index], menu[newIndex]] = [menu[newIndex], menu[index]];
+    renderEventsMenuPanel();
+  }
+
+  function addEventsMenuItem(sectionIndex) {
+    captureDraftIfPossible();
+    if (!state.content.events?.menu?.[sectionIndex]) return;
+    if (!state.content.events.menu[sectionIndex].items) {
+      state.content.events.menu[sectionIndex].items = [];
+    }
+    state.content.events.menu[sectionIndex].items.push({
+      name: "",
+      description: "",
+      ingredients: [],
+    });
+    renderEventsMenuPanel();
+  }
+
+  function removeEventsMenuItem(sectionIndex, itemIndex) {
+    captureDraftIfPossible();
+    if (state.content.events?.menu?.[sectionIndex]?.items) {
+      state.content.events.menu[sectionIndex].items.splice(itemIndex, 1);
+    }
+    renderEventsMenuPanel();
+  }
+
+  function moveEventsMenuItem(sectionIndex, itemIndex, direction) {
+    captureDraftIfPossible();
+    if (!state.content.events?.menu?.[sectionIndex]?.items) return;
+    const items = state.content.events.menu[sectionIndex].items;
+    const newIndex = itemIndex + direction;
+    if (newIndex < 0 || newIndex >= items.length) return;
+    [items[itemIndex], items[newIndex]] = [items[newIndex], items[itemIndex]];
+    renderEventsMenuPanel();
+  }
+
+  function addEventsMenuSubcategory(sectionIndex) {
+    captureDraftIfPossible();
+    if (!state.content.events?.menu?.[sectionIndex]) return;
+    if (!state.content.events.menu[sectionIndex].items) {
+      state.content.events.menu[sectionIndex].items = [];
+    }
+    state.content.events.menu[sectionIndex].items.push({
+      name: "",
+      description: "",
+      ingredients: [],
+      subcategory: "Nowa podkategoria",
+    });
+    renderEventsMenuPanel();
+  }
+
+  function removeEventsMenuSubcategory(sectionIndex, subcategoryName) {
+    captureDraftIfPossible();
+    if (!state.content.events?.menu?.[sectionIndex]?.items) return;
+    state.content.events.menu[sectionIndex].items = state.content.events.menu[sectionIndex].items.filter(
+      (item) => item.subcategory !== subcategoryName
+    );
+    renderEventsMenuPanel();
+  }
+
+  function moveEventsMenuSubcategory(sectionIndex, subcategoryName, direction) {
+    captureDraftIfPossible();
+    if (!state.content.events?.menu?.[sectionIndex]?.items) return;
+
+    const items = state.content.events.menu[sectionIndex].items;
+    const subcategories = Array.from(new Set(items.map((item) => item.subcategory).filter(Boolean)));
+    const currentIndex = subcategories.indexOf(subcategoryName);
+    if (currentIndex === -1) return;
+
+    const newIndex = currentIndex + direction;
+    if (newIndex < 0 || newIndex >= subcategories.length) return;
+
+    const targetSubcategory = subcategories[newIndex];
+
+    items.forEach((item) => {
+      if (item.subcategory === subcategoryName) {
+        item.subcategory = targetSubcategory + "_temp";
+      } else if (item.subcategory === targetSubcategory) {
+        item.subcategory = subcategoryName;
+      }
+    });
+
+    items.forEach((item) => {
+      if (item.subcategory === targetSubcategory + "_temp") {
+        item.subcategory = targetSubcategory;
+      }
+    });
+
+    renderEventsMenuPanel();
+  }
+
+  function renderRestaurantGalleryPanel(statusMessage = "") {
+    const panel = document.querySelector("#restaurant-gallery-panel");
+    const gallery = state.content.restaurant?.gallery || [];
+
+    panel.innerHTML = `
+      <p class="pill">Restauracja</p>
+      <h2>Galeria Restauracji</h2>
+      <p class="section-intro">Zarzadzaj zdjeciami galerii restauracji. Mozesz dodawac, usuwac i zmieniac kolejnosc zdjec.</p>
+      <p class="status">${escapeHtml(statusMessage)}</p>
+      <div class="stack">
+        <form class="repeater-item" data-upload-restaurant-gallery>
+          <label class="field-full">
+            <span>Dodaj zdjecia</span>
+            <input type="file" name="images" accept="image/*" multiple />
+          </label>
+          <button class="button secondary" type="submit">Wgraj zdjecia</button>
+        </form>
+        <div class="thumb-grid" id="restaurant-gallery-thumbs">
+          ${
+            gallery.length
+              ? gallery
+                  .map(
+                    (image, index) => `
+                      <article class="thumb-card">
+                        <img src="${escapeAttribute(image.url || image)}" alt="${escapeAttribute(image.alt || "Restauracja")}" />
+                        <div class="inline-actions">
+                          <button class="button secondary" type="button" data-move-restaurant-image-up="${index}" ${index === 0 ? 'disabled' : ''}>↑</button>
+                          <button class="button secondary" type="button" data-move-restaurant-image-down="${index}" ${index === gallery.length - 1 ? 'disabled' : ''}>↓</button>
+                          <button class="button danger" type="button" data-remove-restaurant-image="${index}">Usun</button>
+                        </div>
+                      </article>`
+                  )
+                  .join("")
+              : `<p class="empty">Brak zdjec w galerii.</p>`
+          }
+        </div>
+      </div>
+    `;
+
+    panel.querySelector("[data-upload-restaurant-gallery]").addEventListener("submit", uploadRestaurantGalleryImages);
+    panel.querySelectorAll("[data-remove-restaurant-image]").forEach((button) => {
+      button.addEventListener("click", () => removeRestaurantImage(Number(button.dataset.removeRestaurantImage)));
+    });
+    panel.querySelectorAll("[data-move-restaurant-image-up]").forEach((button) => {
+      button.addEventListener("click", () => moveRestaurantImage(Number(button.dataset.moveRestaurantImageUp), -1));
+    });
+    panel.querySelectorAll("[data-move-restaurant-image-down]").forEach((button) => {
+      button.addEventListener("click", () => moveRestaurantImage(Number(button.dataset.moveRestaurantImageDown), 1));
+    });
+  }
+
+  async function uploadRestaurantGalleryImages(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const files = formData.getAll("images");
+
+    if (files.length === 0 || !files[0].size) {
+      renderRestaurantGalleryPanel("Wybierz pliki do wgrania.");
+      return;
+    }
+
+    try {
+      const images = await Promise.all(
+        Array.from(files).map(async (file) => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              resolve({
+                url: e.target.result,
+                alt: file.name.replace(/\.[^/.]+$/, ""),
+              });
+            };
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+
+      if (!state.content.restaurant) {
+        state.content.restaurant = {};
+      }
+      if (!state.content.restaurant.gallery) {
+        state.content.restaurant.gallery = [];
+      }
+
+      state.content.restaurant.gallery.push(...images);
+      await saveContent();
+      await loadDashboard("Zdjecia zostaly dodane.");
+    } catch (error) {
+      renderRestaurantGalleryPanel(error.message || "Blad podczas wgrywania zdjec.");
+    }
+  }
+
+  async function removeRestaurantImage(index) {
+    if (!state.content.restaurant?.gallery) {
+      return;
+    }
+    state.content.restaurant.gallery.splice(index, 1);
+    await saveContent();
+    await loadDashboard("Zdjecie zostalo usuniete.");
+  }
+
+  async function moveRestaurantImage(index, direction) {
+    if (!state.content.restaurant?.gallery) {
+      return;
+    }
+    const images = state.content.restaurant.gallery;
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= images.length) {
+      return;
+    }
+    [images[index], images[newIndex]] = [images[newIndex], images[index]];
+    await saveContent();
+    await loadDashboard("Kolejnosc zdjec zostala zmieniona.");
+  }
+
+  function renderHotelRoomGalleriesPanel(statusMessage = "") {
+    const panel = document.querySelector("#hotel-room-galleries-panel");
+    const roomGalleries = state.content.hotel?.roomGalleries || {
+      "1-osobowe": [],
+      "2-osobowe": [],
+      "3-osobowe": [],
+      "4-osobowe": [],
+    };
+
+    const roomTypes = [
+      { key: "1-osobowe", label: "Pokoje 1-osobowe" },
+      { key: "2-osobowe", label: "Pokoje 2-osobowe" },
+      { key: "3-osobowe", label: "Pokoje 3-osobowe" },
+      { key: "4-osobowe", label: "Pokoje 4-osobowe" },
+    ];
+
+    panel.innerHTML = `
+      <p class="pill">Hotel</p>
+      <h2>Galeria Pokoi</h2>
+      <p class="section-intro">Zarzadzaj zdjeciami dla poszczegolnych typow pokoi. Mozesz dodawac, usuwac i zmieniac kolejnosc zdjec.</p>
+      <p class="status">${escapeHtml(statusMessage)}</p>
+      <div class="grid">
+        ${roomTypes
+          .map(
+            (roomType) => `
+              <div class="col-6">
+                <div class="repeater-item">
+                  <h3>${escapeHtml(roomType.label)}</h3>
+                  <form class="stack" data-upload-room-gallery="${escapeAttribute(roomType.key)}">
+                    <label class="field-full">
+                      <span>Dodaj zdjecia</span>
+                      <input type="file" name="images" accept="image/*" multiple />
+                    </label>
+                    <button class="button secondary" type="submit">Wgraj zdjecia</button>
+                  </form>
+                  <div class="thumb-grid" data-room-gallery="${escapeAttribute(roomType.key)}">
+                    ${
+                      roomGalleries[roomType.key] && roomGalleries[roomType.key].length
+                        ? roomGalleries[roomType.key]
+                            .map(
+                              (image, index) => `
+                                <article class="thumb-card">
+                                  <img src="${escapeAttribute(image.url || image)}" alt="${escapeAttribute(image.alt || roomType.label)}" />
+                                  <div class="inline-actions">
+                                    <button class="button secondary" type="button" data-move-up="${roomType.key}" data-index="${index}" ${index === 0 ? 'disabled' : ''}>↑</button>
+                                    <button class="button secondary" type="button" data-move-down="${roomType.key}" data-index="${index}" ${index === roomGalleries[roomType.key].length - 1 ? 'disabled' : ''}>↓</button>
+                                    <button class="button danger" type="button" data-remove-room-image="${roomType.key}" data-index="${index}">Usun</button>
+                                  </div>
+                                </article>`
+                            )
+                            .join("")
+                        : `<p class="empty">Brak zdjec dla tego typu pokoju.</p>`
+                    }
+                  </div>
+                </div>
+              </div>`
+          )
+          .join("")}
+      </div>
+    `;
+
+    panel.querySelectorAll("[data-upload-room-gallery]").forEach((form) => {
+      form.addEventListener("submit", (e) => uploadRoomGalleryImages(e, form.dataset.uploadRoomGallery));
+    });
+
+    panel.querySelectorAll("[data-remove-room-image]").forEach((button) => {
+      button.addEventListener("click", () => removeRoomImage(button.dataset.removeRoomImage, Number(button.dataset.index)));
+    });
+
+    panel.querySelectorAll("[data-move-up]").forEach((button) => {
+      button.addEventListener("click", () => moveRoomImage(button.dataset.moveUp, Number(button.dataset.index), -1));
+    });
+
+    panel.querySelectorAll("[data-move-down]").forEach((button) => {
+      button.addEventListener("click", () => moveRoomImage(button.dataset.moveDown, Number(button.dataset.index), 1));
+    });
+  }
+
+  async function uploadRoomGalleryImages(event, roomType) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const files = formData.getAll("images");
+
+    if (files.length === 0 || !files[0].size) {
+      renderHotelRoomGalleriesPanel("Wybierz pliki do wgrania.");
+      return;
+    }
+
+    try {
+      // Konwertuj pliki na base64 lub URL (dla uproszczenia używamy base64)
+      const images = await Promise.all(
+        Array.from(files).map(async (file) => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              resolve({
+                url: e.target.result,
+                alt: file.name.replace(/\.[^/.]+$/, ""),
+              });
+            };
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+
+      if (!state.content.hotel) {
+        state.content.hotel = {};
+      }
+      if (!state.content.hotel.roomGalleries) {
+        state.content.hotel.roomGalleries = {
+          "1-osobowe": [],
+          "2-osobowe": [],
+          "3-osobowe": [],
+          "4-osobowe": [],
+        };
+      }
+
+      if (!state.content.hotel.roomGalleries[roomType]) {
+        state.content.hotel.roomGalleries[roomType] = [];
+      }
+
+      state.content.hotel.roomGalleries[roomType].push(...images);
+      await saveContent();
+      await loadDashboard("Zdjecia zostaly dodane.");
+    } catch (error) {
+      renderHotelRoomGalleriesPanel(error.message || "Blad podczas wgrywania zdjec.");
+    }
+  }
+
+  async function removeRoomImage(roomType, index) {
+    if (!state.content.hotel?.roomGalleries?.[roomType]) {
+      return;
+    }
+    state.content.hotel.roomGalleries[roomType].splice(index, 1);
+    await saveContent();
+    await loadDashboard("Zdjecie zostalo usuniete.");
+  }
+
+  async function moveRoomImage(roomType, index, direction) {
+    if (!state.content.hotel?.roomGalleries?.[roomType]) {
+      return;
+    }
+    const images = state.content.hotel.roomGalleries[roomType];
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= images.length) {
+      return;
+    }
+    [images[index], images[newIndex]] = [images[newIndex], images[index]];
+    await saveContent();
+    await loadDashboard("Kolejnosc zdjec zostala zmieniona.");
+  }
+
+  function renderEventsHallGalleriesPanel(statusMessage = "") {
+    const panel = document.querySelector("#events-hall-galleries-panel");
+    const hallGalleries = state.content.events?.hallGalleries || {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [],
+      "5": [],
+    };
+
+    const hallTypes = [
+      { key: "1", label: "Sala 1" },
+      { key: "2", label: "Sala 2" },
+      { key: "3", label: "Sala 3" },
+      { key: "4", label: "Sala 4" },
+      { key: "5", label: "Sala 5" },
+    ];
+
+    panel.innerHTML = `
+      <p class="pill">Przyjecia</p>
+      <h2>Galeria Sal</h2>
+      <p class="section-intro">Zarzadzaj zdjeciami dla poszczegolnych sal. Mozesz dodawac, usuwac i zmieniac kolejnosc zdjec.</p>
+      <p class="status">${escapeHtml(statusMessage)}</p>
+      <div class="grid">
+        ${hallTypes
+          .map(
+            (hallType) => `
+              <div class="col-6">
+                <div class="repeater-item">
+                  <h3>${escapeHtml(hallType.label)}</h3>
+                  <form class="stack" data-upload-hall-gallery="${escapeAttribute(hallType.key)}">
+                    <label class="field-full">
+                      <span>Dodaj zdjecia</span>
+                      <input type="file" name="images" accept="image/*" multiple />
+                    </label>
+                    <button class="button secondary" type="submit">Wgraj zdjecia</button>
+                  </form>
+                  <div class="thumb-grid" data-hall-gallery="${escapeAttribute(hallType.key)}">
+                    ${
+                      hallGalleries[hallType.key] && hallGalleries[hallType.key].length
+                        ? hallGalleries[hallType.key]
+                            .map(
+                              (image, index) => `
+                                <article class="thumb-card">
+                                  <img src="${escapeAttribute(image.url || image)}" alt="${escapeAttribute(image.alt || hallType.label)}" />
+                                  <div class="inline-actions">
+                                    <button class="button secondary" type="button" data-move-up-hall="${hallType.key}" data-index="${index}" ${index === 0 ? 'disabled' : ''}>↑</button>
+                                    <button class="button secondary" type="button" data-move-down-hall="${hallType.key}" data-index="${index}" ${index === hallGalleries[hallType.key].length - 1 ? 'disabled' : ''}>↓</button>
+                                    <button class="button danger" type="button" data-remove-hall-image="${hallType.key}" data-index="${index}">Usun</button>
+                                  </div>
+                                </article>`
+                            )
+                            .join("")
+                        : `<p class="empty">Brak zdjec dla tej sali.</p>`
+                    }
+                  </div>
+                </div>
+              </div>`
+          )
+          .join("")}
+      </div>
+    `;
+
+    panel.querySelectorAll("[data-upload-hall-gallery]").forEach((form) => {
+      form.addEventListener("submit", (e) => uploadHallGalleryImages(e, form.dataset.uploadHallGallery));
+    });
+
+    panel.querySelectorAll("[data-remove-hall-image]").forEach((button) => {
+      button.addEventListener("click", () => removeHallImage(button.dataset.removeHallImage, Number(button.dataset.index)));
+    });
+
+    panel.querySelectorAll("[data-move-up-hall]").forEach((button) => {
+      button.addEventListener("click", () => moveHallImage(button.dataset.moveUpHall, Number(button.dataset.index), -1));
+    });
+
+    panel.querySelectorAll("[data-move-down-hall]").forEach((button) => {
+      button.addEventListener("click", () => moveHallImage(button.dataset.moveDownHall, Number(button.dataset.index), 1));
+    });
+  }
+
+  async function uploadHallGalleryImages(event, hallNumber) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const files = formData.getAll("images");
+
+    if (files.length === 0 || !files[0].size) {
+      renderEventsHallGalleriesPanel("Wybierz pliki do wgrania.");
+      return;
+    }
+
+    try {
+      // Konwertuj pliki na base64 lub URL (dla uproszczenia używamy base64)
+      const images = await Promise.all(
+        Array.from(files).map(async (file) => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              resolve({
+                url: e.target.result,
+                alt: file.name.replace(/\.[^/.]+$/, ""),
+              });
+            };
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+
+      if (!state.content.events) {
+        state.content.events = {};
+      }
+      if (!state.content.events.hallGalleries) {
+        state.content.events.hallGalleries = {
+          "1": [],
+          "2": [],
+          "3": [],
+          "4": [],
+          "5": [],
+        };
+      }
+
+      if (!state.content.events.hallGalleries[hallNumber]) {
+        state.content.events.hallGalleries[hallNumber] = [];
+      }
+
+      state.content.events.hallGalleries[hallNumber].push(...images);
+      await saveContent();
+      await loadDashboard("Zdjecia zostaly dodane.");
+    } catch (error) {
+      renderEventsHallGalleriesPanel(error.message || "Blad podczas wgrywania zdjec.");
+    }
+  }
+
+  async function removeHallImage(hallNumber, index) {
+    if (!state.content.events?.hallGalleries?.[hallNumber]) {
+      return;
+    }
+    state.content.events.hallGalleries[hallNumber].splice(index, 1);
+    await saveContent();
+    await loadDashboard("Zdjecie zostalo usuniete.");
+  }
+
+  async function moveHallImage(hallNumber, index, direction) {
+    if (!state.content.events?.hallGalleries?.[hallNumber]) {
+      return;
+    }
+    const images = state.content.events.hallGalleries[hallNumber];
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= images.length) {
+      return;
+    }
+    [images[index], images[newIndex]] = [images[newIndex], images[index]];
+    await saveContent();
+    await loadDashboard("Kolejnosc zdjec zostala zmieniona.");
+  }
+
+  function renderDocumentsPanel(statusMessage = "") {
+    const panel = document.querySelector("#documents-panel");
+    const documentsMenu = state.content.documentsMenu || { title: "", intro: "", sections: [] };
+    panel.innerHTML = `
+      <p class="pill">Dokumenty</p>
+      <h2>Menu i pliki</h2>
+      <div class="stack">
+        <div class="repeater-item">
+          <div class="repeater-head">
+            <div>
+              <h3>Menu okolicznosciowe</h3>
+              <p class="helper">To menu wyswietla sie na stronie dokumentow jako rozwijana sekcja.</p>
+            </div>
+            <button class="button secondary" type="button" id="add-documents-menu-section">Dodaj sekcje</button>
+          </div>
+          <div class="field-grid">
+            <label class="field-full"><span>Tytul</span><input id="documents-menu-title" value="${escapeAttribute(documentsMenu.title || "")}" /></label>
+            <label class="field-full"><span>Wstep</span><textarea id="documents-menu-intro">${escapeHtml(documentsMenu.intro || "")}</textarea></label>
+          </div>
+          <div id="documents-menu-sections-list" class="repeater-list"></div>
+          <div class="inline-actions">
+            <button class="button" type="button" id="save-documents-menu">Zapisz menu</button>
+          </div>
+        </div>
+        <form id="document-form" class="repeater-item">
+          <div class="field-grid">
+            <label class="field"><span>Tytul</span><input name="title" required /></label>
+            <label class="field"><span>Plik</span><input name="file" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required /></label>
+            <label class="field-full"><span>Opis</span><textarea name="description"></textarea></label>
+          </div>
+          <button class="button" type="submit">Wgraj dokument</button>
+          <p class="status">${escapeHtml(statusMessage)}</p>
+        </form>
+        ${
+          state.documents.length
+            ? state.documents
+                .map(
+                  (documentEntry) => `
+                    <article class="list-item">
+                      <div class="list-head">
+                        <strong>${escapeHtml(documentEntry.title)}</strong>
+                        <span class="pill">${escapeHtml(documentEntry.fileType || "")}</span>
+                      </div>
+                      <p>${escapeHtml(documentEntry.description || "")}</p>
+                      <div class="inline-actions">
+                        <a class="button secondary" href="${escapeAttribute(documentEntry.downloadUrl)}" target="_blank" rel="noreferrer">Sprawdz plik</a>
+                        <button class="button danger" type="button" data-delete-document="${documentEntry.id}">Usun</button>
+                      </div>
+                    </article>`
+                )
+                .join("")
+            : `<p class="empty">Brak dokumentow.</p>`
+        }
+      </div>
+    `;
+
+    renderDocumentsMenuSections();
+    panel.querySelector("#add-documents-menu-section").addEventListener("click", addDocumentsMenuSection);
+    panel.querySelector("#save-documents-menu").addEventListener("click", saveDocumentsMenu);
+    document.querySelector("#document-form").addEventListener("submit", uploadDocument);
+    panel.querySelectorAll("[data-delete-document]").forEach((button) => {
+      button.addEventListener("click", () => deleteDocument(button.dataset.deleteDocument));
+    });
+  }
+
+  function renderDocumentsMenuSections() {
+    const target = document.querySelector("#documents-menu-sections-list");
+    if (!target) {
+      return;
+    }
+    target.innerHTML = (state.content.documentsMenu?.sections || [])
+      .map(
+        (section, index) => `
+          <div class="repeater-item">
+            <div class="repeater-head">
+              <strong>Sekcja ${index + 1}</strong>
+              <button class="button danger" type="button" data-remove-documents-menu-section="${index}">Usun</button>
+            </div>
+            <div class="field-grid">
+              <label class="field"><span>Nazwa sekcji</span><input data-documents-menu-title="${index}" value="${escapeAttribute(section.title || "")}" /></label>
+              <label class="field-full"><span>Pozycje, jedna w linii</span><textarea data-documents-menu-items="${index}">${escapeHtml((section.items || []).join("\n"))}</textarea></label>
+            </div>
+          </div>`
+      )
+      .join("");
+
+    target.querySelectorAll("[data-remove-documents-menu-section]").forEach((button) => {
+      button.addEventListener("click", () => removeDocumentsMenuSection(Number(button.dataset.removeDocumentsMenuSection)));
+    });
+  }
+
+  function collectDocumentsMenuFromPanel() {
+    return {
+      title: document.querySelector("#documents-menu-title")?.value.trim() || "",
+      intro: document.querySelector("#documents-menu-intro")?.value.trim() || "",
+      sections: Array.from(document.querySelectorAll("[data-documents-menu-title]")).map((element, index) => ({
+        title: element.value.trim(),
+        items: (document.querySelector(`[data-documents-menu-items="${index}"]`)?.value || "")
+          .split("\n")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      })),
+    };
+  }
+
+  function addDocumentsMenuSection() {
+    state.content.documentsMenu = collectDocumentsMenuFromPanel();
+    state.content.documentsMenu.sections.push({ title: "", items: [] });
+    renderDocumentsPanel();
+  }
+
+  function removeDocumentsMenuSection(index) {
+    state.content.documentsMenu = collectDocumentsMenuFromPanel();
+    state.content.documentsMenu.sections.splice(index, 1);
+    renderDocumentsPanel();
+  }
+
+  async function saveDocumentsMenu() {
+    try {
+      state.content.documentsMenu = collectDocumentsMenuFromPanel();
+      const data = await api("/api/admin/content", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: state.content }),
+      });
+      state.content = data.content;
+      renderDocumentsPanel("Menu okolicznosciowe zostalo zapisane.");
+    } catch (error) {
+      renderDocumentsPanel(error.message);
+    }
+  }
+
+  async function uploadDocument(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    try {
+      await fetch(state.apiBase + "/api/admin/documents", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      }).then(async (response) => {
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || "Nie udalo sie dodac dokumentu.");
+        }
+      });
+      await loadDashboard("Dokument zostal wgrany.");
+    } catch (error) {
+      renderDocumentsPanel(error.message);
+    }
+  }
+
+  async function deleteDocument(documentId) {
+    await api(`/api/admin/documents/${documentId}`, { method: "DELETE" });
+    await loadDashboard("Dokument zostal usuniety.");
+  }
+
+  function renderCalendarPanel(statusMessage = "") {
+    const panel = document.querySelector("#calendar-panel");
+    panel.innerHTML = `
+      <p class="pill">Kalendarz sal</p>
+      <h2>Blokady terminow</h2>
+      <div class="stack">
+        <form id="calendar-form" class="repeater-item">
+          <div class="field-grid">
+            <label class="field">
+              <span>Sala</span>
+              <select name="hallKey" required>
+                ${state.content.events.halls
+                  .map((hall) => `<option value="${escapeAttribute(hall.key)}">${escapeHtml(hall.name)}</option>`)
+                  .join("")}
+              </select>
+            </label>
+            <label class="field"><span>Etykieta</span><input name="label" placeholder="np. Wesele Nowak" required /></label>
+            <label class="field"><span>Od</span><input name="startAt" type="datetime-local" required /></label>
+            <label class="field"><span>Do</span><input name="endAt" type="datetime-local" required /></label>
+            <label class="field-full"><span>Notatka</span><textarea name="notes"></textarea></label>
+          </div>
+          <button class="button" type="submit">Dodaj blokade</button>
+          <p class="status">${escapeHtml(statusMessage)}</p>
+        </form>
+        ${
+          state.calendarBlocks.length
+            ? state.calendarBlocks
+                .map(
+                  (block) => `
+                    <article class="list-item">
+                      <div class="list-head">
+                        <strong>${escapeHtml(block.label)}</strong>
+                        <span class="pill">${escapeHtml(block.hallName || block.hallKey)}</span>
+                      </div>
+                      <p>${escapeHtml(block.startAt)} - ${escapeHtml(block.endAt)}</p>
+                      <p class="helper">${escapeHtml(block.notes || "")}</p>
+                      <button class="button danger" type="button" data-delete-block="${block.id}">Usun blokade</button>
+                    </article>`
+                )
+                .join("")
+            : `<p class="empty">Brak blokad terminow.</p>`
+        }
+      </div>
+    `;
+
+    document.querySelector("#calendar-form").addEventListener("submit", addCalendarBlock);
+    panel.querySelectorAll("[data-delete-block]").forEach((button) => {
+      button.addEventListener("click", () => deleteCalendarBlock(button.dataset.deleteBlock));
+    });
+  }
+
+  async function addCalendarBlock(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const payload = Object.fromEntries(new FormData(form).entries());
+    try {
+      await api("/api/admin/calendar/blocks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      await loadDashboard("Blokada zostala dodana.");
+    } catch (error) {
+      renderCalendarPanel(error.message);
+    }
+  }
+
+  async function deleteCalendarBlock(blockId) {
+    await api(`/api/admin/calendar/blocks/${blockId}`, { method: "DELETE" });
+    await loadDashboard("Blokada zostala usunieta.");
+  }
+
+  async function handleLogin(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const email = String(form.email.value || "").trim();
+    const password = form.password.value;
+    try {
+      await firebase.auth().signInWithEmailAndPassword(email, password);
+      /* Sukces: panel zaladuje sie w onAuthStateChanged po weryfikacji tokenu przez API */
+    } catch (error) {
+      if (error?.code?.startsWith?.("auth/")) {
+        renderLogin(mapFirebaseError(error));
+        return;
+      }
+      renderLogin(error.message || "Logowanie nie powiodlo sie.");
+    }
+  }
+
+  async function logout() {
+    try {
+      await firebase.auth().signOut();
+    } catch (error) {
+      /* ignore */
+    }
+    state.loggedIn = false;
+    renderLogin();
+  }
+
+  async function loadDashboard(message = "") {
+    const data = await api("/api/admin/dashboard");
+    state.content = data.content;
+    state.documents = data.documents;
+    state.galleryAlbums = data.galleryAlbums;
+    state.calendarBlocks = data.calendarBlocks;
+    state.submissions = data.submissions;
+    renderDashboard();
+    if (message) {
+      renderContentPanel(message);
+    }
+  }
+
+  function bootstrap() {
+    initCustomScrollbar();
+
+    if (missingApiConfiguration) {
+      renderLogin(getConnectionErrorMessage());
+      return;
+    }
+
+    if (
+      typeof firebase === "undefined" ||
+      !config.firebaseApiKey ||
+      !config.firebaseProjectId
+    ) {
+      renderLogin(
+        "Brak konfiguracji Firebase. Uzupelnij firebaseApiKey, firebaseAuthDomain i firebaseProjectId w pliku assets/js/config.js."
+      );
+      return;
+    }
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp({
+        apiKey: config.firebaseApiKey,
+        authDomain: config.firebaseAuthDomain || `${config.firebaseProjectId}.firebaseapp.com`,
+        projectId: config.firebaseProjectId,
+      });
+    }
+
+    firebase.auth().onAuthStateChanged(async (user) => {
+      if (!user) {
+        state.loggedIn = false;
+        renderLogin();
+        return;
+      }
+      try {
+        await api("/api/admin/session");
+        state.loggedIn = true;
+        await loadDashboard();
+      } catch (error) {
+        try {
+          await firebase.auth().signOut();
+        } catch (e) {
+          /* ignore */
+        }
+        state.loggedIn = false;
+        renderLogin(error.message || "Brak uprawnien administratora.");
+      }
+    });
+  }
+
+  bootstrap();
+})();

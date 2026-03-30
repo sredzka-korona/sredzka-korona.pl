@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../ikony/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../ikony/favicon-16x16.png" />
+    <link rel="shortcut icon" href="../favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../ikony/favicon-180x180.png" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Sredzka Korona - Hotel | Restauracja | Imprezy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 2rem;
+        font-family: "Manrope", sans-serif;
+        background: linear-gradient(180deg, #f8f1e7 0%, #ebdecb 100%);
+        color: #1f1712;
+      }
+      .card {
+        max-width: 520px;
+        padding: 2rem;
+        border-radius: 24px;
+        background: rgba(255, 249, 241, 0.95);
+        border: 1px solid rgba(198, 148, 34, 0.22);
+        box-shadow: 0 24px 60px rgba(79, 55, 22, 0.12);
+      }
+      h1 {
+        margin: 0 0 1rem;
+        font-size: 1.35rem;
+      }
+      p {
+        line-height: 1.6;
+        margin: 0 0 1rem;
+      }
+      .err {
+        color: #b71c1c;
+      }
+      a {
+        color: #8b6914;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card" id="out">
+      <p>Trwa potwierdzanie…</p>
+    </div>
+    <script src="../assets/js/config.js"></script>
+    <script>
+      (function () {
+        function restaurantApiBase() {
+          const c = window.SREDZKA_CONFIG || {};
+          if (c.restaurantApiBase) return String(c.restaurantApiBase).replace(/\/$/, "");
+          if (c.firebaseProjectId) {
+            return "https://europe-west1-" + c.firebaseProjectId + ".cloudfunctions.net/restaurantApi";
+          }
+          return "";
+        }
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get("token");
+        const out = document.querySelector("#out");
+        if (!token) {
+          out.innerHTML =
+            '<h1 class="err">Brak tokenu</h1><p>Link jest niepełny. Użyj adresu z wiadomości e-mail.</p><p><a href="./index.html">Wróć do strony Restauracja</a></p>';
+          return;
+        }
+        const base = restaurantApiBase();
+        if (!base) {
+          out.innerHTML = "<p class=\"err\">Brak konfiguracji API (config.js).</p>";
+          return;
+        }
+        fetch(base + "?op=public-reservation-confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        })
+          .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+          .then(({ ok, d }) => {
+            if (!ok) {
+              out.innerHTML =
+                '<h1 class="err">Nie udało się potwierdzić</h1><p>' +
+                (d.error || "Błąd") +
+                '</p><p><a href="./index.html">Strona Restauracja</a></p>';
+              return;
+            }
+            out.innerHTML =
+              "<h1>Rezerwacja oczekuje na restaurację</h1>" +
+              "<p>Dziękujemy za potwierdzenie adresu e-mail. Zgłoszenie ma status <strong>oczekujące na akceptację przez restaurację</strong> — w wybranym terminie stoliki zostały wstępnie zablokowane.</p>" +
+              "<p>Restauracja ma do <strong>3 dni</strong> na potwierdzenie rezerwacji. Otrzymasz kolejną wiadomość po decyzji.</p>" +
+              '<p><a href="./index.html">Wróć do strony Restauracja</a></p>';
+          })
+          .catch(() => {
+            out.innerHTML = '<p class="err">Błąd połączenia z serwerem.</p>';
+          });
+      })();
+    </script>
+  </body>
+</html>

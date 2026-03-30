@@ -1,0 +1,25 @@
+{
+  "name": "Średzka Korona — hotel, restauracja, imprezy",
+  "short_name": "Średzka Korona",
+  "description": "Hotel, restauracja i sale na imprezy okolicznościowe w Środzie Śląskiej.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fefcf9",
+  "theme_color": "#fefcf9",
+  "lang": "pl",
+  "icons": [
+    {
+      "src": "/ikony/favicon-180x180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/ikony/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

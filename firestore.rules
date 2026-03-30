@@ -1,0 +1,10 @@
+rules_version = '2';
+// Cała logika biznesowa i dostęp do danych odbywa się wyłącznie przez Cloud Functions (Admin SDK).
+// Klient publiczny i panel admina nie łączą się bezpośrednio z Firestore.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

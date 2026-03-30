@@ -1,0 +1,10 @@
+{
+  "name": "sredzka-korona",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "preview": "node scripts/preview.mjs",
+    "seo:generate": "node scripts/generate-seo.mjs"
+  }
+}
+

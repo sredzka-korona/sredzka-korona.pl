@@ -1,0 +1,1082 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="canonical" href="https://www.sredzkakorona.pl/dokumenty/" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../ikony/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../ikony/favicon-16x16.png" />
+    <link rel="shortcut icon" href="../favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../ikony/favicon-180x180.png" />
+    <link rel="manifest" href="../site.webmanifest" />
+    <meta name="theme-color" content="#f8f1e7" />
+    <meta name="robots" content="index,follow" />
+    <title>Sredzka Korona - Hotel | Restauracja | Imprezy</title>
+    <meta
+      name="description"
+      content="Regulaminy, polityka prywatności i dokumenty Średzkiej Korony (Środa Śląska) — do podglądu i pobrania."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pl_PL" />
+    <meta property="og:url" content="https://www.sredzkakorona.pl/dokumenty/" />
+    <meta property="og:title" content="Dokumenty | Średzka Korona" />
+    <meta property="og:description" content="Regulaminy i dokumenty obiektu w Środzie Śląskiej." />
+    <meta property="og:image" content="https://www.sredzkakorona.pl/ikony/logo-korona.png" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebPage",
+            "@id": "https://www.sredzkakorona.pl/dokumenty/#webpage",
+            "url": "https://www.sredzkakorona.pl/dokumenty/",
+            "name": "Dokumenty i regulaminy — Średzka Korona",
+            "isPartOf": { "@id": "https://www.sredzkakorona.pl/#website" },
+            "inLanguage": "pl-PL"
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Strona główna",
+                "item": "https://www.sredzkakorona.pl/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Dokumenty",
+                "item": "https://www.sredzkakorona.pl/dokumenty/"
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+    <style>
+      html {
+        color-scheme: light;
+        background:
+          radial-gradient(circle at top right, rgba(184, 139, 47, 0.15), transparent 22%),
+          radial-gradient(circle at bottom left, rgba(224, 196, 151, 0.38), transparent 28%),
+          linear-gradient(180deg, #f8f1e7 0%, #f1e7d8 54%, #ebdecb 100%);
+        scrollbar-width: none;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        font-family: "Manrope", sans-serif;
+        color: #1f1712;
+        overflow-x: hidden;
+        background:
+          radial-gradient(circle at top right, rgba(184, 139, 47, 0.15), transparent 22%),
+          radial-gradient(circle at bottom left, rgba(224, 196, 151, 0.38), transparent 28%),
+          linear-gradient(180deg, #f8f1e7 0%, #f1e7d8 54%, #ebdecb 100%);
+      }
+
+      html::-webkit-scrollbar,
+      body::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+      }
+
+      .wrap {
+        width: min(960px, calc(100vw - 2rem));
+        margin: 0 auto;
+        min-height: 100vh;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        padding: 2rem 0 1rem;
+      }
+
+      .card {
+        border: 1px solid rgba(198, 148, 34, 0.22);
+        border-radius: 28px;
+        padding: 1.5rem;
+        background: rgba(255, 249, 241, 0.9);
+        box-shadow: 0 24px 60px rgba(79, 55, 22, 0.12);
+        margin-bottom: 1rem;
+      }
+
+      .page-header {
+        position: relative;
+        margin-bottom: 1.75rem;
+        padding: 0.5rem 0 0;
+        text-align: center;
+      }
+
+      .back-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        color: #241b14;
+        text-decoration: none;
+        transition: color 0.2s ease;
+      }
+
+      .back-link:hover {
+        color: #efcf78;
+      }
+
+      .back-link-wrap {
+        position: absolute;
+        top: 0.25rem;
+        left: clamp(-7rem, calc((960px - 100vw) / 2 - 3rem), -2.25rem);
+      }
+
+      .page-title {
+        margin: 0;
+        color: #1f1712;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        font-size: clamp(1.15rem, 2vw, 1.45rem);
+        font-weight: 700;
+      }
+
+      .back-link svg {
+        width: 1.2rem;
+        height: 1.2rem;
+      }
+
+      .collapsible-card {
+        padding: 0;
+        overflow: hidden;
+        scroll-margin-top: 1rem;
+      }
+
+      .collapsible-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        cursor: pointer;
+        list-style: none;
+        padding: 1.1rem 1.5rem;
+        position: relative;
+        min-height: 84px;
+      }
+
+      .collapsible-summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .collapsible-summary::after {
+        content: "";
+        flex: 0 0 auto;
+        width: 0.9rem;
+        height: 0.9rem;
+        border-right: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        color: #efcf78;
+        transform: rotate(45deg);
+        transition: transform 0.2s ease;
+      }
+
+      .collapsible-card[open] .collapsible-summary::after {
+        transform: rotate(-135deg);
+      }
+
+      .collapsible-content {
+        padding: 0 1.5rem 1.5rem;
+      }
+
+      .menu-sections {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .menu-section {
+        padding-top: 0.25rem;
+      }
+
+      .menu-section h3 {
+        margin: 0 0 0.75rem;
+        color: #c69422;
+      }
+
+      .collapsible-summary h2,
+      .collapsible-summary p {
+        margin-bottom: 0;
+      }
+
+      .collapsible-summary h2 {
+        color: #c69422;
+        margin: 0;
+        font-size: calc(1.5rem - 2px);
+      }
+
+      #documents-list {
+        margin-top: 2.5rem;
+      }
+
+      #documents-list .card:first-child {
+        margin-top: 0.6rem;
+      }
+
+      .button {
+        display: inline-block;
+        margin-right: 0.75rem;
+        margin-top: 0.75rem;
+        border: 1px solid rgba(198, 148, 34, 0.48);
+        border-radius: 999px;
+        padding: 0.9rem 1.4rem;
+        background: linear-gradient(135deg, rgba(12, 11, 10, 0.99), rgba(35, 28, 24, 0.96));
+        color: #f7efe2;
+        text-decoration: none;
+      }
+
+      .eyebrow {
+        color: #c69422;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        font-size: 0.82rem;
+      }
+
+      .muted {
+        color: #c5b89f;
+      }
+
+      .data-admin-title {
+        margin: 1.25rem 0 0.8rem;
+        color: #241b14;
+        font-weight: 400;
+      }
+
+      .data-admin-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem 2rem;
+        margin-bottom: 1rem;
+      }
+
+      .data-admin-column {
+        color: #c69422;
+      }
+
+      .data-admin-column p {
+        margin: 0 0 0.35rem;
+      }
+
+      .crown-list {
+        display: grid;
+        gap: 0.65rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .crown-list li {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        color: #241b14;
+      }
+
+      .crown-list li::before {
+        content: "♛";
+        color: #241b14;
+        line-height: 1.1;
+      }
+
+      iframe {
+        width: 100%;
+        height: 70vh;
+        border: 0;
+        border-radius: 18px;
+      }
+
+      .scroll-indicator {
+        position: fixed;
+        top: 0.2rem;
+        right: 0.05rem;
+        bottom: 0.4rem;
+        width: 14px;
+        border-radius: 999px;
+        background: transparent;
+        box-shadow: none;
+        pointer-events: none;
+        z-index: 20;
+      }
+
+      .scroll-indicator-thumb {
+        position: absolute;
+        top: 0;
+        left: 2px;
+        width: 10px;
+        min-height: 44px;
+        border-radius: 999px;
+        background: rgba(168, 150, 108, 0.72);
+      }
+
+      .cookie-banner {
+        position: fixed;
+        left: 1rem;
+        right: 1rem;
+        bottom: 1rem;
+        z-index: 40;
+        padding: 1rem 1rem 1.1rem;
+        border: 1px solid rgba(198, 148, 34, 0.22);
+        border-radius: 24px;
+        background: rgba(255, 249, 241, 0.96);
+        box-shadow: 0 24px 60px rgba(79, 55, 22, 0.18);
+      }
+
+      .cookie-banner strong {
+        display: block;
+        font-size: 1.02rem;
+      }
+
+      .cookie-banner p {
+        margin: 0.35rem 0 0;
+        line-height: 1.45;
+        color: rgba(36, 27, 20, 0.82);
+      }
+
+      .cookie-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+        margin-top: 0.85rem;
+      }
+
+      .cookie-actions .button {
+        margin-top: 0;
+        margin-right: 0;
+      }
+
+      .footer-links {
+        display: flex;
+        justify-content: center;
+        gap: 0.55rem;
+        margin-top: auto;
+        padding: 1.75rem 0 0.2rem;
+        color: rgba(197, 184, 159, 0.34);
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .footer-links a,
+      .footer-links span {
+        color: inherit;
+        text-decoration: none;
+        transition: color 0.2s ease;
+      }
+
+      .footer-links a:hover {
+        color: rgba(201, 180, 137, 0.7);
+      }
+
+      @media (max-width: 720px) {
+        .back-link-wrap {
+          position: static;
+          margin-bottom: 0.75rem;
+          text-align: left;
+        }
+
+        .scroll-indicator {
+          top: 0.2rem;
+          right: 0.02rem;
+          bottom: 0.3rem;
+          width: 12px;
+        }
+
+        .scroll-indicator-thumb {
+          left: 2px;
+          width: 8px;
+        }
+
+        .cookie-banner {
+          left: 0.75rem;
+          right: 0.75rem;
+          bottom: 0.75rem;
+        }
+
+        .data-admin-grid {
+          grid-template-columns: 1fr;
+          gap: 0.4rem;
+        }
+
+        .floating-contact-button {
+          right: 1rem !important;
+          bottom: 1rem !important;
+        }
+      }
+
+      .floating-contact-button {
+        position: fixed;
+        right: 2rem;
+        bottom: 2rem;
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: #c8aa78;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 20px rgba(168, 137, 90, 0.4);
+        transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+        text-decoration: none;
+        z-index: 99;
+        cursor: pointer;
+        border: none;
+      }
+
+      .floating-contact-button:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 24px rgba(168, 137, 90, 0.6);
+        background: #b8946a;
+      }
+
+      .floating-contact-button:active {
+        transform: scale(0.95);
+      }
+
+      .floating-contact-button svg {
+        width: 28px;
+        height: 28px;
+        display: block;
+      }
+
+      .watermark {
+        position: fixed;
+        bottom: 1rem;
+        left: 1rem;
+        z-index: 50;
+        font-size: 0.75rem;
+        color: rgba(31, 23, 18, 0.3);
+        font-family: "Manrope", sans-serif;
+        font-weight: 400;
+        opacity: 0.42;
+        transition: opacity 0.3s ease;
+      }
+
+      .watermark:hover {
+        opacity: 0.62;
+      }
+
+      a.watermark {
+        text-decoration: none;
+      }
+
+      a.watermark:link,
+      a.watermark:visited {
+        color: rgba(31, 23, 18, 0.3);
+      }
+
+      @media (max-width: 780px) {
+        .watermark {
+          font-size: 0.65rem;
+          bottom: 0.75rem;
+          left: 0.75rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="scroll-indicator" aria-hidden="true">
+      <div class="scroll-indicator-thumb"></div>
+    </div>
+    <div class="wrap">
+      <header class="page-header">
+        <div class="back-link-wrap">
+          <a class="back-link" href="../kontakt/index.html" aria-label="Wroc do kontaktu">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M15 5 8 12l7 7"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </a>
+        </div>
+        <h1 class="page-title">Dokumenty</h1>
+      </header>
+      <details class="card collapsible-card" id="regulamin-rezerwacji-hotel">
+        <summary class="collapsible-summary">
+          <div>
+            <h2>Regulamin rezerwacji pokoi hotelowych</h2>
+            <p class="muted" style="margin: 0.35rem 0 0; font-size: 0.9rem">
+              Proces rezerwacji przez formularz na stronie Hotelu
+            </p>
+          </div>
+        </summary>
+        <div class="collapsible-content">
+          <div class="menu-sections">
+            <div class="menu-section">
+              <h3>1. Zgłoszenie i potwierdzenie e-mail</h3>
+              <p>
+                Wypełnienie formularza rezerwacji nie jest jeszcze skutkiem prawnym ani nie blokuje automatycznie
+                terminu na długo. Po wysłaniu formularza otrzymasz wiadomość z linkiem potwierdzającym — w ciągu
+                <strong>2 godzin</strong> musisz kliknąć ten link. Dopiero po potwierdzeniu adresu e-mail zgłoszenie
+                przechodzi do statusu <strong>oczekującego na decyzję hotelu</strong>, a wybrane terminy są
+                wstępnie blokowane dla innych gości.
+              </p>
+            </div>
+            <div class="menu-section">
+              <h3>2. Termin na potwierdzenie przez hotel</h3>
+              <p>
+                Hotel (recepcja) ma <strong>do 3 dni</strong> na potwierdzenie rezerwacji od momentu, gdy zgłoszenie
+                ma status oczekującego. Brak odpowiedzi w tym czasie może skutkować
+                <strong>automatycznym anulowaniem</strong> rezerwacji i zwolnieniem terminów bez roszczeń wobec hotelu
+                po stronie gościa, zgodnie z mechanizmem systemu rezerwacji.
+              </p>
+            </div>
+            <div class="menu-section">
+              <h3>3. Skutki akceptacji</h3>
+              <p>
+                Po pozytywnym potwierdzeniu rezerwacji przez hotel rezerwacja ma charakter
+                <strong>zobowiązujący</strong>. Gość zobowiązuje się do zapłaty za pobyt zgodnie z warunkami obiektu,
+                ceną wynikającą z potwierdzenia oraz obowiązującymi przepisami.
+              </p>
+            </div>
+            <div class="menu-section">
+              <h3>4. Dane kontaktowe</h3>
+              <p>
+                Podanie nieprawdziwych lub nieobsługiwanych danych kontaktowych może uniemożliwić realizację rezerwacji
+                lub skuteczne powiadomienie gościa. Za podane dane odpowiada gość.
+              </p>
+            </div>
+            <div class="menu-section">
+              <h3>5. Kontakt ze strony hotelu</h3>
+              <p>
+                Hotel może kontaktować się z gościem w sprawach rezerwacji drogą <strong>mailową i telefoniczną</strong>
+                na podany adres e-mail i numer telefonu.
+              </p>
+            </div>
+          </div>
+        </div>
+      </details>
+      <details class="card collapsible-card" id="regulamin-rezerwacji-restauracja">
+        <summary class="collapsible-summary">
+          <div>
+            <h2>Regulamin rezerwacji restauracji</h2>
+            <p class="muted" style="margin: 0.35rem 0 0; font-size: 0.9rem">
+              Rezerwacja stolików przez formularz na stronie Restauracji
+            </p>
+          </div>
+        </summary>
+        <div class="collapsible-content">
+          <div class="menu-sections">
+            <div class="menu-section">
+              <h3>1. Zgłoszenie i potwierdzenie e-mail</h3>
+              <p>
+                Wypełnienie formularza nie blokuje jeszcze stolików na czas oczekiwania na decyzję lokalu. Po wysłaniu
+                zgłoszenia otrzymasz wiadomość z linkiem potwierdzającym — w ciągu
+                <strong>2 godzin</strong> musisz kliknąć ten link. Dopiero po potwierdzeniu adresu e-mail zgłoszenie
+                przechodzi do statusu <strong>oczekującego na decyzję restauracji</strong>, a wybrane stoliki są
+                wstępnie rezerwowane w systemie na wskazany termin (z uwzględnieniem przerwy organizacyjnej między
+                rezerwacjami).
+              </p>
+            </div>
+            <div class="menu-section">
+              <h3>2. Termin na potwierdzenie przez restaurację</h3>
+              <p>
+                Restauracja ma <strong>do 3 dni</strong> na potwierdzenie rezerwacji od momentu, gdy zgłoszenie ma status
+                oczekującego. Brak odpowiedzi w tym czasie skutkuje
+                <strong>automatycznym anulowaniem</strong> bez roszczeń wobec lokalu po stronie gościa, zgodnie z
+                mechanizmem systemu rezerwacji.
+              </p>
+            </div>
+            <div class="menu-section">
+              <h3>3. Skutki akceptacji</h3>
+              <p>
+                Po pozytywnym potwierdzeniu rezerwacji przez restaurację umowa jest
+                <strong>zobowiązująca</strong>. Gość zobowiązuje się do przestrzegania warunków lokalu oraz podanych
+                ustaleń organizacyjnych.
+              </p>
+            </div>
+            <div class="menu-section">
+              <h3>4. Dane kontaktowe</h3>
+              <p>
+                Należy podać prawidłowe dane kontaktowe. Nieprawdziwe lub nieobsługiwane dane mogą uniemożliwić
+                realizację rezerwacji lub skuteczne powiadomienie gościa.
+              </p>
+            </div>
+            <div class="menu-section">
+              <h3>5. Kontakt ze strony lokalu</h3>
+              <p>
+                Lokal może kontaktować się z gościem w sprawach rezerwacji drogą <strong>mailową i telefoniczną</strong>
+                na podany adres e-mail i numer telefonu.
+              </p>
+            </div>
+            <div class="menu-section">
+              <h3>6. Połączenie stołów</h3>
+              <p>
+                Zaznaczenie prośby o połączenie stołów ma charakter <strong>preferencji organizacyjnej</strong>. Realizacja
+                zależy od możliwości lokalu i układu sali; system nie gwarantuje fizycznego połączenia — personel
+                dobierze rozsadzenie zgodnie z dostępnością.
+              </p>
+            </div>
+            <div class="menu-section">
+              <h3>7. Przerwy między rezerwacjami</h3>
+              <p>
+                Między rezerwacjami obowiązuje <strong>przerwa organizacyjna</strong> (w systemie uwzględniana przy
+                planowaniu zajętości stolików). Lokal zarządza rozsadzeniem gości zgodnie z dostępnością i bezpieczeństwem
+                obsługi.
+              </p>
+            </div>
+          </div>
+        </div>
+      </details>
+      <details class="card collapsible-card" id="regulamin-rezerwacji-sali">
+        <summary class="collapsible-summary">
+          <div>
+            <h2>Regulamin rezerwacji sali</h2>
+            <p class="muted" style="margin: 0.35rem 0 0; font-size: 0.9rem">
+              Wynajem sal na przyjęcia — zgłoszenie przez formularz na stronie Przyjęcia
+            </p>
+          </div>
+        </summary>
+        <div class="collapsible-content">
+          <div class="menu-sections">
+            <div class="menu-section">
+              <h3>1. Zgłoszenie i potwierdzenie e-mail</h3>
+              <p>
+                Wypełnienie formularza tworzy <strong>zgłoszenie rezerwacyjne</strong> — nie blokuje jeszcze sali na czas
+                oczekiwania na decyzję obiektu. Po wysłaniu zgłoszenia otrzymasz wiadomość z linkiem potwierdzającym;
+                link jest ważny <strong>2 godziny</strong>. Dopiero po kliknięciu linku zgłoszenie przechodzi do statusu
+                <strong>oczekującego</strong> na decyzję obiektu, a termin jest wstępnie blokowany w systemie zgodnie z
+                zasadami dostępności sal (w tym przerwą organizacyjną między rezerwacjami).
+              </p>
+            </div>
+            <div class="menu-section">
+              <h3>2. Wycena i kontakt telefoniczny</h3>
+              <p>
+                <strong>Nie ma stałego cennika online.</strong> Wycena wynajmu sali jest ustalana
+                <strong>indywidualnie po kontakcie telefonicznym</strong> z przedstawicielem obiektu. Ostateczne
+                potwierdzenie rezerwacji zależy od ustaleń z obiektem.
+              </p>
+            </div>
+            <div class="menu-section">
+              <h3>3. Termin oczekiwania na decyzję obiektu</h3>
+              <p>
+                Obiekt ma <strong>7 dni kalendarzowych</strong> na potwierdzenie rezerwacji od momentu, gdy zgłoszenie ma
+                status oczekującego (po potwierdzeniu e-mailem). W razie potrzeby obsługa może
+                <strong>przedłużyć ten termin o kolejne 7 dni</strong> (wielokrotnie). Brak potwierdzenia w terminie
+                skutkuje <strong>automatycznym anulowaniem</strong> bez roszczeń klienta wobec obiektu — zgodnie z
+                mechanizmem systemu rezerwacji (powiadomienia e-mail, zwolnienie terminu).
+              </p>
+            </div>
+            <div class="menu-section">
+              <h3>4. Sala mała i sala duża — zasady zajętości</h3>
+              <p>
+                <strong>Sala mała</strong> jest zawsze rezerwowana na <strong>wyłączność</strong> (do wskazanego limitu
+                miejsc). <strong>Sala duża</strong> może być współdzielona przez kilka wydarzeń jednocześnie do łącznej
+                liczby osób nieprzekraczającej pojemności sali, <strong>chyba że</strong> wybrano opcję wyłączności albo
+                liczba gości powoduje pełną blokadę sali (w systemie domyślnie od <strong>100 osób</strong> w górę — próg
+                może być skonfigurowany przez obiekt). Między rezerwacjami obowiązuje
+                <strong>przerwa organizacyjna co najmniej 1 godzina</strong> (bufor), liczona zgodnie z ustawieniami
+                systemu.
+              </p>
+            </div>
+            <div class="menu-section">
+              <h3>5. Dane kontaktowe</h3>
+              <p>
+                Klient ma obowiązek podać prawidłowe dane kontaktowe. Nieprawdziwe lub nieobsługiwane dane mogą
+                uniemożliwić realizację rezerwacji lub skuteczne powiadomienie.
+              </p>
+            </div>
+            <div class="menu-section">
+              <h3>6. Kontakt ze strony obiektu</h3>
+              <p>
+                Obsługa kontaktuje się z zamawiającym w sprawie <strong>wyceny i potwierdzenia rezerwacji</strong> drogą
+                <strong>telefoniczną i e-mailową</strong>, na podane dane.
+              </p>
+            </div>
+          </div>
+        </div>
+      </details>
+      <div id="documents-list"></div>
+      <div class="card" id="preview-card" style="display: none;">
+        <p class="eyebrow">Podglad</p>
+        <h2 id="preview-title"></h2>
+        <iframe id="preview-frame" title="Podglad dokumentu"></iframe>
+      </div>
+      <details class="card collapsible-card" id="cookies-info">
+        <summary class="collapsible-summary">
+          <h2>Szczegoly polityki cookies</h2>
+        </summary>
+        <div class="collapsible-content">
+          <p>
+            Strona korzysta z plikow cookies niezbednych do prawidlowego dzialania oraz
+            opcjonalnych cookies analitycznych i marketingowych. Zgode mozna zmienic w dowolnym momencie.
+          </p>
+          <ul class="crown-list">
+            <li>Cookies niezbedne obsluguja podstawowe funkcje strony, bezpieczenstwo oraz panel administratora.</li>
+            <li>Cookies opcjonalne sa aktywowane tylko po wyrazeniu zgody przez odwiedzajacego.</li>
+            <li>Uzytkownik moze zaakceptowac wszystkie cookies albo pozostawic jedynie niezbedne.</li>
+            <li>Wycofanie zgody jest mozliwe w dowolnym momencie przez ponowna zmiane ustawien przegladarki lub komunikatu zgody.</li>
+            <li>W sprawach prywatnosci i danych kontakt z administratorem odbywa sie telefonicznie lub korespondencyjnie.</li>
+          </ul>
+          <p class="data-admin-title">Administrator danych:</p>
+          <div class="data-admin-grid">
+            <div class="data-admin-column">
+              <p>Średzka Korona</p>
+              <p>Bartosz Hamkało</p>
+              <p>ul. Wrocławska 11</p>
+              <p>55-300 Środa Śląska</p>
+            </div>
+            <div class="data-admin-column">
+              <p>Tel. 691 964 714</p>
+              <p>NIP: 9131513928</p>
+              <p>REGON: 522050940</p>
+              <p>e-mail: kontakt@sredzka-korona.pl</p>
+            </div>
+          </div>
+          <p class="muted">Aktualizacja polityki: 2026-03-05.</p>
+        </div>
+      </details>
+      <footer class="footer-links">
+        <a href="#cookies-info" data-open-cookies>Polityka prywatnosci</a>
+        <span>|</span>
+        <a href="../admin/index.html">Panel administracyjny</a>
+      </footer>
+    </div>
+    <script>
+      (() => {
+        const COOKIE_CHOICE_KEY = "sredzka-cookies-choice";
+        const COOKIE_SEEN_KEY = "sredzka-cookies-seen";
+        const config = { apiBase: "" };
+        const fallbackDocs = [];
+        const fallbackContent = {
+          documentsMenu: {
+            title: "Menu okolicznosciowe",
+            intro: "Przykladowa propozycja dla imprez rodzinnych, spotkan firmowych i przyjec zamknietych.",
+            sections: [
+              {
+                title: "Przystawki",
+                items: [
+                  "Tatar wolowy z ogorkiem kiszonym i pieczywem",
+                  "Carpaccio z buraka z kozim serem i orzechami",
+                  "Deska regionalnych wedlin i serow",
+                ],
+              },
+              {
+                title: "Dania glowne",
+                items: [
+                  "Rolada z indyka w sosie tymiankowym",
+                  "Schab pieczony z sosem pieczeniowym",
+                  "Sandacz na puree ziemniaczanym i warzywach sezonowych",
+                ],
+              },
+              {
+                title: "Dodatki",
+                items: [
+                  "Ziemniaki opiekane z ziolami",
+                  "Kluski slaskie",
+                  "Bukiet salat z winegretem",
+                ],
+              },
+              {
+                title: "Desery",
+                items: [
+                  "Sernik z biala czekolada",
+                  "Szarlotka na cieplo",
+                  "Mini beza z kremem mascarpone",
+                ],
+              },
+            ],
+          },
+        };
+        const isLocalPreview =
+          window.location.protocol === "file:" ||
+          window.location.hostname === "127.0.0.1" ||
+          window.location.hostname === "localhost";
+        const fallbackApiBase =
+          isLocalPreview
+            ? ""
+            : window.location.hostname && !window.location.hostname.endsWith("github.io")
+              ? "https://api." + window.location.hostname.replace(/^www\./, "")
+              : "";
+        const docsTarget = document.querySelector("#documents-list");
+        const scrollIndicator = document.querySelector(".scroll-indicator");
+        const scrollIndicatorThumb = document.querySelector(".scroll-indicator-thumb");
+        const cookiesInfo = document.querySelector("#cookies-info");
+        let cookieBanner = null;
+        let scrollIndicatorFrame = 0;
+
+        const escapeHtml = (value) =>
+          String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
+
+        function updateScrollIndicator() {
+          const viewportHeight = window.innerHeight;
+          const scrollHeight = document.documentElement.scrollHeight;
+          const maxScroll = Math.max(scrollHeight - viewportHeight, 0);
+
+          if (!scrollIndicator || !scrollIndicatorThumb) {
+            return;
+          }
+
+          if (maxScroll <= 0) {
+            scrollIndicator.style.opacity = "0";
+            scrollIndicatorThumb.style.transform = "translateY(0)";
+            return;
+          }
+
+          scrollIndicator.style.opacity = "1";
+
+          const trackHeight = scrollIndicator.clientHeight;
+          const thumbHeight = Math.max((viewportHeight / scrollHeight) * trackHeight, 44);
+          const maxThumbOffset = Math.max(trackHeight - thumbHeight, 0);
+          const scrollRatio = Math.min(Math.max(window.scrollY / maxScroll, 0), 1);
+          const thumbOffset = maxThumbOffset * scrollRatio;
+
+          scrollIndicatorThumb.style.height = `${thumbHeight}px`;
+          scrollIndicatorThumb.style.transform = `translateY(${thumbOffset}px)`;
+        }
+
+        function scheduleScrollIndicatorUpdate() {
+          if (scrollIndicatorFrame) {
+            return;
+          }
+          scrollIndicatorFrame = window.requestAnimationFrame(() => {
+            scrollIndicatorFrame = 0;
+            updateScrollIndicator();
+          });
+        }
+
+        function markCookiesSeen() {
+          localStorage.setItem(COOKIE_SEEN_KEY, "1");
+        }
+
+        function closeCookieBanner() {
+          if (!cookieBanner) {
+            return;
+          }
+          cookieBanner.remove();
+          cookieBanner = null;
+        }
+
+        function openCookiesInfo() {
+          if (!cookiesInfo) {
+            return;
+          }
+          cookiesInfo.open = true;
+          scheduleScrollIndicatorUpdate();
+          window.requestAnimationFrame(() => {
+            cookiesInfo.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        }
+
+        function setCookieChoice(value) {
+          localStorage.setItem(COOKIE_CHOICE_KEY, JSON.stringify(value));
+          markCookiesSeen();
+          closeCookieBanner();
+        }
+
+        function showCookieBanner(force = false) {
+          if (!force && (localStorage.getItem(COOKIE_CHOICE_KEY) || localStorage.getItem(COOKIE_SEEN_KEY))) {
+            return;
+          }
+
+          if (cookieBanner) {
+            return;
+          }
+
+          markCookiesSeen();
+
+          cookieBanner = document.createElement("div");
+          cookieBanner.className = "cookie-banner";
+          cookieBanner.innerHTML = `
+            <p class="eyebrow">Cookies</p>
+            <strong>Twoja prywatnosc</strong>
+            <p>Strona korzysta z plikow cookies niezbednych do dzialania oraz opcjonalnych cookies analitycznych i marketingowych.</p>
+            <div class="cookie-actions">
+              <button class="button secondary" type="button" data-cookie-open-details>Zobacz szczegoly</button>
+              <button class="button secondary" type="button" data-cookie-action="necessary-only">Tylko niezbedne</button>
+              <button class="button" type="button" data-cookie-action="accept-all">Akceptuj wszystko</button>
+            </div>
+          `;
+
+          document.body.appendChild(cookieBanner);
+
+          cookieBanner.querySelector("[data-cookie-open-details]")?.addEventListener("click", () => {
+            openCookiesInfo();
+          });
+
+          cookieBanner.querySelectorAll("[data-cookie-action]").forEach((button) => {
+            button.addEventListener("click", () => {
+              const value =
+                button.dataset.cookieAction === "accept-all"
+                  ? { necessary: true, analytics: true, marketing: true }
+                  : { necessary: true, analytics: false, marketing: false };
+              setCookieChoice(value);
+            });
+          });
+        }
+
+        function renderDocumentsMenu(documentsMenu) {
+          if (!documentsMenu?.title) {
+            return "";
+          }
+
+          return `
+            <details class="card collapsible-card" id="occasion-menu">
+              <summary class="collapsible-summary">
+                <h2>${escapeHtml(documentsMenu.title)}</h2>
+              </summary>
+              <div class="collapsible-content">
+                <div class="menu-sections">
+                  ${(documentsMenu.sections || [])
+                    .map(
+                      (section) => `
+                        <section class="menu-section">
+                          <h3>${escapeHtml(section.title || "")}</h3>
+                          <ul class="crown-list">
+                            ${(section.items || [])
+                              .map((item) => `<li>${escapeHtml(item)}</li>`)
+                              .join("")}
+                          </ul>
+                        </section>`
+                    )
+                    .join("")}
+                </div>
+              </div>
+            </details>
+          `;
+        }
+
+        function renderDocuments(documents, documentsMenu) {
+          const menuMarkup = renderDocumentsMenu(documentsMenu);
+          const documentsMarkup = documents
+            .map(
+              (item, index) => `
+                <article class="card">
+                  <p class="eyebrow">${escapeHtml(item.fileType || "plik")}</p>
+                  <h2>${escapeHtml(item.title)}</h2>
+                  <p>${escapeHtml(item.description || "")}</p>
+                  ${
+                    item.previewUrl
+                      ? `<button class="button" type="button" data-preview="${index}">Podglad</button>`
+                      : ""
+                  }
+                  <a class="button" href="${escapeHtml(item.downloadUrl || "#")}" target="_blank" rel="noreferrer">Pobierz</a>
+                </article>`
+            )
+            .join("");
+
+          docsTarget.innerHTML = `${menuMarkup}${documentsMarkup}`;
+
+          docsTarget.querySelectorAll("details").forEach((element) => {
+            element.addEventListener("toggle", scheduleScrollIndicatorUpdate);
+          });
+
+          docsTarget.querySelectorAll("[data-preview]").forEach((button) => {
+            button.addEventListener("click", () => {
+              const doc = documents[Number(button.dataset.preview)];
+              document.querySelector("#preview-card").style.display = "block";
+              document.querySelector("#preview-title").textContent = doc.title;
+              document.querySelector("#preview-frame").src = doc.previewUrl;
+              scheduleScrollIndicatorUpdate();
+              window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+            });
+          });
+
+          scheduleScrollIndicatorUpdate();
+          
+          // Po renderowaniu sprawdź hash i otwórz menu jeśli potrzeba
+          if (window.location.hash === "#occasion-menu") {
+            setTimeout(() => {
+              openOccasionMenuFromHash();
+            }, 100);
+          }
+        }
+
+        async function bootstrap() {
+          try {
+            if (isLocalPreview && !config.apiBase) {
+              throw new Error("local-preview");
+            }
+            const response = await fetch((config.apiBase || fallbackApiBase) + "/api/public/bootstrap");
+            if (!response.ok) {
+              throw new Error("bootstrap unavailable");
+            }
+            const payload = await response.json();
+            renderDocuments(payload.documents || fallbackDocs, payload.content?.documentsMenu || fallbackContent.documentsMenu);
+          } catch (error) {
+            renderDocuments(fallbackDocs, fallbackContent.documentsMenu);
+          }
+          // Po załadowaniu dokumentów sprawdź hash
+          openOccasionMenuFromHash();
+        }
+
+        const previewFrame = document.querySelector("#preview-frame");
+        if (previewFrame) {
+          previewFrame.addEventListener("load", scheduleScrollIndicatorUpdate);
+        }
+
+        document.querySelectorAll("[data-open-cookies]").forEach((element) => {
+          element.addEventListener("click", (event) => {
+            event.preventDefault();
+            showCookieBanner(true);
+          });
+        });
+
+        if (cookiesInfo) {
+          cookiesInfo.addEventListener("toggle", () => {
+            scheduleScrollIndicatorUpdate();
+          });
+        }
+
+        const resizeObserver = new ResizeObserver(() => {
+          scheduleScrollIndicatorUpdate();
+        });
+        resizeObserver.observe(document.body);
+        resizeObserver.observe(document.documentElement);
+
+        const mutationObserver = new MutationObserver(() => {
+          scheduleScrollIndicatorUpdate();
+        });
+        mutationObserver.observe(document.body, {
+          attributes: true,
+          childList: true,
+          subtree: true,
+        });
+
+        window.addEventListener("scroll", scheduleScrollIndicatorUpdate, { passive: true });
+        window.addEventListener("resize", scheduleScrollIndicatorUpdate);
+        window.addEventListener("load", scheduleScrollIndicatorUpdate);
+
+        // Obsługa otwierania menu okolicznościowego przez hash
+        function openOccasionMenuFromHash() {
+          if (window.location.hash === "#occasion-menu") {
+            const occasionMenu = document.querySelector("#occasion-menu");
+            if (occasionMenu && occasionMenu.tagName === "DETAILS") {
+              occasionMenu.open = true;
+              setTimeout(() => {
+                occasionMenu.scrollIntoView({ behavior: "smooth", block: "start" });
+              }, 100);
+            }
+          }
+        }
+
+        window.addEventListener("hashchange", openOccasionMenuFromHash);
+
+        bootstrap();
+        showCookieBanner();
+      })();
+    </script>
+    <a href="../kontakt/index.html" class="floating-contact-button" aria-label="Kontakt">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+      </svg>
+    </a>
+    <a class="watermark" href="https://kontakt.strzelca.pl/Igor_Janicki.html">Design &amp; Development by Igor Janicki</a>
+  </body>
+</html>

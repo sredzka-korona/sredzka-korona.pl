@@ -1,0 +1,109 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "hotelReservations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "emailVerificationExpiresAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "hotelReservations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "pendingExpiresAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "hotelReservations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "hotelRooms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "active", "order": "ASCENDING" },
+        { "fieldPath": "sortOrder", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "restaurantReservations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "emailVerificationExpiresAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "restaurantReservations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "pendingExpiresAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "restaurantReservations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "restaurantTableLocks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tableId", "order": "ASCENDING" },
+        { "fieldPath": "blockEndMs", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "venueReservations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "emailVerificationExpiresAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "venueReservations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "pendingExpiresAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "venueReservations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "venueHalls",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "active", "order": "ASCENDING" },
+        { "fieldPath": "sortOrder", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "venueReservations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "hallId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

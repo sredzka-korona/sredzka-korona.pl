@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin/
+Disallow: /Hotel/potwierdzenie.html
+Disallow: /Restauracja/potwierdzenie.html
+Disallow: /Przyjec/potwierdzenie.html
+
+Sitemap: https://www.sredzkakorona.pl/sitemap.xml

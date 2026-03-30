@@ -1,0 +1,25 @@
+{
+  "name": "sredzka-korona-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-03-05",
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "sredzka-korona",
+      "database_id": "WKLEJ_TUTAJ_DATABASE_ID"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA_BUCKET",
+      "bucket_name": "sredzka-korona-media"
+    }
+  ],
+  "vars": {
+    "ALLOWED_ORIGIN": "https://twoja-domena.pl",
+    "FIREBASE_PROJECT_ID": "twoj-projekt-firebase",
+    "FIREBASE_ADMIN_EMAILS": "admin@twoja-domena.pl"
+  }
+}
+
