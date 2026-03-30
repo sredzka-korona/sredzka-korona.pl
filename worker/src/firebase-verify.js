@@ -3,8 +3,8 @@
  * @see https://firebase.google.com/docs/auth/admin/verify-id-tokens
  */
 
-const GOOGLE_CERTS_URL =
-  "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com";
+const GOOGLE_JWKS_URL =
+  "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
 const CERT_CACHE_MS = 55 * 60 * 1000;
 
 let certCache = { map: null, fetchedAt: 0 };
@@ -28,40 +28,21 @@ function base64UrlToString(segment) {
   return new TextDecoder().decode(bytes);
 }
 
-function pemCertificateToSpki(pem) {
-  const b64 = pem
-    .replace(/-----BEGIN CERTIFICATE-----/g, "")
-    .replace(/-----END CERTIFICATE-----/g, "")
-    .replace(/\s/g, "");
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes.buffer;
-}
-
-async function importRsaKeyFromCertPem(pem) {
-  const spki = pemCertificateToSpki(pem);
-  return crypto.subtle.importKey(
-    "spki",
-    spki,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["verify"]
-  );
-}
-
 async function getPublicKeyMap() {
   const now = Date.now();
   if (certCache.map && now - certCache.fetchedAt < CERT_CACHE_MS) {
     return certCache.map;
   }
-  const response = await fetch(GOOGLE_CERTS_URL);
+  const response = await fetch(GOOGLE_JWKS_URL);
   if (!response.ok) {
     throw new Error("Nie udalo sie pobrac kluczy Google do weryfikacji tokenu.");
   }
-  certCache.map = await response.json();
+  const jwks = await response.json();
+  certCache.map = new Map(
+    (jwks.keys || [])
+      .filter((key) => key && key.kid)
+      .map((key) => [key.kid, key])
+  );
   certCache.fetchedAt = now;
   return certCache.map;
 }
@@ -87,12 +68,18 @@ export async function verifyFirebaseIdToken(idToken, env) {
   const payload = JSON.parse(base64UrlToString(payloadSeg));
 
   const keys = await getPublicKeyMap();
-  const pem = keys[header.kid];
-  if (!pem) {
+  const jwk = keys.get(header.kid);
+  if (!jwk) {
     throw new Error("Nieznany klucz podpisu tokenu.");
   }
 
-  const cryptoKey = await importRsaKeyFromCertPem(pem);
+  const cryptoKey = await crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["verify"]
+  );
   const signature = base64UrlToArrayBuffer(signatureSeg);
   const data = new TextEncoder().encode(`${headerSeg}.${payloadSeg}`);
   const ok = await crypto.subtle.verify(

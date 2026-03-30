@@ -940,6 +940,13 @@
           touch-action: manipulation;
         }
 
+        .main-split-section img,
+        .main-split-section:hover img {
+          transform: none;
+          filter: brightness(0.96);
+          object-position: center center;
+        }
+
         .main-split-section:nth-child(1) {
           clip-path: polygon(0 0, 100% 0, 100% 62%, 0 92%);
         }
@@ -980,6 +987,7 @@
           white-space: normal;
           padding: 0 0.25rem;
           transform: none;
+          transition: none;
         }
 
         .main-split-soon,
