@@ -862,13 +862,6 @@
         opacity: 1;
       }
 
-      .main-split-copy {
-        display: flex;
-        flex-direction: column;
-        gap: 0.35rem;
-        max-width: min(350px, 72%);
-      }
-
       .main-split-label {
         color: #fff;
         font-family: "Cormorant Garamond", serif;
@@ -883,10 +876,6 @@
         white-space: normal;
         transform: translateY(30px);
         transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-
-      .main-split-caption {
-        display: none;
       }
 
       .main-split-section:hover .main-split-label {
@@ -942,153 +931,63 @@
         opacity: 0.92;
       }
 
-      .home-mobile-intro {
-        display: none;
-      }
-
       @media (max-width: 780px) {
-        html,
-        body {
-          height: auto;
-          min-height: 100%;
-          overflow-x: hidden;
-          overflow-y: auto;
-        }
-
-        .shell {
-          min-height: 100svh;
-          height: auto;
-          overflow: visible;
-        }
-
-        .home-mobile-intro {
-          display: grid;
-          gap: 0.5rem;
-          padding: calc(var(--nav-height) + 1rem) 1rem 0;
-          position: relative;
-          z-index: 2;
-        }
-
-        .home-mobile-intro .eyebrow {
-          margin: 0;
-          font-size: 0.78rem;
-          letter-spacing: 0.18em;
-        }
-
-        .home-mobile-intro h2 {
-          margin: 0;
-          font-family: "Cormorant Garamond", serif;
-          font-size: clamp(2.3rem, 10vw, 3.4rem);
-          line-height: 0.95;
-          color: #241b14;
-        }
-
-        .home-mobile-intro p:last-child {
-          margin: 0;
-          max-width: 32ch;
-          color: var(--muted);
-          line-height: 1.55;
-        }
-
         .main-split-container {
-          position: relative;
-          top: auto;
-          left: auto;
-          right: auto;
-          bottom: auto;
-          height: auto;
-          min-height: auto;
-          display: grid;
-          gap: 0.95rem;
-          padding: 1rem 1rem calc(5.5rem + env(safe-area-inset-bottom, 0px));
-          overflow: visible;
+          height: calc(100svh - var(--nav-height));
         }
 
         .main-split-section {
-          position: relative;
-          top: auto;
-          left: auto;
-          width: 100%;
-          height: clamp(190px, 27svh, 250px);
-          min-height: 190px;
-          border-radius: 28px;
-          border: 1px solid rgba(200, 170, 120, 0.22);
-          box-shadow: 0 20px 36px rgba(31, 23, 18, 0.16);
-          isolation: isolate;
+          touch-action: manipulation;
         }
 
-        .main-split-section:nth-child(1),
-        .main-split-section:nth-child(2),
+        .main-split-section:nth-child(1) {
+          clip-path: polygon(0 0, 100% 0, 100% 62%, 0 92%);
+        }
+
+        .main-split-section:nth-child(2) {
+          clip-path: polygon(0 24%, 100% 4%, 100% 82%, 0 100%);
+        }
+
         .main-split-section:nth-child(3) {
-          clip-path: none;
-          margin-left: 0;
-        }
-
-        .main-split-section:hover {
-          z-index: 1;
-        }
-
-        .main-split-section img,
-        .main-split-section:hover img {
-          transform: scale(1);
-          filter: brightness(0.92);
+          clip-path: polygon(0 58%, 100% 34%, 100% 100%, 0 100%);
         }
 
         .main-split-overlay,
         .main-split-section:hover .main-split-overlay {
           opacity: 1;
           align-items: flex-end;
-          justify-content: flex-start;
-          padding: 1.3rem;
-          background: linear-gradient(180deg, rgba(15, 11, 9, 0.08) 0%, rgba(15, 11, 9, 0.72) 100%);
+          background: linear-gradient(to bottom, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.62));
         }
 
-        .main-split-section:nth-child(1) .main-split-overlay,
-        .main-split-section:nth-child(2) .main-split-overlay,
+        .main-split-section:nth-child(1) .main-split-overlay {
+          justify-content: flex-start;
+          padding: 0 0 1.35rem 1rem;
+        }
+
+        .main-split-section:nth-child(2) .main-split-overlay {
+          justify-content: center;
+          padding: 0 1rem 1.35rem;
+        }
+
         .main-split-section:nth-child(3) .main-split-overlay {
-          justify-content: flex-start;
-          padding-left: 1.3rem;
-          padding-right: 1.3rem;
+          justify-content: flex-end;
+          padding: 0 1rem 1.35rem 0;
         }
 
-        .main-split-copy {
-          gap: 0.55rem;
-          max-width: min(100%, 20rem);
-        }
-
-        .main-split-label,
-        .main-split-section:hover .main-split-label {
-          max-width: none;
-          padding: 0;
-          font-size: clamp(2rem, 9vw, 3rem);
-          text-align: left;
+        .main-split-label {
+          max-width: 9ch;
+          font-size: clamp(1.45rem, 5.8vw, 2.2rem);
+          white-space: normal;
+          padding: 0 0.25rem;
           transform: none;
-        }
-
-        .main-split-caption {
-          display: block;
-          margin: 0;
-          color: rgba(255, 248, 239, 0.88);
-          font-size: 0.95rem;
-          line-height: 1.5;
-          text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
         }
 
         .main-split-soon,
         .main-split-section.is-blocked:hover .main-split-soon {
-          position: static;
-          left: auto;
-          right: auto;
-          bottom: auto;
           opacity: 1;
-          margin-top: 0.25rem;
-          text-align: left;
-          font-size: 0.72rem;
-          line-height: 1.45;
-        }
-
-        .main-split-section.is-blocked .main-split-overlay {
-          background: linear-gradient(180deg, rgba(15, 11, 9, 0.12) 0%, rgba(15, 11, 9, 0.78) 100%);
+          bottom: 9%;
+          font-size: 0.68rem;
+          line-height: 1.35;
         }
       }
 
@@ -2063,16 +1962,9 @@
           events: "PRZYJĘCIA",
         };
 
-        const SECTION_DESCRIPTIONS = {
-          hotel: "Komfortowe pokoje i szybka rezerwacja noclegu.",
-          restaurant: "Autorska kuchnia, menu i stoliki na miejscu.",
-          events: "Sale, wesela i rodzinne przyjęcia w jednym miejscu.",
-        };
-
         function renderMainSplitSection(sectionKey, link, label, imageUrl, alt, imagePriority) {
           const sb = state.content.home?.sectionBlocks || {};
           const blocked = Boolean(sb[sectionKey]);
-          const description = SECTION_DESCRIPTIONS[sectionKey] || "";
           const soonText = SECTION_SOON_LABEL[sectionKey]
             ? `${SECTION_SOON_LABEL[sectionKey]} — wkrótce dostępne`
             : `${String(label).toUpperCase()} — wkrótce dostępne`;
@@ -2095,10 +1987,7 @@
                 >
                   <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(alt)}"${imgAttrs} />
                   <div class="main-split-overlay">
-                    <div class="main-split-copy">
-                      <span class="main-split-label">${escapeHtml(label)}</span>
-                      ${description ? `<span class="main-split-caption">${escapeHtml(description)}</span>` : ""}
-                    </div>
+                    <span class="main-split-label">${escapeHtml(label)}</span>
                     ${blocked ? `<span class="main-split-soon">${escapeHtml(soonText)}</span>` : ""}
                   </div>
                 </div>`;
@@ -2116,11 +2005,6 @@
                     <span class="floating-nav-brand-text">KORONA</span>
                   </a>
                 </nav>
-                <section class="home-mobile-intro" aria-label="Wprowadzenie do sekcji">
-                  <p class="eyebrow">Średzka Korona</p>
-                  <h2>Wybierz, czego szukasz</h2>
-                  <p>Trzy szybkie wejścia do hotelu, restauracji i organizacji przyjęć.</p>
-                </section>
                 <div class="main-split-container">
                   ${renderMainSplitSection(
                     "hotel",

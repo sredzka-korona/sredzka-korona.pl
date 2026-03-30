@@ -6,16 +6,17 @@ Ten wariant nie uzywa Firebase Functions. Panel admina loguje sie przez Firebase
 
 Repo jest teraz przygotowane do startu bez `R2`. To oznacza:
 
-- nie potrzebujesz karty, zeby uruchomic kontakt, panel, tresci i kalendarz,
-- upload galerii i dokumentow z panelu bedzie wylaczony,
-- jesli kiedys dodasz `R2`, uploady da sie wlaczyc bez duzej przebudowy.
+- nie potrzebujesz karty, zeby uruchomic kontakt, panel, tresci, kalendarz, galerie i dokumenty,
+- pliki sa trzymane bezposrednio w `D1`,
+- obrazy sa automatycznie kompresowane w panelu przed uploadem,
+- dokumenty i obrazy wgrywane przez API maja twardy limit rozmiaru.
 
 ## Co dziala bez karty
 
 - strona publiczna na GitHub Pages,
 - panel admina,
 - edycja tresci,
-- galerie i dokumenty jako sekcje panelu, ale bez uploadu plikow,
+- galerie i dokumenty z uploadem przez API do `D1`,
 - kalendarz,
 - formularz kontaktowy,
 - logowanie admina przez Firebase.
@@ -44,6 +45,12 @@ window.SREDZKA_CONFIG = {
   hallApiBase: "",
 };
 ```
+
+Limity praktyczne w tej wersji:
+
+- obrazy do API sa automatycznie kompresowane do ok. `1.7 MB`,
+- obrazy zapisane bezposrednio w tresci strony sa kompresowane mocniej,
+- dokumenty `PDF/DOC/DOCX` musza miescic sie w ok. `1.7 MB`, bo nie sa automatycznie kompresowane.
 
 ## 1. Firebase - tylko logowanie admina
 
@@ -83,12 +90,20 @@ window.SREDZKA_CONFIG = {
 6. Skopiuj `Database ID`.
 7. Otworz `worker/wrangler.jsonc` i wklej `database_id`.
 8. W D1 otworz zakladke SQL.
-9. Uruchom SQL z pliku `worker/schema.sql`.
-10. Wejdz do `Turnstile`.
-11. Kliknij `Add site`.
-12. Dodaj domene strony.
-13. Skopiuj `site key` i `secret key`.
-14. `site key` wklej do `assets/js/config.js` jako `turnstileSiteKey`.
+9. Jesli to nowa baza, uruchom SQL z pliku `worker/schema.sql`.
+10. Jesli ta baza byla juz zalozona wczesniej wedlug starego schematu, najprosciej usun ja i zaloz ponownie, a potem znow uruchom `worker/schema.sql`.
+11. Aby sprawdzic, czy schema weszlo poprawnie, uruchom:
+
+```sql
+SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;
+```
+
+12. Jesli widzisz tabele `site_content`, `contact_submissions`, `calendar_blocks`, `gallery_albums`, `gallery_images`, `documents`, to jest OK.
+13. Wejdz do `Turnstile`.
+14. Kliknij `Add site`.
+15. Dodaj domene strony.
+16. Skopiuj `site key` i `secret key`.
+17. `site key` wklej do `assets/js/config.js` jako `turnstileSiteKey`.
 
 ## 3. Cloudflare - Worker
 
@@ -127,15 +142,16 @@ window.SREDZKA_CONFIG = {
     - wysylke formularza kontaktowego,
     - edycje kalendarza.
 
-## Kiedy bedzie potrzebne R2
+## Kiedy rozważyć R2
 
-R2 jest potrzebne dopiero wtedy, gdy chcesz z panelu:
+R2 warto rozważyć wtedy, gdy:
 
-- wgrywac dokumenty PDF/DOC/DOCX,
-- wgrywac galerie zdjec,
-- serwowac pliki binarne z bucketu.
+- zdjecia z telefonu po kompresji wciaz sa za duze,
+- dokumenty PDF/DOC/DOCX przekraczaja limit ok. `1.7 MB`,
+- chcesz trzymac duzo plikow poza baza `D1`,
+- zalezy Ci na wygodniejszym storage dla galerii i dokumentow.
 
-Jesli Cloudflare pokazuje ekran billingowy dla `R2`, po prostu pomin ten krok na razie.
+W tej chwili juz to obslugujemy bez `R2`, ale `R2` bedzie lepsze przy duzej liczbie zdjec albo duzych plikach.
 
 ## Uwaga
 

@@ -1,6 +1,8 @@
 import { DEFAULT_CONTENT } from "./default-content.js";
 import { parseAdminEmailAllowlist, verifyFirebaseIdToken } from "./firebase-verify.js";
 
+const MAX_MEDIA_FILE_BYTES = 1_700_000;
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -63,7 +65,7 @@ export default {
             calendarBlocks,
             submissions: submissions.results || [],
             capabilities: {
-              mediaStorageEnabled: hasMediaStorage(env),
+              mediaStorageEnabled: true,
             },
           },
           200,
@@ -177,7 +179,7 @@ async function getPublicBootstrap(env, url) {
     documents: await listDocuments(env, url),
     galleryAlbums: await listGalleryAlbums(env, url),
     capabilities: {
-      mediaStorageEnabled: hasMediaStorage(env),
+      mediaStorageEnabled: true,
     },
   };
 }
@@ -202,9 +204,6 @@ async function saveContent(env, content) {
 }
 
 async function listDocuments(env, url) {
-  if (!hasMediaStorage(env)) {
-    return [];
-  }
   const result = await env.DB.prepare(
     "SELECT id, title, description, mime_type AS mimeType, file_name AS fileName FROM documents ORDER BY created_at DESC"
   ).all();
@@ -221,9 +220,6 @@ async function listDocuments(env, url) {
 }
 
 async function listGalleryAlbums(env, url) {
-  if (!hasMediaStorage(env)) {
-    return [];
-  }
   const albumResult = await env.DB.prepare(
     "SELECT id, slug, title, description, cover_image_id AS coverImageId FROM gallery_albums ORDER BY created_at DESC"
   ).all();
@@ -345,7 +341,6 @@ async function requireFirebaseAdmin(request, env) {
 }
 
 async function uploadGalleryImages(albumId, request, env) {
-  requireMediaStorage(env);
   const album = await env.DB.prepare(
     "SELECT id, slug, cover_image_id AS coverImageId FROM gallery_albums WHERE id = ?"
   )
@@ -362,15 +357,23 @@ async function uploadGalleryImages(albumId, request, env) {
 
   let firstInsertedId = null;
   for (const file of files) {
+    assertFileWithinLimit(file, "Zdjecie");
     const safeName = sanitizeFileName(file.name);
     const objectKey = `gallery/${album.slug}/${crypto.randomUUID()}-${safeName}`;
-    await env.MEDIA_BUCKET.put(objectKey, await file.arrayBuffer(), {
-      httpMetadata: { contentType: file.type || "application/octet-stream" },
-    });
+    const blobData = new Uint8Array(await file.arrayBuffer());
     const insert = await env.DB.prepare(
-      "INSERT INTO gallery_images (album_id, object_key, file_name, alt_text, mime_type, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+      "INSERT INTO gallery_images (album_id, object_key, file_name, alt_text, mime_type, blob_data, byte_size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
-      .bind(album.id, objectKey, file.name, album.slug, file.type || "application/octet-stream", nowIso())
+      .bind(
+        album.id,
+        objectKey,
+        file.name,
+        album.slug,
+        file.type || "application/octet-stream",
+        blobData,
+        blobData.byteLength,
+        nowIso()
+      )
       .run();
     if (!firstInsertedId) {
       firstInsertedId = insert.meta.last_row_id;
@@ -384,7 +387,6 @@ async function uploadGalleryImages(albumId, request, env) {
 }
 
 async function setAlbumCover(imageId, env) {
-  requireMediaStorage(env);
   const image = await env.DB.prepare(
     "SELECT id, album_id AS albumId FROM gallery_images WHERE id = ?"
   )
@@ -399,16 +401,14 @@ async function setAlbumCover(imageId, env) {
 }
 
 async function deleteGalleryImage(imageId, env) {
-  requireMediaStorage(env);
   const image = await env.DB.prepare(
-    "SELECT id, album_id AS albumId, object_key AS objectKey FROM gallery_images WHERE id = ?"
+    "SELECT id, album_id AS albumId FROM gallery_images WHERE id = ?"
   )
     .bind(imageId)
     .first();
   if (!image) {
     throw badRequest("Zdjecie nie istnieje.");
   }
-  await env.MEDIA_BUCKET.delete(image.objectKey);
   await env.DB.prepare("DELETE FROM gallery_images WHERE id = ?").bind(imageId).run();
   const nextImage = await env.DB.prepare(
     "SELECT id FROM gallery_images WHERE album_id = ? ORDER BY created_at ASC LIMIT 1"
@@ -421,7 +421,6 @@ async function deleteGalleryImage(imageId, env) {
 }
 
 async function uploadDocument(request, env) {
-  requireMediaStorage(env);
   const formData = await request.formData();
   const title = String(formData.get("title") || "").trim();
   const description = String(formData.get("description") || "").trim();
@@ -437,29 +436,24 @@ async function uploadDocument(request, env) {
   if (!allowed.includes(file.type)) {
     throw badRequest("Dozwolone sa tylko pliki PDF, DOC i DOCX.");
   }
+  assertFileWithinLimit(file, "Dokument");
   const safeName = sanitizeFileName(file.name);
   const objectKey = `documents/${crypto.randomUUID()}-${safeName}`;
-  await env.MEDIA_BUCKET.put(objectKey, await file.arrayBuffer(), {
-    httpMetadata: { contentType: file.type },
-  });
+  const blobData = new Uint8Array(await file.arrayBuffer());
   await env.DB.prepare(
-    "INSERT INTO documents (title, description, object_key, file_name, mime_type, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    "INSERT INTO documents (title, description, object_key, file_name, mime_type, blob_data, byte_size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
   )
-    .bind(title, description, objectKey, file.name, file.type, nowIso())
+    .bind(title, description, objectKey, file.name, file.type, blobData, blobData.byteLength, nowIso())
     .run();
 }
 
 async function deleteDocument(documentId, env) {
-  requireMediaStorage(env);
-  const documentEntry = await env.DB.prepare(
-    "SELECT object_key AS objectKey FROM documents WHERE id = ?"
-  )
+  const documentEntry = await env.DB.prepare("SELECT id FROM documents WHERE id = ?")
     .bind(documentId)
     .first();
   if (!documentEntry) {
     throw badRequest("Dokument nie istnieje.");
   }
-  await env.MEDIA_BUCKET.delete(documentEntry.objectKey);
   await env.DB.prepare("DELETE FROM documents WHERE id = ?").bind(documentId).run();
 }
 
@@ -488,18 +482,15 @@ async function createCalendarBlock(payload, env) {
 }
 
 async function streamGalleryImage(imageId, env, request) {
-  if (!hasMediaStorage(env)) {
-    return jsonResponse({ error: "Magazyn mediow nie jest wlaczony." }, 503, request, env);
-  }
   const image = await env.DB.prepare(
-    "SELECT object_key AS objectKey, mime_type AS mimeType FROM gallery_images WHERE id = ?"
+    "SELECT blob_data AS blobData, mime_type AS mimeType FROM gallery_images WHERE id = ?"
   )
     .bind(Number(imageId))
     .first();
   if (!image) {
     return jsonResponse({ error: "Zdjecie nie istnieje." }, 404, request, env);
   }
-  const object = await env.MEDIA_BUCKET.get(image.objectKey);
+  const object = normalizeBlobData(image.blobData);
   if (!object) {
     return jsonResponse({ error: "Plik nie istnieje." }, 404, request, env);
   }
@@ -507,18 +498,15 @@ async function streamGalleryImage(imageId, env, request) {
 }
 
 async function streamDocument(documentId, download, env, request) {
-  if (!hasMediaStorage(env)) {
-    return jsonResponse({ error: "Magazyn mediow nie jest wlaczony." }, 503, request, env);
-  }
   const documentEntry = await env.DB.prepare(
-    "SELECT object_key AS objectKey, mime_type AS mimeType, file_name AS fileName FROM documents WHERE id = ?"
+    "SELECT blob_data AS blobData, mime_type AS mimeType, file_name AS fileName FROM documents WHERE id = ?"
   )
     .bind(Number(documentId))
     .first();
   if (!documentEntry) {
     return jsonResponse({ error: "Dokument nie istnieje." }, 404, request, env);
   }
-  const object = await env.MEDIA_BUCKET.get(documentEntry.objectKey);
+  const object = normalizeBlobData(documentEntry.blobData);
   if (!object) {
     return jsonResponse({ error: "Plik nie istnieje." }, 404, request, env);
   }
@@ -600,14 +588,26 @@ function sanitizeContent(content) {
   };
 }
 
-function hasMediaStorage(env) {
-  return Boolean(env.MEDIA_BUCKET && typeof env.MEDIA_BUCKET.get === "function");
+function assertFileWithinLimit(file, label) {
+  if (file.size > MAX_MEDIA_FILE_BYTES) {
+    throw badRequest(`${label} jest zbyt duzy. Maksymalny rozmiar po kompresji to ok. 1.7 MB.`);
+  }
 }
 
-function requireMediaStorage(env) {
-  if (!hasMediaStorage(env)) {
-    throw badRequest("Uploady galerii i dokumentow sa wylaczone, bo magazyn mediow nie jest skonfigurowany.");
+function normalizeBlobData(value) {
+  if (!value) {
+    return null;
   }
+  if (value instanceof Uint8Array) {
+    return value;
+  }
+  if (value instanceof ArrayBuffer) {
+    return new Uint8Array(value);
+  }
+  if (Array.isArray(value)) {
+    return new Uint8Array(value);
+  }
+  return null;
 }
 
 function jsonResponse(data, status, request, env, extraHeaders = {}) {

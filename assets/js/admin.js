@@ -24,6 +24,10 @@
       mediaStorageEnabled: false,
     },
   };
+  const INLINE_IMAGE_MAX_BYTES = 320 * 1024;
+  const API_IMAGE_MAX_BYTES = 1_700_000;
+  const DOCUMENT_MAX_BYTES = 1_700_000;
+  const IMAGE_MAX_DIMENSION = 1600;
   const missingApiConfiguration = !state.apiBase && isGithubPages;
 
   const app = document.querySelector("#admin-app");
@@ -42,6 +46,95 @@
 
   function escapeAttribute(value) {
     return escapeHtml(value).replaceAll("`", "&#96;");
+  }
+
+  function replaceFileExtension(name, ext) {
+    return String(name || "plik")
+      .replace(/\.[^/.]+$/, "")
+      .concat(ext);
+  }
+
+  function readImageElement(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(img);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("Nie udalo sie odczytac obrazu."));
+      };
+      img.src = url;
+    });
+  }
+
+  function canvasToBlob(canvas, type, quality) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error("Nie udalo sie skompresowac obrazu."));
+          return;
+        }
+        resolve(blob);
+      }, type, quality);
+    });
+  }
+
+  async function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("Nie udalo sie odczytac obrazu po kompresji."));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function compressImageFile(file, { maxBytes, maxDimension = IMAGE_MAX_DIMENSION } = {}) {
+    if (!(file instanceof File) || !String(file.type || "").startsWith("image/")) {
+      throw new Error("Wybrany plik nie jest obrazem.");
+    }
+
+    const image = await readImageElement(file);
+    let scale = Math.min(1, maxDimension / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
+    const qualities = [0.86, 0.78, 0.7, 0.62, 0.55];
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
+      const height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d", { alpha: true });
+      if (!ctx) {
+        throw new Error("Przegladarka nie pozwala przygotowac kompresji obrazu.");
+      }
+      ctx.drawImage(image, 0, 0, width, height);
+
+      for (const quality of qualities) {
+        const blob = await canvasToBlob(canvas, "image/webp", quality);
+        if (blob.size <= maxBytes) {
+          return new File([blob], replaceFileExtension(file.name, ".webp"), { type: "image/webp" });
+        }
+      }
+
+      scale *= 0.82;
+    }
+
+    throw new Error(`Nie udalo sie zmniejszyc obrazu "${file.name}" do bezpiecznego rozmiaru.`);
+  }
+
+  async function filesToInlineGalleryImages(files, maxBytes, fallbackAlt) {
+    const compressed = await Promise.all(
+      Array.from(files).map((file) => compressImageFile(file, { maxBytes }))
+    );
+    return Promise.all(
+      compressed.map(async (file) => ({
+        url: await blobToDataUrl(file),
+        alt: file.name.replace(/\.[^/.]+$/, "") || fallbackAlt,
+      }))
+    );
   }
 
   function ensureScrollIndicator() {
@@ -948,7 +1041,7 @@
       <p class="pill">Galeria</p>
       <h2>Albumy i zdjecia</h2>
       <p class="section-intro">Dodaj album, potem wgraj zdjecia i ustaw okladke widoczna na stronie.</p>
-      ${mediaEnabled ? "" : '<p class="status">Upload galerii jest obecnie wylaczony, bo Cloudflare R2 nie jest skonfigurowane.</p>'}
+      ${mediaEnabled ? "" : '<p class="status">Upload galerii jest obecnie niedostepny.</p>'}
       <div class="grid">
         <div class="col-4">
           <div class="repeater-item">
@@ -1044,12 +1137,24 @@
     event.preventDefault();
     const form = event.currentTarget;
     const albumId = form.dataset.uploadAlbum;
-    const formData = new FormData(form);
+    const rawFormData = new FormData(form);
+    const files = rawFormData.getAll("images").filter((entry) => entry instanceof File && entry.size);
+    if (!files.length) {
+      renderGalleryPanel("Wybierz zdjecia do wgrania.");
+      return;
+    }
     try {
+      const authHeaders = await getFirebaseAuthHeaders();
+      const prepared = new FormData();
+      const compressed = await Promise.all(
+        files.map((file) => compressImageFile(file, { maxBytes: API_IMAGE_MAX_BYTES }))
+      );
+      compressed.forEach((file) => prepared.append("images", file, file.name));
       await fetch(state.apiBase + `/api/admin/gallery/albums/${albumId}/images`, {
         method: "POST",
-        body: formData,
+        body: prepared,
         credentials: "include",
+        headers: authHeaders,
       }).then(async (response) => {
         if (!response.ok) {
           const data = await response.json().catch(() => ({}));
@@ -1798,20 +1903,7 @@
     }
 
     try {
-      const images = await Promise.all(
-        Array.from(files).map(async (file) => {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              resolve({
-                url: e.target.result,
-                alt: file.name.replace(/\.[^/.]+$/, ""),
-              });
-            };
-            reader.readAsDataURL(file);
-          });
-        })
-      );
+      const images = await filesToInlineGalleryImages(files, INLINE_IMAGE_MAX_BYTES, "Restauracja");
 
       if (!state.content.restaurant) {
         state.content.restaurant = {};
@@ -1941,21 +2033,7 @@
     }
 
     try {
-      // Konwertuj pliki na base64 lub URL (dla uproszczenia używamy base64)
-      const images = await Promise.all(
-        Array.from(files).map(async (file) => {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              resolve({
-                url: e.target.result,
-                alt: file.name.replace(/\.[^/.]+$/, ""),
-              });
-            };
-            reader.readAsDataURL(file);
-          });
-        })
-      );
+      const images = await filesToInlineGalleryImages(files, INLINE_IMAGE_MAX_BYTES, roomType);
 
       if (!state.content.hotel) {
         state.content.hotel = {};
@@ -2096,21 +2174,7 @@
     }
 
     try {
-      // Konwertuj pliki na base64 lub URL (dla uproszczenia używamy base64)
-      const images = await Promise.all(
-        Array.from(files).map(async (file) => {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              resolve({
-                url: e.target.result,
-                alt: file.name.replace(/\.[^/.]+$/, ""),
-              });
-            };
-            reader.readAsDataURL(file);
-          });
-        })
-      );
+      const images = await filesToInlineGalleryImages(files, INLINE_IMAGE_MAX_BYTES, hallNumber);
 
       if (!state.content.events) {
         state.content.events = {};
@@ -2185,7 +2249,7 @@
             <button class="button" type="button" id="save-documents-menu">Zapisz menu</button>
           </div>
         </div>
-        ${mediaEnabled ? "" : '<p class="status">Upload plikow jest obecnie wylaczony, bo Cloudflare R2 nie jest skonfigurowane.</p>'}
+        ${mediaEnabled ? "" : '<p class="status">Upload plikow jest obecnie niedostepny.</p>'}
         <form id="document-form" class="repeater-item">
           <div class="field-grid">
             <label class="field"><span>Tytul</span><input name="title" required ${mediaEnabled ? "" : "disabled"} /></label>
@@ -2298,11 +2362,22 @@
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
+    const file = formData.get("file");
+    if (!(file instanceof File) || !file.size) {
+      renderDocumentsPanel("Wybierz dokument do wgrania.");
+      return;
+    }
+    if (file.size > DOCUMENT_MAX_BYTES) {
+      renderDocumentsPanel("Dokument jest zbyt duzy. Maksymalny rozmiar to ok. 1.7 MB.");
+      return;
+    }
     try {
+      const authHeaders = await getFirebaseAuthHeaders();
       await fetch(state.apiBase + "/api/admin/documents", {
         method: "POST",
         body: formData,
         credentials: "include",
+        headers: authHeaders,
       }).then(async (response) => {
         if (!response.ok) {
           const data = await response.json().catch(() => ({}));

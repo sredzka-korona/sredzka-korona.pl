@@ -1,6 +1,6 @@
 # Sredzka Korona
 
-Statyczny frontend pod GitHub Pages oraz panel/API pod Cloudflare Worker + D1 + R2. Logowanie administratora dziala przez Firebase Authentication bez potrzeby wdrazania Firebase Functions.
+Statyczny frontend pod GitHub Pages oraz panel/API pod Cloudflare Worker + D1. Logowanie administratora dziala przez Firebase Authentication bez potrzeby wdrazania Firebase Functions.
 
 ## Najwazniejsze katalogi
 
@@ -37,6 +37,8 @@ Logowanie do panelu odbywa sie przez **Firebase Authentication** (e-mail i haslo
 Domyslna konfiguracja w repo jest ustawiona pod wariant bez karty klienta:
 - publiczna strona i kontakt dzialaja przez Cloudflare Worker,
 - panel admina dziala przez Cloudflare Worker + Firebase Auth,
+- galerie i dokumenty sa trzymane w D1,
+- obrazy w panelu sa kompresowane przed zapisem,
 - rezerwacje online hotel/restauracja/sale sa domyslnie wylaczone.
 
 Szczegoly konfiguracji: [WDROZENIE-CLOUDFLARE-GITHUB.md](WDROZENIE-CLOUDFLARE-GITHUB.md).
