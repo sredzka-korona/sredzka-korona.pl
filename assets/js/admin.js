@@ -465,21 +465,21 @@
               <input type="checkbox" id="section-block-hotel" ${content.home.sectionBlocks?.hotel ? "checked" : ""} />
               <span class="checkbox-copy">
                 <strong>Zablokuj Hotel</strong>
-                <span>Wyszarza kafelek i blokuje wejscie na `/Hotel/`.</span>
+                <span>Wyszarza kafelek i blokuje wejscie na adres /Hotel/.</span>
               </span>
             </label>
             <label class="checkbox-field">
               <input type="checkbox" id="section-block-restaurant" ${content.home.sectionBlocks?.restaurant ? "checked" : ""} />
               <span class="checkbox-copy">
                 <strong>Zablokuj Restauracje</strong>
-                <span>Wyszarza kafelek i blokuje wejscie na `/Restauracja/`.</span>
+                <span>Wyszarza kafelek i blokuje wejscie na adres /Restauracja/.</span>
               </span>
             </label>
             <label class="checkbox-field">
               <input type="checkbox" id="section-block-events" ${content.home.sectionBlocks?.events ? "checked" : ""} />
               <span class="checkbox-copy">
                 <strong>Zablokuj Przyjecia</strong>
-                <span>Wyszarza kafelek i blokuje wejscie na `/Przyjec/`.</span>
+                <span>Wyszarza kafelek i blokuje wejscie na adres /Przyjec/.</span>
               </span>
             </label>
           </div>
