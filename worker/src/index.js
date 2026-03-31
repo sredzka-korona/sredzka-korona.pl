@@ -231,7 +231,11 @@ async function getContent(env, url = null) {
     const fallback = structuredClone(DEFAULT_CONTENT);
     return url ? withHotelRoomGalleries(fallback, await listHotelRoomGalleries(env, url)) : fallback;
   }
-  const content = sanitizeContent(JSON.parse(record.content_json));
+  const parsed = JSON.parse(record.content_json);
+  const content = sanitizeContent(parsed);
+  if (JSON.stringify(parsed) !== JSON.stringify(content)) {
+    await saveContent(env, content);
+  }
   if (!url) {
     return content;
   }
@@ -766,30 +770,6 @@ function normalizeBookingPauseRanges(ranges, fallbackFrom, fallbackTo) {
   return [];
 }
 
-function sanitizeHotelRoomGalleryEntries(roomGalleries) {
-  const source = roomGalleries && typeof roomGalleries === "object" ? roomGalleries : {};
-  const normalized = emptyHotelRoomGalleries();
-  Object.keys(normalized).forEach((roomType) => {
-    const items = Array.isArray(source[roomType]) ? source[roomType] : [];
-    normalized[roomType] = items
-      .map((item) => {
-        const entry = typeof item === "string" ? { url: item } : item;
-        const id = Number(entry?.id);
-        const url = String(entry?.url || "").trim();
-        if (url.startsWith("data:")) {
-          return null;
-        }
-        const sanitized = {};
-        if (Number.isInteger(id) && id > 0) sanitized.id = id;
-        if (url) sanitized.url = url;
-        if (entry?.alt) sanitized.alt = String(entry.alt);
-        return Object.keys(sanitized).length ? sanitized : null;
-      })
-      .filter(Boolean);
-  });
-  return normalized;
-}
-
 function sanitizeContent(content) {
   const rawBooking = content.booking || {};
   const restaurantPauseRanges = normalizeBookingPauseRanges(
@@ -827,7 +807,8 @@ function sanitizeContent(content) {
     hotel: {
       ...DEFAULT_CONTENT.hotel,
       ...(content.hotel || {}),
-      roomGalleries: sanitizeHotelRoomGalleryEntries(content.hotel?.roomGalleries),
+      // Galerie pokoi sa utrzymywane poza content_json (tabela hotel_room_images).
+      roomGalleries: emptyHotelRoomGalleries(),
     },
     events: { ...DEFAULT_CONTENT.events, ...(content.events || {}) },
     services: Array.isArray(content.services) ? content.services : DEFAULT_CONTENT.services,

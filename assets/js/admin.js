@@ -385,11 +385,15 @@
 
   function normalizeHotelRoomGalleries(roomGalleries) {
     const source = roomGalleries && typeof roomGalleries === "object" ? roomGalleries : {};
+    const normalizeList = (list) =>
+      (Array.isArray(list) ? list : [])
+        .map((item) => (typeof item === "string" ? { url: item } : item))
+        .filter((item) => item && !String(item.url || "").startsWith("data:"));
     return {
-      "1-osobowe": Array.isArray(source["1-osobowe"]) ? source["1-osobowe"] : [],
-      "2-osobowe": Array.isArray(source["2-osobowe"]) ? source["2-osobowe"] : [],
-      "3-osobowe": Array.isArray(source["3-osobowe"]) ? source["3-osobowe"] : [],
-      "4-osobowe": Array.isArray(source["4-osobowe"]) ? source["4-osobowe"] : [],
+      "1-osobowe": normalizeList(source["1-osobowe"]),
+      "2-osobowe": normalizeList(source["2-osobowe"]),
+      "3-osobowe": normalizeList(source["3-osobowe"]),
+      "4-osobowe": normalizeList(source["4-osobowe"]),
     };
   }
 
