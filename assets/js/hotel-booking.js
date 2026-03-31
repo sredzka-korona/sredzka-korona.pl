@@ -512,32 +512,36 @@
   }
 
   function init() {
-    const reservationInfo = document.querySelector(".reservation-info");
-    if (reservationInfo) {
-      reservationInfo.addEventListener("click", (e) => {
+    document.addEventListener("click", (e) => {
+      const target = e.target instanceof Element ? e.target : null;
+      if (!target) return;
+
+      if (target.closest(".reservation-info")) {
         e.preventDefault();
         openModal();
-      });
-      const link = reservationInfo.querySelector("a");
-      if (link) {
-        link.addEventListener("click", (e) => {
-          e.preventDefault();
-          openModal();
-        });
+        return;
       }
-    }
-    document.querySelector("#booking-modal")?.addEventListener("click", (e) => {
-      if (e.target.id === "booking-modal") {
+
+      if (target.id === "booking-modal") {
+        closeModal();
+        return;
+      }
+
+      if (target.matches("#booking-modal-close")) {
         closeModal();
       }
     });
-    document.addEventListener("click", (e) => {
-      if (e.target.matches("#booking-modal-close")) {
-        closeModal();
-      }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const target = e.target instanceof Element ? e.target : null;
+      if (!target) return;
+      if (!target.closest(".reservation-info")) return;
+      e.preventDefault();
+      openModal();
     });
   }
 
-  /* Strona Hotel buduje DOM skryptem inline — czekamy na load */
-  window.addEventListener("load", init);
+  /* Strona Hotel buduje DOM asynchronicznie — delegacja zdarzeń jest odporna na opóźniony render */
+  init();
 })();

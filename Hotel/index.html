@@ -785,9 +785,8 @@
       }
 
       .watermark {
-        --watermark-bottom-base: 16px;
         position: fixed;
-        bottom: calc(var(--watermark-bottom-current, var(--watermark-bottom-base)) + env(safe-area-inset-bottom, 0px));
+        bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
         left: 50%;
         transform: translateX(-50%);
         z-index: 50;
@@ -818,8 +817,8 @@
 
       @media (max-width: 780px) {
         .watermark {
-          --watermark-bottom-base: 12px;
           font-size: 0.65rem;
+          bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
           left: 50%;
         }
       }
@@ -1242,42 +1241,5 @@
       </svg>
     </a>
     <a class="watermark" href="https://kontakt.strzelca.pl/Igor_Janicki.html">Design &amp; Development by Igor Janicki</a>
-    <script>
-      (() => {
-        const watermark = document.querySelector(".watermark");
-        const contactButton = document.querySelector(".floating-contact-button");
-        if (!watermark || !contactButton) return;
-
-        function updateWatermarkPosition() {
-          const styles = window.getComputedStyle(watermark);
-          const baseBottom = Number.parseFloat(styles.getPropertyValue("--watermark-bottom-base")) || 16;
-          const safeGap = 18;
-          let targetBottom = baseBottom;
-          watermark.style.setProperty("--watermark-bottom-current", targetBottom + "px");
-
-          const buttonStyles = window.getComputedStyle(contactButton);
-          if (buttonStyles.display === "none" || buttonStyles.visibility === "hidden") {
-            return;
-          }
-
-          const watermarkRect = watermark.getBoundingClientRect();
-          const buttonRect = contactButton.getBoundingClientRect();
-          const hasHorizontalConflict =
-            watermarkRect.left < buttonRect.right + safeGap &&
-            watermarkRect.right > buttonRect.left - safeGap;
-          const isTooCloseVertically = watermarkRect.bottom > buttonRect.top - safeGap;
-
-          if (hasHorizontalConflict && isTooCloseVertically) {
-            targetBottom = Math.max(baseBottom, window.innerHeight - buttonRect.top + safeGap);
-            watermark.style.setProperty("--watermark-bottom-current", targetBottom + "px");
-          }
-        }
-
-        updateWatermarkPosition();
-        window.addEventListener("resize", updateWatermarkPosition);
-        window.addEventListener("orientationchange", updateWatermarkPosition);
-        window.setTimeout(updateWatermarkPosition, 150);
-      })();
-    </script>
   </body>
 </html>

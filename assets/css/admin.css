@@ -144,7 +144,7 @@ a {
 }
 
 .admin-topbar-simple {
-  grid-template-columns: 56px minmax(0, 1fr) 56px;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
   gap: 0.75rem;
   padding: 0.45rem 0.8rem;
   border-radius: 18px;
@@ -159,6 +159,17 @@ a {
 
 .admin-topbar-side-end {
   justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.admin-global-save-actions {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-global-save-actions.is-visible {
+  display: inline-flex;
 }
 
 .admin-topbar-spacer {
@@ -644,6 +655,7 @@ a {
 .menu-editor-card-actions {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 0.35rem;
   margin-bottom: 0.25rem;
 }
@@ -655,6 +667,12 @@ a {
   border-radius: 12px;
   font-size: 1rem;
   line-height: 1;
+}
+
+.menu-editor-card-remove {
+  min-height: 34px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.86rem;
 }
 
 .menu-editor-card:hover {
@@ -841,6 +859,52 @@ body.admin-modal-open {
   font-size: 0.92rem;
 }
 
+.menu-editor-subcategory-pill-editable {
+  gap: 0.5rem;
+  padding-right: 0.35rem;
+}
+
+.menu-editor-subcategory-pill-editable .inline-actions {
+  gap: 0.3rem;
+}
+
+.menu-editor-subcategory-group {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.menu-editor-subcategory-cards {
+  margin-top: 0.55rem;
+}
+
+.menu-editor-subcategory-card .list-head {
+  margin-bottom: 0;
+}
+
+.menu-editor-subcategory-group + .menu-editor-subcategory-group {
+  margin-top: 0.35rem;
+}
+
+.menu-editor-subcategory-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.4rem 0.1rem 0.15rem;
+  border-bottom: 1px solid rgba(200, 170, 120, 0.2);
+}
+
+.menu-editor-item-meta-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.menu-editor-item-meta-row.has-price {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .admin-toggle-group {
   display: grid;
   gap: 0.8rem;
@@ -973,6 +1037,15 @@ body.admin-modal-open {
     width: 100%;
   }
 
+  .admin-global-save-actions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-global-save-actions .button {
+    flex: 1 1 160px;
+  }
+
   .admin-topbar-spacer {
     display: none;
   }
@@ -1016,6 +1089,7 @@ body.admin-modal-open {
   max-width: 100%;
   margin: 0 auto;
   padding: 0 0 2rem;
+  justify-items: center;
 }
 
 .admin-workspace-head {
@@ -1024,6 +1098,7 @@ body.admin-modal-open {
   gap: 0.8rem;
   align-items: flex-start;
   flex-wrap: wrap;
+  width: min(100%, 980px);
 }
 
 .admin-workspace-head h2 {
@@ -1037,6 +1112,13 @@ body.admin-modal-open {
   grid-template-columns: repeat(auto-fit, minmax(240px, 280px));
   gap: 1.15rem;
   justify-content: center;
+  width: min(100%, 980px);
+  margin-inline: auto;
+}
+
+.admin-section-tile-grid {
+  grid-template-columns: repeat(var(--tile-count, 4), minmax(0, 1fr));
+  width: min(100%, 1120px);
 }
 
 .admin-tile {
@@ -1115,6 +1197,7 @@ body.admin-modal-open {
 
 .admin-stage {
   margin-top: 0.25rem;
+  width: 100%;
 }
 
 .admin-stage-panel {
@@ -1135,27 +1218,6 @@ body.admin-modal-open {
 
 .admin-entry-tile {
   min-height: 176px;
-}
-
-.admin-save-dock {
-  display: none;
-  margin-top: 0.9rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid rgba(200, 170, 120, 0.24);
-  border-radius: 18px;
-  background: rgba(255, 253, 249, 0.92);
-  box-shadow: var(--shadow);
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.8rem;
-}
-
-.admin-save-dock.is-visible {
-  display: flex;
-}
-
-.admin-save-dock .helper {
-  margin: 0;
 }
 
 .admin-hotel-wrap {
@@ -1368,13 +1430,8 @@ body.admin-modal-open {
     width: 100%;
   }
 
-  .admin-save-dock {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .admin-save-dock .button {
-    width: 100%;
+  .admin-global-save-actions {
+    flex-wrap: wrap;
   }
 
   .admin-topbar .inline-actions > * {

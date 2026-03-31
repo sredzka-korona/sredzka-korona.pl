@@ -5,6 +5,9 @@
   const config = window.SREDZKA_CONFIG || {};
 
   function hallApiBase() {
+    if (config.apiBase) {
+      return `${String(config.apiBase).replace(/\/$/, "")}/api/admin/legacy-bookings/hall`;
+    }
     if (config.hallApiBase) {
       return String(config.hallApiBase).replace(/\/$/, "");
     }

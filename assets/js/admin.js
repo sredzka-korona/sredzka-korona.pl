@@ -231,50 +231,74 @@
     return [];
   }
 
-  function renderPauseRangesEditorMarkup(domainKey, ranges, { disabled = false, label = "Przerwy" } = {}) {
-    const normalized = normalizePauseRanges(ranges);
-    const rows = (normalized.length ? normalized : [{ from: "", to: "" }])
+  function getTodayIsoDate() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function filterCurrentAndFuturePauseRanges(ranges) {
+    const today = getTodayIsoDate();
+    return normalizePauseRanges(ranges).filter((entry) => entry.to >= today);
+  }
+
+  function renderPauseRangesListMarkup(domainKey, ranges, { disabled = false } = {}) {
+    if (!ranges.length) {
+      return `<li class="helper" data-booking-pause-empty="${escapeAttribute(domainKey)}">Brak obecnych i przyszlych zakresow.</li>`;
+    }
+    return ranges
       .map(
-        (entry, index) => `
-          <div class="field-grid" data-booking-pause-row="${escapeAttribute(domainKey)}">
-            <label class="field"><span>${index === 0 ? escapeHtml(label + " — od") : "Od"}</span><input type="date" data-booking-pause-domain="${escapeAttribute(
-              domainKey
-            )}" data-booking-pause-role="from" value="${escapeAttribute(entry.from)}" ${disabled ? "disabled" : ""} /></label>
-            <label class="field"><span>Do</span><input type="date" data-booking-pause-domain="${escapeAttribute(
-              domainKey
-            )}" data-booking-pause-role="to" value="${escapeAttribute(entry.to)}" ${disabled ? "disabled" : ""} /></label>
-            <div class="field" style="display:flex; align-items:flex-end; gap:0.45rem;">
-              <button class="button secondary" type="button" data-add-booking-pause-range="${escapeAttribute(
-                domainKey
-              )}" ${disabled ? "disabled" : ""}>+ Zakres</button>
-              <button class="button danger" type="button" data-remove-booking-pause-row ${disabled ? "disabled" : ""}>Usun</button>
+        (entry) => `
+          <li class="repeater-item" data-booking-pause-item="${escapeAttribute(domainKey)}">
+            <div style="display:flex; justify-content:space-between; gap:0.75rem; align-items:center;">
+              <span><strong>${escapeHtml(entry.from)}</strong> - <strong>${escapeHtml(entry.to)}</strong></span>
+              <button class="button danger" type="button" data-remove-booking-pause-item ${disabled ? "disabled" : ""}>Usun</button>
             </div>
-          </div>
+            <input type="hidden" data-booking-pause-hidden-role="from" value="${escapeAttribute(entry.from)}" />
+            <input type="hidden" data-booking-pause-hidden-role="to" value="${escapeAttribute(entry.to)}" />
+          </li>
         `
       )
       .join("");
-    return `<div data-booking-pause-list="${escapeAttribute(domainKey)}">${rows}</div>`;
   }
 
-  function createPauseRangeRowElement(domainKey, disabled = false) {
-    const row = document.createElement("div");
-    row.className = "field-grid";
-    row.dataset.bookingPauseRow = domainKey;
-    row.innerHTML = `
-      <label class="field"><span>Od</span><input type="date" data-booking-pause-domain="${escapeAttribute(
-        domainKey
-      )}" data-booking-pause-role="from" ${disabled ? "disabled" : ""} /></label>
-      <label class="field"><span>Do</span><input type="date" data-booking-pause-domain="${escapeAttribute(
-        domainKey
-      )}" data-booking-pause-role="to" ${disabled ? "disabled" : ""} /></label>
-      <div class="field" style="display:flex; align-items:flex-end; gap:0.45rem;">
-        <button class="button secondary" type="button" data-add-booking-pause-range="${escapeAttribute(
+  function renderPauseRangesEditorMarkup(domainKey, ranges, { disabled = false, label = "Przerwy" } = {}) {
+    const filtered = filterCurrentAndFuturePauseRanges(ranges);
+    return `
+      <div class="field-grid" data-booking-pause-controls="${escapeAttribute(domainKey)}">
+        <label class="field"><span>${escapeHtml(label + " — od")}</span><input type="date" data-booking-pause-domain="${escapeAttribute(
           domainKey
-        )}" ${disabled ? "disabled" : ""}>+ Zakres</button>
-        <button class="button danger" type="button" data-remove-booking-pause-row ${disabled ? "disabled" : ""}>Usun</button>
+        )}" data-booking-pause-role="from" ${disabled ? "disabled" : ""} /></label>
+        <label class="field"><span>Do</span><input type="date" data-booking-pause-domain="${escapeAttribute(
+          domainKey
+        )}" data-booking-pause-role="to" ${disabled ? "disabled" : ""} /></label>
+        <div class="field" style="display:flex; align-items:flex-end; gap:0.45rem;">
+          <button class="button secondary" type="button" data-add-booking-pause-range="${escapeAttribute(
+            domainKey
+          )}" ${disabled ? "disabled" : ""}>+ Dodaj zakres</button>
+        </div>
       </div>
+      <ul data-booking-pause-list="${escapeAttribute(domainKey)}" style="list-style:none; padding:0; margin:0.75rem 0 0;">
+        ${renderPauseRangesListMarkup(domainKey, filtered, { disabled })}
+      </ul>
     `;
-    return row;
+  }
+
+  function createPauseRangeListItemElement(domainKey, range, disabled = false) {
+    const item = document.createElement("li");
+    item.className = "repeater-item";
+    item.dataset.bookingPauseItem = domainKey;
+    item.innerHTML = `
+      <div style="display:flex; justify-content:space-between; gap:0.75rem; align-items:center;">
+        <span><strong>${escapeHtml(range.from)}</strong> - <strong>${escapeHtml(range.to)}</strong></span>
+        <button class="button danger" type="button" data-remove-booking-pause-item ${disabled ? "disabled" : ""}>Usun</button>
+      </div>
+      <input type="hidden" data-booking-pause-hidden-role="from" value="${escapeAttribute(range.from)}" />
+      <input type="hidden" data-booking-pause-hidden-role="to" value="${escapeAttribute(range.to)}" />
+    `;
+    return item;
   }
 
   function normalizeAdminContent(rawContent) {
@@ -454,7 +478,7 @@
       tiles: [
         { key: "menu", label: "Menu", description: "Kategorie, pozycje, skladniki i kolejnosc." },
         { key: "gallery", label: "Galeria", description: "Zdjecia restauracji i ich kolejnosc." },
-        { key: "orders", label: "Zamowienia", description: "Obecny modul zamowien jedzenia i tekst widoczny w kafelku / CTA." },
+        { key: "orders", label: "Zamowienia / Catering", description: "Edycja tresci modala zamowien i cateringu widocznej na stronie restauracji." },
         { key: "hours", label: "Godziny otwarcia", description: "Dni i godziny widoczne na stronie restauracji." },
         { key: "settings", label: "Ustawienia rezerwacji", description: "Wlaczenie i przerwy w przyjmowaniu rezerwacji." },
       ],
@@ -517,7 +541,15 @@
     const template = document.createElement("template");
     template.innerHTML = String(rawHtml || "");
     const allowedTags = new Set(["p", "ul", "ol", "li", "strong", "em", "u", "a", "br", "span", "div", "h1", "h2", "h3"]);
-    const allowedStyleProps = new Set(["text-align", "font-size", "color", "font-weight", "font-style", "text-decoration"]);
+    const allowedStyleProps = new Set([
+      "text-align",
+      "font-size",
+      "color",
+      "font-weight",
+      "font-style",
+      "text-decoration",
+      "font-family",
+    ]);
     const urlPattern = /^(https?:|mailto:|tel:|\/|#)/i;
 
     const sanitizeStyle = (styleValue) => {
@@ -558,6 +590,23 @@
         em.innerHTML = node.innerHTML;
         node.replaceWith(em);
         node = em;
+      } else if (tagName === "font") {
+        const span = document.createElement("span");
+        const styles = [];
+        const fontColor = node.getAttribute("color");
+        const fontFace = node.getAttribute("face");
+        if (fontColor) {
+          styles.push(`color: ${fontColor}`);
+        }
+        if (fontFace) {
+          styles.push(`font-family: ${fontFace}`);
+        }
+        if (styles.length) {
+          span.setAttribute("style", styles.join("; "));
+        }
+        span.innerHTML = node.innerHTML;
+        node.replaceWith(span);
+        node = span;
       } else if (!allowedTags.has(tagName)) {
         const fragment = document.createDocumentFragment();
         while (node.firstChild) {
@@ -608,7 +657,7 @@
     return template.innerHTML;
   }
 
-  function applyOfertaFontSize(editor, sizeValue) {
+  function applyRichTextFontSize(editor, sizeValue) {
     if (!editor || !sizeValue) return;
     editor.focus();
     document.execCommand("fontSize", false, "7");
@@ -620,10 +669,10 @@
     });
   }
 
-  function initOfertaRichTextEditor() {
-    const textarea = document.querySelector("#events-oferta-modal-html");
-    const editor = document.querySelector("#events-oferta-modal-editor");
-    const toolbar = document.querySelector("#events-oferta-editor-toolbar");
+  function initRichTextEditor({ textareaSelector, editorSelector, toolbarSelector }) {
+    const textarea = document.querySelector(textareaSelector);
+    const editor = document.querySelector(editorSelector);
+    const toolbar = document.querySelector(toolbarSelector);
     if (!textarea || !editor || !toolbar) return;
 
     const syncToTextarea = () => {
@@ -671,7 +720,28 @@
       fontSizeSelect.addEventListener("change", () => {
         const value = fontSizeSelect.value;
         if (!value) return;
-        applyOfertaFontSize(editor, value);
+        applyRichTextFontSize(editor, value);
+        syncToTextarea();
+      });
+    }
+
+    const colorInput = toolbar.querySelector("[data-richtext-color]");
+    if (colorInput) {
+      colorInput.addEventListener("input", () => {
+        if (!colorInput.value) return;
+        editor.focus();
+        document.execCommand("foreColor", false, colorInput.value);
+        syncToTextarea();
+      });
+    }
+
+    const fontFamilySelect = toolbar.querySelector("[data-richtext-font-family]");
+    if (fontFamilySelect) {
+      fontFamilySelect.addEventListener("change", () => {
+        const value = fontFamilySelect.value;
+        if (!value) return;
+        editor.focus();
+        document.execCommand("fontName", false, value);
         syncToTextarea();
       });
     }
@@ -685,6 +755,22 @@
       const safeHtml = sanitizeOfertaEditorHtml(clipboardHtml || clipboardText.replace(/\n/g, "<br>"));
       document.execCommand("insertHTML", false, safeHtml);
       syncToTextarea();
+    });
+  }
+
+  function initOfertaRichTextEditor() {
+    initRichTextEditor({
+      textareaSelector: "#events-oferta-modal-html",
+      editorSelector: "#events-oferta-modal-editor",
+      toolbarSelector: "#events-oferta-editor-toolbar",
+    });
+  }
+
+  function initRestaurantOrdersRichTextEditor() {
+    initRichTextEditor({
+      textareaSelector: "#restaurant-orders-info-html",
+      editorSelector: "#restaurant-orders-editor",
+      toolbarSelector: "#restaurant-orders-editor-toolbar",
     });
   }
 
@@ -988,21 +1074,34 @@
     return tab.tiles.find((tile) => tile.key === stored)?.key || tab.tiles[0]?.key || "";
   }
 
-  function hasUnsavedContentChanges() {
-    if (!state.loggedIn || state.ui.view !== "section") {
-      return false;
-    }
+  function collectCurrentDraftContent() {
     try {
-      const draft = collectContentFromForm();
-      const baseline = state.lastSavedContent || state.content;
-      return JSON.stringify(draft) !== JSON.stringify(baseline);
+      return collectContentFromForm();
     } catch (error) {
-      return false;
+      return structuredClone(state.content || {});
     }
   }
 
+  function hasUnsavedContentChanges() {
+    if (!state.loggedIn) {
+      return false;
+    }
+    const draft = toUnsavedComparableContent(collectCurrentDraftContent());
+    const baseline = toUnsavedComparableContent(state.lastSavedContent || state.content);
+    return JSON.stringify(draft) !== JSON.stringify(baseline);
+  }
+
+  function toUnsavedComparableContent(content) {
+    const comparable = normalizeAdminContent(content || {});
+    if (comparable.hotel) {
+      // Galerie pokoi zapisują się od razu osobnym endpointem, więc nie powinny oznaczać "niezapisanych treści".
+      delete comparable.hotel.roomGalleries;
+    }
+    return comparable;
+  }
+
   function refreshSaveDockVisibility() {
-    const dock = document.querySelector("#admin-save-dock");
+    const dock = document.querySelector("#admin-global-save-actions");
     if (!dock) return;
     const dirty = hasUnsavedContentChanges();
     dock.classList.toggle("is-visible", dirty);
@@ -1025,13 +1124,10 @@
     if (!hasUnsavedContentChanges()) {
       return true;
     }
-    return window.confirm("Masz niezapisane zmiany. Czy na pewno chcesz opuscic ten widok?");
+    return window.confirm("Masz niezapisane zmiany. Czy na pewno chcesz opuscic panel?");
   }
 
   function setAdminTab(tabKey) {
-    if (!confirmLeaveIfUnsaved()) {
-      return;
-    }
     dismissMenuEditorModal({ skipRender: true, closeEntirely: true });
     captureDraftIfPossible();
     state.ui.view = "section";
@@ -1041,9 +1137,6 @@
   }
 
   function setAdminTile(tabKey, tileKey) {
-    if (!confirmLeaveIfUnsaved()) {
-      return;
-    }
     dismissMenuEditorModal({ skipRender: true, closeEntirely: true });
     captureDraftIfPossible();
     state.ui.view = "section";
@@ -1053,9 +1146,6 @@
   }
 
   function goToAdminHome() {
-    if (!confirmLeaveIfUnsaved()) {
-      return;
-    }
     dismissMenuEditorModal({ skipRender: true, closeEntirely: true });
     captureDraftIfPossible();
     state.ui.view = "home";
@@ -1272,6 +1362,10 @@
             </a>
           </div>
           <div class="admin-topbar-side admin-topbar-side-end">
+            <div class="admin-global-save-actions" id="admin-global-save-actions">
+              <button class="button secondary" id="cancel-content-button" type="button">Anuluj</button>
+              <button class="button" id="save-content-button" type="button">Zapisz</button>
+            </div>
             <button class="button danger icon-button" id="logout-button" type="button" aria-label="Wyloguj">⎋</button>
           </div>
         </header>
@@ -1286,7 +1380,7 @@
                   <p class="section-intro">${escapeHtml(activeTab.description)}</p>
                 </div>
               </div>
-              <div class="admin-tile-grid" aria-label="Sekcje w module ${escapeAttribute(activeTab.label)}">
+              <div class="admin-tile-grid admin-section-tile-grid" style="--tile-count: ${activeTab.tiles.length};" aria-label="Sekcje w module ${escapeAttribute(activeTab.label)}">
                 ${activeTab.tiles
                   .map(
                     (tile) => `
@@ -1306,10 +1400,6 @@
               <div class="grid admin-stage">
                 ${renderAdminStageMarkup(activeTab.key, activeTile)}
                 <div id="admin-modal-root" class="admin-modal-root col-12"></div>
-              </div>
-              <div class="admin-save-dock" id="admin-save-dock">
-                <p class="helper">Masz niezapisane zmiany w tej sekcji.</p>
-                <button class="button" id="save-content-button" type="button">Zapisz tresci</button>
               </div>
             `
               : `
@@ -1339,7 +1429,11 @@
     scheduleScrollIndicatorUpdate();
     const saveButton = document.querySelector("#save-content-button");
     if (saveButton) {
-      saveButton.addEventListener("click", saveContent);
+      saveButton.addEventListener("click", () => saveContent());
+    }
+    const cancelButton = document.querySelector("#cancel-content-button");
+    if (cancelButton) {
+      cancelButton.addEventListener("click", discardContentChanges);
     }
     document.querySelector("#logout-button").addEventListener("click", logout);
     bindAdminNavigation();
@@ -1347,8 +1441,8 @@
       renderActiveAdminTile();
       renderMenuEditorModal();
       bindUnsavedTracking();
-      refreshSaveDockVisibility();
     }
+    refreshSaveDockVisibility();
   }
 
   function renderContentPanel(statusMessage = "") {
@@ -1654,34 +1748,72 @@
 
   function bindRepeaterButtons() {
     document.querySelectorAll("[data-add-array]").forEach((button) => {
+      if (button.dataset.listenerBound === "1") return;
+      button.dataset.listenerBound = "1";
       button.addEventListener("click", () => addArrayItem(button.dataset.addArray));
     });
     document.querySelectorAll("[data-remove-array]").forEach((button) => {
+      if (button.dataset.listenerBound === "1") return;
+      button.dataset.listenerBound = "1";
       button.addEventListener("click", () => removeArrayItem(button.dataset.removeArray, Number(button.dataset.index)));
     });
     document.querySelectorAll("[data-add-booking-pause-range]").forEach((button) => {
+      if (button.dataset.listenerBound === "1") return;
+      button.dataset.listenerBound = "1";
       button.addEventListener("click", () => {
         const domainKey = String(button.dataset.addBookingPauseRange || "").trim();
         if (!domainKey) return;
         const list = document.querySelector(`[data-booking-pause-list="${domainKey}"]`);
         if (!list) return;
-        list.appendChild(createPauseRangeRowElement(domainKey, button.disabled));
-      });
-    });
-    document.querySelectorAll("[data-remove-booking-pause-row]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const row = button.closest("[data-booking-pause-row]");
-        if (!row) return;
-        const list = row.parentElement;
-        if (!list) return;
-        const allRows = list.querySelectorAll("[data-booking-pause-row]");
-        if (allRows.length <= 1) {
-          row.querySelectorAll('input[type="date"]').forEach((input) => {
-            input.value = "";
-          });
+        const controls = document.querySelector(`[data-booking-pause-controls="${domainKey}"]`);
+        if (!controls) return;
+        const fromInput = controls.querySelector('[data-booking-pause-role="from"]');
+        const toInput = controls.querySelector('[data-booking-pause-role="to"]');
+        const candidate = normalizePauseRanges([
+          {
+            from: fromInput?.value?.trim() || "",
+            to: toInput?.value?.trim() || "",
+          },
+        ])[0];
+        if (!candidate) return;
+        if (candidate.to < getTodayIsoDate()) {
+          if (fromInput) fromInput.value = "";
+          if (toInput) toInput.value = "";
           return;
         }
-        row.remove();
+        const duplicates = Array.from(list.querySelectorAll("[data-booking-pause-item]")).some((item) => {
+          const from = item.querySelector('[data-booking-pause-hidden-role="from"]')?.value || "";
+          const to = item.querySelector('[data-booking-pause-hidden-role="to"]')?.value || "";
+          return from === candidate.from && to === candidate.to;
+        });
+        if (duplicates) return;
+        const emptyMessage = list.querySelector(`[data-booking-pause-empty="${domainKey}"]`);
+        if (emptyMessage) {
+          emptyMessage.remove();
+        }
+        list.appendChild(createPauseRangeListItemElement(domainKey, candidate, button.disabled));
+        bindRepeaterButtons();
+        if (fromInput) fromInput.value = "";
+        if (toInput) toInput.value = "";
+      });
+    });
+    document.querySelectorAll("[data-remove-booking-pause-item]").forEach((button) => {
+      if (button.dataset.listenerBound === "1") return;
+      button.dataset.listenerBound = "1";
+      button.addEventListener("click", () => {
+        const item = button.closest("[data-booking-pause-item]");
+        if (!item) return;
+        const list = item.parentElement;
+        if (!list) return;
+        const domainKey = String(item.dataset.bookingPauseItem || "").trim();
+        item.remove();
+        const hasAnyItems = list.querySelector("[data-booking-pause-item]");
+        if (!hasAnyItems && domainKey) {
+          list.insertAdjacentHTML(
+            "beforeend",
+            `<li class="helper" data-booking-pause-empty="${escapeAttribute(domainKey)}">Brak obecnych i przyszlych zakresow.</li>`
+          );
+        }
       });
     });
   }
@@ -1798,19 +1930,20 @@
     }
 
     function collectPauseRanges(domainKey) {
-      const rows = Array.from(
-        document.querySelectorAll(`[data-booking-pause-row="${domainKey}"]`)
-      );
-      return normalizePauseRanges(
-        rows.map((row) => ({
-          from:
-            row.querySelector('[data-booking-pause-role="from"]')?.value?.trim() ||
-            "",
-          to:
-            row.querySelector('[data-booking-pause-role="to"]')?.value?.trim() ||
-            "",
-        }))
-      );
+      const listItems = Array.from(document.querySelectorAll(`[data-booking-pause-item="${domainKey}"]`));
+      const rangesFromList = listItems.map((item) => ({
+        from: item.querySelector('[data-booking-pause-hidden-role="from"]')?.value?.trim() || "",
+        to: item.querySelector('[data-booking-pause-hidden-role="to"]')?.value?.trim() || "",
+      }));
+      const controls = document.querySelector(`[data-booking-pause-controls="${domainKey}"]`);
+      const draftRange = controls
+        ? {
+            from: controls.querySelector('[data-booking-pause-role="from"]')?.value?.trim() || "",
+            to: controls.querySelector('[data-booking-pause-role="to"]')?.value?.trim() || "",
+          }
+        : null;
+      const allRanges = draftRange ? [...rangesFromList, draftRange] : rangesFromList;
+      return filterCurrentAndFuturePauseRanges(allRanges);
     }
     const restaurantRanges = onlineBookingsEnabled ? collectPauseRanges("restaurant") : [];
     const hotelRanges = onlineBookingsEnabled ? collectPauseRanges("hotel") : [];
@@ -1853,7 +1986,7 @@
         .map((item) => item.trim())
         .filter(Boolean);
     }
-    const restaurantOrdersInfoText = getTrimmedValue("#restaurant-orders-info-text");
+    const restaurantOrdersInfoText = getTrimmedValue("#restaurant-orders-info-html") ?? getTrimmedValue("#restaurant-orders-info-text");
     if (restaurantOrdersInfoText !== null) {
       content.restaurant.ordersInfoText = restaurantOrdersInfoText;
     }
@@ -1934,6 +2067,10 @@
       content.events.menu = collectEventsMenuFromPanel();
     }
 
+    if (document.querySelector("#documents-menu-sections-list")) {
+      content.documentsMenu = collectDocumentsMenuFromPanel();
+    }
+
     if (document.querySelector("[data-service-title]")) {
       content.services = Array.from(document.querySelectorAll("[data-service-title]")).map((element, index) => ({
         title: element.value.trim(),
@@ -1966,7 +2103,23 @@
     }
   }
 
-  async function saveContent() {
+  function discardContentChanges() {
+    if (!hasUnsavedContentChanges()) {
+      return;
+    }
+    if (!window.confirm("Anulowac wszystkie niezapisane zmiany?")) {
+      return;
+    }
+
+    dismissMenuEditorModal({ skipRender: true, closeEntirely: true });
+    state.content = structuredClone(state.lastSavedContent || state.content);
+    renderDashboard();
+    if (state.ui.view === "section") {
+      renderActiveAdminTile("Niezapisane zmiany zostaly anulowane.");
+    }
+  }
+
+  async function saveContent(successMessage = "Zmiany zostaly zapisane.") {
     try {
       const content = collectContentFromForm();
       // Zbierz menu z panelu zarządzania menu jeśli istnieje
@@ -2002,10 +2155,14 @@
       const normalizedContent = normalizeAdminContent(data.content);
       state.content = normalizedContent;
       state.lastSavedContent = structuredClone(normalizedContent);
-      renderActiveAdminTile("Zmiany zostaly zapisane.");
+      if (state.ui.view === "section") {
+        renderActiveAdminTile(successMessage);
+      }
       refreshSaveDockVisibility();
     } catch (error) {
-      renderActiveAdminTile(error.message);
+      if (state.ui.view === "section") {
+        renderActiveAdminTile(error.message);
+      }
     }
   }
 
@@ -2122,16 +2279,58 @@
 
     panel.innerHTML = `
       <p class="pill">Restauracja</p>
-      <h2>Obecny modul zamowien jedzenia</h2>
-      <p class="section-intro">Edytuj tresc widoczna w kafelku "Zamowienia" na stronie restauracji.</p>
+      <h2>Zamowienia / Catering</h2>
+      <p class="section-intro">Edytuj tresc modala widocznego po kliknieciu kafelka "Zamowienia / Catering" na stronie restauracji.</p>
       <div class="stack">
-        <label class="field-full">
-          <span>Tresc kafelka</span>
-          <textarea id="restaurant-orders-info-text" rows="4">${escapeHtml(currentInfoText)}</textarea>
-        </label>
+        <div class="field-full">
+          <span>Tresc modala</span>
+          <div class="admin-richtext">
+            <div class="admin-richtext-toolbar" id="restaurant-orders-editor-toolbar">
+              <button class="button secondary" type="button" data-richtext-command="bold" title="Pogrubienie"><strong>B</strong></button>
+              <button class="button secondary" type="button" data-richtext-command="italic" title="Kursywa"><em>I</em></button>
+              <button class="button secondary" type="button" data-richtext-command="underline" title="Podkreslenie"><span style="text-decoration: underline;">U</span></button>
+              <button class="button secondary" type="button" data-richtext-block="h2" title="Naglowek">H2</button>
+              <button class="button secondary" type="button" data-richtext-block="p" title="Akapit">Akapit</button>
+              <button class="button secondary" type="button" data-richtext-command="insertUnorderedList" title="Lista punktowana">Lista</button>
+              <button class="button secondary" type="button" data-richtext-command="justifyLeft" title="Do lewej">Lewo</button>
+              <button class="button secondary" type="button" data-richtext-command="justifyCenter" title="Wysrodkuj">Srodek</button>
+              <button class="button secondary" type="button" data-richtext-command="justifyRight" title="Do prawej">Prawo</button>
+              <button class="button secondary" type="button" data-richtext-command="createLink" title="Wstaw link">Link</button>
+              <label class="admin-richtext-size">
+                <span>Rozmiar</span>
+                <select data-richtext-font-size>
+                  <option value="">--</option>
+                  <option value="0.9rem">Maly</option>
+                  <option value="1rem">Normalny</option>
+                  <option value="1.1rem">Sredni</option>
+                  <option value="1.25rem">Duzy</option>
+                  <option value="1.5rem">XL</option>
+                </select>
+              </label>
+              <label class="admin-richtext-size">
+                <span>Czcionka</span>
+                <select data-richtext-font-family>
+                  <option value="">--</option>
+                  <option value="Manrope, sans-serif">Manrope</option>
+                  <option value="'Cormorant Garamond', serif">Cormorant Garamond</option>
+                  <option value="Arial, sans-serif">Arial</option>
+                  <option value="'Times New Roman', serif">Times New Roman</option>
+                </select>
+              </label>
+              <label class="admin-richtext-size">
+                <span>Kolor</span>
+                <input type="color" data-richtext-color value="#1f1712" />
+              </label>
+            </div>
+            <div class="admin-richtext-editor" id="restaurant-orders-editor" contenteditable="true"></div>
+            <textarea id="restaurant-orders-info-html" rows="10" hidden>${escapeHtml(currentInfoText)}</textarea>
+          </div>
+        </div>
+        <p class="helper">Edytor wizualny zapisuje wyglad tresci wyswietlanej w modalu "Zamowienia / Catering".</p>
         <p class="status">${escapeHtml(statusMessage)}</p>
       </div>
     `;
+    initRestaurantOrdersRichTextEditor();
   }
 
   function renderEventsOfferPanel(statusMessage = "") {
@@ -2588,6 +2787,57 @@
     return getMenuEditorSectionSubcategories(section);
   }
 
+  function buildMenuEditorSectionGroups(section) {
+    const items = Array.isArray(section?.items) ? section.items : [];
+    const explicitSubcategories = Array.isArray(section?.subcategories)
+      ? section.subcategories.map((value) => String(value || "").trim()).filter(Boolean)
+      : [];
+    const fallbackSubcategories = items.map((item) => String(item?.subcategory || "").trim()).filter(Boolean);
+    const orderedSubcategories = Array.from(new Set([...explicitSubcategories, ...fallbackSubcategories]));
+    const groupsByKey = new Map();
+
+    orderedSubcategories.forEach((name) => {
+      groupsByKey.set(name, { key: name, name, isUncategorized: false, entries: [] });
+    });
+    groupsByKey.set("", { key: "", name: "Bez podkategorii", isUncategorized: true, entries: [] });
+
+    items.forEach((item, index) => {
+      const key = String(item?.subcategory || "").trim();
+      if (!groupsByKey.has(key)) {
+        groupsByKey.set(key, { key, name: key || "Bez podkategorii", isUncategorized: !key, entries: [] });
+      }
+      groupsByKey.get(key).entries.push({ item, index });
+    });
+
+    const namedGroups = orderedSubcategories.map((name) => groupsByKey.get(name)).filter(Boolean);
+    const uncategorizedGroup = groupsByKey.get("");
+    if (uncategorizedGroup?.entries?.length) {
+      namedGroups.push(uncategorizedGroup);
+    }
+    return namedGroups.filter((group) => group.entries.length);
+  }
+
+  function getMenuEditorSectionSubcategoryEntries(section) {
+    const groups = buildMenuEditorSectionGroups(section);
+    const counts = new Map(groups.map((group) => [group.key, group.entries.length]));
+    const named = getMenuEditorSectionSubcategories(section).map((name) => ({
+      key: name,
+      label: name,
+      isDefault: false,
+      count: counts.get(name) || 0,
+    }));
+    const uncategorizedCount = counts.get("") || 0;
+    return [
+      ...named,
+      {
+        key: "",
+        label: "Bez podkategorii",
+        isDefault: true,
+        count: uncategorizedCount,
+      },
+    ];
+  }
+
   function readMenuEditorItemDraft(kind, form) {
     const formData = new FormData(form);
     const item = createMenuEditorItem(kind, {
@@ -2655,6 +2905,7 @@
       kind,
       type: "section",
       sectionIndex,
+      activeSubcategory: typeof options.activeSubcategory === "string" ? options.activeSubcategory : null,
       statusMessage: options.statusMessage || "",
     };
     renderMenuEditorModal();
@@ -2711,6 +2962,7 @@
     }
     if (returnTo.type === "section" && typeof returnTo.sectionIndex === "number") {
       openMenuEditorSectionModal(returnTo.kind || modal.kind, returnTo.sectionIndex, {
+        activeSubcategory: typeof returnTo.activeSubcategory === "string" ? returnTo.activeSubcategory : null,
         statusMessage: returnTo.statusMessage || "",
       });
       return;
@@ -2780,6 +3032,14 @@
                       >
                         ↓
                       </button>
+                      <button
+                        class="button danger menu-editor-card-remove"
+                        type="button"
+                        data-menu-editor-remove-section="${sectionIndex}"
+                        aria-label="Usun kategorie"
+                      >
+                        Usun
+                      </button>
                     </div>
                     <span class="menu-editor-card-label">${escapeHtml(config.categoryLabel)} ${sectionIndex + 1}</span>
                     <strong>${escapeHtml(getMenuEditorSectionLabel(section, sectionIndex))}</strong>
@@ -2825,6 +3085,16 @@
         moveMenuEditorSection(kind, Number(button.dataset.menuEditorMoveSectionDown), 1, { reopenModal: false });
       });
     });
+    panel.querySelectorAll("[data-menu-editor-remove-section]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const sectionIndex = Number(button.dataset.menuEditorRemoveSection);
+        if (!window.confirm("Usunac cala kategorie razem z jej produktami?")) {
+          return;
+        }
+        removeMenuEditorSection(kind, sectionIndex);
+      });
+    });
     renderMenuEditorModal();
   }
 
@@ -2865,7 +3135,7 @@
               : `<p class="helper">Najpierw dodaj przynajmniej jedna kategorie, aby przypisywac podkategorie i produkty.</p>`
           }
           <div class="admin-modal-footer">
-            <p class="helper">Zmiany lokalne zapiszesz przyciskiem "Zapisz tresci" w panelu admina.</p>
+            <p class="helper">Zmiany lokalne zapiszesz przyciskiem "Zapisz" w gornej belce panelu.</p>
             <button class="button secondary" type="button" data-menu-modal-close>Zamknij</button>
           </div>
         </section>
@@ -2959,7 +3229,17 @@
       state.ui.menuEditorModal = null;
       return "";
     }
-    const subcategories = getMenuEditorSectionSubcategories(section);
+    const subcategoryEntries = getMenuEditorSectionSubcategoryEntries(section);
+    const groupedItems = buildMenuEditorSectionGroups(section);
+    const activeSubcategory = typeof modal.activeSubcategory === "string" ? modal.activeSubcategory : null;
+    const activeGroup =
+      activeSubcategory === null
+        ? null
+        : groupedItems.find((group) => group.key === activeSubcategory) || {
+            key: activeSubcategory,
+            name: activeSubcategory || "Bez podkategorii",
+            entries: [],
+          };
 
     return `
       <div class="admin-modal-overlay" data-menu-modal-overlay>
@@ -2968,7 +3248,6 @@
             <div>
               <p class="pill">${escapeHtml(config.pill)}</p>
               <h3 id="menu-editor-section-title">Edycja kategorii</h3>
-              <p class="helper">Tu zmienisz nazwe kategorii i kolejnosc produktow bez otwierania kazdego wpisu po kolei.</p>
             </div>
             <button class="button icon-button secondary" type="button" data-menu-modal-close aria-label="Zamknij">×</button>
           </div>
@@ -2977,56 +3256,85 @@
             <span>Nazwa kategorii</span>
             <input data-menu-modal-section-name value="${escapeAttribute(section.section || "")}" placeholder="np. Przystawki, Zupy, Dania glowne" />
           </label>
-          <div class="inline-actions menu-editor-modal-actions">
-            <button class="button secondary menu-editor-card-move" type="button" data-move-menu-section-up aria-label="Przesun kategorie wyzej" ${modal.sectionIndex === 0 ? "disabled" : ""}>↑</button>
-            <button class="button secondary menu-editor-card-move" type="button" data-move-menu-section-down aria-label="Przesun kategorie nizej" ${modal.sectionIndex === getMenuSectionsByKind(modal.kind).length - 1 ? "disabled" : ""}>↓</button>
-            <button class="button danger" type="button" data-remove-menu-section>Usun kategorie</button>
-          </div>
-          <div class="menu-editor-subcategory-strip">
-            <strong>Podkategorie</strong>
-            ${
-              subcategories.length
-                ? `
-                  <div class="menu-editor-subcategory-list">
-                    ${subcategories.map((name) => `<span class="menu-editor-subcategory-pill">${escapeHtml(name)}</span>`).join("")}
+          ${
+            activeSubcategory === null
+              ? `
+                <div class="menu-editor-subcategory-strip">
+                  <strong>Podkategorie</strong>
+                  <div class="stack menu-editor-subcategory-cards">
+                    ${subcategoryEntries
+                      .map(
+                        (entry, subcategoryIndex) => `
+                          <article class="list-item menu-editor-subcategory-card">
+                            <div class="list-head">
+                              <div>
+                                <strong>${escapeHtml(entry.label)}</strong>
+                                <p class="helper">${entry.count} ${entry.count === 1 ? "produkt" : "produkty"}${entry.isDefault ? " • domyslna (tylko admin)" : ""}</p>
+                              </div>
+                              <div class="inline-actions">
+                                <button class="button secondary" type="button" data-open-menu-subcategory="${escapeAttribute(entry.key)}">Otworz</button>
+                                ${
+                                  entry.isDefault
+                                    ? ""
+                                    : `
+                                      <button class="button secondary menu-editor-card-move" type="button" data-move-menu-subcategory-up="${escapeAttribute(entry.key)}" aria-label="Przesun podkategorie wyzej" ${subcategoryIndex === 0 ? "disabled" : ""}>↑</button>
+                                      <button class="button secondary menu-editor-card-move" type="button" data-move-menu-subcategory-down="${escapeAttribute(entry.key)}" aria-label="Przesun podkategorie nizej" ${subcategoryIndex === subcategoryEntries.length - 2 ? "disabled" : ""}>↓</button>
+                                    `
+                                }
+                              </div>
+                            </div>
+                          </article>
+                        `
+                      )
+                      .join("")}
                   </div>
-                `
-                : `<p class="helper">Brak podkategorii w tej kategorii. Dodasz je z glownego przycisku "Dodaj".</p>`
-            }
-          </div>
-          <div class="stack menu-editor-product-list">
-            ${
-              section.items?.length
-                ? section.items
-                    .map((item, itemIndex) => `
-                      <article class="list-item menu-editor-product-card">
-                        <div class="list-head">
-                          <div>
-                            <strong>${escapeHtml(item.name || `${config.productLabel} ${itemIndex + 1}`)}</strong>
-                            <p class="helper">${escapeHtml(buildMenuEditorItemMeta(item, config.includePrice) || "Bez dodatkowych informacji")}</p>
-                          </div>
-                          <div class="inline-actions menu-editor-product-actions">
-                            <button class="button secondary menu-editor-card-move" type="button" data-move-menu-item-up="${itemIndex}" aria-label="Przesun produkt wyzej" ${itemIndex === 0 ? "disabled" : ""}>↑</button>
-                            <button class="button secondary menu-editor-card-move" type="button" data-move-menu-item-down="${itemIndex}" aria-label="Przesun produkt nizej" ${itemIndex === section.items.length - 1 ? "disabled" : ""}>↓</button>
-                            <button class="button secondary" type="button" data-open-menu-item="${itemIndex}">Otworz</button>
-                            <button class="button danger" type="button" data-remove-menu-item="${itemIndex}">Usun</button>
-                          </div>
+                </div>
+              `
+              : `
+                <div class="menu-editor-subcategory-group-head">
+                  <strong>Podkategoria: ${escapeHtml(activeGroup.name)}</strong>
+                  <div class="inline-actions">
+                    <button class="button secondary" type="button" data-back-to-subcategories>Wroc do podkategorii</button>
+                  </div>
+                </div>
+                <div class="stack menu-editor-product-list">
+                  ${
+                    activeGroup.entries.length
+                      ? activeGroup.entries
+                          .map((entry, groupItemIndex) => {
+                            const item = entry.item;
+                            const itemIndex = entry.index;
+                            return `
+                              <article class="list-item menu-editor-product-card">
+                                <div class="list-head">
+                                  <div>
+                                    <strong>${escapeHtml(item.name || `${config.productLabel} ${itemIndex + 1}`)}</strong>
+                                    <p class="helper">${escapeHtml(buildMenuEditorItemMeta(item, config.includePrice) || "Bez dodatkowych informacji")}</p>
+                                  </div>
+                                  <div class="inline-actions menu-editor-product-actions">
+                                    <button class="button secondary menu-editor-card-move" type="button" data-move-menu-item-up="${itemIndex}" aria-label="Przesun produkt wyzej" ${groupItemIndex === 0 ? "disabled" : ""}>↑</button>
+                                    <button class="button secondary menu-editor-card-move" type="button" data-move-menu-item-down="${itemIndex}" aria-label="Przesun produkt nizej" ${groupItemIndex === activeGroup.entries.length - 1 ? "disabled" : ""}>↓</button>
+                                    <button class="button secondary" type="button" data-open-menu-item="${itemIndex}">Otworz</button>
+                                    <button class="button danger" type="button" data-remove-menu-item="${itemIndex}">Usun</button>
+                                  </div>
+                                </div>
+                                <p>${escapeHtml(truncateMenuEditorText(item.description || "", 180) || "Brak opisu produktu.")}</p>
+                                ${item.ingredients?.length ? `<p class="helper">${escapeHtml(item.ingredients.join(", "))}</p>` : ""}
+                              </article>
+                            `;
+                          })
+                          .join("")
+                      : `
+                        <div class="repeater-item menu-editor-empty-state">
+                          <strong>Brak produktow w tej podkategorii</strong>
+                          <p class="helper">Dodaj produkt z glownego przycisku "Dodaj" i przypisz go do tej podkategorii.</p>
                         </div>
-                        <p>${escapeHtml(truncateMenuEditorText(item.description || "", 180) || "Brak opisu produktu.")}</p>
-                        ${item.ingredients?.length ? `<p class="helper">${escapeHtml(item.ingredients.join(", "))}</p>` : ""}
-                      </article>
-                    `)
-                    .join("")
-                : `
-                  <div class="repeater-item menu-editor-empty-state">
-                    <strong>Ta kategoria nie ma jeszcze produktow</strong>
-                    <p class="helper">Dodaj pierwszy produkt z glownego przycisku "Dodaj".</p>
-                  </div>
-                `
-            }
-          </div>
+                      `
+                  }
+                </div>
+              `
+          }
           <div class="admin-modal-footer">
-            <p class="helper">Zmiany lokalne zapiszesz przyciskiem "Zapisz tresci" w panelu admina.</p>
             <button class="button secondary" type="button" data-menu-modal-close>Zamknij</button>
           </div>
         </section>
@@ -3061,45 +3369,47 @@
                 <span>Nazwa produktu</span>
                 <input name="name" value="${escapeAttribute(draft.name || "")}" placeholder="np. Rosol domowy" />
               </label>
-              <label class="field">
-                <span>Kategoria</span>
-                <select name="sectionIndex">
-                  ${categoryOptions
-                    .map(
-                      (option) => `
-                        <option value="${escapeAttribute(option.value)}" ${String(modal.sectionIndex) === option.value ? "selected" : ""}>
-                          ${escapeHtml(option.label)}
-                        </option>
-                      `
-                    )
-                    .join("")}
-                </select>
-              </label>
-              ${
-                config.includePrice
-                  ? `
-                    <label class="field">
-                      <span>Cena</span>
-                      <input name="price" value="${escapeAttribute(draft.price || "")}" placeholder="np. 24 zl" />
-                    </label>
-                  `
-                  : ""
-              }
-              <label class="field ${config.includePrice ? "" : "field-full"}">
-                <span>Podkategoria</span>
-                <select name="subcategory">
-                  <option value="">Brak</option>
-                  ${subcategoryOptions
-                    .map(
-                      (option) => `
-                        <option value="${escapeAttribute(option)}" ${option === draft.subcategory ? "selected" : ""}>
-                          ${escapeHtml(option)}
-                        </option>
-                      `
-                    )
-                    .join("")}
-                </select>
-              </label>
+              <div class="menu-editor-item-meta-row ${config.includePrice ? "has-price" : ""}">
+                <label class="field">
+                  <span>Kategoria</span>
+                  <select name="sectionIndex">
+                    ${categoryOptions
+                      .map(
+                        (option) => `
+                          <option value="${escapeAttribute(option.value)}" ${String(modal.sectionIndex) === option.value ? "selected" : ""}>
+                            ${escapeHtml(option.label)}
+                          </option>
+                        `
+                      )
+                      .join("")}
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Podkategoria</span>
+                  <select name="subcategory">
+                    <option value="">Brak</option>
+                    ${subcategoryOptions
+                      .map(
+                        (option) => `
+                          <option value="${escapeAttribute(option)}" ${option === draft.subcategory ? "selected" : ""}>
+                            ${escapeHtml(option)}
+                          </option>
+                        `
+                      )
+                      .join("")}
+                  </select>
+                </label>
+                ${
+                  config.includePrice
+                    ? `
+                      <label class="field">
+                        <span>Cena</span>
+                        <input name="price" value="${escapeAttribute(draft.price || "")}" placeholder="np. 24 zl" />
+                      </label>
+                    `
+                    : ""
+                }
+              </div>
               <label class="field-full">
                 <span>Opis</span>
                 <textarea name="description" rows="4" placeholder="Krotki opis produktu">${escapeHtml(draft.description || "")}</textarea>
@@ -3207,22 +3517,27 @@
         section.section = event.currentTarget.value;
         refreshSaveDockVisibility();
       });
-      root.querySelector("[data-remove-menu-section]")?.addEventListener("click", () => {
-        if (!window.confirm("Usunac cala kategorie razem z jej produktami?")) {
-          return;
-        }
-        removeMenuEditorSection(modal.kind, modal.sectionIndex);
+      root.querySelectorAll("[data-open-menu-subcategory]").forEach((button) => {
+        button.addEventListener("click", () => {
+          openMenuEditorSectionModal(modal.kind, modal.sectionIndex, {
+            activeSubcategory: String(button.dataset.openMenuSubcategory || ""),
+          });
+        });
       });
-      root.querySelector("[data-move-menu-section-up]")?.addEventListener("click", () => {
-        moveMenuEditorSection(modal.kind, modal.sectionIndex, -1);
-      });
-      root.querySelector("[data-move-menu-section-down]")?.addEventListener("click", () => {
-        moveMenuEditorSection(modal.kind, modal.sectionIndex, 1);
+      root.querySelector("[data-back-to-subcategories]")?.addEventListener("click", () => {
+        openMenuEditorSectionModal(modal.kind, modal.sectionIndex, {
+          statusMessage: modal.statusMessage || "",
+        });
       });
       root.querySelectorAll("[data-open-menu-item]").forEach((button) => {
         button.addEventListener("click", () => {
           openMenuEditorItemModal(modal.kind, modal.sectionIndex, Number(button.dataset.openMenuItem), {
-            returnTo: { kind: modal.kind, type: "section", sectionIndex: modal.sectionIndex },
+            returnTo: {
+              kind: modal.kind,
+              type: "section",
+              sectionIndex: modal.sectionIndex,
+              activeSubcategory: typeof modal.activeSubcategory === "string" ? modal.activeSubcategory : null,
+            },
           });
         });
       });
@@ -3239,6 +3554,16 @@
       root.querySelectorAll("[data-move-menu-item-down]").forEach((button) => {
         button.addEventListener("click", () => {
           moveMenuEditorItem(modal.kind, modal.sectionIndex, Number(button.dataset.moveMenuItemDown), 1);
+        });
+      });
+      root.querySelectorAll("[data-move-menu-subcategory-up]").forEach((button) => {
+        button.addEventListener("click", () => {
+          moveMenuEditorSubcategory(modal.kind, modal.sectionIndex, String(button.dataset.moveMenuSubcategoryUp || ""), -1);
+        });
+      });
+      root.querySelectorAll("[data-move-menu-subcategory-down]").forEach((button) => {
+        button.addEventListener("click", () => {
+          moveMenuEditorSubcategory(modal.kind, modal.sectionIndex, String(button.dataset.moveMenuSubcategoryDown || ""), 1);
         });
       });
       return;
@@ -3361,13 +3686,51 @@
   function moveMenuEditorItem(kind, sectionIndex, itemIndex, direction) {
     const section = getMenuSectionsByKind(kind)[sectionIndex];
     if (!section?.items) return;
-    const newIndex = itemIndex + direction;
-    if (newIndex < 0 || newIndex >= section.items.length) return;
-    [section.items[itemIndex], section.items[newIndex]] = [section.items[newIndex], section.items[itemIndex]];
+    const currentItem = section.items[itemIndex];
+    if (!currentItem) return;
+    const currentSubcategory = String(currentItem.subcategory || "").trim();
+    const targetIndex = itemIndex + direction;
+    if (targetIndex < 0 || targetIndex >= section.items.length) return;
+    const targetItem = section.items[targetIndex];
+    const targetSubcategory = String(targetItem?.subcategory || "").trim();
+    if (currentSubcategory !== targetSubcategory) return;
+    [section.items[itemIndex], section.items[targetIndex]] = [section.items[targetIndex], section.items[itemIndex]];
     openMenuEditorSectionModal(kind, sectionIndex, {
       statusMessage: "Produkt zostal przesuniety.",
     });
     setMenuEditorStatus(kind, "Kolejnosc produktow zostala zaktualizowana.");
+    renderMenuEditorPanel(kind);
+    refreshSaveDockVisibility();
+  }
+
+  function moveMenuEditorSubcategory(kind, sectionIndex, subcategoryName, direction) {
+    const section = getMenuSectionsByKind(kind)[sectionIndex];
+    if (!section) return;
+    const subcategories = getMenuEditorSectionSubcategories(section);
+    const currentIndex = subcategories.indexOf(subcategoryName);
+    const targetIndex = currentIndex + direction;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= subcategories.length) return;
+
+    [subcategories[currentIndex], subcategories[targetIndex]] = [subcategories[targetIndex], subcategories[currentIndex]];
+    section.subcategories = subcategories;
+
+    const groupedEntries = new Map();
+    (section.items || []).forEach((item) => {
+      const key = String(item?.subcategory || "").trim();
+      if (!groupedEntries.has(key)) {
+        groupedEntries.set(key, []);
+      }
+      groupedEntries.get(key).push(item);
+    });
+    const uncategorized = groupedEntries.get("") || [];
+    const reorderedItems = subcategories.flatMap((name) => groupedEntries.get(name) || []);
+    reorderedItems.push(...uncategorized);
+    section.items = reorderedItems;
+
+    openMenuEditorSectionModal(kind, sectionIndex, {
+      statusMessage: "Kolejnosc podkategorii zostala zaktualizowana.",
+    });
+    setMenuEditorStatus(kind, "Kolejnosc podkategorii zostala zaktualizowana.");
     renderMenuEditorPanel(kind);
     refreshSaveDockVisibility();
   }
@@ -3639,10 +4002,21 @@
   }
 
   function setHotelRoomGalleries(roomGalleries) {
+    const normalized = normalizeHotelRoomGalleries(roomGalleries);
+
     if (!state.content.hotel) {
       state.content.hotel = {};
     }
-    state.content.hotel.roomGalleries = normalizeHotelRoomGalleries(roomGalleries);
+    state.content.hotel.roomGalleries = structuredClone(normalized);
+
+    if (!state.lastSavedContent) {
+      state.lastSavedContent = structuredClone(state.content);
+    }
+    if (!state.lastSavedContent.hotel) {
+      state.lastSavedContent.hotel = {};
+    }
+    state.lastSavedContent.hotel.roomGalleries = structuredClone(normalized);
+    refreshSaveDockVisibility();
   }
 
   async function uploadRoomGalleryImages(event, roomType) {
@@ -3972,33 +4346,19 @@
     state.content.documentsMenu = collectDocumentsMenuFromPanel();
     state.content.documentsMenu.sections.push({ title: "", items: [] });
     renderDocumentsPanel();
+    refreshSaveDockVisibility();
   }
 
   function removeDocumentsMenuSection(index) {
     state.content.documentsMenu = collectDocumentsMenuFromPanel();
     state.content.documentsMenu.sections.splice(index, 1);
     renderDocumentsPanel();
+    refreshSaveDockVisibility();
   }
 
   async function saveDocumentsMenu() {
-    try {
-      state.content.documentsMenu = collectDocumentsMenuFromPanel();
-      const payloadContent = structuredClone(state.content);
-      if (payloadContent.hotel) {
-        delete payloadContent.hotel.roomGalleries;
-      }
-      const data = await api("/api/admin/content", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: payloadContent }),
-      });
-      const normalizedContent = normalizeAdminContent(data.content);
-      state.content = normalizedContent;
-      state.lastSavedContent = structuredClone(normalizedContent);
-      renderDocumentsPanel("Menu okolicznosciowe zostalo zapisane.");
-    } catch (error) {
-      renderDocumentsPanel(error.message);
-    }
+    state.content.documentsMenu = collectDocumentsMenuFromPanel();
+    await saveContent("Menu okolicznosciowe zostalo zapisane.");
   }
 
   async function uploadDocument(event) {
@@ -4041,9 +4401,16 @@
   function renderCalendarPanel(statusMessage = "") {
     const panel = document.querySelector("#calendar-panel");
     if (!panel) return;
+    const halls = Array.isArray(state.content.events?.halls) ? state.content.events.halls : [];
+    const largeHall =
+      halls.find((hall) => String(hall?.key || "") === "1") ||
+      halls.find((hall) => /duza|duża|large/i.test(String(hall?.name || ""))) ||
+      halls[0] ||
+      null;
+    const largeHallKey = largeHall ? String(largeHall.key || "") : "";
     panel.innerHTML = `
       <p class="pill">Kalendarz sal</p>
-      <h2>Blokady terminow</h2>
+      <h2>Zarezerwuj termin</h2>
       <div class="stack">
         <form id="calendar-form" class="repeater-item">
           <div class="field-grid">
@@ -4058,9 +4425,22 @@
             <label class="field"><span>Etykieta</span><input name="label" placeholder="np. Wesele Nowak" required /></label>
             <label class="field"><span>Od</span><input name="startAt" type="datetime-local" required /></label>
             <label class="field"><span>Do</span><input name="endAt" type="datetime-local" required /></label>
+            <label class="field" id="calendar-guests-field" style="display:none;">
+              <span>Liczba osob (duza sala)</span>
+              <input name="guestsCount" type="number" min="1" step="1" placeholder="np. 40" />
+            </label>
+            <label class="field-full" id="calendar-exclusive-field" style="display:none;">
+              <span class="checkbox-field">
+                <input name="exclusive" type="checkbox" value="1" />
+                <span class="checkbox-copy">
+                  <strong>Sala na wylacznosc</strong>
+                  <span>Blokuje cala duza sale niezaleznie od liczby osob.</span>
+                </span>
+              </span>
+            </label>
             <label class="field-full"><span>Notatka</span><textarea name="notes"></textarea></label>
           </div>
-          <button class="button" type="submit">Dodaj blokade</button>
+          <button class="button" type="submit">Zarezerwuj termin</button>
           <p class="status">${escapeHtml(statusMessage)}</p>
         </form>
         ${
@@ -4074,17 +4454,53 @@
                         <span class="pill">${escapeHtml(block.hallName || block.hallKey)}</span>
                       </div>
                       <p>${escapeHtml(block.startAt)} - ${escapeHtml(block.endAt)}</p>
+                      ${
+                        Number(block.guestsCount) > 0
+                          ? `<p class="helper">Liczba osob: ${escapeHtml(String(block.guestsCount))}${block.exclusive ? " | Sala na wylacznosc: tak" : ""}</p>`
+                          : block.exclusive
+                            ? `<p class="helper">Sala na wylacznosc: tak</p>`
+                            : ""
+                      }
                       <p class="helper">${escapeHtml(block.notes || "")}</p>
-                      <button class="button danger" type="button" data-delete-block="${block.id}">Usun blokade</button>
+                      <button class="button danger" type="button" data-delete-block="${block.id}">Usun rezerwacje terminu</button>
                     </article>`
                 )
                 .join("")
-            : `<p class="empty">Brak blokad terminow.</p>`
+            : `<p class="empty">Brak rezerwacji terminow.</p>`
         }
       </div>
     `;
 
-    document.querySelector("#calendar-form").addEventListener("submit", addCalendarBlock);
+    const form = document.querySelector("#calendar-form");
+    const hallSelect = form?.querySelector('select[name="hallKey"]');
+    const guestsField = form?.querySelector("#calendar-guests-field");
+    const guestsInput = form?.querySelector('input[name="guestsCount"]');
+    const exclusiveField = form?.querySelector("#calendar-exclusive-field");
+    const exclusiveInput = form?.querySelector('input[name="exclusive"]');
+
+    const updateCalendarOptionalFields = () => {
+      const selectedHallKey = String(hallSelect?.value || "");
+      const isLargeHallSelected = Boolean(largeHallKey) && selectedHallKey === largeHallKey;
+      if (guestsField) {
+        guestsField.style.display = isLargeHallSelected ? "" : "none";
+      }
+      if (exclusiveField) {
+        exclusiveField.style.display = isLargeHallSelected ? "" : "none";
+      }
+      if (guestsInput) {
+        guestsInput.required = isLargeHallSelected;
+        if (!isLargeHallSelected) {
+          guestsInput.value = "";
+        }
+      }
+      if (exclusiveInput && !isLargeHallSelected) {
+        exclusiveInput.checked = false;
+      }
+    };
+
+    hallSelect?.addEventListener("change", updateCalendarOptionalFields);
+    updateCalendarOptionalFields();
+    form?.addEventListener("submit", addCalendarBlock);
     panel.querySelectorAll("[data-delete-block]").forEach((button) => {
       button.addEventListener("click", () => deleteCalendarBlock(button.dataset.deleteBlock));
     });
@@ -4093,14 +4509,19 @@
   async function addCalendarBlock(event) {
     event.preventDefault();
     const form = event.currentTarget;
-    const payload = Object.fromEntries(new FormData(form).entries());
+    const formData = new FormData(form);
+    const payload = Object.fromEntries(formData.entries());
+    payload.exclusive = formData.has("exclusive");
+    if (!payload.guestsCount) {
+      delete payload.guestsCount;
+    }
     try {
       await api("/api/admin/calendar/blocks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      await loadDashboard("Blokada zostala dodana.");
+      await loadDashboard("Termin zostal zarezerwowany.");
     } catch (error) {
       renderCalendarPanel(error.message);
     }
@@ -4108,7 +4529,7 @@
 
   async function deleteCalendarBlock(blockId) {
     await api(`/api/admin/calendar/blocks/${blockId}`, { method: "DELETE" });
-    await loadDashboard("Blokada zostala usunieta.");
+    await loadDashboard("Rezerwacja terminu zostala usunieta.");
   }
 
   async function handleLogin(event) {

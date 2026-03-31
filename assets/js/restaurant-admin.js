@@ -5,6 +5,9 @@
   const config = window.SREDZKA_CONFIG || {};
 
   function restaurantApiBase() {
+    if (config.apiBase) {
+      return `${String(config.apiBase).replace(/\/$/, "")}/api/admin/legacy-bookings/restaurant`;
+    }
     if (config.restaurantApiBase) {
       return String(config.restaurantApiBase).replace(/\/$/, "");
     }

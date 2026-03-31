@@ -921,39 +921,7 @@
           });
         }
 
-        function renderDocumentsMenu(documentsMenu) {
-          if (!documentsMenu?.title) {
-            return "";
-          }
-
-          return `
-            <details class="card collapsible-card" id="occasion-menu">
-              <summary class="collapsible-summary">
-                <h2>${escapeHtml(documentsMenu.title)}</h2>
-              </summary>
-              <div class="collapsible-content">
-                <div class="menu-sections">
-                  ${(documentsMenu.sections || [])
-                    .map(
-                      (section) => `
-                        <section class="menu-section">
-                          <h3>${escapeHtml(section.title || "")}</h3>
-                          <ul class="crown-list">
-                            ${(section.items || [])
-                              .map((item) => `<li>${escapeHtml(item)}</li>`)
-                              .join("")}
-                          </ul>
-                        </section>`
-                    )
-                    .join("")}
-                </div>
-              </div>
-            </details>
-          `;
-        }
-
-        function renderDocuments(documents, documentsMenu) {
-          const menuMarkup = renderDocumentsMenu(documentsMenu);
+        function renderDocuments(documents) {
           const documentsMarkup = documents
             .map(
               (item, index) => `
@@ -971,7 +939,7 @@
             )
             .join("");
 
-          docsTarget.innerHTML = `${menuMarkup}${documentsMarkup}`;
+          docsTarget.innerHTML = documentsMarkup;
 
           docsTarget.querySelectorAll("details").forEach((element) => {
             element.addEventListener("toggle", scheduleScrollIndicatorUpdate);
@@ -989,13 +957,6 @@
           });
 
           scheduleScrollIndicatorUpdate();
-          
-          // Po renderowaniu sprawdź hash i otwórz menu jeśli potrzeba
-          if (window.location.hash === "#occasion-menu") {
-            setTimeout(() => {
-              openOccasionMenuFromHash();
-            }, 100);
-          }
         }
 
         async function bootstrap() {
@@ -1008,12 +969,10 @@
               throw new Error("bootstrap unavailable");
             }
             const payload = await response.json();
-            renderDocuments(payload.documents || fallbackDocs, payload.content?.documentsMenu || fallbackContent.documentsMenu);
+            renderDocuments(payload.documents || fallbackDocs);
           } catch (error) {
-            renderDocuments(fallbackDocs, fallbackContent.documentsMenu);
+            renderDocuments(fallbackDocs);
           }
-          // Po załadowaniu dokumentów sprawdź hash
-          openOccasionMenuFromHash();
         }
 
         const previewFrame = document.querySelector("#preview-frame");
@@ -1052,21 +1011,6 @@
         window.addEventListener("scroll", scheduleScrollIndicatorUpdate, { passive: true });
         window.addEventListener("resize", scheduleScrollIndicatorUpdate);
         window.addEventListener("load", scheduleScrollIndicatorUpdate);
-
-        // Obsługa otwierania menu okolicznościowego przez hash
-        function openOccasionMenuFromHash() {
-          if (window.location.hash === "#occasion-menu") {
-            const occasionMenu = document.querySelector("#occasion-menu");
-            if (occasionMenu && occasionMenu.tagName === "DETAILS") {
-              occasionMenu.open = true;
-              setTimeout(() => {
-                occasionMenu.scrollIntoView({ behavior: "smooth", block: "start" });
-              }, 100);
-            }
-          }
-        }
-
-        window.addEventListener("hashchange", openOccasionMenuFromHash);
 
         bootstrap();
         showCookieBanner();

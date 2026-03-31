@@ -664,6 +664,10 @@
         flex-direction: column;
       }
 
+      .modal-body.modal-body-hours {
+        width: min(560px, 100%);
+      }
+
       .modal-header {
         display: flex;
         justify-content: space-between;
@@ -1123,6 +1127,26 @@
         font-size: 1.1rem;
       }
 
+      .restaurant-orders-richtext {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .restaurant-orders-richtext p,
+      .restaurant-orders-richtext div,
+      .restaurant-orders-richtext ul,
+      .restaurant-orders-richtext ol,
+      .restaurant-orders-richtext h1,
+      .restaurant-orders-richtext h2,
+      .restaurant-orders-richtext h3 {
+        margin: 0;
+      }
+
+      .restaurant-orders-richtext p:empty::before,
+      .restaurant-orders-richtext div:empty::before {
+        content: "\00a0";
+      }
+
       @media (max-width: 1080px) {
         :root {
           --content-width: min(100vw - 2rem, 1200px);
@@ -1349,9 +1373,8 @@
       }
 
       .watermark {
-        --watermark-bottom-base: 16px;
         position: fixed;
-        bottom: calc(var(--watermark-bottom-current, var(--watermark-bottom-base)) + env(safe-area-inset-bottom, 0px));
+        bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
         left: 50%;
         transform: translateX(-50%);
         z-index: 50;
@@ -1382,8 +1405,8 @@
 
       @media (max-width: 780px) {
         .watermark {
-          --watermark-bottom-base: 12px;
           font-size: 0.65rem;
+          bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
           left: 50%;
         }
       }
@@ -1705,6 +1728,105 @@
           return div.innerHTML;
         }
 
+        function sanitizeRichTextHtml(rawHtml) {
+          const template = document.createElement("template");
+          template.innerHTML = String(rawHtml || "");
+          const allowedTags = new Set(["p", "ul", "ol", "li", "strong", "em", "u", "a", "br", "span", "div", "h1", "h2", "h3"]);
+          const allowedStyleProps = new Set(["text-align", "font-size", "color", "font-weight", "font-style", "text-decoration", "font-family"]);
+          const urlPattern = /^(https?:|mailto:|tel:|\/|#)/i;
+
+          const sanitizeStyle = (styleValue) =>
+            String(styleValue || "")
+              .split(";")
+              .map((part) => part.trim())
+              .filter(Boolean)
+              .map((part) => {
+                const separatorIndex = part.indexOf(":");
+                if (separatorIndex === -1) return "";
+                const property = part.slice(0, separatorIndex).trim().toLowerCase();
+                const value = part.slice(separatorIndex + 1).trim();
+                if (!allowedStyleProps.has(property) || !value) return "";
+                return `${property}: ${value}`;
+              })
+              .filter(Boolean)
+              .join("; ");
+
+          const sanitizeNode = (node) => {
+            if (node.nodeType === Node.TEXT_NODE) return;
+            if (node.nodeType !== Node.ELEMENT_NODE) {
+              node.remove();
+              return;
+            }
+            const tagName = node.tagName.toLowerCase();
+            if (tagName === "script" || tagName === "style" || tagName === "iframe" || tagName === "object") {
+              node.remove();
+              return;
+            }
+            if (tagName === "b") {
+              const strong = document.createElement("strong");
+              strong.innerHTML = node.innerHTML;
+              node.replaceWith(strong);
+              node = strong;
+            } else if (tagName === "i") {
+              const em = document.createElement("em");
+              em.innerHTML = node.innerHTML;
+              node.replaceWith(em);
+              node = em;
+            } else if (tagName === "font") {
+              const span = document.createElement("span");
+              const styles = [];
+              const fontColor = node.getAttribute("color");
+              const fontFace = node.getAttribute("face");
+              if (fontColor) styles.push(`color: ${fontColor}`);
+              if (fontFace) styles.push(`font-family: ${fontFace}`);
+              if (styles.length) span.setAttribute("style", styles.join("; "));
+              span.innerHTML = node.innerHTML;
+              node.replaceWith(span);
+              node = span;
+            } else if (!allowedTags.has(tagName)) {
+              const fragment = document.createDocumentFragment();
+              while (node.firstChild) {
+                fragment.appendChild(node.firstChild);
+              }
+              node.replaceWith(fragment);
+              return;
+            }
+
+            Array.from(node.attributes).forEach((attribute) => {
+              const attrName = attribute.name.toLowerCase();
+              const attrValue = attribute.value;
+              if (attrName === "style") {
+                const safeStyle = sanitizeStyle(attrValue);
+                if (safeStyle) node.setAttribute("style", safeStyle);
+                else node.removeAttribute("style");
+                return;
+              }
+              if (tagName === "a" && attrName === "href") {
+                const safeHref = String(attrValue || "").trim();
+                if (!safeHref || !urlPattern.test(safeHref)) node.removeAttribute("href");
+                else node.setAttribute("href", safeHref);
+                return;
+              }
+              if (tagName === "a" && (attrName === "target" || attrName === "rel")) {
+                if (attrName === "target" && attrValue !== "_blank") {
+                  node.removeAttribute("target");
+                }
+                return;
+              }
+              node.removeAttribute(attribute.name);
+            });
+
+            if (tagName === "a" && node.getAttribute("target") === "_blank") {
+              node.setAttribute("rel", "noopener noreferrer");
+            }
+
+            Array.from(node.childNodes).forEach(sanitizeNode);
+          };
+
+          Array.from(template.content.childNodes).forEach(sanitizeNode);
+          return template.innerHTML;
+        }
+
         let selectedCategoryIndex = 0;
         let companyPhone = "+48 600 700 800";
         let companyEmail = "kontakt@sredzkakorona.pl";
@@ -1852,7 +1974,7 @@
 
         function renderOpeningHours() {
           return `
-            <div class="modal-body">
+            <div class="modal-body modal-body-hours">
               <div class="modal-header">
                 <h2>Godziny Otwarcia</h2>
                 <button class="modal-close" id="close-hours" aria-label="Zamknij">×</button>
@@ -1885,7 +2007,7 @@
                   class="opening-hours-row"
                   style="display: grid; gap: 0.85rem; text-align: left; line-height: 1.7;"
                 >
-                  <p style="margin: 0;">${escapeHtml(restaurantOrdersInfoText)}</p>
+                  <div class="restaurant-orders-richtext">${sanitizeRichTextHtml(restaurantOrdersInfoText)}</div>
                   <p style="margin: 0;">
                     Kontakt telefoniczny:
                     <a href="tel:${encodeURIComponent(companyPhone)}" style="color: var(--text); font-weight: 700; text-decoration: underline;">${escapeHtml(companyPhone)}</a>.
@@ -1924,7 +2046,7 @@
                     <div class="action-button-title">GALERIA</div>
                   </button>
                   <button class="action-button" id="orders-button">
-                    <div class="action-button-title">ZAMÓWIENIA<br />CATERING</div>
+                    <div class="action-button-title">ZAMÓWIENIA /<br />CATERING</div>
                   </button>
                   <button class="action-button" id="hours-button">
                     <div class="action-button-title">GODZINY</div>
@@ -2054,42 +2176,5 @@
       </svg>
     </a>
     <a class="watermark" href="https://kontakt.strzelca.pl/Igor_Janicki.html">Design &amp; Development by Igor Janicki</a>
-    <script>
-      (() => {
-        const watermark = document.querySelector(".watermark");
-        const contactButton = document.querySelector(".floating-contact-button");
-        if (!watermark || !contactButton) return;
-
-        function updateWatermarkPosition() {
-          const styles = window.getComputedStyle(watermark);
-          const baseBottom = Number.parseFloat(styles.getPropertyValue("--watermark-bottom-base")) || 16;
-          const safeGap = 18;
-          let targetBottom = baseBottom;
-          watermark.style.setProperty("--watermark-bottom-current", targetBottom + "px");
-
-          const buttonStyles = window.getComputedStyle(contactButton);
-          if (buttonStyles.display === "none" || buttonStyles.visibility === "hidden") {
-            return;
-          }
-
-          const watermarkRect = watermark.getBoundingClientRect();
-          const buttonRect = contactButton.getBoundingClientRect();
-          const hasHorizontalConflict =
-            watermarkRect.left < buttonRect.right + safeGap &&
-            watermarkRect.right > buttonRect.left - safeGap;
-          const isTooCloseVertically = watermarkRect.bottom > buttonRect.top - safeGap;
-
-          if (hasHorizontalConflict && isTooCloseVertically) {
-            targetBottom = Math.max(baseBottom, window.innerHeight - buttonRect.top + safeGap);
-            watermark.style.setProperty("--watermark-bottom-current", targetBottom + "px");
-          }
-        }
-
-        updateWatermarkPosition();
-        window.addEventListener("resize", updateWatermarkPosition);
-        window.addEventListener("orientationchange", updateWatermarkPosition);
-        window.setTimeout(updateWatermarkPosition, 150);
-      })();
-    </script>
   </body>
 </html>

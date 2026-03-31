@@ -6,6 +6,9 @@
   const config = window.SREDZKA_CONFIG || {};
 
   function hotelApiBase() {
+    if (config.apiBase) {
+      return `${String(config.apiBase).replace(/\/$/, "")}/api/admin/legacy-bookings/hotel`;
+    }
     if (config.hotelApiBase) {
       return String(config.hotelApiBase).replace(/\/$/, "");
     }

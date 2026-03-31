@@ -202,6 +202,15 @@ export default {
         return jsonResponse({ ok: true }, 200, request, env);
       }
 
+      if (
+        url.pathname.match(/^\/api\/admin\/legacy-bookings\/(hotel|restaurant|hall)$/) &&
+        ["GET", "POST", "PUT", "PATCH", "DELETE"].includes(request.method)
+      ) {
+        await requireFirebaseAdmin(request, env);
+        const service = url.pathname.split("/").pop();
+        return proxyLegacyBookingApi(service, request, url, env);
+      }
+
       return jsonResponse({ error: "Nie znaleziono zasobu." }, 404, request, env);
     } catch (error) {
       const status = error.status || 500;
@@ -378,16 +387,31 @@ async function listHotelRoomGalleries(env, url) {
 async function getCalendarBlocks(env, from, url) {
   const startDate = from ? new Date(`${from}T00:00:00`) : new Date();
   const endDate = new Date(startDate.getTime() + 1000 * 60 * 60 * 24 * 31);
-  const result = await env.DB.prepare(
-    "SELECT id, hall_key AS hallKey, start_at AS startAt, end_at AS endAt, label, notes FROM calendar_blocks WHERE start_at <= ? AND end_at >= ? ORDER BY start_at ASC"
-  )
-    .bind(endDate.toISOString(), startDate.toISOString())
-    .all();
+  let result;
+  try {
+    result = await env.DB.prepare(
+      "SELECT id, hall_key AS hallKey, start_at AS startAt, end_at AS endAt, label, notes, guests_count AS guestsCount, exclusive FROM calendar_blocks WHERE start_at <= ? AND end_at >= ? ORDER BY start_at ASC"
+    )
+      .bind(endDate.toISOString(), startDate.toISOString())
+      .all();
+  } catch (error) {
+    const message = String(error?.message || "");
+    if (!/no such column:\s*(guests_count|exclusive)/i.test(message)) {
+      throw error;
+    }
+    result = await env.DB.prepare(
+      "SELECT id, hall_key AS hallKey, start_at AS startAt, end_at AS endAt, label, notes FROM calendar_blocks WHERE start_at <= ? AND end_at >= ? ORDER BY start_at ASC"
+    )
+      .bind(endDate.toISOString(), startDate.toISOString())
+      .all();
+  }
   return {
     blocks: (result.results || []).map((item) => ({
       ...item,
       startAt: item.startAt,
       endAt: item.endAt,
+      guestsCount: Number(item.guestsCount) || null,
+      exclusive: Boolean(item.exclusive),
       detailsUrl: absoluteUrl(url, "/index.html#contact"),
     })),
   };
@@ -494,7 +518,7 @@ async function uploadGalleryImages(albumId, request, env) {
           objectKey,
           file.name,
           album.slug,
-          file.type || "application/octet-stream",
+          normalizeImageMimeType(file.type, file.name),
           blobData,
           blobData.byteLength,
           nowIso()
@@ -586,7 +610,7 @@ async function uploadHotelRoomImages(roomType, request, env) {
         normalizedRoomType,
         file.name || "zdjecie",
         normalizedRoomType,
-        file.type || "application/octet-stream",
+        normalizeImageMimeType(file.type, file.name),
         blobData,
         blobData.byteLength,
         nextOrder,
@@ -726,24 +750,43 @@ async function createCalendarBlock(payload, env) {
   if (Number.isNaN(startAt.valueOf()) || Number.isNaN(endAt.valueOf()) || startAt >= endAt) {
     throw badRequest("Zakres dat jest nieprawidlowy.");
   }
-  await env.DB.prepare(
-    "INSERT INTO calendar_blocks (hall_key, start_at, end_at, label, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-  )
-    .bind(
-      payload.hallKey,
-      startAt.toISOString(),
-      endAt.toISOString(),
-      payload.label.trim(),
-      (payload.notes || "").trim(),
-      nowIso(),
-      nowIso()
+  const guestsCountRaw = payload.guestsCount;
+  const guestsCount =
+    guestsCountRaw === undefined || guestsCountRaw === null || String(guestsCountRaw).trim() === ""
+      ? null
+      : Number(guestsCountRaw);
+  if (guestsCount !== null && (!Number.isInteger(guestsCount) || guestsCount < 1)) {
+    throw badRequest("Liczba osob musi byc dodatnia liczba calkowita.");
+  }
+  const exclusive = payload.exclusive === true || payload.exclusive === "true" || payload.exclusive === "1";
+  try {
+    await env.DB.prepare(
+      "INSERT INTO calendar_blocks (hall_key, start_at, end_at, label, notes, guests_count, exclusive, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
-    .run();
+      .bind(
+        payload.hallKey,
+        startAt.toISOString(),
+        endAt.toISOString(),
+        payload.label.trim(),
+        (payload.notes || "").trim(),
+        guestsCount,
+        exclusive ? 1 : 0,
+        nowIso(),
+        nowIso()
+      )
+      .run();
+  } catch (error) {
+    const message = String(error?.message || "");
+    if (/no such column:\s*(guests_count|exclusive)/i.test(message)) {
+      throw badRequest("Brak migracji bazy kalendarza. Zaktualizuj schemat D1 (calendar_blocks).");
+    }
+    throw error;
+  }
 }
 
 async function streamGalleryImage(imageId, env, request) {
   const image = await env.DB.prepare(
-    "SELECT blob_data AS blobData, mime_type AS mimeType FROM gallery_images WHERE id = ?"
+    "SELECT blob_data AS blobData, mime_type AS mimeType, file_name AS fileName FROM gallery_images WHERE id = ?"
   )
     .bind(Number(imageId))
     .first();
@@ -754,7 +797,7 @@ async function streamGalleryImage(imageId, env, request) {
   if (!object) {
     return jsonResponse({ error: "Plik nie istnieje." }, 404, request, env);
   }
-  return binaryResponse(object, image.mimeType || "application/octet-stream", request, env);
+  return binaryResponse(object, normalizeImageMimeType(image.mimeType, image.fileName), request, env);
 }
 
 async function streamDocument(documentId, download, env, request) {
@@ -781,7 +824,7 @@ async function streamHotelRoomImage(imageId, env, request) {
   let image;
   try {
     image = await env.DB.prepare(
-      "SELECT blob_data AS blobData, mime_type AS mimeType FROM hotel_room_images WHERE id = ?"
+      "SELECT blob_data AS blobData, mime_type AS mimeType, file_name AS fileName FROM hotel_room_images WHERE id = ?"
     )
       .bind(Number(imageId))
       .first();
@@ -798,7 +841,7 @@ async function streamHotelRoomImage(imageId, env, request) {
   if (!object) {
     return jsonResponse({ error: "Plik nie istnieje." }, 404, request, env);
   }
-  return binaryResponse(object, image.mimeType || "application/octet-stream", request, env);
+  return binaryResponse(object, normalizeImageMimeType(image.mimeType, image.fileName), request, env);
 }
 
 function normalizeBookingPausePair(from, to) {
@@ -914,6 +957,41 @@ function assertFileWithinLimit(file, label) {
   }
 }
 
+function normalizeImageMimeType(mimeType, fileName = "") {
+  const normalized = String(mimeType || "").toLowerCase().trim();
+  const allowed = new Set([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "image/bmp",
+    "image/avif",
+    "image/svg+xml",
+  ]);
+  if (allowed.has(normalized)) {
+    return normalized;
+  }
+
+  const extension = String(fileName || "")
+    .toLowerCase()
+    .split("?")[0]
+    .split("#")[0]
+    .split(".")
+    .pop();
+
+  const byExtension = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    gif: "image/gif",
+    bmp: "image/bmp",
+    avif: "image/avif",
+    svg: "image/svg+xml",
+  };
+  return byExtension[extension] || "image/jpeg";
+}
+
 function normalizeBlobData(value) {
   if (!value) {
     return null;
@@ -946,7 +1024,8 @@ function binaryResponse(object, contentType, request, env, extraHeaders = {}) {
   headers.set("Content-Type", contentType);
   headers.set("Cache-Control", "public, max-age=3600");
   Object.entries(extraHeaders).forEach(([key, value]) => headers.set(key, value));
-  return new Response(object.body, { headers });
+  const body = object && typeof object === "object" && "body" in object ? object.body : object;
+  return new Response(body, { headers });
 }
 
 function corsHeaders(request, env) {
@@ -960,6 +1039,60 @@ function corsHeaders(request, env) {
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     Vary: "Origin",
   };
+}
+
+function getLegacyBookingApiBase(service, env) {
+  const projectId = String(env.FIREBASE_PROJECT_ID || "sredzka-korona").trim();
+  const defaults = {
+    hotel: `https://europe-west1-${projectId}.cloudfunctions.net/hotelApi`,
+    restaurant: `https://europe-west1-${projectId}.cloudfunctions.net/restaurantApi`,
+    hall: `https://europe-west1-${projectId}.cloudfunctions.net/hallApi`,
+  };
+  const byEnv = {
+    hotel: env.HOTEL_API_BASE,
+    restaurant: env.RESTAURANT_API_BASE,
+    hall: env.HALL_API_BASE,
+  };
+  return String(byEnv[service] || defaults[service] || "").trim();
+}
+
+async function proxyLegacyBookingApi(service, request, url, env) {
+  const base = getLegacyBookingApiBase(service, env);
+  if (!base) {
+    return jsonResponse({ error: "Brak konfiguracji adresu API rezerwacji." }, 500, request, env);
+  }
+
+  const targetUrl = new URL(base);
+  for (const [key, value] of url.searchParams.entries()) {
+    targetUrl.searchParams.set(key, value);
+  }
+
+  const headers = new Headers();
+  const auth = request.headers.get("Authorization");
+  const contentType = request.headers.get("Content-Type");
+  if (auth) headers.set("Authorization", auth);
+  if (contentType) headers.set("Content-Type", contentType);
+
+  const bodyAllowed = !["GET", "HEAD"].includes(request.method);
+  const rawBody = bodyAllowed ? await request.text() : "";
+  const upstream = await fetch(targetUrl.toString(), {
+    method: request.method,
+    headers,
+    body: bodyAllowed && rawBody ? rawBody : undefined,
+  });
+
+  const responseHeaders = new Headers(corsHeaders(request, env));
+  const upstreamContentType = upstream.headers.get("Content-Type");
+  if (upstreamContentType) {
+    responseHeaders.set("Content-Type", upstreamContentType);
+  } else {
+    responseHeaders.set("Content-Type", "application/json; charset=utf-8");
+  }
+
+  return new Response(await upstream.text(), {
+    status: upstream.status,
+    headers: responseHeaders,
+  });
 }
 
 function absoluteUrl(url, pathname) {
