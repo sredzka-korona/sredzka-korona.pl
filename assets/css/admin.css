@@ -86,6 +86,40 @@ a {
   padding: 0.9rem 1.1rem;
 }
 
+.admin-topbar-simple {
+  grid-template-columns: 56px minmax(0, 1fr) 56px;
+  gap: 0.75rem;
+}
+
+.admin-topbar-side {
+  display: flex;
+  align-items: center;
+}
+
+.admin-topbar-side-end {
+  justify-content: flex-end;
+}
+
+.admin-topbar-spacer {
+  width: 44px;
+  height: 44px;
+}
+
+.admin-topbar-center {
+  text-align: center;
+}
+
+.admin-topbar-center .pill {
+  margin-bottom: 0.35rem;
+}
+
+.admin-topbar-center h1 {
+  margin: 0;
+  font-family: "Cormorant Garamond", serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 0.95;
+}
+
 .brand-row {
   display: flex;
   align-items: center;
@@ -161,6 +195,14 @@ a {
 .button.danger {
   border-color: rgba(229, 110, 94, 0.45);
   background: rgba(229, 110, 94, 0.08);
+}
+
+.button.icon-button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 1.3rem;
 }
 
 .login-wrap {
@@ -448,6 +490,21 @@ a {
     align-items: flex-start;
   }
 
+  .admin-topbar-simple {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .admin-topbar-side,
+  .admin-topbar-side-end {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .admin-topbar-spacer {
+    display: none;
+  }
+
   .scroll-indicator {
     top: 0.2rem;
     right: 0.02rem;
@@ -485,7 +542,11 @@ a {
 }
 
 .admin-workspace-head {
-  display: block;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .admin-workspace-head h2 {
@@ -547,6 +608,39 @@ a {
 
 .admin-stage-panel {
   width: 100%;
+}
+
+.admin-workspace-actions {
+  justify-content: flex-end;
+}
+
+.admin-entry-grid {
+  margin-top: 0.35rem;
+}
+
+.admin-entry-tile {
+  min-height: 108px;
+}
+
+.admin-save-dock {
+  display: none;
+  margin-top: 0.9rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(200, 170, 120, 0.24);
+  border-radius: 18px;
+  background: rgba(255, 253, 249, 0.92);
+  box-shadow: var(--shadow);
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.admin-save-dock.is-visible {
+  display: flex;
+}
+
+.admin-save-dock .helper {
+  margin: 0;
 }
 
 .admin-hotel-wrap {
@@ -748,6 +842,24 @@ a {
   .admin-topbar .inline-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .admin-workspace-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .admin-workspace-actions .button {
+    width: 100%;
+  }
+
+  .admin-save-dock {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-save-dock .button {
+    width: 100%;
   }
 
   .admin-topbar .inline-actions > * {

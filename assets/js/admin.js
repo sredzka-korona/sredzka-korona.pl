@@ -16,6 +16,7 @@
     apiBase: config.apiBase || fallbackApiBase,
     loggedIn: false,
     content: defaultContent,
+    lastSavedContent: structuredClone(defaultContent),
     documents: [],
     galleryAlbums: [],
     calendarBlocks: [],
@@ -24,6 +25,7 @@
       mediaStorageEnabled: false,
     },
     ui: {
+      view: "home",
       topTab: onlineBookingsEnabled ? "rezerwacje" : "hotel",
       tileByTab: {
         rezerwacje: "hotel",
@@ -405,17 +407,74 @@
     return tab.tiles.find((tile) => tile.key === stored)?.key || tab.tiles[0]?.key || "";
   }
 
+  function hasUnsavedContentChanges() {
+    if (!state.loggedIn || state.ui.view !== "section") {
+      return false;
+    }
+    try {
+      const draft = collectContentFromForm();
+      const baseline = state.lastSavedContent || state.content;
+      return JSON.stringify(draft) !== JSON.stringify(baseline);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function refreshSaveDockVisibility() {
+    const dock = document.querySelector("#admin-save-dock");
+    if (!dock) return;
+    const dirty = hasUnsavedContentChanges();
+    dock.classList.toggle("is-visible", dirty);
+  }
+
+  function bindUnsavedTracking() {
+    const stage = document.querySelector(".admin-stage");
+    if (!stage) return;
+    const handleStageChange = () => {
+      refreshSaveDockVisibility();
+    };
+    stage.addEventListener("input", handleStageChange);
+    stage.addEventListener("change", handleStageChange);
+    stage.addEventListener("click", () => {
+      window.setTimeout(refreshSaveDockVisibility, 0);
+    });
+  }
+
+  function confirmLeaveIfUnsaved() {
+    if (!hasUnsavedContentChanges()) {
+      return true;
+    }
+    return window.confirm("Masz niezapisane zmiany. Czy na pewno chcesz opuscic ten widok?");
+  }
+
   function setAdminTab(tabKey) {
+    if (!confirmLeaveIfUnsaved()) {
+      return;
+    }
     captureDraftIfPossible();
+    state.ui.view = "section";
     state.ui.topTab = tabKey;
     state.ui.tileByTab[tabKey] = getActiveAdminTile(tabKey);
     renderDashboard();
   }
 
   function setAdminTile(tabKey, tileKey) {
+    if (!confirmLeaveIfUnsaved()) {
+      return;
+    }
     captureDraftIfPossible();
+    state.ui.view = "section";
     state.ui.topTab = tabKey;
     state.ui.tileByTab[tabKey] = tileKey;
+    renderDashboard();
+  }
+
+  function goToAdminHome() {
+    if (!confirmLeaveIfUnsaved()) {
+      return;
+    }
+    captureDraftIfPossible();
+    state.ui.view = "home";
     renderDashboard();
   }
 
@@ -484,9 +543,16 @@
     document.querySelectorAll("[data-admin-tab]").forEach((button) => {
       button.addEventListener("click", () => setAdminTab(button.dataset.adminTab));
     });
+    document.querySelectorAll("[data-admin-entry]").forEach((button) => {
+      button.addEventListener("click", () => setAdminTab(button.dataset.adminEntry));
+    });
     document.querySelectorAll("[data-admin-tile]").forEach((button) => {
       button.addEventListener("click", () => setAdminTile(button.dataset.adminTabKey, button.dataset.adminTile));
     });
+    const backButton = document.querySelector("#admin-back-button");
+    if (backButton) {
+      backButton.addEventListener("click", goToAdminHome);
+    }
   }
 
   function renderOnlineBookingsUnavailable(panelSelector, options = {}) {
@@ -602,74 +668,102 @@
   function renderDashboard() {
     const activeTab = getAdminTabConfig();
     const activeTile = getActiveAdminTile(activeTab.key);
+    const inSectionView = state.ui.view === "section";
 
     app.innerHTML = `
       <div class="admin-shell">
-        <header class="admin-topbar">
-          <div class="brand-row">
-            <img src="../ikony/logo.png" alt="Logo" />
-            <div>
-              <p class="pill">Sredzka Korona</p>
-              <h1>Panel administracyjny</h1>
-              <p>Proste zarzadzanie tresciami, kalendarzem, dokumentami i galeria.</p>
-            </div>
+        <header class="admin-topbar admin-topbar-simple">
+          <div class="admin-topbar-side">
+            ${
+              inSectionView
+                ? '<button class="button icon-button secondary" id="admin-back-button" type="button" aria-label="Powrot do kafelkow glownych">←</button>'
+                : '<span class="admin-topbar-spacer" aria-hidden="true"></span>'
+            }
           </div>
-          <div class="inline-actions">
-            <a class="button secondary" href="../index.html">Zobacz strone</a>
-            <button class="button" id="save-content-button" type="button">Zapisz tresci</button>
-            <button class="button danger" id="logout-button" type="button">Wyloguj</button>
+          <div class="admin-topbar-center">
+            <p class="pill">Panel administratora</p>
+            <h1>Sredzka Korona</h1>
+          </div>
+          <div class="admin-topbar-side admin-topbar-side-end">
+            <button class="button danger icon-button" id="logout-button" type="button" aria-label="Wyloguj">⎋</button>
           </div>
         </header>
-        <nav class="admin-main-tabs" aria-label="Moduly panelu">
-          ${ADMIN_TABS.map(
-            (tab) => `
-              <button
-                type="button"
-                class="button ${tab.key === activeTab.key ? "" : "secondary"}"
-                data-admin-tab="${escapeAttribute(tab.key)}"
-              >
-                ${escapeHtml(tab.label)}
-              </button>
-            `
-          ).join("")}
-        </nav>
         <section class="admin-workspace">
-          <div class="admin-workspace-head">
-            <div>
-              <p class="pill">${escapeHtml(activeTab.label)}</p>
-              <h2>${escapeHtml(activeTab.label)}</h2>
-              <p class="section-intro">${escapeHtml(activeTab.description)}</p>
-            </div>
-          </div>
-          <div class="admin-tile-grid" aria-label="Sekcje w module ${escapeAttribute(activeTab.label)}">
-            ${activeTab.tiles
-              .map(
-                (tile) => `
-                  <button
-                    type="button"
-                    class="admin-tile${tile.key === activeTile ? " is-active" : ""}"
-                    data-admin-tab-key="${escapeAttribute(activeTab.key)}"
-                    data-admin-tile="${escapeAttribute(tile.key)}"
-                  >
-                    <span class="admin-tile-title">${escapeHtml(tile.label)}</span>
-                    <span class="admin-tile-copy">${escapeHtml(tile.description)}</span>
-                  </button>
-                `
-              )
-              .join("")}
-          </div>
-          <div class="grid admin-stage">
-            ${renderAdminStageMarkup(activeTab.key, activeTile)}
-          </div>
+          ${
+            inSectionView
+              ? `
+              <div class="admin-workspace-head">
+                <div>
+                  <p class="pill">${escapeHtml(activeTab.label)}</p>
+                  <h2>${escapeHtml(activeTab.label)}</h2>
+                  <p class="section-intro">${escapeHtml(activeTab.description)}</p>
+                </div>
+              </div>
+              <div class="admin-tile-grid" aria-label="Sekcje w module ${escapeAttribute(activeTab.label)}">
+                ${activeTab.tiles
+                  .map(
+                    (tile) => `
+                      <button
+                        type="button"
+                        class="admin-tile${tile.key === activeTile ? " is-active" : ""}"
+                        data-admin-tab-key="${escapeAttribute(activeTab.key)}"
+                        data-admin-tile="${escapeAttribute(tile.key)}"
+                      >
+                        <span class="admin-tile-title">${escapeHtml(tile.label)}</span>
+                        <span class="admin-tile-copy">${escapeHtml(tile.description)}</span>
+                      </button>
+                    `
+                  )
+                  .join("")}
+              </div>
+              <div class="grid admin-stage">
+                ${renderAdminStageMarkup(activeTab.key, activeTile)}
+              </div>
+              <div class="admin-save-dock" id="admin-save-dock">
+                <p class="helper">Masz niezapisane zmiany w tej sekcji.</p>
+                <button class="button" id="save-content-button" type="button">Zapisz tresci</button>
+              </div>
+            `
+              : `
+              <div class="admin-workspace-head">
+                <div>
+                  <p class="pill">Panel glowny</p>
+                  <h2>Wybierz sekcje</h2>
+                  <p class="section-intro">Po kliknieciu kafelka przejdziesz do zarzadzania dana czescia strony.</p>
+                </div>
+              </div>
+              <div class="admin-tile-grid admin-entry-grid" aria-label="Glowne sekcje panelu administracyjnego">
+                ${ADMIN_TABS.map(
+                  (tab) => `
+                    <button
+                      type="button"
+                      class="admin-tile admin-entry-tile"
+                      data-admin-entry="${escapeAttribute(tab.key)}"
+                    >
+                      <span class="admin-tile-title">${escapeHtml(tab.label)}</span>
+                      <span class="admin-tile-copy">${escapeHtml(tab.description)}</span>
+                    </button>
+                  `
+                ).join("")}
+              </div>
+            `
+          }
         </section>
       </div>
     `;
 
     scheduleScrollIndicatorUpdate();
-    document.querySelector("#save-content-button").addEventListener("click", saveContent);
+    const saveButton = document.querySelector("#save-content-button");
+    if (saveButton) {
+      saveButton.addEventListener("click", saveContent);
+    }
     document.querySelector("#logout-button").addEventListener("click", logout);
     bindAdminNavigation();
-    renderActiveAdminTile();
+    if (inSectionView) {
+      renderActiveAdminTile();
+      bindUnsavedTracking();
+      refreshSaveDockVisibility();
+    }
   }
 
   function renderContentPanel(statusMessage = "") {
@@ -1272,6 +1366,7 @@
         body: JSON.stringify(payload),
       });
       state.content = data.content;
+      state.lastSavedContent = structuredClone(data.content);
       renderContentPanel("Tresci zostaly zapisane.");
       if (document.querySelector("#restaurant-menu-panel")) {
         renderRestaurantMenuPanel("Menu zostalo zapisane.");
@@ -2997,6 +3092,9 @@
   }
 
   async function logout() {
+    if (!confirmLeaveIfUnsaved()) {
+      return;
+    }
     try {
       await firebase.auth().signOut();
     } catch (error) {
@@ -3009,6 +3107,7 @@
   async function loadDashboard(message = "") {
     const data = await api("/api/admin/dashboard");
     state.content = data.content;
+    state.lastSavedContent = structuredClone(data.content);
     state.documents = data.documents;
     state.galleryAlbums = data.galleryAlbums;
     state.calendarBlocks = data.calendarBlocks;
@@ -3021,6 +3120,14 @@
   }
 
   function bootstrap() {
+    window.addEventListener("beforeunload", (event) => {
+      if (!hasUnsavedContentChanges()) {
+        return;
+      }
+      event.preventDefault();
+      event.returnValue = "";
+    });
+
     initCustomScrollbar();
 
     if (missingApiConfiguration) {

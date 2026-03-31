@@ -1011,19 +1011,23 @@
         }
 
         .main-split-label {
-          position: static;
-          display: inline-block;
-          max-width: min(82vw, 12ch);
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          display: block;
+          width: min(86vw, 22rem);
+          max-width: none;
           font-size: clamp(1.6rem, 4.8vw, 2.4rem);
           white-space: normal;
           padding: 0.2rem 0.65rem;
+          margin: 0;
           text-align: center;
-          transform: none !important;
+          transform: translate(-50%, -50%) !important;
           transition: none !important;
         }
 
         .main-split-section:hover .main-split-label {
-          transform: none !important;
+          transform: translate(-50%, -50%) !important;
         }
 
         .main-split-soon,
@@ -1041,7 +1045,7 @@
 
       @media (max-width: 780px) {
         .main-split-label {
-          max-width: min(70vw, 9ch);
+          width: min(80vw, 18rem);
           font-size: clamp(1.45rem, 5.8vw, 2.1rem);
         }
 
