@@ -2476,11 +2476,15 @@
       }
 
       .watermark {
+        --watermark-bottom-base: 16px;
         position: fixed;
-        bottom: 1.75rem;
+        bottom: calc(var(--watermark-bottom-current, var(--watermark-bottom-base)) + env(safe-area-inset-bottom, 0px));
         left: 50%;
         transform: translateX(-50%);
         z-index: 50;
+        max-width: min(92vw, 420px);
+        text-align: center;
+        white-space: nowrap;
         font-size: 0.75rem;
         color: rgba(255, 255, 255, 0.34);
         font-family: "Manrope", sans-serif;
@@ -2505,8 +2509,8 @@
 
       @media (max-width: 780px) {
         .watermark {
+          --watermark-bottom-base: 12px;
           font-size: 0.65rem;
-          bottom: 1.4rem;
           left: 50%;
         }
       }
@@ -3035,5 +3039,42 @@
       </svg>
     </a>
     <a class="watermark" href="https://kontakt.strzelca.pl/Igor_Janicki.html">Design &amp; Development by Igor Janicki</a>
+    <script>
+      (() => {
+        const watermark = document.querySelector(".watermark");
+        const contactButton = document.querySelector(".floating-contact-button");
+        if (!watermark || !contactButton) return;
+
+        function updateWatermarkPosition() {
+          const styles = window.getComputedStyle(watermark);
+          const baseBottom = Number.parseFloat(styles.getPropertyValue("--watermark-bottom-base")) || 16;
+          let targetBottom = baseBottom;
+          watermark.style.setProperty("--watermark-bottom-current", targetBottom + "px");
+
+          const buttonStyles = window.getComputedStyle(contactButton);
+          if (buttonStyles.display === "none" || buttonStyles.visibility === "hidden") {
+            return;
+          }
+
+          const watermarkRect = watermark.getBoundingClientRect();
+          const buttonRect = contactButton.getBoundingClientRect();
+          const intersects =
+            watermarkRect.left < buttonRect.right &&
+            watermarkRect.right > buttonRect.left &&
+            watermarkRect.top < buttonRect.bottom &&
+            watermarkRect.bottom > buttonRect.top;
+
+          if (intersects) {
+            targetBottom = Math.max(baseBottom, window.innerHeight - buttonRect.top + 12);
+            watermark.style.setProperty("--watermark-bottom-current", targetBottom + "px");
+          }
+        }
+
+        updateWatermarkPosition();
+        window.addEventListener("resize", updateWatermarkPosition);
+        window.addEventListener("orientationchange", updateWatermarkPosition);
+        window.setTimeout(updateWatermarkPosition, 150);
+      })();
+    </script>
   </body>
 </html>

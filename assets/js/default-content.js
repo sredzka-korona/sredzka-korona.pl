@@ -63,7 +63,7 @@ window.SREDZKA_DEFAULT_CONTENT = {
       "Restauracja Sredzka Korona laczy elegancje sali, staranna obsluge i kuchnie, ktora dobrze sprawdza sie zarowno podczas codziennych kolacji, jak i okazji specjalnych.",
     orderButtonText: "Rezerwacja stolika",
     ordersInfoText:
-      "Zamówienia indywidualne realizowane są w godzinach 14:00-23:00. Catering zamawiany poprzez kontakt telefoniczny i mailowy.",
+      "Zamówienia indywidualne są tymczasowo wstrzymane. Catering zamawiany poprzez kontakt telefoniczny i mailowy.",
     menuSections: [
       {
         title: "Przystawki",
@@ -233,10 +233,13 @@ window.SREDZKA_DEFAULT_CONTENT = {
     events: false,
     restaurantPauseFrom: "",
     restaurantPauseTo: "",
+    restaurantPauseRanges: [],
     hotelPauseFrom: "",
     hotelPauseTo: "",
+    hotelPauseRanges: [],
     eventsPauseFrom: "",
     eventsPauseTo: "",
+    eventsPauseRanges: [],
   },
   services: [
     {

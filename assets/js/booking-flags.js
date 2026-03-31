@@ -37,7 +37,7 @@
     return `${y}-${mo}-${d}`;
   }
 
-  /** YYYY-MM-DD, oba ustawione, dzisiaj w [from, to] włącznie (czas lokalny przeglądarki). */
+  /** YYYY-MM-DD, oba ustawione, dzisiaj w [from, to] wlacznie (czas lokalny przegladarki). */
   function isInPauseRange(fromStr, toStr) {
     const from = String(fromStr || "").trim();
     const to = String(toStr || "").trim();
@@ -51,11 +51,43 @@
     return today >= from && today <= to;
   }
 
-  function effectiveEnabled(moduleEnabled, pauseFrom, pauseTo) {
+  function normalizePauseRanges(ranges, fallbackFrom, fallbackTo) {
+    const source = Array.isArray(ranges) ? ranges : [];
+    const normalized = source
+      .map((entry) => {
+        let from = String(entry?.from || "").trim().slice(0, 10);
+        let to = String(entry?.to || "").trim().slice(0, 10);
+        if (!from || !to) return null;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return null;
+        if (from > to) {
+          const swap = from;
+          from = to;
+          to = swap;
+        }
+        return { from, to };
+      })
+      .filter(Boolean);
+    if (normalized.length > 0) {
+      return normalized;
+    }
+    const from = String(fallbackFrom || "").trim().slice(0, 10);
+    const to = String(fallbackTo || "").trim().slice(0, 10);
+    if (from && to) {
+      return normalizePauseRanges([{ from, to }]);
+    }
+    return [];
+  }
+
+  function isPausedNow(pauseRanges, pauseFrom, pauseTo) {
+    const ranges = normalizePauseRanges(pauseRanges, pauseFrom, pauseTo);
+    return ranges.some((range) => isInPauseRange(range.from, range.to));
+  }
+
+  function effectiveEnabled(moduleEnabled, pauseRanges, pauseFrom, pauseTo) {
     if (moduleEnabled === false) {
       return false;
     }
-    if (isInPauseRange(pauseFrom, pauseTo)) {
+    if (isPausedNow(pauseRanges, pauseFrom, pauseTo)) {
       return false;
     }
     return true;
@@ -78,9 +110,24 @@
       const payload = await r.json();
       const b = payload.content?.booking || {};
       return {
-        restaurant: effectiveEnabled(b.restaurant !== false, b.restaurantPauseFrom, b.restaurantPauseTo),
-        hotel: effectiveEnabled(b.hotel !== false, b.hotelPauseFrom, b.hotelPauseTo),
-        events: effectiveEnabled(b.events !== false, b.eventsPauseFrom, b.eventsPauseTo),
+        restaurant: effectiveEnabled(
+          b.restaurant !== false,
+          b.restaurantPauseRanges,
+          b.restaurantPauseFrom,
+          b.restaurantPauseTo
+        ),
+        hotel: effectiveEnabled(
+          b.hotel !== false,
+          b.hotelPauseRanges,
+          b.hotelPauseFrom,
+          b.hotelPauseTo
+        ),
+        events: effectiveEnabled(
+          b.events !== false,
+          b.eventsPauseRanges,
+          b.eventsPauseFrom,
+          b.eventsPauseTo
+        ),
       };
     } catch {
       return { ...DEFAULTS };

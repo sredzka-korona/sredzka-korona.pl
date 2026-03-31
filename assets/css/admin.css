@@ -434,6 +434,23 @@ a {
   gap: 0.85rem;
 }
 
+.upload-room-gallery-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.65rem;
+}
+
+.upload-room-gallery-form .field-full {
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+.upload-room-gallery-form .button {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
 .repeater-item,
 .list-item {
   padding: 1rem;
@@ -620,20 +637,6 @@ a {
 
 .menu-editor-section-actions {
   justify-content: flex-end;
-}
-
-.menu-editor-quick-add {
-  display: grid;
-  gap: 0.85rem;
-  padding: 1rem;
-  border: 1px dashed rgba(200, 170, 120, 0.42);
-  border-radius: 18px;
-  background: rgba(249, 246, 239, 0.82);
-}
-
-.menu-editor-quick-add-copy {
-  display: grid;
-  gap: 0.28rem;
 }
 
 .menu-editor-items-head {
@@ -933,6 +936,8 @@ a {
   margin: 0 auto;
   grid-template-columns: repeat(3, minmax(220px, 320px));
   justify-content: center;
+  justify-self: center;
+  width: min(100%, calc(3 * 320px + 2 * 1.15rem));
 }
 
 .admin-entry-tile {
@@ -1194,6 +1199,7 @@ a {
 
   .admin-entry-grid {
     grid-template-columns: repeat(2, minmax(220px, 320px));
+    width: min(100%, calc(2 * 320px + 1 * 1.15rem));
   }
 
   .hotel-filters {
@@ -1208,5 +1214,10 @@ a {
   .hotel-subpanel .button {
     width: 100%;
     justify-self: stretch;
+  }
+
+  .upload-room-gallery-form .button {
+    width: auto;
+    justify-self: auto;
   }
 }

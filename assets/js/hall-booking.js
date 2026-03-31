@@ -630,7 +630,7 @@
           modal.setAttribute("aria-hidden", "false");
           const root = modal.querySelector(".hb-inner");
           if (root) {
-            root.innerHTML = `<div class="hb-success"><p>Rezerwacje online sa wylaczone w tej wersji strony.</p><p>Skontaktuj sie z obiektem telefonicznie lub przez formularz kontaktowy.</p><p><button type="button" class="hb-btn" id="hb-close-paused">Zamknij</button></p></div>`;
+            root.innerHTML = `<div class="hb-success"><p>Rezerwacje online sa obecnie wstrzymane.</p><p>Aby dokonac rezerwacji, prosimy o kontakt telefoniczny lub przez formularz kontaktowy.</p><p><button type="button" class="hb-btn" id="hb-close-paused">Zamknij</button></p></div>`;
             document.getElementById("hb-close-paused")?.addEventListener("click", closeModal);
           }
           return;

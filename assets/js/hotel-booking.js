@@ -468,8 +468,8 @@
     if (!inner) return;
     inner.innerHTML = `
       <div class="booking-session-expired">
-        <p>Rezerwacje online sa wylaczone w tej wersji strony.</p>
-        <p>Skontaktuj sie z obiektem telefonicznie lub przez formularz kontaktowy.</p>
+        <p>Rezerwacje online sa obecnie wstrzymane.</p>
+        <p>Aby dokonac rezerwacji, prosimy o kontakt telefoniczny lub przez formularz kontaktowy.</p>
         <button type="button" class="booking-btn" id="booking-close-paused">Zamknij</button>
       </div>`;
     document.querySelector("#booking-close-paused")?.addEventListener("click", closeModal);

@@ -1349,11 +1349,15 @@
       }
 
       .watermark {
+        --watermark-bottom-base: 16px;
         position: fixed;
-        bottom: 1.75rem;
+        bottom: calc(var(--watermark-bottom-current, var(--watermark-bottom-base)) + env(safe-area-inset-bottom, 0px));
         left: 50%;
         transform: translateX(-50%);
         z-index: 50;
+        max-width: min(92vw, 420px);
+        text-align: center;
+        white-space: nowrap;
         font-size: 0.75rem;
         color: rgba(255, 255, 255, 0.34);
         font-family: "Manrope", sans-serif;
@@ -1378,8 +1382,8 @@
 
       @media (max-width: 780px) {
         .watermark {
+          --watermark-bottom-base: 12px;
           font-size: 0.65rem;
-          bottom: 1.4rem;
           left: 50%;
         }
       }
@@ -1706,7 +1710,7 @@
         let companyEmail = "kontakt@sredzkakorona.pl";
         let restaurantOrderButtonText = "Rezerwacja stolika";
         let restaurantOrdersInfoText =
-          "Zamówienia indywidualne realizowane są w godzinach 14:00-23:00. Catering zamawiany poprzez kontakt telefoniczny i mailowy.";
+          "Zamówienia indywidualne są tymczasowo wstrzymane. Catering zamawiany poprzez kontakt telefoniczny i mailowy.";
 
         function renderMenuItems(items) {
           if (!items || items.length === 0) {
@@ -1877,12 +1881,19 @@
                 <button class="modal-close" id="close-orders" aria-label="Zamknij">×</button>
               </div>
               <div class="opening-hours-list">
-                <div class="opening-hours-row" style="display: block; text-align: left; line-height: 1.7;">
-                  ${escapeHtml(restaurantOrdersInfoText)}<br />
-                  Kontakt telefoniczny:
-                  <a href="tel:${encodeURIComponent(companyPhone)}" style="color: var(--text); font-weight: 700; text-decoration: underline;">${escapeHtml(companyPhone)}</a>.<br />
-                  Kontakt mailowy:
-                  <a href="mailto:${encodeURIComponent(companyEmail)}" style="color: var(--text); font-weight: 700; text-decoration: underline;">${escapeHtml(companyEmail)}</a>.
+                <div
+                  class="opening-hours-row"
+                  style="display: grid; gap: 0.85rem; text-align: left; line-height: 1.7;"
+                >
+                  <p style="margin: 0;">${escapeHtml(restaurantOrdersInfoText)}</p>
+                  <p style="margin: 0;">
+                    Kontakt telefoniczny:
+                    <a href="tel:${encodeURIComponent(companyPhone)}" style="color: var(--text); font-weight: 700; text-decoration: underline;">${escapeHtml(companyPhone)}</a>.
+                  </p>
+                  <p style="margin: 0;">
+                    Kontakt mailowy:
+                    <a href="mailto:${encodeURIComponent(companyEmail)}" style="color: var(--text); font-weight: 700; text-decoration: underline;">${escapeHtml(companyEmail)}</a>.
+                  </p>
                 </div>
               </div>
             </div>
@@ -2043,5 +2054,42 @@
       </svg>
     </a>
     <a class="watermark" href="https://kontakt.strzelca.pl/Igor_Janicki.html">Design &amp; Development by Igor Janicki</a>
+    <script>
+      (() => {
+        const watermark = document.querySelector(".watermark");
+        const contactButton = document.querySelector(".floating-contact-button");
+        if (!watermark || !contactButton) return;
+
+        function updateWatermarkPosition() {
+          const styles = window.getComputedStyle(watermark);
+          const baseBottom = Number.parseFloat(styles.getPropertyValue("--watermark-bottom-base")) || 16;
+          let targetBottom = baseBottom;
+          watermark.style.setProperty("--watermark-bottom-current", targetBottom + "px");
+
+          const buttonStyles = window.getComputedStyle(contactButton);
+          if (buttonStyles.display === "none" || buttonStyles.visibility === "hidden") {
+            return;
+          }
+
+          const watermarkRect = watermark.getBoundingClientRect();
+          const buttonRect = contactButton.getBoundingClientRect();
+          const intersects =
+            watermarkRect.left < buttonRect.right &&
+            watermarkRect.right > buttonRect.left &&
+            watermarkRect.top < buttonRect.bottom &&
+            watermarkRect.bottom > buttonRect.top;
+
+          if (intersects) {
+            targetBottom = Math.max(baseBottom, window.innerHeight - buttonRect.top + 12);
+            watermark.style.setProperty("--watermark-bottom-current", targetBottom + "px");
+          }
+        }
+
+        updateWatermarkPosition();
+        window.addEventListener("resize", updateWatermarkPosition);
+        window.addEventListener("orientationchange", updateWatermarkPosition);
+        window.setTimeout(updateWatermarkPosition, 150);
+      })();
+    </script>
   </body>
 </html>

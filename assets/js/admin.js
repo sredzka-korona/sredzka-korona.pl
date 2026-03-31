@@ -196,6 +196,78 @@
     });
   }
 
+  function normalizePauseRanges(value, fallbackFrom = "", fallbackTo = "") {
+    const source = Array.isArray(value) ? value : [];
+    const ranges = source
+      .map((entry) => {
+        let from = String(entry?.from || "").trim().slice(0, 10);
+        let to = String(entry?.to || "").trim().slice(0, 10);
+        if (!from || !to) return null;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return null;
+        if (from > to) {
+          const swap = from;
+          from = to;
+          to = swap;
+        }
+        return { from, to };
+      })
+      .filter(Boolean);
+
+    if (ranges.length > 0) {
+      ranges.sort((a, b) => (a.from === b.from ? a.to.localeCompare(b.to) : a.from.localeCompare(b.from)));
+      return ranges;
+    }
+
+    const fallback = normalizePauseRanges([{ from: fallbackFrom, to: fallbackTo }]);
+    return fallback;
+  }
+
+  function renderPauseRangesEditorMarkup(domainKey, ranges, { disabled = false, label = "Przerwy" } = {}) {
+    const normalized = normalizePauseRanges(ranges);
+    const rows = (normalized.length ? normalized : [{ from: "", to: "" }])
+      .map(
+        (entry, index) => `
+          <div class="field-grid" data-booking-pause-row="${escapeAttribute(domainKey)}">
+            <label class="field"><span>${index === 0 ? escapeHtml(label + " — od") : "Od"}</span><input type="date" data-booking-pause-domain="${escapeAttribute(
+              domainKey
+            )}" data-booking-pause-role="from" value="${escapeAttribute(entry.from)}" ${disabled ? "disabled" : ""} /></label>
+            <label class="field"><span>Do</span><input type="date" data-booking-pause-domain="${escapeAttribute(
+              domainKey
+            )}" data-booking-pause-role="to" value="${escapeAttribute(entry.to)}" ${disabled ? "disabled" : ""} /></label>
+            <div class="field" style="display:flex; align-items:flex-end; gap:0.45rem;">
+              <button class="button secondary" type="button" data-add-booking-pause-range="${escapeAttribute(
+                domainKey
+              )}" ${disabled ? "disabled" : ""}>+ Zakres</button>
+              <button class="button danger" type="button" data-remove-booking-pause-row ${disabled ? "disabled" : ""}>Usun</button>
+            </div>
+          </div>
+        `
+      )
+      .join("");
+    return `<div data-booking-pause-list="${escapeAttribute(domainKey)}">${rows}</div>`;
+  }
+
+  function createPauseRangeRowElement(domainKey, disabled = false) {
+    const row = document.createElement("div");
+    row.className = "field-grid";
+    row.dataset.bookingPauseRow = domainKey;
+    row.innerHTML = `
+      <label class="field"><span>Od</span><input type="date" data-booking-pause-domain="${escapeAttribute(
+        domainKey
+      )}" data-booking-pause-role="from" ${disabled ? "disabled" : ""} /></label>
+      <label class="field"><span>Do</span><input type="date" data-booking-pause-domain="${escapeAttribute(
+        domainKey
+      )}" data-booking-pause-role="to" ${disabled ? "disabled" : ""} /></label>
+      <div class="field" style="display:flex; align-items:flex-end; gap:0.45rem;">
+        <button class="button secondary" type="button" data-add-booking-pause-range="${escapeAttribute(
+          domainKey
+        )}" ${disabled ? "disabled" : ""}>+ Zakres</button>
+        <button class="button danger" type="button" data-remove-booking-pause-row ${disabled ? "disabled" : ""}>Usun</button>
+      </div>
+    `;
+    return row;
+  }
+
   function normalizeAdminContent(rawContent) {
     const content = structuredClone(rawContent || {});
 
@@ -244,6 +316,28 @@
     }
     content.events.halls = normalizeEventHalls(content.events.halls);
     content.events.hallGalleries = normalizeEventHallGalleries(content.events.hallGalleries);
+    if (!content.hotel) {
+      content.hotel = {};
+    }
+    content.hotel.roomGalleries = normalizeHotelRoomGalleries(content.hotel.roomGalleries);
+    if (!content.booking || typeof content.booking !== "object") {
+      content.booking = {};
+    }
+    content.booking.restaurantPauseRanges = normalizePauseRanges(
+      content.booking.restaurantPauseRanges,
+      content.booking.restaurantPauseFrom,
+      content.booking.restaurantPauseTo
+    );
+    content.booking.hotelPauseRanges = normalizePauseRanges(
+      content.booking.hotelPauseRanges,
+      content.booking.hotelPauseFrom,
+      content.booking.hotelPauseTo
+    );
+    content.booking.eventsPauseRanges = normalizePauseRanges(
+      content.booking.eventsPauseRanges,
+      content.booking.eventsPauseFrom,
+      content.booking.eventsPauseTo
+    );
 
     return content;
   }
@@ -277,6 +371,16 @@
     return {
       "1": Array.isArray(source["1"]) ? source["1"] : [],
       "2": Array.isArray(source["2"]) ? source["2"] : [],
+    };
+  }
+
+  function normalizeHotelRoomGalleries(roomGalleries) {
+    const source = roomGalleries && typeof roomGalleries === "object" ? roomGalleries : {};
+    return {
+      "1-osobowe": Array.isArray(source["1-osobowe"]) ? source["1-osobowe"] : [],
+      "2-osobowe": Array.isArray(source["2-osobowe"]) ? source["2-osobowe"] : [],
+      "3-osobowe": Array.isArray(source["3-osobowe"]) ? source["3-osobowe"] : [],
+      "4-osobowe": Array.isArray(source["4-osobowe"]) ? source["4-osobowe"] : [],
     };
   }
 
@@ -915,6 +1019,7 @@
     if (!confirmLeaveIfUnsaved()) {
       return;
     }
+    dismissMenuEditorModal({ skipRender: true, closeEntirely: true });
     captureDraftIfPossible();
     state.ui.view = "section";
     state.ui.topTab = tabKey;
@@ -926,6 +1031,7 @@
     if (!confirmLeaveIfUnsaved()) {
       return;
     }
+    dismissMenuEditorModal({ skipRender: true, closeEntirely: true });
     captureDraftIfPossible();
     state.ui.view = "section";
     state.ui.topTab = tabKey;
@@ -937,6 +1043,7 @@
     if (!confirmLeaveIfUnsaved()) {
       return;
     }
+    dismissMenuEditorModal({ skipRender: true, closeEntirely: true });
     captureDraftIfPossible();
     state.ui.view = "home";
     renderDashboard();
@@ -1185,6 +1292,7 @@
               </div>
               <div class="grid admin-stage">
                 ${renderAdminStageMarkup(activeTab.key, activeTile)}
+                <div id="admin-modal-root" class="admin-modal-root col-12"></div>
               </div>
               <div class="admin-save-dock" id="admin-save-dock">
                 <p class="helper">Masz niezapisane zmiany w tej sekcji.</p>
@@ -1224,6 +1332,7 @@
     bindAdminNavigation();
     if (inSectionView) {
       renderActiveAdminTile();
+      renderMenuEditorModal();
       bindUnsavedTracking();
       refreshSaveDockVisibility();
     }
@@ -1310,15 +1419,7 @@
                 <span>Wlacza formularz zapytania o sale i rezerwacje.</span>
               </span>
             </label>
-            <p class="helper" style="margin: 0.75rem 0 0.35rem;">Tymczasowe wstrzymanie rezerwacji (dni wlacznie; puste pola = brak przerwy)</p>
-            <div class="field-grid">
-              <label class="field"><span>Restauracja — od</span><input type="date" id="booking-restaurant-pause-from" value="${escapeAttribute(content.booking?.restaurantPauseFrom || "")}" ${onlineBookingsEnabled ? "" : "disabled"} /></label>
-              <label class="field"><span>do</span><input type="date" id="booking-restaurant-pause-to" value="${escapeAttribute(content.booking?.restaurantPauseTo || "")}" ${onlineBookingsEnabled ? "" : "disabled"} /></label>
-              <label class="field"><span>Hotel — od</span><input type="date" id="booking-hotel-pause-from" value="${escapeAttribute(content.booking?.hotelPauseFrom || "")}" ${onlineBookingsEnabled ? "" : "disabled"} /></label>
-              <label class="field"><span>do</span><input type="date" id="booking-hotel-pause-to" value="${escapeAttribute(content.booking?.hotelPauseTo || "")}" ${onlineBookingsEnabled ? "" : "disabled"} /></label>
-              <label class="field"><span>Przyjecia / sale — od</span><input type="date" id="booking-events-pause-from" value="${escapeAttribute(content.booking?.eventsPauseFrom || "")}" ${onlineBookingsEnabled ? "" : "disabled"} /></label>
-              <label class="field"><span>do</span><input type="date" id="booking-events-pause-to" value="${escapeAttribute(content.booking?.eventsPauseTo || "")}" ${onlineBookingsEnabled ? "" : "disabled"} /></label>
-            </div>
+            <p class="helper" style="margin: 0.75rem 0 0.35rem;">Okresy przerw ustawisz nizej, osobno w panelach: Hotel / Restauracja / Przyjecia.</p>
           </div>
           <div class="panel-note">
             <strong>Uwaga:</strong> czesc pol tresci nizej pochodzi ze starszej wersji panelu. Aktualny front korzysta glownie z blokad sekcji, rezerwacji online, godzin otwarcia, menu, galerii, dokumentow, kalendarza i modala „Oferta”.
@@ -1545,6 +1646,31 @@
     document.querySelectorAll("[data-remove-array]").forEach((button) => {
       button.addEventListener("click", () => removeArrayItem(button.dataset.removeArray, Number(button.dataset.index)));
     });
+    document.querySelectorAll("[data-add-booking-pause-range]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const domainKey = String(button.dataset.addBookingPauseRange || "").trim();
+        if (!domainKey) return;
+        const list = document.querySelector(`[data-booking-pause-list="${domainKey}"]`);
+        if (!list) return;
+        list.appendChild(createPauseRangeRowElement(domainKey, button.disabled));
+      });
+    });
+    document.querySelectorAll("[data-remove-booking-pause-row]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const row = button.closest("[data-booking-pause-row]");
+        if (!row) return;
+        const list = row.parentElement;
+        if (!list) return;
+        const allRows = list.querySelectorAll("[data-booking-pause-row]");
+        if (allRows.length <= 1) {
+          row.querySelectorAll('input[type="date"]').forEach((input) => {
+            input.value = "";
+          });
+          return;
+        }
+        row.remove();
+      });
+    });
   }
 
   function addArrayItem(type) {
@@ -1658,25 +1784,36 @@
       content.booking.events = false;
     }
 
-    function normalizePausePair(fromId, toId) {
-      let f = document.querySelector(fromId)?.value?.trim() || "";
-      let t = document.querySelector(toId)?.value?.trim() || "";
-      if (f && t && f > t) {
-        const x = f;
-        f = t;
-        t = x;
-      }
-      return { from: f, to: t };
+    function collectPauseRanges(domainKey) {
+      const rows = Array.from(
+        document.querySelectorAll(`[data-booking-pause-row="${domainKey}"]`)
+      );
+      return normalizePauseRanges(
+        rows.map((row) => ({
+          from:
+            row.querySelector('[data-booking-pause-role="from"]')?.value?.trim() ||
+            "",
+          to:
+            row.querySelector('[data-booking-pause-role="to"]')?.value?.trim() ||
+            "",
+        }))
+      );
     }
-    const pr = normalizePausePair("#booking-restaurant-pause-from", "#booking-restaurant-pause-to");
-    const ph = normalizePausePair("#booking-hotel-pause-from", "#booking-hotel-pause-to");
-    const pe = normalizePausePair("#booking-events-pause-from", "#booking-events-pause-to");
-    content.booking.restaurantPauseFrom = onlineBookingsEnabled ? pr.from : "";
-    content.booking.restaurantPauseTo = onlineBookingsEnabled ? pr.to : "";
-    content.booking.hotelPauseFrom = onlineBookingsEnabled ? ph.from : "";
-    content.booking.hotelPauseTo = onlineBookingsEnabled ? ph.to : "";
-    content.booking.eventsPauseFrom = onlineBookingsEnabled ? pe.from : "";
-    content.booking.eventsPauseTo = onlineBookingsEnabled ? pe.to : "";
+    const restaurantRanges = onlineBookingsEnabled ? collectPauseRanges("restaurant") : [];
+    const hotelRanges = onlineBookingsEnabled ? collectPauseRanges("hotel") : [];
+    const eventsRanges = onlineBookingsEnabled ? collectPauseRanges("events") : [];
+    content.booking.restaurantPauseRanges = restaurantRanges;
+    content.booking.hotelPauseRanges = hotelRanges;
+    content.booking.eventsPauseRanges = eventsRanges;
+    const firstRestaurantRange = restaurantRanges[0] || { from: "", to: "" };
+    const firstHotelRange = hotelRanges[0] || { from: "", to: "" };
+    const firstEventsRange = eventsRanges[0] || { from: "", to: "" };
+    content.booking.restaurantPauseFrom = firstRestaurantRange.from;
+    content.booking.restaurantPauseTo = firstRestaurantRange.to;
+    content.booking.hotelPauseFrom = firstHotelRange.from;
+    content.booking.hotelPauseTo = firstHotelRange.to;
+    content.booking.eventsPauseFrom = firstEventsRange.from;
+    content.booking.eventsPauseTo = firstEventsRange.to;
 
     if (document.querySelector("[data-staff-index]")) {
       content.home.staff = Array.from(document.querySelectorAll("[data-staff-index]"))
@@ -1839,6 +1976,10 @@
         }
         content.restaurant.gallery = state.content.restaurant.gallery;
       }
+      if (content.hotel) {
+        // Zdjecia pokoi sa przechowywane osobno w DB, nie w content_json.
+        delete content.hotel.roomGalleries;
+      }
       const payload = { content };
       const data = await api("/api/admin/content", {
         method: "PUT",
@@ -1865,11 +2006,8 @@
       enabledId,
       enabledLabel,
       enabledHelp,
-      fromId,
-      toId,
-      fromKey,
-      toKey,
-      fromLabel,
+      pauseRangesKey,
+      pauseLabel,
       statusMessage = "",
       disabled = false,
     } = options;
@@ -1891,10 +2029,11 @@
             <span>${escapeHtml(enabledHelp)}</span>
           </span>
         </label>
-        <div class="field-grid">
-          <label class="field"><span>${escapeHtml(fromLabel)}</span><input type="date" id="${escapeAttribute(fromId)}" value="${escapeAttribute(booking[fromKey] || "")}" ${disabled ? "disabled" : ""} /></label>
-          <label class="field"><span>Do</span><input type="date" id="${escapeAttribute(toId)}" value="${escapeAttribute(booking[toKey] || "")}" ${disabled ? "disabled" : ""} /></label>
-        </div>
+        <p class="helper" style="margin: 0;">Mozesz dodac wiele okresow przerwy. Dni graniczne sa liczone wlacznie.</p>
+        ${renderPauseRangesEditorMarkup(domainKey, booking[pauseRangesKey], {
+          disabled,
+          label: pauseLabel || "Przerwa",
+        })}
         <p class="status">${escapeHtml(statusMessage)}</p>
       </div>
     `;
@@ -1907,11 +2046,8 @@
       enabledId: "booking-enable-hotel",
       enabledLabel: "Hotel - rezerwacja pokoi wlaczona",
       enabledHelp: "Wylacza lub wlacza formularz rezerwacji na stronie hotelu.",
-      fromId: "booking-hotel-pause-from",
-      toId: "booking-hotel-pause-to",
-      fromKey: "hotelPauseFrom",
-      toKey: "hotelPauseTo",
-      fromLabel: "Przerwa od",
+      pauseRangesKey: "hotelPauseRanges",
+      pauseLabel: "Hotel",
       statusMessage,
       disabled: !onlineBookingsEnabled,
     });
@@ -1924,11 +2060,8 @@
       enabledId: "booking-enable-restaurant",
       enabledLabel: "Restauracja - rezerwacja stolika wlaczona",
       enabledHelp: "Wylacza lub wlacza formularz rezerwacji na stronie restauracji.",
-      fromId: "booking-restaurant-pause-from",
-      toId: "booking-restaurant-pause-to",
-      fromKey: "restaurantPauseFrom",
-      toKey: "restaurantPauseTo",
-      fromLabel: "Przerwa od",
+      pauseRangesKey: "restaurantPauseRanges",
+      pauseLabel: "Restauracja",
       statusMessage,
       disabled: !onlineBookingsEnabled,
     });
@@ -1941,11 +2074,8 @@
       enabledId: "booking-enable-events",
       enabledLabel: "Przyjecia / sale - rezerwacja wlaczona",
       enabledHelp: "Wylacza lub wlacza formularz zapytania o sale.",
-      fromId: "booking-events-pause-from",
-      toId: "booking-events-pause-to",
-      fromKey: "eventsPauseFrom",
-      toKey: "eventsPauseTo",
-      fromLabel: "Przerwa od",
+      pauseRangesKey: "eventsPauseRanges",
+      pauseLabel: "Przyjecia / sale",
       statusMessage,
       disabled: !onlineBookingsEnabled,
     });
@@ -2279,10 +2409,6 @@
         intro:
           "Uproszczony edytor menu: kategorie rozwijane, pozycje w tabeli i szybkie dodawanie przez wklejenie wielu linii naraz.",
         includePrice: true,
-        quickAddHint:
-          "Format linii: Nazwa | Cena | Opis | skladnik 1, skladnik 2 | Podkategoria",
-        quickAddPlaceholder:
-          "Rosol domowy | 19 zl | Bulion z makaronem | makaron, natka pietruszki | Zupy",
         emptyState:
           "Nie ma jeszcze zadnej kategorii. Zacznij od dodania pierwszej kategorii albo wklej pozycje po jej utworzeniu.",
         itemEmptyText: "Ta kategoria nie ma jeszcze pozycji.",
@@ -2297,10 +2423,6 @@
       intro:
         "Edytor dla menu okolicznosciowego bez cen: sekcje sa rozwijane, a pozycje wygodnie edytujesz w jednym miejscu.",
       includePrice: false,
-      quickAddHint:
-        "Format linii: Nazwa | Opis | skladnik 1, skladnik 2 | Podkategoria",
-      quickAddPlaceholder:
-        "Pieczony schab w ziolach | Serwowany z sosem pieczeniowym | schab, rozmaryn, demi-glace | Dania glowne",
       emptyState:
         "Nie ma jeszcze zadnej kategorii. Dodaj sekcje i uzupelnij pozycje albo skorzystaj z szybkiego wklejania.",
       itemEmptyText: "Ta kategoria nie ma jeszcze pozycji.",
@@ -2386,44 +2508,6 @@
     return String(value || "")
       .split(/\r?\n|,|;/)
       .map((item) => item.trim())
-      .filter(Boolean);
-  }
-
-  function parseQuickAddMenuItems(text, kind) {
-    const includePrice = getMenuEditorConfig(kind).includePrice;
-    return String(text || "")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const parts = line.split("|").map((part) => part.trim());
-        if (includePrice) {
-          const [name = "", price = "", description = "", ingredientsText = "", subcategory = ""] = parts;
-          if (!name) return null;
-          const item = createMenuEditorItem(kind, {
-            name,
-            price,
-            description,
-            ingredients: parseMenuEditorIngredients(ingredientsText),
-          });
-          if (subcategory) {
-            item.subcategory = subcategory;
-          }
-          return item;
-        }
-
-        const [name = "", description = "", ingredientsText = "", subcategory = ""] = parts;
-        if (!name) return null;
-        const item = createMenuEditorItem(kind, {
-          name,
-          description,
-          ingredients: parseMenuEditorIngredients(ingredientsText),
-        });
-        if (subcategory) {
-          item.subcategory = subcategory;
-        }
-        return item;
-      })
       .filter(Boolean);
   }
 
@@ -2525,27 +2609,11 @@
                 </label>
               </div>
 
-              <div class="menu-editor-quick-add">
-                <div class="menu-editor-quick-add-copy">
-                  <strong>Szybkie dodawanie pozycji</strong>
-                  <p class="helper">${escapeHtml(config.quickAddHint)}</p>
-                  <p class="helper">Kolejnosc podkategorii na stronie wynika z pierwszego wystapienia pozycji z dana nazwa podkategorii.</p>
-                </div>
-                <label class="field-full">
-                  <span>Wklej wiele pozycji naraz</span>
-                  <textarea
-                    rows="4"
-                    data-menu-quick-add="${sectionIndex}"
-                    placeholder="${escapeAttribute(config.quickAddPlaceholder)}"
-                  ></textarea>
-                </label>
-                <button class="button secondary" type="button" data-apply-menu-quick-add="${sectionIndex}">Dodaj linie do kategorii</button>
-              </div>
-
               <div class="repeater-head menu-editor-items-head">
                 <strong>Pozycje w kategorii</strong>
                 <button class="button secondary" type="button" data-add-menu-item="${sectionIndex}">Dodaj pozycje</button>
               </div>
+              <p class="helper">Kolejnosc podkategorii na stronie wynika z pierwszego wystapienia pozycji z dana nazwa podkategorii.</p>
 
               <div class="table-scroll menu-editor-table-scroll">
                 <table class="hotel-table menu-editor-table">
@@ -2633,9 +2701,6 @@
     target.querySelectorAll("[data-move-menu-section-down]").forEach((button) => {
       button.addEventListener("click", () => moveMenuEditorSection(kind, Number(button.dataset.moveMenuSectionDown), 1));
     });
-    target.querySelectorAll("[data-apply-menu-quick-add]").forEach((button) => {
-      button.addEventListener("click", () => applyQuickAddToMenuSection(kind, Number(button.dataset.applyMenuQuickAdd)));
-    });
   }
 
   function setMenuEditorSectionsOpen(kind, isOpen) {
@@ -2710,25 +2775,6 @@
     if (newIndex < 0 || newIndex >= section.items.length) return;
     [section.items[itemIndex], section.items[newIndex]] = [section.items[newIndex], section.items[itemIndex]];
     renderMenuEditorPanel(kind);
-  }
-
-  function applyQuickAddToMenuSection(kind, sectionIndex) {
-    captureDraftIfPossible();
-    rememberMenuEditorOpenSections(kind);
-    const root = getMenuEditorRoot(kind);
-    const textarea = root?.querySelector(`[data-menu-quick-add="${sectionIndex}"]`);
-    const items = parseQuickAddMenuItems(textarea?.value || "", kind);
-    if (!items.length) {
-      renderMenuEditorPanel(kind, "Nie znaleziono poprawnych linii do dodania.");
-      return;
-    }
-    const section = getMenuSectionsByKind(kind)[sectionIndex];
-    if (!section) return;
-    if (!Array.isArray(section.items)) {
-      section.items = [];
-    }
-    section.items.push(...items);
-    renderMenuEditorPanel(kind, `Dodano ${items.length} pozycji do kategorii.`);
   }
 
   function collectMenuEditorFromPanel(kind) {
@@ -2935,7 +2981,7 @@
               <div class="col-12">
                 <div class="repeater-item">
                   <h3>${escapeHtml(roomType.label)}</h3>
-                  <form class="stack" data-upload-room-gallery="${escapeAttribute(roomType.key)}">
+                  <form class="stack upload-room-gallery-form" data-upload-room-gallery="${escapeAttribute(roomType.key)}">
                     <label class="field-full">
                       <span>Dodaj zdjecia</span>
                       <input type="file" name="images" accept="image/*" multiple />
@@ -2985,6 +3031,13 @@
     });
   }
 
+  function setHotelRoomGalleries(roomGalleries) {
+    if (!state.content.hotel) {
+      state.content.hotel = {};
+    }
+    state.content.hotel.roomGalleries = normalizeHotelRoomGalleries(roomGalleries);
+  }
+
   async function uploadRoomGalleryImages(event, roomType) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -2992,44 +3045,52 @@
     const files = formData.getAll("images");
 
     if (files.length === 0 || !files[0].size) {
-      renderHotelRoomGalleriesPanel("Wybierz pliki do wgrania.");
+      const fileInput = form.querySelector('input[name="images"]');
+      if (fileInput) {
+        fileInput.click();
+      } else {
+        renderHotelRoomGalleriesPanel("Wybierz pliki do wgrania.");
+      }
       return;
     }
 
     try {
-      const images = await filesToInlineGalleryImages(files, INLINE_IMAGE_MAX_BYTES, roomType);
-
-      if (!state.content.hotel) {
-        state.content.hotel = {};
+      const payload = new FormData();
+      files.forEach((file) => {
+        if (file instanceof File && file.size) {
+          payload.append("images", file);
+        }
+      });
+      if (!payload.getAll("images").length) {
+        renderHotelRoomGalleriesPanel("Wybierz pliki do wgrania.");
+        return;
       }
-      if (!state.content.hotel.roomGalleries) {
-        state.content.hotel.roomGalleries = {
-          "1-osobowe": [],
-          "2-osobowe": [],
-          "3-osobowe": [],
-          "4-osobowe": [],
-        };
-      }
-
-      if (!state.content.hotel.roomGalleries[roomType]) {
-        state.content.hotel.roomGalleries[roomType] = [];
-      }
-
-      state.content.hotel.roomGalleries[roomType].push(...images);
-      await saveContent();
-      await loadDashboard("Zdjecia zostaly dodane.");
+      const response = await api(`/api/admin/hotel/room-galleries/${encodeURIComponent(roomType)}/images`, {
+        method: "POST",
+        body: payload,
+      });
+      setHotelRoomGalleries(response?.roomGalleries);
+      renderHotelRoomGalleriesPanel("Zdjecia zostaly dodane.");
     } catch (error) {
       renderHotelRoomGalleriesPanel(error.message || "Blad podczas wgrywania zdjec.");
     }
   }
 
   async function removeRoomImage(roomType, index) {
-    if (!state.content.hotel?.roomGalleries?.[roomType]) {
+    const image = state.content.hotel?.roomGalleries?.[roomType]?.[index];
+    const imageId = Number(image?.id);
+    if (!Number.isInteger(imageId) || imageId <= 0) {
       return;
     }
-    state.content.hotel.roomGalleries[roomType].splice(index, 1);
-    await saveContent();
-    await loadDashboard("Zdjecie zostalo usuniete.");
+    try {
+      const response = await api(`/api/admin/hotel/room-images/${imageId}`, {
+        method: "DELETE",
+      });
+      setHotelRoomGalleries(response?.roomGalleries);
+      renderHotelRoomGalleriesPanel("Zdjecie zostalo usuniete.");
+    } catch (error) {
+      renderHotelRoomGalleriesPanel(error.message || "Nie udalo sie usunac zdjecia.");
+    }
   }
 
   async function moveRoomImage(roomType, index, direction) {
@@ -3041,9 +3102,26 @@
     if (newIndex < 0 || newIndex >= images.length) {
       return;
     }
-    [images[index], images[newIndex]] = [images[newIndex], images[index]];
-    await saveContent();
-    await loadDashboard("Kolejnosc zdjec zostala zmieniona.");
+    const reordered = [...images];
+    [reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]];
+    const imageIds = reordered
+      .map((entry) => Number(entry?.id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+    if (imageIds.length !== reordered.length) {
+      renderHotelRoomGalleriesPanel("Nie udalo sie zmienic kolejnosci. Odswiez panel.");
+      return;
+    }
+    try {
+      const response = await api(`/api/admin/hotel/room-galleries/${encodeURIComponent(roomType)}/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageIds }),
+      });
+      setHotelRoomGalleries(response?.roomGalleries);
+      renderHotelRoomGalleriesPanel("Kolejnosc zdjec zostala zmieniona.");
+    } catch (error) {
+      renderHotelRoomGalleriesPanel(error.message || "Nie udalo sie zmienic kolejnosci zdjec.");
+    }
   }
 
   function renderEventsHallGalleriesPanel(statusMessage = "") {
@@ -3295,10 +3373,14 @@
   async function saveDocumentsMenu() {
     try {
       state.content.documentsMenu = collectDocumentsMenuFromPanel();
+      const payloadContent = structuredClone(state.content);
+      if (payloadContent.hotel) {
+        delete payloadContent.hotel.roomGalleries;
+      }
       const data = await api("/api/admin/content", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: state.content }),
+        body: JSON.stringify({ content: payloadContent }),
       });
       const normalizedContent = normalizeAdminContent(data.content);
       state.content = normalizedContent;

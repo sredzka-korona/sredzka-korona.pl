@@ -98,7 +98,7 @@ Limity praktyczne w tej wersji:
 SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;
 ```
 
-12. Jesli widzisz tabele `site_content`, `contact_submissions`, `calendar_blocks`, `gallery_albums`, `gallery_images`, `documents`, to jest OK.
+12. Jesli widzisz tabele `site_content`, `contact_submissions`, `calendar_blocks`, `gallery_albums`, `gallery_images`, `hotel_room_images`, `documents`, to jest OK.
 13. Wejdz do `Turnstile`.
 14. Kliknij `Add site`.
 15. Dodaj domene strony.

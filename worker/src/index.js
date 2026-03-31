@@ -38,6 +38,11 @@ export default {
         return streamDocument(documentId, download, env, request);
       }
 
+      if (url.pathname.startsWith("/api/public/hotel-room-images/") && request.method === "GET") {
+        const imageId = url.pathname.split("/").pop();
+        return streamHotelRoomImage(imageId, env, request);
+      }
+
       if (url.pathname === "/api/admin/session" && request.method === "GET") {
         await requireFirebaseAdmin(request, env);
         return jsonResponse({ ok: true }, 200, request, env);
@@ -45,7 +50,7 @@ export default {
 
       if (url.pathname === "/api/admin/dashboard" && request.method === "GET") {
         await requireFirebaseAdmin(request, env);
-        const content = await getContent(env);
+        const content = await getContent(env, url);
         const documents = await listDocuments(env, url);
         const galleryAlbums = await listGalleryAlbums(env, url);
         const calendar = await getCalendarBlocks(env, null, url);
@@ -79,7 +84,7 @@ export default {
         const payload = await request.json();
         const content = sanitizeContent(payload.content || DEFAULT_CONTENT);
         await saveContent(env, content);
-        return jsonResponse({ content }, 200, request, env);
+        return jsonResponse({ content: await getContent(env, url) }, 200, request, env);
       }
 
       if (url.pathname === "/api/admin/gallery/albums" && request.method === "POST") {
@@ -131,6 +136,39 @@ export default {
         return jsonResponse({ ok: true }, 201, request, env);
       }
 
+      if (url.pathname === "/api/admin/hotel/room-galleries" && request.method === "GET") {
+        await requireFirebaseAdmin(request, env);
+        return jsonResponse({ roomGalleries: await listHotelRoomGalleries(env, url) }, 200, request, env);
+      }
+
+      if (
+        url.pathname.match(/^\/api\/admin\/hotel\/room-galleries\/[^/]+\/images$/) &&
+        request.method === "POST"
+      ) {
+        await requireFirebaseAdmin(request, env);
+        const roomType = decodeURIComponent(url.pathname.split("/")[5]);
+        await uploadHotelRoomImages(roomType, request, env);
+        return jsonResponse({ roomGalleries: await listHotelRoomGalleries(env, url) }, 201, request, env);
+      }
+
+      if (url.pathname.match(/^\/api\/admin\/hotel\/room-images\/\d+$/) && request.method === "DELETE") {
+        await requireFirebaseAdmin(request, env);
+        const imageId = Number(url.pathname.split("/")[5]);
+        await deleteHotelRoomImage(imageId, env);
+        return jsonResponse({ roomGalleries: await listHotelRoomGalleries(env, url) }, 200, request, env);
+      }
+
+      if (
+        url.pathname.match(/^\/api\/admin\/hotel\/room-galleries\/[^/]+\/reorder$/) &&
+        request.method === "POST"
+      ) {
+        await requireFirebaseAdmin(request, env);
+        const roomType = decodeURIComponent(url.pathname.split("/")[5]);
+        const payload = await request.json();
+        await reorderHotelRoomImages(roomType, payload.imageIds, env);
+        return jsonResponse({ roomGalleries: await listHotelRoomGalleries(env, url) }, 200, request, env);
+      }
+
       if (url.pathname.match(/^\/api\/admin\/documents\/\d+$/) && request.method === "DELETE") {
         await requireFirebaseAdmin(request, env);
         const documentId = Number(url.pathname.split("/")[4]);
@@ -173,7 +211,7 @@ export default {
 };
 
 async function getPublicBootstrap(env, url) {
-  const content = await getContent(env);
+  const content = await getContent(env, url);
   return {
     content,
     documents: await listDocuments(env, url),
@@ -184,23 +222,38 @@ async function getPublicBootstrap(env, url) {
   };
 }
 
-async function getContent(env) {
+async function getContent(env, url = null) {
   const record = await env.DB.prepare(
     "SELECT content_json FROM site_content WHERE id = 1"
   ).first();
   if (!record) {
     await saveContent(env, DEFAULT_CONTENT);
-    return structuredClone(DEFAULT_CONTENT);
+    const fallback = structuredClone(DEFAULT_CONTENT);
+    return url ? withHotelRoomGalleries(fallback, await listHotelRoomGalleries(env, url)) : fallback;
   }
-  return sanitizeContent(JSON.parse(record.content_json));
+  const content = sanitizeContent(JSON.parse(record.content_json));
+  if (!url) {
+    return content;
+  }
+  return withHotelRoomGalleries(content, await listHotelRoomGalleries(env, url));
 }
 
 async function saveContent(env, content) {
-  await env.DB.prepare(
-    "INSERT INTO site_content (id, content_json, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET content_json = excluded.content_json, updated_at = excluded.updated_at"
-  )
-    .bind(JSON.stringify(content), nowIso())
-    .run();
+  try {
+    await env.DB.prepare(
+      "INSERT INTO site_content (id, content_json, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET content_json = excluded.content_json, updated_at = excluded.updated_at"
+    )
+      .bind(JSON.stringify(content), nowIso())
+      .run();
+  } catch (error) {
+    const message = String(error?.message || "");
+    if (/SQLITE_TOOBIG|string or blob too big|too big/i.test(message)) {
+      throw badRequest(
+        "Nie udalo sie zapisac tresci, bo laczny rozmiar danych jest zbyt duzy. Zmniejsz liczbe lub rozmiar zdjec i sprobuj ponownie."
+      );
+    }
+    throw error;
+  }
 }
 
 async function listDocuments(env, url) {
@@ -249,6 +302,52 @@ async function listGalleryAlbums(env, url) {
       images,
     };
   });
+}
+
+function normalizeHotelRoomType(roomType) {
+  const normalized = String(roomType || "").trim();
+  const allowed = new Set(["1-osobowe", "2-osobowe", "3-osobowe", "4-osobowe"]);
+  if (!allowed.has(normalized)) {
+    throw badRequest("Nieprawidlowy typ pokoju.");
+  }
+  return normalized;
+}
+
+function emptyHotelRoomGalleries() {
+  return {
+    "1-osobowe": [],
+    "2-osobowe": [],
+    "3-osobowe": [],
+    "4-osobowe": [],
+  };
+}
+
+function withHotelRoomGalleries(content, roomGalleries) {
+  return {
+    ...content,
+    hotel: {
+      ...(content.hotel || {}),
+      roomGalleries,
+    },
+  };
+}
+
+async function listHotelRoomGalleries(env, url) {
+  const result = await env.DB.prepare(
+    "SELECT id, room_type AS roomType, alt_text AS altText FROM hotel_room_images ORDER BY room_type ASC, sort_order ASC, id ASC"
+  ).all();
+  const galleries = emptyHotelRoomGalleries();
+  for (const item of result.results || []) {
+    if (!galleries[item.roomType]) {
+      galleries[item.roomType] = [];
+    }
+    galleries[item.roomType].push({
+      id: item.id,
+      url: absoluteUrl(url, `/api/public/hotel-room-images/${item.id}`),
+      alt: item.altText || "",
+    });
+  }
+  return galleries;
 }
 
 async function getCalendarBlocks(env, from, url) {
@@ -420,6 +519,101 @@ async function deleteGalleryImage(imageId, env) {
     .run();
 }
 
+async function uploadHotelRoomImages(roomType, request, env) {
+  const normalizedRoomType = normalizeHotelRoomType(roomType);
+  const formData = await request.formData();
+  const files = formData.getAll("images").filter((entry) => entry instanceof File);
+  if (!files.length) {
+    throw badRequest("Wybierz co najmniej jedno zdjecie.");
+  }
+
+  const orderRow = await env.DB.prepare(
+    "SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM hotel_room_images WHERE room_type = ?"
+  )
+    .bind(normalizedRoomType)
+    .first();
+  let nextOrder = Number(orderRow?.maxOrder ?? -1) + 1;
+
+  for (const file of files) {
+    assertFileWithinLimit(file, "Zdjecie");
+    const blobData = new Uint8Array(await file.arrayBuffer());
+    await env.DB.prepare(
+      "INSERT INTO hotel_room_images (room_type, file_name, alt_text, mime_type, blob_data, byte_size, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    )
+      .bind(
+        normalizedRoomType,
+        file.name || "zdjecie",
+        normalizedRoomType,
+        file.type || "application/octet-stream",
+        blobData,
+        blobData.byteLength,
+        nextOrder,
+        nowIso()
+      )
+      .run();
+    nextOrder += 1;
+  }
+}
+
+async function deleteHotelRoomImage(imageId, env) {
+  const image = await env.DB.prepare(
+    "SELECT id, room_type AS roomType FROM hotel_room_images WHERE id = ?"
+  )
+    .bind(imageId)
+    .first();
+  if (!image) {
+    throw badRequest("Zdjecie nie istnieje.");
+  }
+  await env.DB.prepare("DELETE FROM hotel_room_images WHERE id = ?").bind(imageId).run();
+  await compactHotelRoomImageOrder(image.roomType, env);
+}
+
+async function reorderHotelRoomImages(roomType, imageIds, env) {
+  const normalizedRoomType = normalizeHotelRoomType(roomType);
+  const ids = Array.isArray(imageIds)
+    ? imageIds
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    : [];
+  if (!ids.length) {
+    throw badRequest("Brak listy zdjec do ustawienia kolejnosci.");
+  }
+  const existing = await env.DB.prepare(
+    "SELECT id FROM hotel_room_images WHERE room_type = ? ORDER BY sort_order ASC, id ASC"
+  )
+    .bind(normalizedRoomType)
+    .all();
+  const existingIds = (existing.results || []).map((row) => Number(row.id));
+  if (existingIds.length !== ids.length) {
+    throw badRequest("Lista zdjec ma nieprawidlowa dlugosc.");
+  }
+  const expected = [...existingIds].sort((a, b) => a - b).join(",");
+  const received = [...ids].sort((a, b) => a - b).join(",");
+  if (expected !== received) {
+    throw badRequest("Lista zdjec jest nieprawidlowa.");
+  }
+  for (let index = 0; index < ids.length; index += 1) {
+    await env.DB.prepare("UPDATE hotel_room_images SET sort_order = ? WHERE id = ?")
+      .bind(index, ids[index])
+      .run();
+  }
+}
+
+async function compactHotelRoomImageOrder(roomType, env) {
+  const normalizedRoomType = normalizeHotelRoomType(roomType);
+  const result = await env.DB.prepare(
+    "SELECT id FROM hotel_room_images WHERE room_type = ? ORDER BY sort_order ASC, id ASC"
+  )
+    .bind(normalizedRoomType)
+    .all();
+  const ids = (result.results || []).map((row) => Number(row.id));
+  for (let index = 0; index < ids.length; index += 1) {
+    await env.DB.prepare("UPDATE hotel_room_images SET sort_order = ? WHERE id = ?")
+      .bind(index, ids[index])
+      .run();
+  }
+}
+
 async function uploadDocument(request, env) {
   const formData = await request.formData();
   const title = String(formData.get("title") || "").trim();
@@ -517,6 +711,22 @@ async function streamDocument(documentId, download, env, request) {
   });
 }
 
+async function streamHotelRoomImage(imageId, env, request) {
+  const image = await env.DB.prepare(
+    "SELECT blob_data AS blobData, mime_type AS mimeType FROM hotel_room_images WHERE id = ?"
+  )
+    .bind(Number(imageId))
+    .first();
+  if (!image) {
+    return jsonResponse({ error: "Zdjecie nie istnieje." }, 404, request, env);
+  }
+  const object = normalizeBlobData(image.blobData);
+  if (!object) {
+    return jsonResponse({ error: "Plik nie istnieje." }, 404, request, env);
+  }
+  return binaryResponse(object, image.mimeType || "application/octet-stream", request, env);
+}
+
 function normalizeBookingPausePair(from, to) {
   let f = String(from ?? "").trim().slice(0, 10);
   let t = String(to ?? "").trim().slice(0, 10);
@@ -534,20 +744,72 @@ function normalizeBookingPausePair(from, to) {
   return [f, t];
 }
 
+function normalizeBookingPauseRanges(ranges, fallbackFrom, fallbackTo) {
+  const source = Array.isArray(ranges) ? ranges : [];
+  const normalized = source
+    .map((entry) => {
+      const [from, to] = normalizeBookingPausePair(entry?.from, entry?.to);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+        return null;
+      }
+      return { from, to };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (a.from === b.from ? a.to.localeCompare(b.to) : a.from.localeCompare(b.from)));
+  if (normalized.length > 0) {
+    return normalized;
+  }
+  const [from, to] = normalizeBookingPausePair(fallbackFrom, fallbackTo);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return [{ from, to }];
+  }
+  return [];
+}
+
+function sanitizeHotelRoomGalleryEntries(roomGalleries) {
+  const source = roomGalleries && typeof roomGalleries === "object" ? roomGalleries : {};
+  const normalized = emptyHotelRoomGalleries();
+  Object.keys(normalized).forEach((roomType) => {
+    const items = Array.isArray(source[roomType]) ? source[roomType] : [];
+    normalized[roomType] = items
+      .map((item) => {
+        const entry = typeof item === "string" ? { url: item } : item;
+        const id = Number(entry?.id);
+        const url = String(entry?.url || "").trim();
+        if (url.startsWith("data:")) {
+          return null;
+        }
+        const sanitized = {};
+        if (Number.isInteger(id) && id > 0) sanitized.id = id;
+        if (url) sanitized.url = url;
+        if (entry?.alt) sanitized.alt = String(entry.alt);
+        return Object.keys(sanitized).length ? sanitized : null;
+      })
+      .filter(Boolean);
+  });
+  return normalized;
+}
+
 function sanitizeContent(content) {
   const rawBooking = content.booking || {};
-  const [restaurantPauseFrom, restaurantPauseTo] = normalizeBookingPausePair(
+  const restaurantPauseRanges = normalizeBookingPauseRanges(
+    rawBooking.restaurantPauseRanges,
     rawBooking.restaurantPauseFrom,
     rawBooking.restaurantPauseTo
   );
-  const [hotelPauseFrom, hotelPauseTo] = normalizeBookingPausePair(
+  const hotelPauseRanges = normalizeBookingPauseRanges(
+    rawBooking.hotelPauseRanges,
     rawBooking.hotelPauseFrom,
     rawBooking.hotelPauseTo
   );
-  const [eventsPauseFrom, eventsPauseTo] = normalizeBookingPausePair(
+  const eventsPauseRanges = normalizeBookingPauseRanges(
+    rawBooking.eventsPauseRanges,
     rawBooking.eventsPauseFrom,
     rawBooking.eventsPauseTo
   );
+  const firstRestaurantPause = restaurantPauseRanges[0] || { from: "", to: "" };
+  const firstHotelPause = hotelPauseRanges[0] || { from: "", to: "" };
+  const firstEventsPause = eventsPauseRanges[0] || { from: "", to: "" };
 
   return {
     ...DEFAULT_CONTENT,
@@ -562,7 +824,11 @@ function sanitizeContent(content) {
       },
     },
     restaurant: { ...DEFAULT_CONTENT.restaurant, ...(content.restaurant || {}) },
-    hotel: { ...DEFAULT_CONTENT.hotel, ...(content.hotel || {}) },
+    hotel: {
+      ...DEFAULT_CONTENT.hotel,
+      ...(content.hotel || {}),
+      roomGalleries: sanitizeHotelRoomGalleryEntries(content.hotel?.roomGalleries),
+    },
     events: { ...DEFAULT_CONTENT.events, ...(content.events || {}) },
     services: Array.isArray(content.services) ? content.services : DEFAULT_CONTENT.services,
     gallery: { ...DEFAULT_CONTENT.gallery, ...(content.gallery || {}) },
@@ -578,12 +844,15 @@ function sanitizeContent(content) {
     booking: {
       ...DEFAULT_CONTENT.booking,
       ...rawBooking,
-      restaurantPauseFrom,
-      restaurantPauseTo,
-      hotelPauseFrom,
-      hotelPauseTo,
-      eventsPauseFrom,
-      eventsPauseTo,
+      restaurantPauseRanges,
+      hotelPauseRanges,
+      eventsPauseRanges,
+      restaurantPauseFrom: firstRestaurantPause.from,
+      restaurantPauseTo: firstRestaurantPause.to,
+      hotelPauseFrom: firstHotelPause.from,
+      hotelPauseTo: firstHotelPause.to,
+      eventsPauseFrom: firstEventsPause.from,
+      eventsPauseTo: firstEventsPause.to,
     },
   };
 }
