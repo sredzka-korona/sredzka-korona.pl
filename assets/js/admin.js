@@ -2050,6 +2050,8 @@
         <p class="status">${escapeHtml(statusMessage)}</p>
       </div>
     `;
+
+    bindRepeaterButtons();
   }
 
   function renderHotelBookingSettingsPanel(statusMessage = "") {
@@ -2471,6 +2473,7 @@
       if (!Array.isArray(state.content.restaurant.menu)) {
         state.content.restaurant.menu = [];
       }
+      state.content.restaurant.menu.forEach(syncMenuEditorSectionSubcategories);
       return state.content.restaurant.menu;
     }
 
@@ -2480,6 +2483,7 @@
     if (!Array.isArray(state.content.events.menu)) {
       state.content.events.menu = [];
     }
+    state.content.events.menu.forEach(syncMenuEditorSectionSubcategories);
     return state.content.events.menu;
   }
 
@@ -2491,13 +2495,31 @@
     return { ...baseItem, ...overrides };
   }
 
-  function countMenuEditorSubcategories(items) {
-    return new Set((items || []).map((item) => item?.subcategory).filter(Boolean)).size;
+  function getMenuEditorSectionSubcategories(section) {
+    return Array.from(
+      new Set([
+        ...(Array.isArray(section?.subcategories) ? section.subcategories : []),
+        ...((section?.items || []).map((item) => item?.subcategory).filter(Boolean)),
+      ])
+    )
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+  }
+
+  function syncMenuEditorSectionSubcategories(section) {
+    if (!section || typeof section !== "object") return section;
+    const subcategories = getMenuEditorSectionSubcategories(section);
+    if (subcategories.length) {
+      section.subcategories = subcategories;
+    } else {
+      delete section.subcategories;
+    }
+    return section;
   }
 
   function buildMenuEditorSummary(section) {
     const items = Array.isArray(section?.items) ? section.items.length : 0;
-    const subcategories = countMenuEditorSubcategories(section?.items || []);
+    const subcategories = getMenuEditorSectionSubcategories(section).length;
     return `${items} pozycji${subcategories ? ` • ${subcategories} podkategorii` : ""}`;
   }
 
@@ -2550,16 +2572,82 @@
     return parts.join(" • ");
   }
 
-  function cleanupEmptyNewMenuSection(modal) {
-    if (!modal?.isNewSection) return;
-    const sections = getMenuSectionsByKind(modal.kind);
-    const section = sections[modal.sectionIndex];
-    if (!section) return;
-    const hasName = Boolean(String(section.section || "").trim());
-    const hasItems = Array.isArray(section.items) && section.items.length > 0;
-    if (!hasName && !hasItems) {
-      sections.splice(modal.sectionIndex, 1);
+  function getMenuEditorSectionLabel(section, index) {
+    return String(section?.section || "").trim() || `Kategoria ${index + 1}`;
+  }
+
+  function getMenuEditorCategoryOptions(kind) {
+    return getMenuSectionsByKind(kind).map((section, index) => ({
+      value: String(index),
+      label: getMenuEditorSectionLabel(section, index),
+    }));
+  }
+
+  function getMenuEditorSubcategoryOptions(kind, sectionIndex) {
+    const section = getMenuSectionsByKind(kind)[sectionIndex];
+    return getMenuEditorSectionSubcategories(section);
+  }
+
+  function readMenuEditorItemDraft(kind, form) {
+    const formData = new FormData(form);
+    const item = createMenuEditorItem(kind, {
+      name: String(formData.get("name") || "").trim(),
+      description: String(formData.get("description") || "").trim(),
+      ingredients: parseMenuEditorIngredients(formData.get("ingredients") || ""),
+    });
+    if (getMenuEditorConfig(kind).includePrice) {
+      item.price = String(formData.get("price") || "").trim();
     }
+    const subcategory = String(formData.get("subcategory") || "").trim();
+    if (subcategory) {
+      item.subcategory = subcategory;
+    }
+    const rawSectionIndex = String(formData.get("sectionIndex") || "").trim();
+    const sectionIndex = rawSectionIndex === "" ? null : Number(rawSectionIndex);
+    return {
+      item,
+      sectionIndex: Number.isInteger(sectionIndex) ? sectionIndex : null,
+    };
+  }
+
+  function openMenuEditorCreateModal(kind, options = {}) {
+    state.ui.menuEditorModal = {
+      kind,
+      type: "create",
+      statusMessage: options.statusMessage || "",
+    };
+    renderMenuEditorModal();
+  }
+
+  function openMenuEditorCategoryCreateModal(kind, options = {}) {
+    state.ui.menuEditorModal = {
+      kind,
+      type: "category-create",
+      draft: { section: "" },
+      statusMessage: options.statusMessage || "",
+      returnTo: options.returnTo || { kind, type: "create" },
+    };
+    renderMenuEditorModal();
+  }
+
+  function openMenuEditorSubcategoryCreateModal(kind, options = {}) {
+    const sections = getMenuSectionsByKind(kind);
+    state.ui.menuEditorModal = {
+      kind,
+      type: "subcategory-create",
+      draft: {
+        name: "",
+        sectionIndex:
+          typeof options.sectionIndex === "number" && sections[options.sectionIndex]
+            ? options.sectionIndex
+            : sections.length
+              ? 0
+              : null,
+      },
+      statusMessage: options.statusMessage || "",
+      returnTo: options.returnTo || { kind, type: "create" },
+    };
+    renderMenuEditorModal();
   }
 
   function openMenuEditorSectionModal(kind, sectionIndex, options = {}) {
@@ -2567,24 +2655,31 @@
       kind,
       type: "section",
       sectionIndex,
-      isNewSection: options.isNewSection === true,
       statusMessage: options.statusMessage || "",
     };
     renderMenuEditorModal();
   }
 
   function openMenuEditorItemModal(kind, sectionIndex, itemIndex = null, options = {}) {
-    const section = getMenuSectionsByKind(kind)[sectionIndex];
+    const sections = getMenuSectionsByKind(kind);
+    const resolvedSectionIndex =
+      typeof sectionIndex === "number" && sections[sectionIndex]
+        ? sectionIndex
+        : sections.length
+          ? 0
+          : null;
+    const section = resolvedSectionIndex === null ? null : sections[resolvedSectionIndex];
     if (!section) return;
     const currentItem = itemIndex === null ? createMenuEditorItem(kind) : section.items?.[itemIndex];
     state.ui.menuEditorModal = {
       kind,
       type: "item",
-      sectionIndex,
+      sectionIndex: resolvedSectionIndex,
+      sourceSectionIndex: itemIndex === null ? null : resolvedSectionIndex,
       itemIndex,
-      isNewSection: options.isNewSection === true,
       draft: structuredClone(currentItem || createMenuEditorItem(kind)),
       statusMessage: options.statusMessage || "",
+      returnTo: options.returnTo || null,
     };
     renderMenuEditorModal();
   }
@@ -2592,20 +2687,35 @@
   function dismissMenuEditorModal(options = {}) {
     const modal = getMenuEditorModalState();
     if (!modal) return;
-    const { skipRender = false, closeEntirely = false } = options;
+    const { skipRender = false } = options;
 
-    if (!closeEntirely && modal.type === "item") {
-      openMenuEditorSectionModal(modal.kind, modal.sectionIndex, {
-        isNewSection: modal.isNewSection,
-      });
-      return;
-    }
-
-    cleanupEmptyNewMenuSection(modal);
     state.ui.menuEditorModal = null;
     if (!skipRender) {
       renderMenuEditorPanel(modal.kind);
     }
+  }
+
+  function goBackMenuEditorModal() {
+    const modal = getMenuEditorModalState();
+    if (!modal) return;
+    const returnTo = modal.returnTo || null;
+    if (!returnTo) {
+      dismissMenuEditorModal();
+      return;
+    }
+    if (returnTo.type === "create") {
+      openMenuEditorCreateModal(returnTo.kind || modal.kind, {
+        statusMessage: returnTo.statusMessage || "",
+      });
+      return;
+    }
+    if (returnTo.type === "section" && typeof returnTo.sectionIndex === "number") {
+      openMenuEditorSectionModal(returnTo.kind || modal.kind, returnTo.sectionIndex, {
+        statusMessage: returnTo.statusMessage || "",
+      });
+      return;
+    }
+    dismissMenuEditorModal();
   }
 
   function renderMenuEditorPanel(kind, statusMessage = "") {
@@ -2619,10 +2729,7 @@
 
     const sections = getMenuSectionsByKind(kind);
     const itemCount = sections.reduce((sum, section) => sum + (section.items || []).length, 0);
-    const subcategoryCount = sections.reduce(
-      (sum, section) => sum + countMenuEditorSubcategories(section.items || []),
-      0
-    );
+    const subcategoryCount = sections.reduce((sum, section) => sum + getMenuEditorSectionSubcategories(section).length, 0);
 
     panel.innerHTML = `
       <p class="pill">${escapeHtml(config.pill)}</p>
@@ -2644,7 +2751,7 @@
           </div>
         </div>
         <div class="inline-actions menu-editor-toolbar-actions">
-          <button class="button" type="button" data-menu-editor-add-section>Dodaj kategorie</button>
+          <button class="button" type="button" data-menu-editor-open-create>Dodaj</button>
         </div>
       </div>
       <p class="status">${escapeHtml(getMenuEditorStatus(kind))}</p>
@@ -2653,12 +2760,32 @@
           sections.length
             ? sections
                 .map((section, sectionIndex) => `
-                  <button class="menu-editor-card" type="button" data-open-menu-section="${sectionIndex}">
+                  <article class="menu-editor-card" data-open-menu-section="${sectionIndex}" tabindex="0" role="button" aria-label="Otworz kategorie ${escapeAttribute(getMenuEditorSectionLabel(section, sectionIndex))}">
+                    <div class="menu-editor-card-actions">
+                      <button
+                        class="button secondary menu-editor-card-move"
+                        type="button"
+                        data-menu-editor-move-section-up="${sectionIndex}"
+                        aria-label="Przesun kategorie wyzej"
+                        ${sectionIndex === 0 ? "disabled" : ""}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        class="button secondary menu-editor-card-move"
+                        type="button"
+                        data-menu-editor-move-section-down="${sectionIndex}"
+                        aria-label="Przesun kategorie nizej"
+                        ${sectionIndex === sections.length - 1 ? "disabled" : ""}
+                      >
+                        ↓
+                      </button>
+                    </div>
                     <span class="menu-editor-card-label">${escapeHtml(config.categoryLabel)} ${sectionIndex + 1}</span>
-                    <strong>${escapeHtml(section.section || "Nowa kategoria")}</strong>
+                    <strong>${escapeHtml(getMenuEditorSectionLabel(section, sectionIndex))}</strong>
                     <span class="menu-editor-card-meta">${escapeHtml(buildMenuEditorSummary(section))}</span>
                     <span class="menu-editor-card-copy">${escapeHtml(getMenuEditorCategoryPreview(section) || "Kliknij, aby otworzyc te kategorie i zarzadzac produktami.")}</span>
-                  </button>
+                  </article>
                 `)
                 .join("")
             : `
@@ -2666,7 +2793,7 @@
                 <strong>Menu jest jeszcze puste</strong>
                 <p class="helper">${escapeHtml(config.emptyState)}</p>
                 <div class="inline-actions">
-                  <button class="button" type="button" data-menu-editor-add-section>Dodaj pierwsza kategorie</button>
+                  <button class="button" type="button" data-menu-editor-open-create>Dodaj</button>
                 </div>
               </div>
             `
@@ -2674,13 +2801,155 @@
       </div>
     `;
 
-    panel.querySelectorAll("[data-menu-editor-add-section]").forEach((button) => {
-      button.addEventListener("click", () => addMenuEditorSection(kind));
+    panel.querySelectorAll("[data-menu-editor-open-create]").forEach((button) => {
+      button.addEventListener("click", () => openMenuEditorCreateModal(kind));
     });
     panel.querySelectorAll("[data-open-menu-section]").forEach((button) => {
       button.addEventListener("click", () => openMenuEditorSectionModal(kind, Number(button.dataset.openMenuSection)));
+      button.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openMenuEditorSectionModal(kind, Number(button.dataset.openMenuSection));
+        }
+      });
+    });
+    panel.querySelectorAll("[data-menu-editor-move-section-up]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        moveMenuEditorSection(kind, Number(button.dataset.menuEditorMoveSectionUp), -1, { reopenModal: false });
+      });
+    });
+    panel.querySelectorAll("[data-menu-editor-move-section-down]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        moveMenuEditorSection(kind, Number(button.dataset.menuEditorMoveSectionDown), 1, { reopenModal: false });
+      });
     });
     renderMenuEditorModal();
+  }
+
+  function renderMenuEditorCreateModal(modal) {
+    const config = getMenuEditorConfig(modal.kind);
+    const sections = getMenuSectionsByKind(modal.kind);
+    const hasCategories = sections.length > 0;
+
+    return `
+      <div class="admin-modal-overlay" data-menu-modal-overlay>
+        <section class="admin-modal menu-editor-modal" role="dialog" aria-modal="true" aria-labelledby="menu-editor-create-title">
+          <div class="admin-modal-head">
+            <div>
+              <p class="pill">${escapeHtml(config.pill)}</p>
+              <h3 id="menu-editor-create-title">Dodaj element menu</h3>
+              <p class="helper">Wybierz, czy chcesz dodac nowa kategorie, podkategorie albo pojedynczy produkt.</p>
+            </div>
+            <button class="button icon-button secondary" type="button" data-menu-modal-close aria-label="Zamknij">×</button>
+          </div>
+          <p class="status">${escapeHtml(modal.statusMessage || "")}</p>
+          <div class="menu-editor-create-grid">
+            <button class="menu-editor-create-option" type="button" data-menu-create-choice="category">
+              <strong>Dodaj kategorie</strong>
+              <span>Utworz nowa kategorie i nadaj jej nazwe.</span>
+            </button>
+            <button class="menu-editor-create-option" type="button" data-menu-create-choice="subcategory" ${hasCategories ? "" : "disabled"}>
+              <strong>Dodaj podkategorie</strong>
+              <span>Podaj nazwe podkategorii i przypisz ja do wybranej kategorii.</span>
+            </button>
+            <button class="menu-editor-create-option" type="button" data-menu-create-choice="item" ${hasCategories ? "" : "disabled"}>
+              <strong>Dodaj produkt</strong>
+              <span>Uzupelnij dane produktu i przypisz go do kategorii oraz opcjonalnej podkategorii.</span>
+            </button>
+          </div>
+          ${
+            hasCategories
+              ? ""
+              : `<p class="helper">Najpierw dodaj przynajmniej jedna kategorie, aby przypisywac podkategorie i produkty.</p>`
+          }
+          <div class="admin-modal-footer">
+            <p class="helper">Zmiany lokalne zapiszesz przyciskiem "Zapisz tresci" w panelu admina.</p>
+            <button class="button secondary" type="button" data-menu-modal-close>Zamknij</button>
+          </div>
+        </section>
+      </div>
+    `;
+  }
+
+  function renderMenuEditorCategoryCreateModal(modal) {
+    const config = getMenuEditorConfig(modal.kind);
+    const draft = modal.draft || { section: "" };
+
+    return `
+      <div class="admin-modal-overlay" data-menu-modal-overlay>
+        <section class="admin-modal menu-editor-modal" role="dialog" aria-modal="true" aria-labelledby="menu-editor-category-create-title">
+          <form id="menu-editor-category-form" class="stack">
+            <div class="admin-modal-head">
+              <div>
+                <p class="pill">${escapeHtml(config.pill)}</p>
+                <h3 id="menu-editor-category-create-title">Dodaj kategorie</h3>
+                <p class="helper">Nadaj nazwie kategorii, aby pojawila sie na liscie menu.</p>
+              </div>
+              <button class="button icon-button secondary" type="button" data-menu-modal-close aria-label="Zamknij">×</button>
+            </div>
+            <p class="status">${escapeHtml(modal.statusMessage || "")}</p>
+            <label class="field-full">
+              <span>Nazwa kategorii</span>
+              <input name="section" value="${escapeAttribute(draft.section || "")}" placeholder="np. Przystawki, Zupy, Dania glowne" />
+            </label>
+            <div class="admin-modal-footer">
+              <button class="button secondary" type="button" data-menu-modal-back>Wroc</button>
+              <button class="button" type="submit">Dodaj kategorie</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    `;
+  }
+
+  function renderMenuEditorSubcategoryCreateModal(modal) {
+    const config = getMenuEditorConfig(modal.kind);
+    const categories = getMenuEditorCategoryOptions(modal.kind);
+    const draft = modal.draft || { name: "", sectionIndex: null };
+
+    return `
+      <div class="admin-modal-overlay" data-menu-modal-overlay>
+        <section class="admin-modal menu-editor-modal" role="dialog" aria-modal="true" aria-labelledby="menu-editor-subcategory-create-title">
+          <form id="menu-editor-subcategory-form" class="stack">
+            <div class="admin-modal-head">
+              <div>
+                <p class="pill">${escapeHtml(config.pill)}</p>
+                <h3 id="menu-editor-subcategory-create-title">Dodaj podkategorie</h3>
+                <p class="helper">Podkategorie przypisujesz do jednej kategorii, a potem wybierasz je przy produktach.</p>
+              </div>
+              <button class="button icon-button secondary" type="button" data-menu-modal-close aria-label="Zamknij">×</button>
+            </div>
+            <p class="status">${escapeHtml(modal.statusMessage || "")}</p>
+            <div class="field-grid">
+              <label class="field">
+                <span>Kategoria</span>
+                <select name="sectionIndex">
+                  ${categories
+                    .map(
+                      (option) => `
+                        <option value="${escapeAttribute(option.value)}" ${String(draft.sectionIndex) === option.value ? "selected" : ""}>
+                          ${escapeHtml(option.label)}
+                        </option>
+                      `
+                    )
+                    .join("")}
+                </select>
+              </label>
+              <label class="field">
+                <span>Nazwa podkategorii</span>
+                <input name="name" value="${escapeAttribute(draft.name || "")}" placeholder="np. Salaty, Pierogi, Dodatki" />
+              </label>
+            </div>
+            <div class="admin-modal-footer">
+              <button class="button secondary" type="button" data-menu-modal-back>Wroc</button>
+              <button class="button" type="submit">Dodaj podkategorie</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    `;
   }
 
   function renderMenuEditorSectionModal(modal) {
@@ -2690,6 +2959,7 @@
       state.ui.menuEditorModal = null;
       return "";
     }
+    const subcategories = getMenuEditorSectionSubcategories(section);
 
     return `
       <div class="admin-modal-overlay" data-menu-modal-overlay>
@@ -2698,7 +2968,7 @@
             <div>
               <p class="pill">${escapeHtml(config.pill)}</p>
               <h3 id="menu-editor-section-title">Edycja kategorii</h3>
-              <p class="helper">Kliknij "Dodaj produkt", aby otworzyc osobne okno dla jednej pozycji menu.</p>
+              <p class="helper">Tu zmienisz nazwe kategorii i kolejnosc produktow bez otwierania kazdego wpisu po kolei.</p>
             </div>
             <button class="button icon-button secondary" type="button" data-menu-modal-close aria-label="Zamknij">×</button>
           </div>
@@ -2708,10 +2978,21 @@
             <input data-menu-modal-section-name value="${escapeAttribute(section.section || "")}" placeholder="np. Przystawki, Zupy, Dania glowne" />
           </label>
           <div class="inline-actions menu-editor-modal-actions">
-            <button class="button" type="button" data-menu-modal-add-item>Dodaj produkt</button>
-            <button class="button secondary" type="button" data-move-menu-section-up ${modal.sectionIndex === 0 ? "disabled" : ""}>Przesun wyzej</button>
-            <button class="button secondary" type="button" data-move-menu-section-down ${modal.sectionIndex === getMenuSectionsByKind(modal.kind).length - 1 ? "disabled" : ""}>Przesun nizej</button>
+            <button class="button secondary menu-editor-card-move" type="button" data-move-menu-section-up aria-label="Przesun kategorie wyzej" ${modal.sectionIndex === 0 ? "disabled" : ""}>↑</button>
+            <button class="button secondary menu-editor-card-move" type="button" data-move-menu-section-down aria-label="Przesun kategorie nizej" ${modal.sectionIndex === getMenuSectionsByKind(modal.kind).length - 1 ? "disabled" : ""}>↓</button>
             <button class="button danger" type="button" data-remove-menu-section>Usun kategorie</button>
+          </div>
+          <div class="menu-editor-subcategory-strip">
+            <strong>Podkategorie</strong>
+            ${
+              subcategories.length
+                ? `
+                  <div class="menu-editor-subcategory-list">
+                    ${subcategories.map((name) => `<span class="menu-editor-subcategory-pill">${escapeHtml(name)}</span>`).join("")}
+                  </div>
+                `
+                : `<p class="helper">Brak podkategorii w tej kategorii. Dodasz je z glownego przycisku "Dodaj".</p>`
+            }
           </div>
           <div class="stack menu-editor-product-list">
             ${
@@ -2724,22 +3005,22 @@
                             <strong>${escapeHtml(item.name || `${config.productLabel} ${itemIndex + 1}`)}</strong>
                             <p class="helper">${escapeHtml(buildMenuEditorItemMeta(item, config.includePrice) || "Bez dodatkowych informacji")}</p>
                           </div>
-                          <button class="button secondary" type="button" data-open-menu-item="${itemIndex}">Otworz</button>
+                          <div class="inline-actions menu-editor-product-actions">
+                            <button class="button secondary menu-editor-card-move" type="button" data-move-menu-item-up="${itemIndex}" aria-label="Przesun produkt wyzej" ${itemIndex === 0 ? "disabled" : ""}>↑</button>
+                            <button class="button secondary menu-editor-card-move" type="button" data-move-menu-item-down="${itemIndex}" aria-label="Przesun produkt nizej" ${itemIndex === section.items.length - 1 ? "disabled" : ""}>↓</button>
+                            <button class="button secondary" type="button" data-open-menu-item="${itemIndex}">Otworz</button>
+                            <button class="button danger" type="button" data-remove-menu-item="${itemIndex}">Usun</button>
+                          </div>
                         </div>
                         <p>${escapeHtml(truncateMenuEditorText(item.description || "", 180) || "Brak opisu produktu.")}</p>
                         ${item.ingredients?.length ? `<p class="helper">${escapeHtml(item.ingredients.join(", "))}</p>` : ""}
-                        <div class="inline-actions">
-                          <button class="button secondary" type="button" data-move-menu-item-up="${itemIndex}" ${itemIndex === 0 ? "disabled" : ""}>Przesun wyzej</button>
-                          <button class="button secondary" type="button" data-move-menu-item-down="${itemIndex}" ${itemIndex === section.items.length - 1 ? "disabled" : ""}>Przesun nizej</button>
-                          <button class="button danger" type="button" data-remove-menu-item="${itemIndex}">Usun</button>
-                        </div>
                       </article>
                     `)
                     .join("")
                 : `
                   <div class="repeater-item menu-editor-empty-state">
                     <strong>Ta kategoria nie ma jeszcze produktow</strong>
-                    <p class="helper">Dodaj pierwszy produkt, aby wypelnic te kategorie.</p>
+                    <p class="helper">Dodaj pierwszy produkt z glownego przycisku "Dodaj".</p>
                   </div>
                 `
             }
@@ -2757,6 +3038,10 @@
     const config = getMenuEditorConfig(modal.kind);
     const isNewItem = modal.itemIndex === null;
     const draft = modal.draft || createMenuEditorItem(modal.kind);
+    const categoryOptions = getMenuEditorCategoryOptions(modal.kind);
+    const subcategoryOptions =
+      typeof modal.sectionIndex === "number" ? getMenuEditorSubcategoryOptions(modal.kind, modal.sectionIndex) : [];
+    const backLabel = modal.returnTo?.type === "section" ? "Wroc do kategorii" : "Wroc";
 
     return `
       <div class="admin-modal-overlay" data-menu-modal-overlay>
@@ -2776,6 +3061,20 @@
                 <span>Nazwa produktu</span>
                 <input name="name" value="${escapeAttribute(draft.name || "")}" placeholder="np. Rosol domowy" />
               </label>
+              <label class="field">
+                <span>Kategoria</span>
+                <select name="sectionIndex">
+                  ${categoryOptions
+                    .map(
+                      (option) => `
+                        <option value="${escapeAttribute(option.value)}" ${String(modal.sectionIndex) === option.value ? "selected" : ""}>
+                          ${escapeHtml(option.label)}
+                        </option>
+                      `
+                    )
+                    .join("")}
+                </select>
+              </label>
               ${
                 config.includePrice
                   ? `
@@ -2788,7 +3087,18 @@
               }
               <label class="field ${config.includePrice ? "" : "field-full"}">
                 <span>Podkategoria</span>
-                <input name="subcategory" value="${escapeAttribute(draft.subcategory || "")}" placeholder="opcjonalnie" />
+                <select name="subcategory">
+                  <option value="">Brak</option>
+                  ${subcategoryOptions
+                    .map(
+                      (option) => `
+                        <option value="${escapeAttribute(option)}" ${option === draft.subcategory ? "selected" : ""}>
+                          ${escapeHtml(option)}
+                        </option>
+                      `
+                    )
+                    .join("")}
+                </select>
               </label>
               <label class="field-full">
                 <span>Opis</span>
@@ -2799,8 +3109,13 @@
                 <textarea name="ingredients" rows="4" placeholder="Jeden skladnik w linii lub po przecinku">${escapeHtml((draft.ingredients || []).join("\n"))}</textarea>
               </label>
             </div>
+            ${
+              subcategoryOptions.length
+                ? ""
+                : `<p class="helper">Wybrana kategoria nie ma jeszcze podkategorii. Mozesz zostawic opcje "Brak" albo dodac podkategorie z glownego przycisku "Dodaj".</p>`
+            }
             <div class="admin-modal-footer">
-              <button class="button secondary" type="button" data-menu-modal-back>Wroc do kategorii</button>
+              <button class="button secondary" type="button" data-menu-modal-back>${escapeHtml(backLabel)}</button>
               <button class="button" type="submit">${isNewItem ? "Dodaj produkt" : "Zapisz produkt"}</button>
             </div>
           </form>
@@ -2821,7 +3136,17 @@
       return;
     }
 
-    root.innerHTML = modal.type === "item" ? renderMenuEditorItemModal(modal) : renderMenuEditorSectionModal(modal);
+    if (modal.type === "create") {
+      root.innerHTML = renderMenuEditorCreateModal(modal);
+    } else if (modal.type === "category-create") {
+      root.innerHTML = renderMenuEditorCategoryCreateModal(modal);
+    } else if (modal.type === "subcategory-create") {
+      root.innerHTML = renderMenuEditorSubcategoryCreateModal(modal);
+    } else if (modal.type === "item") {
+      root.innerHTML = renderMenuEditorItemModal(modal);
+    } else {
+      root.innerHTML = renderMenuEditorSectionModal(modal);
+    }
     document.body.classList.add("admin-modal-open");
 
     const overlay = root.querySelector("[data-menu-modal-overlay]");
@@ -2832,22 +3157,55 @@
     });
 
     root.querySelectorAll("[data-menu-modal-close]").forEach((button) => {
-      button.addEventListener("click", () => dismissMenuEditorModal({ closeEntirely: true }));
-    });
-    root.querySelectorAll("[data-menu-modal-back]").forEach((button) => {
       button.addEventListener("click", () => dismissMenuEditorModal());
     });
+    root.querySelectorAll("[data-menu-modal-back]").forEach((button) => {
+      button.addEventListener("click", () => goBackMenuEditorModal());
+    });
+
+    if (modal.type === "create") {
+      root.querySelectorAll("[data-menu-create-choice]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const choice = button.dataset.menuCreateChoice;
+          if (choice === "category") {
+            openMenuEditorCategoryCreateModal(modal.kind);
+            return;
+          }
+          if (choice === "subcategory") {
+            openMenuEditorSubcategoryCreateModal(modal.kind);
+            return;
+          }
+          if (choice === "item") {
+            openMenuEditorItemModal(modal.kind, 0, null, {
+              returnTo: { kind: modal.kind, type: "create" },
+            });
+          }
+        });
+      });
+      return;
+    }
+
+    if (modal.type === "category-create") {
+      root.querySelector("#menu-editor-category-form")?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        saveMenuEditorCategory(modal.kind);
+      });
+      return;
+    }
+
+    if (modal.type === "subcategory-create") {
+      root.querySelector("#menu-editor-subcategory-form")?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        saveMenuEditorSubcategory(modal.kind);
+      });
+      return;
+    }
 
     if (modal.type === "section") {
       const section = getMenuSectionsByKind(modal.kind)[modal.sectionIndex];
       root.querySelector("[data-menu-modal-section-name]")?.addEventListener("input", (event) => {
         section.section = event.currentTarget.value;
         refreshSaveDockVisibility();
-      });
-      root.querySelector("[data-menu-modal-add-item]")?.addEventListener("click", () => {
-        openMenuEditorItemModal(modal.kind, modal.sectionIndex, null, {
-          isNewSection: modal.isNewSection,
-        });
       });
       root.querySelector("[data-remove-menu-section]")?.addEventListener("click", () => {
         if (!window.confirm("Usunac cala kategorie razem z jej produktami?")) {
@@ -2864,7 +3222,7 @@
       root.querySelectorAll("[data-open-menu-item]").forEach((button) => {
         button.addEventListener("click", () => {
           openMenuEditorItemModal(modal.kind, modal.sectionIndex, Number(button.dataset.openMenuItem), {
-            isNewSection: modal.isNewSection,
+            returnTo: { kind: modal.kind, type: "section", sectionIndex: modal.sectionIndex },
           });
         });
       });
@@ -2886,21 +3244,76 @@
       return;
     }
 
-    root.querySelector("#menu-editor-item-form")?.addEventListener("submit", (event) => {
+    const itemForm = root.querySelector("#menu-editor-item-form");
+    itemForm?.addEventListener("submit", (event) => {
       event.preventDefault();
       saveMenuEditorItem(modal.kind, modal.sectionIndex, modal.itemIndex);
     });
+    itemForm?.querySelector('[name="sectionIndex"]')?.addEventListener("change", () => {
+      const { item, sectionIndex } = readMenuEditorItemDraft(modal.kind, itemForm);
+      modal.draft = item;
+      modal.sectionIndex = sectionIndex;
+      if (sectionIndex === null) {
+        modal.statusMessage = "Wybierz kategorie produktu.";
+      } else {
+        const availableSubcategories = getMenuEditorSubcategoryOptions(modal.kind, sectionIndex);
+        if (!availableSubcategories.includes(modal.draft.subcategory || "")) {
+          delete modal.draft.subcategory;
+        }
+        modal.statusMessage = "";
+      }
+      renderMenuEditorModal();
+    });
   }
 
-  function addMenuEditorSection(kind) {
-    captureDraftIfPossible();
+  function saveMenuEditorCategory(kind) {
+    const modal = getMenuEditorModalState();
+    const form = document.querySelector("#menu-editor-category-form");
+    if (!modal || !form) return;
+
+    const sectionName = String(new FormData(form).get("section") || "").trim();
+    if (!sectionName) {
+      modal.statusMessage = "Uzupelnij nazwe kategorii.";
+      renderMenuEditorModal();
+      return;
+    }
+
     const sections = getMenuSectionsByKind(kind);
-    sections.push({ section: "", items: [] });
-    openMenuEditorSectionModal(kind, sections.length - 1, {
-      isNewSection: true,
-      statusMessage: "Uzupelnij nazwe kategorii i dodaj produkty.",
-    });
-    setMenuEditorStatus(kind, "");
+    sections.push({ section: sectionName, items: [] });
+    state.ui.menuEditorModal = null;
+    setMenuEditorStatus(kind, "Kategoria zostala dodana.");
+    renderMenuEditorPanel(kind);
+    refreshSaveDockVisibility();
+  }
+
+  function saveMenuEditorSubcategory(kind) {
+    const modal = getMenuEditorModalState();
+    const form = document.querySelector("#menu-editor-subcategory-form");
+    if (!modal || !form) return;
+
+    const formData = new FormData(form);
+    const sectionIndex = Number(String(formData.get("sectionIndex") || "").trim());
+    const subcategoryName = String(formData.get("name") || "").trim();
+    const section = getMenuSectionsByKind(kind)[sectionIndex];
+
+    if (!section) {
+      modal.statusMessage = "Wybierz kategorie dla podkategorii.";
+      renderMenuEditorModal();
+      return;
+    }
+    if (!subcategoryName) {
+      modal.statusMessage = "Uzupelnij nazwe podkategorii.";
+      renderMenuEditorModal();
+      return;
+    }
+
+    const existingSubcategories = getMenuEditorSectionSubcategories(section);
+    section.subcategories = existingSubcategories.includes(subcategoryName)
+      ? existingSubcategories
+      : [...existingSubcategories, subcategoryName];
+
+    state.ui.menuEditorModal = null;
+    setMenuEditorStatus(kind, "Podkategoria zostala dodana.");
     renderMenuEditorPanel(kind);
     refreshSaveDockVisibility();
   }
@@ -2915,15 +3328,19 @@
     refreshSaveDockVisibility();
   }
 
-  function moveMenuEditorSection(kind, index, direction) {
+  function moveMenuEditorSection(kind, index, direction, options = {}) {
+    const { reopenModal = true } = options;
     const sections = getMenuSectionsByKind(kind);
     const newIndex = index + direction;
     if (newIndex < 0 || newIndex >= sections.length) return;
     [sections[index], sections[newIndex]] = [sections[newIndex], sections[index]];
-    openMenuEditorSectionModal(kind, newIndex, {
-      isNewSection: getMenuEditorModalState()?.isNewSection,
-      statusMessage: "Kategoria zostala przesunieta.",
-    });
+    if (reopenModal) {
+      openMenuEditorSectionModal(kind, newIndex, {
+        statusMessage: "Kategoria zostala przesunieta.",
+      });
+    } else {
+      state.ui.menuEditorModal = null;
+    }
     setMenuEditorStatus(kind, "Kolejnosc kategorii zostala zaktualizowana.");
     renderMenuEditorPanel(kind);
     refreshSaveDockVisibility();
@@ -2934,7 +3351,6 @@
     if (!section?.items?.[itemIndex]) return;
     section.items.splice(itemIndex, 1);
     openMenuEditorSectionModal(kind, sectionIndex, {
-      isNewSection: getMenuEditorModalState()?.isNewSection,
       statusMessage: "Produkt zostal usuniety.",
     });
     setMenuEditorStatus(kind, "Produkt zostal usuniety.");
@@ -2949,7 +3365,6 @@
     if (newIndex < 0 || newIndex >= section.items.length) return;
     [section.items[itemIndex], section.items[newIndex]] = [section.items[newIndex], section.items[itemIndex]];
     openMenuEditorSectionModal(kind, sectionIndex, {
-      isNewSection: getMenuEditorModalState()?.isNewSection,
       statusMessage: "Produkt zostal przesuniety.",
     });
     setMenuEditorStatus(kind, "Kolejnosc produktow zostala zaktualizowana.");
@@ -2960,46 +3375,57 @@
   function saveMenuEditorItem(kind, sectionIndex, itemIndex) {
     const modal = getMenuEditorModalState();
     const form = document.querySelector("#menu-editor-item-form");
-    const section = getMenuSectionsByKind(kind)[sectionIndex];
-    if (!modal || !form || !section) return;
+    if (!modal || !form) return;
 
-    const formData = new FormData(form);
-    const item = createMenuEditorItem(kind, {
-      name: String(formData.get("name") || "").trim(),
-      description: String(formData.get("description") || "").trim(),
-      ingredients: parseMenuEditorIngredients(formData.get("ingredients") || ""),
-    });
-    if (getMenuEditorConfig(kind).includePrice) {
-      item.price = String(formData.get("price") || "").trim();
-    }
-    const subcategory = String(formData.get("subcategory") || "").trim();
-    if (subcategory) {
-      item.subcategory = subcategory;
-    }
+    const { item, sectionIndex: targetSectionIndex } = readMenuEditorItemDraft(kind, form);
+    const sections = getMenuSectionsByKind(kind);
+    const targetSection = targetSectionIndex === null ? null : sections[targetSectionIndex];
 
     if (!item.name) {
       modal.statusMessage = "Uzupelnij nazwe produktu.";
       renderMenuEditorModal();
       return;
     }
+    if (!targetSection) {
+      modal.statusMessage = "Wybierz kategorie produktu.";
+      renderMenuEditorModal();
+      return;
+    }
 
-    if (!Array.isArray(section.items)) {
-      section.items = [];
+    if (item.subcategory) {
+      targetSection.subcategories = getMenuEditorSectionSubcategories(targetSection);
+      if (!targetSection.subcategories.includes(item.subcategory)) {
+        targetSection.subcategories.push(item.subcategory);
+      }
+    }
+
+    if (!Array.isArray(targetSection.items)) {
+      targetSection.items = [];
     }
     if (itemIndex === null || itemIndex === undefined) {
-      section.items.push(item);
+      targetSection.items.push(item);
       setMenuEditorStatus(kind, "Produkt zostal dodany.");
-      openMenuEditorSectionModal(kind, sectionIndex, {
-        isNewSection: modal.isNewSection,
-        statusMessage: "Produkt zostal dodany.",
-      });
+      state.ui.menuEditorModal = null;
     } else {
-      section.items[itemIndex] = item;
+      const sourceSectionIndex =
+        typeof modal.sourceSectionIndex === "number" ? modal.sourceSectionIndex : sectionIndex;
+      const sourceSection = sections[sourceSectionIndex];
+      if (!sourceSection?.items?.[itemIndex]) return;
+
+      if (sourceSectionIndex === targetSectionIndex) {
+        sourceSection.items[itemIndex] = item;
+      } else {
+        sourceSection.items.splice(itemIndex, 1);
+        targetSection.items.push(item);
+      }
       setMenuEditorStatus(kind, "Produkt zostal zaktualizowany.");
-      openMenuEditorSectionModal(kind, sectionIndex, {
-        isNewSection: modal.isNewSection,
-        statusMessage: "Produkt zostal zaktualizowany.",
-      });
+      if (modal.returnTo?.type === "section") {
+        openMenuEditorSectionModal(kind, targetSectionIndex, {
+          statusMessage: "Produkt zostal zaktualizowany.",
+        });
+      } else {
+        state.ui.menuEditorModal = null;
+      }
     }
     renderMenuEditorPanel(kind);
     refreshSaveDockVisibility();
@@ -3237,10 +3663,13 @@
 
     try {
       const payload = new FormData();
-      files.forEach((file) => {
-        if (file instanceof File && file.size) {
-          payload.append("images", file);
-        }
+      const compressedFiles = await Promise.all(
+        files
+          .filter((file) => file instanceof File && file.size)
+          .map((file) => compressImageFile(file, { maxBytes: API_IMAGE_MAX_BYTES }))
+      );
+      compressedFiles.forEach((file) => {
+        payload.append("images", file, file.name);
       });
       if (!payload.getAll("images").length) {
         renderHotelRoomGalleriesPanel("Wybierz pliki do wgrania.");

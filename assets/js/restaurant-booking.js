@@ -20,14 +20,23 @@
       throw new Error("Brak restaurantApiBase / firebaseProjectId w assets/js/config.js");
     }
     const url = `${base}?op=${encodeURIComponent(op)}`;
-    const res = await fetch(url, {
-      method: options.method || "GET",
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-      },
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
+    const method = String(options.method || "GET").toUpperCase();
+    const headers = { ...(options.headers || {}) };
+    let body;
+    if (options.body !== undefined) {
+      body = typeof options.body === "string" ? options.body : JSON.stringify(options.body);
+      if (!headers["Content-Type"] && !headers["content-type"]) {
+        headers["Content-Type"] = "text/plain";
+      }
+    }
+    const init = { method };
+    if (Object.keys(headers).length) {
+      init.headers = headers;
+    }
+    if (body !== undefined) {
+      init.body = body;
+    }
+    const res = await fetch(url, init);
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(data.error || "Błąd połączenia z serwerem rezerwacji.");

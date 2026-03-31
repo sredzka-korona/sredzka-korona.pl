@@ -1251,6 +1251,7 @@
         function updateWatermarkPosition() {
           const styles = window.getComputedStyle(watermark);
           const baseBottom = Number.parseFloat(styles.getPropertyValue("--watermark-bottom-base")) || 16;
+          const safeGap = 18;
           let targetBottom = baseBottom;
           watermark.style.setProperty("--watermark-bottom-current", targetBottom + "px");
 
@@ -1261,14 +1262,13 @@
 
           const watermarkRect = watermark.getBoundingClientRect();
           const buttonRect = contactButton.getBoundingClientRect();
-          const intersects =
-            watermarkRect.left < buttonRect.right &&
-            watermarkRect.right > buttonRect.left &&
-            watermarkRect.top < buttonRect.bottom &&
-            watermarkRect.bottom > buttonRect.top;
+          const hasHorizontalConflict =
+            watermarkRect.left < buttonRect.right + safeGap &&
+            watermarkRect.right > buttonRect.left - safeGap;
+          const isTooCloseVertically = watermarkRect.bottom > buttonRect.top - safeGap;
 
-          if (intersects) {
-            targetBottom = Math.max(baseBottom, window.innerHeight - buttonRect.top + 12);
+          if (hasHorizontalConflict && isTooCloseVertically) {
+            targetBottom = Math.max(baseBottom, window.innerHeight - buttonRect.top + safeGap);
             watermark.style.setProperty("--watermark-bottom-current", targetBottom + "px");
           }
         }

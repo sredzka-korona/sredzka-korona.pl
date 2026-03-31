@@ -31,23 +31,37 @@ body {
   line-height: 1.5;
   color: var(--text);
   background:
-    radial-gradient(1200px 560px at -8% -12%, rgba(200, 170, 120, 0.22), transparent 58%),
-    radial-gradient(960px 460px at 108% 0%, rgba(121, 40, 45, 0.16), transparent 62%),
-    radial-gradient(780px 420px at 50% 118%, rgba(168, 147, 112, 0.18), transparent 66%),
+    radial-gradient(1100px 520px at -10% -8%, rgba(200, 170, 120, 0.24), transparent 56%),
+    radial-gradient(900px 440px at 110% 2%, rgba(121, 40, 45, 0.18), transparent 60%),
+    radial-gradient(760px 420px at 50% 115%, rgba(168, 147, 112, 0.18), transparent 64%),
     linear-gradient(150deg, #fbfaf8 0%, #f6f3ee 55%, #f2efea 100%);
   overflow-x: hidden;
 }
 
-body::before {
+body::before,
+body::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
+}
+
+body::before {
   background:
     radial-gradient(circle at 90% 10%, rgba(143, 30, 43, 0.12), transparent 32%),
     radial-gradient(circle at 15% 15%, rgba(232, 218, 188, 0.25), transparent 28%),
     linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0));
+}
+
+body::after {
+  background-image:
+    linear-gradient(rgba(139, 101, 48, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 101, 48, 0.04) 1px, transparent 1px),
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.45), transparent 58%);
+  background-size: 72px 72px, 72px 72px, auto;
+  mask-image: radial-gradient(circle at center, black 36%, transparent 92%);
+  opacity: 0.82;
 }
 
 #admin-app,
@@ -86,6 +100,24 @@ a {
   width: min(1180px, calc(100vw - 2rem));
   margin: 0 auto;
   padding: 1rem 0 2.5rem;
+}
+
+.admin-shell::before {
+  content: "";
+  position: fixed;
+  left: 50%;
+  top: 7rem;
+  width: min(1180px, 88vw);
+  height: min(720px, 66vh);
+  transform: translateX(-50%);
+  background:
+    radial-gradient(circle at 18% 18%, rgba(200, 170, 120, 0.18), transparent 23%),
+    radial-gradient(circle at 82% 16%, rgba(121, 40, 45, 0.14), transparent 20%),
+    radial-gradient(circle at 50% 76%, rgba(168, 137, 90, 0.12), transparent 22%);
+  filter: blur(24px);
+  opacity: 0.78;
+  z-index: -1;
+  pointer-events: none;
 }
 
 .admin-topbar,
@@ -609,12 +641,33 @@ a {
     border-color 0.18s ease;
 }
 
+.menu-editor-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+
+.menu-editor-card-move {
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 12px;
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .menu-editor-card:hover {
   transform: translateY(-2px);
   border-color: rgba(139, 101, 48, 0.42);
   box-shadow:
     0 22px 34px rgba(79, 55, 22, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.menu-editor-card:focus-visible {
+  outline: 2px solid rgba(139, 101, 48, 0.36);
+  outline-offset: 3px;
 }
 
 .menu-editor-card strong {
@@ -630,6 +683,56 @@ a {
 
 .menu-editor-card-copy {
   color: #4a3729;
+  line-height: 1.45;
+}
+
+.menu-editor-create-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.9rem;
+}
+
+.menu-editor-create-option {
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
+  min-height: 140px;
+  padding: 1rem;
+  border: 1px solid rgba(200, 170, 120, 0.26);
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 250, 244, 0.54));
+  color: var(--text);
+  text-align: left;
+  box-shadow:
+    0 16px 28px rgba(79, 55, 22, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.74);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.menu-editor-create-option:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(139, 101, 48, 0.4);
+  box-shadow:
+    0 20px 32px rgba(79, 55, 22, 0.11),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.menu-editor-create-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+.menu-editor-create-option strong {
+  font-size: 1.05rem;
+  color: #3d2b1d;
+}
+
+.menu-editor-create-option span {
+  color: var(--muted);
   line-height: 1.45;
 }
 
@@ -684,6 +787,8 @@ body.admin-modal-open {
 
 .menu-editor-modal .field input,
 .menu-editor-modal .field-full input,
+.menu-editor-modal .field select,
+.menu-editor-modal .field-full select,
 .menu-editor-modal .field textarea,
 .menu-editor-modal .field-full textarea {
   width: 100%;
@@ -704,8 +809,36 @@ body.admin-modal-open {
   gap: 0.9rem;
 }
 
+.menu-editor-product-actions {
+  justify-content: flex-end;
+  align-items: center;
+}
+
 .menu-editor-product-card p {
   margin: 0;
+}
+
+.menu-editor-subcategory-strip {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.menu-editor-subcategory-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.menu-editor-subcategory-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid rgba(200, 170, 120, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #4a3729;
+  font-size: 0.92rem;
 }
 
 .admin-toggle-group {
@@ -797,6 +930,10 @@ body.admin-modal-open {
     align-items: stretch;
   }
 
+  .menu-editor-create-grid {
+    grid-template-columns: 1fr;
+  }
+
   .menu-editor-stats {
     grid-template-columns: 1fr;
   }
@@ -806,6 +943,11 @@ body.admin-modal-open {
   .admin-modal-footer {
     width: 100%;
     justify-content: stretch;
+  }
+
+  .menu-editor-product-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .menu-editor-toolbar-actions .button,
@@ -892,57 +1034,83 @@ body.admin-modal-open {
 
 .admin-tile-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 280px));
   gap: 1.15rem;
+  justify-content: center;
 }
 
 .admin-tile {
   display: grid;
-  gap: 0.3rem;
+  position: relative;
+  gap: 0.45rem;
+  align-content: end;
   text-align: left;
-  padding: 0.95rem 1rem;
+  min-height: 176px;
+  padding: 1.1rem 1.15rem 1.2rem;
   border: 1px solid rgba(220, 203, 174, 0.58);
-  border-radius: 20px;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.54), rgba(255, 255, 255, 0.3));
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 249, 241, 0.34)),
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.38), transparent 54%);
   box-shadow:
-    0 12px 24px rgba(79, 55, 22, 0.09),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(14px) saturate(130%);
-  -webkit-backdrop-filter: blur(14px) saturate(130%);
+    0 18px 34px rgba(79, 55, 22, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(18px) saturate(135%);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
   cursor: pointer;
+  overflow: hidden;
   transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
-    border-color 0.18s ease;
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.admin-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(140deg, rgba(255, 255, 255, 0.34), transparent 46%),
+    radial-gradient(circle at 84% 18%, rgba(255, 242, 225, 0.32), transparent 24%);
+  pointer-events: none;
+}
+
+.admin-tile > * {
+  position: relative;
+  z-index: 1;
 }
 
 .admin-tile:hover {
-  transform: translateY(-2px);
-  border-color: rgba(139, 101, 48, 0.44);
+  transform: translateY(-4px);
+  border-color: rgba(139, 101, 48, 0.48);
   box-shadow:
-    0 16px 30px rgba(79, 55, 22, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    0 24px 44px rgba(79, 55, 22, 0.17),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
 .admin-tile.is-active {
   border-color: rgba(121, 40, 45, 0.38);
-  background: linear-gradient(145deg, rgba(255, 248, 242, 0.66), rgba(255, 239, 229, 0.45));
+  background:
+    linear-gradient(145deg, rgba(255, 248, 242, 0.72), rgba(255, 239, 229, 0.48)),
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.4), transparent 54%);
   box-shadow:
-    0 18px 30px rgba(88, 30, 36, 0.16),
+    0 24px 40px rgba(88, 30, 36, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.74);
 }
 
 .admin-tile-title {
   font-family: "Cormorant Garamond", serif;
-  font-size: 1.55rem;
+  font-size: 1.95rem;
   line-height: 1.02;
   color: #2f2319;
+  text-wrap: balance;
 }
 
 .admin-tile-copy {
   color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.35;
+  font-size: 0.96rem;
+  line-height: 1.4;
+  max-width: 24ch;
 }
 
 .admin-stage {
@@ -959,14 +1127,14 @@ body.admin-modal-open {
 
 .admin-entry-grid {
   margin: 0 auto;
-  grid-template-columns: repeat(3, minmax(220px, 320px));
+  grid-template-columns: repeat(3, minmax(240px, 280px));
   justify-content: center;
   justify-self: center;
-  width: min(100%, calc(3 * 320px + 2 * 1.15rem));
+  width: min(100%, calc(3 * 280px + 2 * 1.15rem));
 }
 
 .admin-entry-tile {
-  min-height: 108px;
+  min-height: 176px;
 }
 
 .admin-save-dock {
@@ -1223,8 +1391,8 @@ body.admin-modal-open {
   }
 
   .admin-entry-grid {
-    grid-template-columns: repeat(2, minmax(220px, 320px));
-    width: min(100%, calc(2 * 320px + 1 * 1.15rem));
+    grid-template-columns: repeat(2, minmax(220px, 280px));
+    width: min(100%, calc(2 * 280px + 1 * 1.15rem));
   }
 
   .hotel-filters {

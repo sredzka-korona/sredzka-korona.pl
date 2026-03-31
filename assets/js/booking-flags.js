@@ -4,6 +4,8 @@
  */
 (function () {
   const DEFAULTS = { restaurant: false, hotel: false, events: false };
+  const HEALTH_TTL_MS = 5 * 60 * 1000;
+  let healthCache = { ts: 0, values: null };
 
   function publicApiBase() {
     const cfg = window.SREDZKA_CONFIG || {};
@@ -93,6 +95,49 @@
     return true;
   }
 
+  function bookingFnBase(moduleKey) {
+    const cfg = window.SREDZKA_CONFIG || {};
+    const map = {
+      restaurant: { cfgKey: "restaurantApiBase", fnName: "restaurantApi" },
+      hotel: { cfgKey: "hotelApiBase", fnName: "hotelApi" },
+      events: { cfgKey: "hallApiBase", fnName: "hallApi" },
+    };
+    const item = map[moduleKey];
+    if (!item) return "";
+    const explicit = String(cfg[item.cfgKey] || "").trim();
+    if (explicit) {
+      return explicit.replace(/\/$/, "");
+    }
+    const projectId = String(cfg.firebaseProjectId || "").trim();
+    if (!projectId) return "";
+    return `https://europe-west1-${projectId}.cloudfunctions.net/${item.fnName}`;
+  }
+
+  async function loadHealthFlags() {
+    const now = Date.now();
+    if (healthCache.values && now - healthCache.ts < HEALTH_TTL_MS) {
+      return healthCache.values;
+    }
+    const out = { ...DEFAULTS };
+    await Promise.all(
+      Object.keys(out).map(async (key) => {
+        const base = bookingFnBase(key);
+        if (!base) {
+          out[key] = false;
+          return;
+        }
+        try {
+          const r = await fetch(`${base}?op=health`, { method: "GET" });
+          out[key] = r.ok;
+        } catch {
+          out[key] = false;
+        }
+      })
+    );
+    healthCache = { ts: now, values: out };
+    return out;
+  }
+
   window.SREDZKA_fetchBookingSettings = async function fetchBookingSettings() {
     const cfg = window.SREDZKA_CONFIG || {};
     if (cfg.enableOnlineBookings !== true) {
@@ -109,25 +154,32 @@
       }
       const payload = await r.json();
       const b = payload.content?.booking || {};
+      const health = await loadHealthFlags();
       return {
-        restaurant: effectiveEnabled(
-          b.restaurant !== false,
-          b.restaurantPauseRanges,
-          b.restaurantPauseFrom,
-          b.restaurantPauseTo
-        ),
-        hotel: effectiveEnabled(
-          b.hotel !== false,
-          b.hotelPauseRanges,
-          b.hotelPauseFrom,
-          b.hotelPauseTo
-        ),
-        events: effectiveEnabled(
-          b.events !== false,
-          b.eventsPauseRanges,
-          b.eventsPauseFrom,
-          b.eventsPauseTo
-        ),
+        restaurant:
+          health.restaurant &&
+          effectiveEnabled(
+            b.restaurant !== false,
+            b.restaurantPauseRanges,
+            b.restaurantPauseFrom,
+            b.restaurantPauseTo
+          ),
+        hotel:
+          health.hotel &&
+          effectiveEnabled(
+            b.hotel !== false,
+            b.hotelPauseRanges,
+            b.hotelPauseFrom,
+            b.hotelPauseTo
+          ),
+        events:
+          health.events &&
+          effectiveEnabled(
+            b.events !== false,
+            b.eventsPauseRanges,
+            b.eventsPauseFrom,
+            b.eventsPauseTo
+          ),
       };
     } catch {
       return { ...DEFAULTS };

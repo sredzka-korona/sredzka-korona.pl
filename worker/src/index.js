@@ -341,6 +341,14 @@ function isMissingHotelRoomImagesTableError(error) {
   return /no such table:\s*hotel_room_images/i.test(message);
 }
 
+function isMissingGalleryImagesStorageSchemaError(error) {
+  const message = String(error?.message || "");
+  return (
+    /no such table:\s*gallery_images/i.test(message) ||
+    /table\s+gallery_images\s+has no column named\s+(object_key|mime_type|blob_data|byte_size)/i.test(message)
+  );
+}
+
 async function listHotelRoomGalleries(env, url) {
   let result;
   try {
@@ -472,28 +480,37 @@ async function uploadGalleryImages(albumId, request, env) {
   }
 
   let firstInsertedId = null;
-  for (const file of files) {
-    assertFileWithinLimit(file, "Zdjecie");
-    const safeName = sanitizeFileName(file.name);
-    const objectKey = `gallery/${album.slug}/${crypto.randomUUID()}-${safeName}`;
-    const blobData = new Uint8Array(await file.arrayBuffer());
-    const insert = await env.DB.prepare(
-      "INSERT INTO gallery_images (album_id, object_key, file_name, alt_text, mime_type, blob_data, byte_size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-    )
-      .bind(
-        album.id,
-        objectKey,
-        file.name,
-        album.slug,
-        file.type || "application/octet-stream",
-        blobData,
-        blobData.byteLength,
-        nowIso()
+  try {
+    for (const file of files) {
+      assertFileWithinLimit(file, "Zdjecie");
+      const safeName = sanitizeFileName(file.name);
+      const objectKey = `gallery/${album.slug}/${crypto.randomUUID()}-${safeName}`;
+      const blobData = new Uint8Array(await file.arrayBuffer());
+      const insert = await env.DB.prepare(
+        "INSERT INTO gallery_images (album_id, object_key, file_name, alt_text, mime_type, blob_data, byte_size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
       )
-      .run();
-    if (!firstInsertedId) {
-      firstInsertedId = insert.meta.last_row_id;
+        .bind(
+          album.id,
+          objectKey,
+          file.name,
+          album.slug,
+          file.type || "application/octet-stream",
+          blobData,
+          blobData.byteLength,
+          nowIso()
+        )
+        .run();
+      if (!firstInsertedId) {
+        firstInsertedId = insert.meta.last_row_id;
+      }
     }
+  } catch (error) {
+    if (isMissingGalleryImagesStorageSchemaError(error)) {
+      throw badRequest(
+        "Brak aktualnej migracji bazy dla galerii. Uruchom najnowszy worker/schema.sql, aby dodac kolumny do przechowywania zdjec."
+      );
+    }
+    throw error;
   }
   if (!album.coverImageId && firstInsertedId) {
     await env.DB.prepare("UPDATE gallery_albums SET cover_image_id = ?, updated_at = ? WHERE id = ?")
