@@ -1654,6 +1654,9 @@
             }
             const payload = await response.json();
             if (payload.content?.restaurant) {
+              if (payload.content.restaurant.orderButtonText) {
+                restaurantOrderButtonText = payload.content.restaurant.orderButtonText;
+              }
               if (payload.content.restaurant.menu) {
                 restaurantMenu = payload.content.restaurant.menu;
               }
@@ -1689,6 +1692,7 @@
         }
 
         let selectedCategoryIndex = 0;
+        let restaurantOrderButtonText = "Rezerwacja stolika";
 
         function renderMenuItems(items) {
           if (!items || items.length === 0) {
@@ -1881,7 +1885,7 @@
                 </div>
               </div>
               <button type="button" class="reservation-info" id="rb-open-booking">
-                Rezerwacja stolika
+                ${escapeHtml(restaurantOrderButtonText)}
               </button>
             </div>
           </div>
@@ -1889,7 +1893,7 @@
           <div class="modal" id="restaurant-booking-modal">
             <div class="modal-body booking-modal-wrap">
               <div class="modal-header">
-                <h2>Rezerwacja stolika</h2>
+                <h2>${escapeHtml(restaurantOrderButtonText)}</h2>
                 <button type="button" class="modal-close" id="rb-modal-close" aria-label="Zamknij">×</button>
               </div>
               <div class="booking-modal-inner"></div>

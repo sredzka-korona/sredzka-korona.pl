@@ -215,8 +215,11 @@
       </div>`;
   }
 
-  async function renderHallAdminPanel(container) {
+  async function renderHallAdminPanel(container, options = {}) {
     if (!container) return;
+    if (options.defaultTab) {
+      hallSubTab = options.defaultTab;
+    }
     container.innerHTML = `<p class="status">Ładowanie modułu Sale…</p>`;
     try {
       await loadHalls();

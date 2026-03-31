@@ -23,7 +23,82 @@
     capabilities: {
       mediaStorageEnabled: false,
     },
+    ui: {
+      topTab: "rezerwacje",
+      tileByTab: {
+        rezerwacje: "hotel",
+        hotel: "1-osobowe",
+        restauracja: "menu",
+        przyjecia: "oferta",
+        dokumenty: "documents",
+        kontakt: "contact",
+      },
+    },
   };
+  const ADMIN_TABS = [
+    {
+      key: "rezerwacje",
+      label: "Rezerwacje",
+      description: "Zgloszenia i obsluga rezerwacji z poszczegolnych modulow.",
+      tiles: [
+        { key: "hotel", label: "Rezerwacja hotel", description: "Rezerwacje pokoi i blokady terminow." },
+        { key: "restaurant", label: "Rezerwacja restauracja", description: "Rezerwacje stolikow i blokady." },
+        { key: "events", label: "Rezerwacje przyjecia", description: "Zgloszenia sal i rezerwacje eventowe." },
+      ],
+    },
+    {
+      key: "hotel",
+      label: "Hotel",
+      description: "Galerie pokoi i ustawienia formularza hotelowego.",
+      tiles: [
+        { key: "1-osobowe", label: "1 osobowe", description: "Zdjecia i kolejnosc dla pokoi 1-osobowych." },
+        { key: "2-osobowe", label: "2 osobowe", description: "Zdjecia i kolejnosc dla pokoi 2-osobowych." },
+        { key: "3-osobowe", label: "3 osobowe", description: "Zdjecia i kolejnosc dla pokoi 3-osobowych." },
+        { key: "4-osobowe", label: "4 osobowe", description: "Zdjecia i kolejnosc dla pokoi 4-osobowych." },
+        { key: "settings", label: "Ustawienia rezerwacji", description: "Wlaczenie i przerwy w przyjmowaniu rezerwacji." },
+      ],
+    },
+    {
+      key: "restauracja",
+      label: "Restauracja",
+      description: "Menu, galeria, godziny i ustawienia restauracji.",
+      tiles: [
+        { key: "menu", label: "Menu", description: "Kategorie, pozycje, skladniki i kolejnosc." },
+        { key: "gallery", label: "Galeria", description: "Zdjecia restauracji i ich kolejnosc." },
+        { key: "orders", label: "Zamowienia", description: "Obecny modul zamowien jedzenia i tekst widoczny w kafelku / CTA." },
+        { key: "hours", label: "Godziny otwarcia", description: "Dni i godziny widoczne na stronie restauracji." },
+        { key: "settings", label: "Ustawienia rezerwacji", description: "Wlaczenie i przerwy w przyjmowaniu rezerwacji." },
+      ],
+    },
+    {
+      key: "przyjecia",
+      label: "Przyjecia",
+      description: "Oferta, sale, galerie, menu okolicznosciowe i ustawienia.",
+      tiles: [
+        { key: "oferta", label: "Oferta", description: "Edycja tresci kafelka Oferta i modala." },
+        { key: "sale", label: "Sale", description: "Nazwy, opisy i pojemnosci sal." },
+        { key: "gallery", label: "Galeria", description: "Galerie sal i albumy wydarzen." },
+        { key: "menu", label: "Menu okolicznosciowe", description: "Sekcje, pozycje i kolejnosc menu." },
+        { key: "settings", label: "Ustawienia rezerwacji", description: "Wlaczenie rezerwacji i blokady terminow sal." },
+      ],
+    },
+    {
+      key: "dokumenty",
+      label: "Dokumenty",
+      description: "Pliki i menu dokumentow.",
+      tiles: [
+        { key: "documents", label: "Dokumenty", description: "Dodawanie plikow i zarzadzanie menu dokumentow." },
+      ],
+    },
+    {
+      key: "kontakt",
+      label: "Kontakt",
+      description: "Dane kontaktowe widoczne na stronie.",
+      tiles: [
+        { key: "contact", label: "Dane kontaktowe", description: "Telefon, e-mail, adres i podstawowe dane firmy." },
+      ],
+    },
+  ];
   const INLINE_IMAGE_MAX_BYTES = 320 * 1024;
   const API_IMAGE_MAX_BYTES = 1_700_000;
   const DOCUMENT_MAX_BYTES = 1_700_000;
@@ -320,7 +395,171 @@
     document.querySelector("#login-form").addEventListener("submit", handleLogin);
   }
 
+  function getAdminTabConfig(tabKey = state.ui.topTab) {
+    return ADMIN_TABS.find((tab) => tab.key === tabKey) || ADMIN_TABS[0];
+  }
+
+  function getActiveAdminTile(tabKey = state.ui.topTab) {
+    const tab = getAdminTabConfig(tabKey);
+    const stored = state.ui.tileByTab?.[tab.key];
+    return tab.tiles.find((tile) => tile.key === stored)?.key || tab.tiles[0]?.key || "";
+  }
+
+  function setAdminTab(tabKey) {
+    captureDraftIfPossible();
+    state.ui.topTab = tabKey;
+    state.ui.tileByTab[tabKey] = getActiveAdminTile(tabKey);
+    renderDashboard();
+  }
+
+  function setAdminTile(tabKey, tileKey) {
+    captureDraftIfPossible();
+    state.ui.topTab = tabKey;
+    state.ui.tileByTab[tabKey] = tileKey;
+    renderDashboard();
+  }
+
+  function renderAdminStageMarkup(tabKey, tileKey) {
+    if (tabKey === "rezerwacje" && tileKey === "hotel") {
+      return `<div id="admin-panel-hotel" class="admin-hotel-wrap admin-stage-panel"></div>`;
+    }
+    if (tabKey === "rezerwacje" && tileKey === "restaurant") {
+      return `<div id="admin-panel-restaurant" class="admin-hotel-wrap admin-stage-panel"></div>`;
+    }
+    if (tabKey === "rezerwacje" && tileKey === "events") {
+      return `<div id="admin-panel-hall" class="admin-hotel-wrap admin-stage-panel"></div>`;
+    }
+    if (tabKey === "hotel" && ["1-osobowe", "2-osobowe", "3-osobowe", "4-osobowe"].includes(tileKey)) {
+      return `<section class="panel col-12" id="hotel-room-galleries-panel"></section>`;
+    }
+    if (tabKey === "hotel" && tileKey === "settings") {
+      return `<section class="panel col-12" id="hotel-booking-settings-panel"></section>`;
+    }
+    if (tabKey === "restauracja" && tileKey === "menu") {
+      return `<section class="panel col-12" id="restaurant-menu-panel"></section>`;
+    }
+    if (tabKey === "restauracja" && tileKey === "gallery") {
+      return `<section class="panel col-12" id="restaurant-gallery-panel"></section>`;
+    }
+    if (tabKey === "restauracja" && tileKey === "orders") {
+      return `<section class="panel col-12" id="restaurant-order-panel"></section>`;
+    }
+    if (tabKey === "restauracja" && tileKey === "hours") {
+      return `<section class="panel col-12" id="restaurant-opening-hours-panel"></section>`;
+    }
+    if (tabKey === "restauracja" && tileKey === "settings") {
+      return `<section class="panel col-12" id="restaurant-booking-settings-panel"></section>`;
+    }
+    if (tabKey === "przyjecia" && tileKey === "oferta") {
+      return `<section class="panel col-12" id="events-offer-panel"></section>`;
+    }
+    if (tabKey === "przyjecia" && tileKey === "sale") {
+      return `<section class="panel col-12" id="events-halls-panel"></section>`;
+    }
+    if (tabKey === "przyjecia" && tileKey === "gallery") {
+      return `
+        <section class="panel col-12" id="events-hall-galleries-panel"></section>
+        <section class="panel col-12" id="gallery-panel"></section>
+      `;
+    }
+    if (tabKey === "przyjecia" && tileKey === "menu") {
+      return `<section class="panel col-12" id="events-menu-panel"></section>`;
+    }
+    if (tabKey === "przyjecia" && tileKey === "settings") {
+      return `
+        <section class="panel col-12" id="events-booking-settings-panel"></section>
+        <section class="panel col-12" id="calendar-panel"></section>
+      `;
+    }
+    if (tabKey === "dokumenty") {
+      return `<section class="panel col-12" id="documents-panel"></section>`;
+    }
+    if (tabKey === "kontakt") {
+      return `<section class="panel col-12" id="contact-panel"></section>`;
+    }
+    return `<section class="panel col-12"><p class="status">Brak skonfigurowanego widoku.</p></section>`;
+  }
+
+  function bindAdminNavigation() {
+    document.querySelectorAll("[data-admin-tab]").forEach((button) => {
+      button.addEventListener("click", () => setAdminTab(button.dataset.adminTab));
+    });
+    document.querySelectorAll("[data-admin-tile]").forEach((button) => {
+      button.addEventListener("click", () => setAdminTile(button.dataset.adminTabKey, button.dataset.adminTile));
+    });
+  }
+
+  function renderActiveAdminTile(statusMessage = "") {
+    const topTab = state.ui.topTab;
+    const tileKey = getActiveAdminTile(topTab);
+
+    if (topTab === "rezerwacje") {
+      const options = { defaultTab: "reservations" };
+      if (tileKey === "hotel" && typeof window.renderHotelAdminPanel === "function") {
+        window.renderHotelAdminPanel(document.querySelector("#admin-panel-hotel"), options);
+      } else if (tileKey === "restaurant" && typeof window.renderRestaurantAdminPanel === "function") {
+        window.renderRestaurantAdminPanel(document.querySelector("#admin-panel-restaurant"), options);
+      } else if (tileKey === "events" && typeof window.renderHallAdminPanel === "function") {
+        window.renderHallAdminPanel(document.querySelector("#admin-panel-hall"), options);
+      }
+      return;
+    }
+
+    if (topTab === "hotel") {
+      if (tileKey === "settings") {
+        renderHotelBookingSettingsPanel(statusMessage);
+      } else {
+        renderHotelRoomGalleriesPanel(statusMessage);
+      }
+      return;
+    }
+
+    if (topTab === "restauracja") {
+      if (tileKey === "menu") {
+        renderRestaurantMenuPanel(statusMessage);
+      } else if (tileKey === "gallery") {
+        renderRestaurantGalleryPanel(statusMessage);
+      } else if (tileKey === "orders") {
+        renderRestaurantOrderPanel(statusMessage);
+      } else if (tileKey === "hours") {
+        renderRestaurantOpeningHoursPanel(statusMessage);
+      } else if (tileKey === "settings") {
+        renderRestaurantBookingSettingsPanel(statusMessage);
+      }
+      return;
+    }
+
+    if (topTab === "przyjecia") {
+      if (tileKey === "oferta") {
+        renderEventsOfferPanel(statusMessage);
+      } else if (tileKey === "sale") {
+        renderEventsHallsPanel(statusMessage);
+      } else if (tileKey === "gallery") {
+        renderEventsHallGalleriesPanel(statusMessage);
+        renderGalleryPanel(statusMessage);
+      } else if (tileKey === "menu") {
+        renderEventsMenuPanel(statusMessage);
+      } else if (tileKey === "settings") {
+        renderEventsBookingSettingsPanel(statusMessage);
+        renderCalendarPanel(statusMessage);
+      }
+      return;
+    }
+
+    if (topTab === "dokumenty") {
+      renderDocumentsPanel(statusMessage);
+      return;
+    }
+
+    if (topTab === "kontakt") {
+      renderContactPanel(statusMessage);
+    }
+  }
+
   function renderDashboard() {
+    const activeTab = getAdminTabConfig();
+    const activeTile = getActiveAdminTile(activeTab.key);
+
     app.innerHTML = `
       <div class="admin-shell">
         <header class="admin-topbar">
@@ -338,97 +577,56 @@
             <button class="button danger" id="logout-button" type="button">Wyloguj</button>
           </div>
         </header>
-        <nav class="admin-main-tabs" aria-label="Moduły panelu">
-          <button type="button" class="button" id="admin-tab-btn-content">Treści, galeria, dokumenty</button>
-          ${onlineBookingsEnabled
-            ? `
-          <button type="button" class="button secondary" id="admin-tab-btn-hotel">Hotel — rezerwacje</button>
-          <button type="button" class="button secondary" id="admin-tab-btn-restaurant">Restauracja</button>
-          <button type="button" class="button secondary" id="admin-tab-btn-hall">Sale</button>`
-            : ""}
+        <nav class="admin-main-tabs" aria-label="Moduly panelu">
+          ${ADMIN_TABS.map(
+            (tab) => `
+              <button
+                type="button"
+                class="button ${tab.key === activeTab.key ? "" : "secondary"}"
+                data-admin-tab="${escapeAttribute(tab.key)}"
+              >
+                ${escapeHtml(tab.label)}
+              </button>
+            `
+          ).join("")}
         </nav>
-        <div id="admin-panel-main">
-        <div class="grid">
-          <section class="panel col-8" id="content-panel"></section>
-          <section class="panel col-4" id="submissions-panel"></section>
-          <section class="panel col-12" id="restaurant-menu-panel"></section>
-          <section class="panel col-12" id="restaurant-gallery-panel"></section>
-          <section class="panel col-12" id="gallery-panel"></section>
-          <section class="panel col-12" id="hotel-room-galleries-panel"></section>
-          <section class="panel col-12" id="events-hall-galleries-panel"></section>
-          <section class="panel col-12" id="events-menu-panel"></section>
-          <section class="panel col-6" id="documents-panel"></section>
-          <section class="panel col-6" id="calendar-panel"></section>
-        </div>
-        </div>
-        <div id="admin-panel-hotel" class="admin-hotel-wrap" hidden></div>
-        <div id="admin-panel-restaurant" class="admin-hotel-wrap" hidden></div>
-        <div id="admin-panel-hall" class="admin-hotel-wrap" hidden></div>
+        <section class="admin-workspace">
+          <div class="admin-workspace-head">
+            <div>
+              <p class="pill">${escapeHtml(activeTab.label)}</p>
+              <h2>${escapeHtml(activeTab.label)}</h2>
+              <p class="section-intro">${escapeHtml(activeTab.description)}</p>
+            </div>
+          </div>
+          <div class="admin-tile-grid" aria-label="Sekcje w module ${escapeAttribute(activeTab.label)}">
+            ${activeTab.tiles
+              .map(
+                (tile) => `
+                  <button
+                    type="button"
+                    class="admin-tile${tile.key === activeTile ? " is-active" : ""}"
+                    data-admin-tab-key="${escapeAttribute(activeTab.key)}"
+                    data-admin-tile="${escapeAttribute(tile.key)}"
+                  >
+                    <span class="admin-tile-title">${escapeHtml(tile.label)}</span>
+                    <span class="admin-tile-copy">${escapeHtml(tile.description)}</span>
+                  </button>
+                `
+              )
+              .join("")}
+          </div>
+          <div class="grid admin-stage">
+            ${renderAdminStageMarkup(activeTab.key, activeTile)}
+          </div>
+        </section>
       </div>
     `;
-
-    renderContentPanel();
-    renderSubmissionsPanel();
-    renderRestaurantMenuPanel();
-    renderRestaurantGalleryPanel();
-    renderGalleryPanel();
-    renderHotelRoomGalleriesPanel();
-    renderEventsHallGalleriesPanel();
-    renderEventsMenuPanel();
-    renderDocumentsPanel();
-    renderCalendarPanel();
 
     scheduleScrollIndicatorUpdate();
     document.querySelector("#save-content-button").addEventListener("click", saveContent);
     document.querySelector("#logout-button").addEventListener("click", logout);
-
-    const btnContent = document.querySelector("#admin-tab-btn-content");
-    const btnHotel = document.querySelector("#admin-tab-btn-hotel");
-    const btnRestaurant = document.querySelector("#admin-tab-btn-restaurant");
-    const btnHall = document.querySelector("#admin-tab-btn-hall");
-    const panelMain = document.querySelector("#admin-panel-main");
-    const panelHotel = document.querySelector("#admin-panel-hotel");
-    const panelRestaurant = document.querySelector("#admin-panel-restaurant");
-    const panelHall = document.querySelector("#admin-panel-hall");
-    function switchAdminTab(tab) {
-      if (!panelMain || !panelHotel || !panelRestaurant || !panelHall) return;
-      panelMain.hidden = tab !== "content";
-      panelHotel.hidden = tab !== "hotel";
-      panelRestaurant.hidden = tab !== "restaurant";
-      panelHall.hidden = tab !== "hall";
-      btnContent?.classList.toggle("secondary", tab !== "content");
-      btnHotel?.classList.toggle("secondary", tab !== "hotel");
-      btnRestaurant?.classList.toggle("secondary", tab !== "restaurant");
-      btnHall?.classList.toggle("secondary", tab !== "hall");
-      if (tab === "hotel") {
-        if (typeof window.renderHotelAdminPanel === "function") {
-          window.renderHotelAdminPanel(panelHotel);
-        } else {
-          panelHotel.innerHTML =
-            "<p class=\"status\">Nie załadowano hotel-admin.js — dodaj skrypt w admin/index.html.</p>";
-        }
-      }
-      if (tab === "restaurant") {
-        if (typeof window.renderRestaurantAdminPanel === "function") {
-          window.renderRestaurantAdminPanel(panelRestaurant);
-        } else {
-          panelRestaurant.innerHTML =
-            "<p class=\"status\">Nie załadowano restaurant-admin.js — dodaj skrypt w admin/index.html.</p>";
-        }
-      }
-      if (tab === "hall") {
-        if (typeof window.renderHallAdminPanel === "function") {
-          window.renderHallAdminPanel(panelHall);
-        } else {
-          panelHall.innerHTML =
-            "<p class=\"status\">Nie załadowano hall-admin.js — dodaj skrypt w admin/index.html.</p>";
-        }
-      }
-    }
-    btnContent?.addEventListener("click", () => switchAdminTab("content"));
-    btnHotel?.addEventListener("click", () => switchAdminTab("hotel"));
-    btnRestaurant?.addEventListener("click", () => switchAdminTab("restaurant"));
-    btnHall?.addEventListener("click", () => switchAdminTab("hall"));
+    bindAdminNavigation();
+    renderActiveAdminTile();
   }
 
   function renderContentPanel(statusMessage = "") {
@@ -633,6 +831,7 @@
 
   function renderTestimonialsList() {
     const target = document.querySelector("#testimonials-list");
+    if (!target) return;
     target.innerHTML = state.content.home.testimonials
       .map(
         (item, index) => `
@@ -652,6 +851,7 @@
 
   function renderMenuSectionsList() {
     const target = document.querySelector("#menu-sections-list");
+    if (!target) return;
     target.innerHTML = state.content.restaurant.menuSections
       .map(
         (section, index) => `
@@ -671,6 +871,7 @@
 
   function renderRoomsList() {
     const target = document.querySelector("#rooms-list");
+    if (!target) return;
     target.innerHTML = state.content.hotel.rooms
       .map(
         (room, index) => `
@@ -692,6 +893,7 @@
 
   function renderHallsList() {
     const target = document.querySelector("#halls-list");
+    if (!target) return;
     target.innerHTML = state.content.events.halls
       .map(
         (hall, index) => `
@@ -713,6 +915,7 @@
 
   function renderServicesList() {
     const target = document.querySelector("#services-list");
+    if (!target) return;
     target.innerHTML = state.content.services
       .map(
         (service, index) => `
@@ -756,7 +959,7 @@
     } else if (type === "services") {
       state.content.services.push({ title: "", description: "", contact: "", link: "" });
     }
-    renderContentPanel();
+    renderDashboard();
   }
 
   function removeArrayItem(type, index) {
@@ -774,38 +977,53 @@
     } else if (type === "services") {
       state.content.services.splice(index, 1);
     }
-    renderContentPanel();
+    renderDashboard();
   }
 
   function collectContentFromForm() {
     const content = structuredClone(state.content);
-    content.company.name = document.querySelector("#company-name").value.trim();
-    content.company.phone = document.querySelector("#company-phone").value.trim();
-    content.company.email = document.querySelector("#company-email").value.trim();
-    content.company.address = document.querySelector("#company-address").value.trim();
-    content.company.tagline = document.querySelector("#company-tagline").value.trim();
-    content.company.heroTitle = document.querySelector("#company-hero-title").value.trim();
-    content.company.heroText = document.querySelector("#company-hero-text").value.trim();
-    const openingHoursText = document
-      .querySelector("#company-opening-hours")
-      .value.split("\n")
-      .map((item) => item.trim())
-      .filter(Boolean);
-    
-    // Konwertuj format tekstowy na obiekty {day, hours}
-    content.company.openingHours = openingHoursText.map((item) => {
-      const colonIndex = item.indexOf(':');
-      if (colonIndex > 0) {
-        return {
-          day: item.substring(0, colonIndex).trim(),
-          hours: item.substring(colonIndex + 1).trim()
-        };
-      }
-      return item; // Fallback dla starego formatu
-    });
+    const getTrimmedValue = (selector) => {
+      const element = document.querySelector(selector);
+      return element ? element.value.trim() : null;
+    };
 
-    content.home.aboutText = document.querySelector("#home-about-text").value.trim();
-    content.home.owner = document.querySelector("#home-owner").value.trim();
+    const companyName = getTrimmedValue("#company-name");
+    if (companyName !== null) content.company.name = companyName;
+    const companyPhone = getTrimmedValue("#company-phone");
+    if (companyPhone !== null) content.company.phone = companyPhone;
+    const companyEmail = getTrimmedValue("#company-email");
+    if (companyEmail !== null) content.company.email = companyEmail;
+    const companyAddress = getTrimmedValue("#company-address");
+    if (companyAddress !== null) content.company.address = companyAddress;
+    const companyTagline = getTrimmedValue("#company-tagline");
+    if (companyTagline !== null) content.company.tagline = companyTagline;
+    const companyHeroTitle = getTrimmedValue("#company-hero-title");
+    if (companyHeroTitle !== null) content.company.heroTitle = companyHeroTitle;
+    const companyHeroText = getTrimmedValue("#company-hero-text");
+    if (companyHeroText !== null) content.company.heroText = companyHeroText;
+
+    const openingHoursRaw = getTrimmedValue("#company-opening-hours");
+    if (openingHoursRaw !== null) {
+      const openingHoursText = openingHoursRaw
+        .split("\n")
+        .map((item) => item.trim())
+        .filter(Boolean);
+      content.company.openingHours = openingHoursText.map((item) => {
+        const colonIndex = item.indexOf(":");
+        if (colonIndex > 0) {
+          return {
+            day: item.substring(0, colonIndex).trim(),
+            hours: item.substring(colonIndex + 1).trim(),
+          };
+        }
+        return item;
+      });
+    }
+
+    const homeAboutText = getTrimmedValue("#home-about-text");
+    if (homeAboutText !== null) content.home.aboutText = homeAboutText;
+    const homeOwner = getTrimmedValue("#home-owner");
+    if (homeOwner !== null) content.home.owner = homeOwner;
     const prevBlocks = content.home.sectionBlocks || {};
     const elH = document.querySelector("#section-block-hotel");
     const elR = document.querySelector("#section-block-restaurant");
@@ -851,75 +1069,96 @@
     content.booking.eventsPauseFrom = onlineBookingsEnabled ? pe.from : "";
     content.booking.eventsPauseTo = onlineBookingsEnabled ? pe.to : "";
 
-    content.home.staff = Array.from(document.querySelectorAll("[data-staff-index]"))
-      .map((element) => element.value.trim())
-      .filter(Boolean);
-    content.home.testimonials = Array.from(document.querySelectorAll("[data-testimonial-author]")).map(
-      (element, index) => ({
-        author: element.value.trim(),
-        text: document.querySelector(`[data-testimonial-text="${index}"]`).value.trim(),
-      })
-    );
+    if (document.querySelector("[data-staff-index]")) {
+      content.home.staff = Array.from(document.querySelectorAll("[data-staff-index]"))
+        .map((element) => element.value.trim())
+        .filter(Boolean);
+    }
+    if (document.querySelector("[data-testimonial-author]")) {
+      content.home.testimonials = Array.from(document.querySelectorAll("[data-testimonial-author]")).map(
+        (element, index) => ({
+          author: element.value.trim(),
+          text: document.querySelector(`[data-testimonial-text="${index}"]`)?.value.trim() || "",
+        })
+      );
+    }
 
-    content.restaurant.heroTitle = document.querySelector("#restaurant-hero-title")?.value.trim() || "";
-    content.restaurant.heroText = document.querySelector("#restaurant-hero-text")?.value.trim() || "";
-    content.restaurant.extras = (document.querySelector("#restaurant-extras")?.value || "")
-      .split("\n")
-      .map((item) => item.trim())
-      .filter(Boolean);
-    
-    // Zbierz menu z panelu zarządzania menu
+    const restaurantHeroTitle = getTrimmedValue("#restaurant-hero-title");
+    if (restaurantHeroTitle !== null) content.restaurant.heroTitle = restaurantHeroTitle;
+    const restaurantHeroText = getTrimmedValue("#restaurant-hero-text");
+    if (restaurantHeroText !== null) content.restaurant.heroText = restaurantHeroText;
+    const restaurantExtras = getTrimmedValue("#restaurant-extras");
+    if (restaurantExtras !== null) {
+      content.restaurant.extras = restaurantExtras
+        .split("\n")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+    const restaurantOrderButtonText = getTrimmedValue("#restaurant-order-button-text");
+    if (restaurantOrderButtonText !== null) {
+      content.restaurant.orderButtonText = restaurantOrderButtonText;
+    }
+
     if (document.querySelector("#restaurant-menu-panel")) {
       content.restaurant.menu = collectMenuFromPanel();
-    } else {
-      // Fallback dla starego formatu
+    } else if (document.querySelector("[data-menu-title]")) {
       content.restaurant.menuSections = Array.from(document.querySelectorAll("[data-menu-title]")).map(
         (element, index) => ({
           title: element.value.trim(),
-          items: document
-            .querySelector(`[data-menu-items="${index}"]`)
-            .value.split("\n")
+          items: (document.querySelector(`[data-menu-items="${index}"]`)?.value || "")
+            .split("\n")
             .map((item) => item.trim())
             .filter(Boolean),
         })
       );
     }
 
-    content.hotel.heroTitle = document.querySelector("#hotel-hero-title").value.trim();
-    content.hotel.heroText = document.querySelector("#hotel-hero-text").value.trim();
-    content.hotel.amenities = document
-      .querySelector("#hotel-amenities")
-      .value.split("\n")
-      .map((item) => item.trim())
-      .filter(Boolean);
-    content.hotel.rooms = Array.from(document.querySelectorAll("[data-room-name]")).map((element, index) => ({
-      name: element.value.trim(),
-      size: document.querySelector(`[data-room-size="${index}"]`).value.trim(),
-      guests: document.querySelector(`[data-room-guests="${index}"]`).value.trim(),
-      features: document
-        .querySelector(`[data-room-features="${index}"]`)
-        .value.split("\n")
+    const hotelHeroTitle = getTrimmedValue("#hotel-hero-title");
+    if (hotelHeroTitle !== null) content.hotel.heroTitle = hotelHeroTitle;
+    const hotelHeroText = getTrimmedValue("#hotel-hero-text");
+    if (hotelHeroText !== null) content.hotel.heroText = hotelHeroText;
+    const hotelAmenities = getTrimmedValue("#hotel-amenities");
+    if (hotelAmenities !== null) {
+      content.hotel.amenities = hotelAmenities
+        .split("\n")
         .map((item) => item.trim())
-        .filter(Boolean),
-    }));
+        .filter(Boolean);
+    }
+    if (document.querySelector("[data-room-name]")) {
+      content.hotel.rooms = Array.from(document.querySelectorAll("[data-room-name]")).map((element, index) => ({
+        name: element.value.trim(),
+        size: document.querySelector(`[data-room-size="${index}"]`)?.value.trim() || "",
+        guests: document.querySelector(`[data-room-guests="${index}"]`)?.value.trim() || "",
+        features: (document.querySelector(`[data-room-features="${index}"]`)?.value || "")
+          .split("\n")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      }));
+    }
 
-    content.events.heroTitle = document.querySelector("#events-hero-title").value.trim();
-    content.events.heroText = document.querySelector("#events-hero-text").value.trim();
-    content.events.packages = document
-      .querySelector("#events-packages")
-      .value.split("\n")
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const eventsHeroTitle = getTrimmedValue("#events-hero-title");
+    if (eventsHeroTitle !== null) content.events.heroTitle = eventsHeroTitle;
+    const eventsHeroText = getTrimmedValue("#events-hero-text");
+    if (eventsHeroText !== null) content.events.heroText = eventsHeroText;
+    const eventsPackages = getTrimmedValue("#events-packages");
+    if (eventsPackages !== null) {
+      content.events.packages = eventsPackages
+        .split("\n")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
     const ofertaEl = document.querySelector("#events-oferta-modal-html");
     if (ofertaEl) {
       content.events.ofertaModalBodyHtml = ofertaEl.value;
     }
-    content.events.halls = Array.from(document.querySelectorAll("[data-hall-key]")).map((element, index) => ({
-      key: element.value.trim(),
-      name: document.querySelector(`[data-hall-name="${index}"]`).value.trim(),
-      capacity: document.querySelector(`[data-hall-capacity="${index}"]`).value.trim(),
-      description: document.querySelector(`[data-hall-description="${index}"]`).value.trim(),
-    }));
+    if (document.querySelector("[data-hall-key]")) {
+      content.events.halls = Array.from(document.querySelectorAll("[data-hall-key]")).map((element, index) => ({
+        key: element.value.trim(),
+        name: document.querySelector(`[data-hall-name="${index}"]`)?.value.trim() || "",
+        capacity: document.querySelector(`[data-hall-capacity="${index}"]`)?.value.trim() || "",
+        description: document.querySelector(`[data-hall-description="${index}"]`)?.value.trim() || "",
+      }));
+    }
 
     if (document.querySelector("#events-menu-panel")) {
       if (!content.events) {
@@ -928,22 +1167,21 @@
       content.events.menu = collectEventsMenuFromPanel();
     }
 
-    content.services = Array.from(document.querySelectorAll("[data-service-title]")).map((element, index) => ({
-      title: element.value.trim(),
-      contact: document.querySelector(`[data-service-contact="${index}"]`).value.trim(),
-      link: document.querySelector(`[data-service-link="${index}"]`).value.trim(),
-      description: document.querySelector(`[data-service-description="${index}"]`).value.trim(),
-    }));
+    if (document.querySelector("[data-service-title]")) {
+      content.services = Array.from(document.querySelectorAll("[data-service-title]")).map((element, index) => ({
+        title: element.value.trim(),
+        contact: document.querySelector(`[data-service-contact="${index}"]`)?.value.trim() || "",
+        link: document.querySelector(`[data-service-link="${index}"]`)?.value.trim() || "",
+        description: document.querySelector(`[data-service-description="${index}"]`)?.value.trim() || "",
+      }));
+    }
 
     return content;
   }
 
   function captureDraftIfPossible() {
     try {
-      if (document.querySelector("#content-panel")) {
-        state.content = collectContentFromForm();
-      }
-      // Zbierz menu z panelu menu restauracji
+      state.content = collectContentFromForm();
       if (document.querySelector("#restaurant-menu-panel")) {
         if (!state.content.restaurant) {
           state.content.restaurant = {};
@@ -1002,8 +1240,207 @@
         renderRestaurantGalleryPanel("Galeria zostala zapisana.");
       }
     } catch (error) {
-      renderContentPanel(error.message);
+      renderActiveAdminTile(error.message);
     }
+  }
+
+  function renderDomainBookingSettingsPanel(panelSelector, options = {}) {
+    const panel = document.querySelector(panelSelector);
+    if (!panel) return;
+
+    const {
+      title,
+      intro,
+      enabledId,
+      enabledLabel,
+      enabledHelp,
+      fromId,
+      toId,
+      fromKey,
+      toKey,
+      fromLabel,
+      statusMessage = "",
+      disabled = false,
+    } = options;
+
+    const booking = state.content.booking || {};
+    const domainKey = String(enabledId || "").replace(/^booking-enable-/, "");
+    const isEnabled = booking[domainKey] !== false;
+
+    panel.innerHTML = `
+      <p class="pill">Ustawienia rezerwacji</p>
+      <h2>${escapeHtml(title)}</h2>
+      <p class="section-intro">${escapeHtml(intro)}</p>
+      <div class="stack">
+        ${disabled ? '<p class="panel-note">W tej konfiguracji rezerwacje online sa globalnie wylaczone. Po wlaczeniu backendu rezerwacji te ustawienia zaczna dzialac.</p>' : ""}
+        <label class="checkbox-field">
+          <input type="checkbox" id="${escapeAttribute(enabledId)}" ${isEnabled ? "checked" : ""} ${disabled ? "disabled" : ""} />
+          <span class="checkbox-copy">
+            <strong>${escapeHtml(enabledLabel)}</strong>
+            <span>${escapeHtml(enabledHelp)}</span>
+          </span>
+        </label>
+        <div class="field-grid">
+          <label class="field"><span>${escapeHtml(fromLabel)}</span><input type="date" id="${escapeAttribute(fromId)}" value="${escapeAttribute(booking[fromKey] || "")}" ${disabled ? "disabled" : ""} /></label>
+          <label class="field"><span>Do</span><input type="date" id="${escapeAttribute(toId)}" value="${escapeAttribute(booking[toKey] || "")}" ${disabled ? "disabled" : ""} /></label>
+        </div>
+        <p class="status">${escapeHtml(statusMessage)}</p>
+      </div>
+    `;
+  }
+
+  function renderHotelBookingSettingsPanel(statusMessage = "") {
+    renderDomainBookingSettingsPanel("#hotel-booking-settings-panel", {
+      title: "Hotel",
+      intro: "Steruj formularzem rezerwacji pokoi i okresami przerwy.",
+      enabledId: "booking-enable-hotel",
+      enabledLabel: "Hotel - rezerwacja pokoi wlaczona",
+      enabledHelp: "Wylacza lub wlacza formularz rezerwacji na stronie hotelu.",
+      fromId: "booking-hotel-pause-from",
+      toId: "booking-hotel-pause-to",
+      fromKey: "hotelPauseFrom",
+      toKey: "hotelPauseTo",
+      fromLabel: "Przerwa od",
+      statusMessage,
+      disabled: !onlineBookingsEnabled,
+    });
+  }
+
+  function renderRestaurantBookingSettingsPanel(statusMessage = "") {
+    renderDomainBookingSettingsPanel("#restaurant-booking-settings-panel", {
+      title: "Restauracja",
+      intro: "Steruj formularzem rezerwacji stolikow i okresami przerwy.",
+      enabledId: "booking-enable-restaurant",
+      enabledLabel: "Restauracja - rezerwacja stolika wlaczona",
+      enabledHelp: "Wylacza lub wlacza formularz rezerwacji na stronie restauracji.",
+      fromId: "booking-restaurant-pause-from",
+      toId: "booking-restaurant-pause-to",
+      fromKey: "restaurantPauseFrom",
+      toKey: "restaurantPauseTo",
+      fromLabel: "Przerwa od",
+      statusMessage,
+      disabled: !onlineBookingsEnabled,
+    });
+  }
+
+  function renderEventsBookingSettingsPanel(statusMessage = "") {
+    renderDomainBookingSettingsPanel("#events-booking-settings-panel", {
+      title: "Przyjecia",
+      intro: "Steruj formularzem zapytan o sale oraz okresami przerwy.",
+      enabledId: "booking-enable-events",
+      enabledLabel: "Przyjecia / sale - rezerwacja wlaczona",
+      enabledHelp: "Wylacza lub wlacza formularz zapytania o sale.",
+      fromId: "booking-events-pause-from",
+      toId: "booking-events-pause-to",
+      fromKey: "eventsPauseFrom",
+      toKey: "eventsPauseTo",
+      fromLabel: "Przerwa od",
+      statusMessage,
+      disabled: !onlineBookingsEnabled,
+    });
+  }
+
+  function renderRestaurantOpeningHoursPanel(statusMessage = "") {
+    const panel = document.querySelector("#restaurant-opening-hours-panel");
+    if (!panel) return;
+    const openingHours = (state.content.company?.openingHours || [])
+      .map((item) => (typeof item === "object" ? `${item.day}: ${item.hours}` : item))
+      .join("\n");
+
+    panel.innerHTML = `
+      <p class="pill">Restauracja</p>
+      <h2>Godziny otwarcia</h2>
+      <p class="section-intro">Te godziny pojawiaja sie w kafelku "Godziny" na stronie restauracji.</p>
+      <div class="stack">
+        <label class="field-full">
+          <span>Godziny otwarcia (jedna linia = jeden dzien)</span>
+          <textarea id="company-opening-hours" rows="10">${escapeHtml(openingHours)}</textarea>
+        </label>
+        <p class="status">${escapeHtml(statusMessage)}</p>
+      </div>
+    `;
+  }
+
+  function renderRestaurantOrderPanel(statusMessage = "") {
+    const panel = document.querySelector("#restaurant-order-panel");
+    if (!panel) return;
+    const currentLabel = state.content.restaurant?.orderButtonText || "Rezerwacja stolika";
+
+    panel.innerHTML = `
+      <p class="pill">Restauracja</p>
+      <h2>Obecny modul zamowien jedzenia</h2>
+      <p class="section-intro">Edytuj tekst widoczny w obecnym kafelku / przycisku CTA na stronie restauracji.</p>
+      <div class="stack">
+        <label class="field-full">
+          <span>Tresc przycisku</span>
+          <input id="restaurant-order-button-text" value="${escapeAttribute(currentLabel)}" />
+        </label>
+        <p class="status">${escapeHtml(statusMessage)}</p>
+      </div>
+    `;
+  }
+
+  function renderEventsOfferPanel(statusMessage = "") {
+    const panel = document.querySelector("#events-offer-panel");
+    if (!panel) return;
+
+    panel.innerHTML = `
+      <p class="pill">Przyjecia</p>
+      <h2>Oferta</h2>
+      <p class="section-intro">Edytujesz tresc modala otwieranego z kafelka "Oferta" na stronie Przyjecia.</p>
+      <div class="stack">
+        <label class="field-full">
+          <span>HTML oferty</span>
+          <textarea id="events-oferta-modal-html" rows="18">${escapeHtml(state.content.events?.ofertaModalBodyHtml || "")}</textarea>
+        </label>
+        <p class="helper">Dozwolone znaczniki: p, ul, li, strong, a.</p>
+        <p class="status">${escapeHtml(statusMessage)}</p>
+      </div>
+    `;
+  }
+
+  function renderEventsHallsPanel(statusMessage = "") {
+    const panel = document.querySelector("#events-halls-panel");
+    if (!panel) return;
+
+    panel.innerHTML = `
+      <p class="pill">Przyjecia</p>
+      <h2>Sale</h2>
+      <p class="section-intro">Zarzadzaj nazwami, pojemnosciami i opisami sal widocznymi w panelu i na stronie.</p>
+      <div class="stack">
+        <div class="repeater-head">
+          <strong>Lista sal</strong>
+          <button class="button secondary" type="button" data-add-array="halls">Dodaj sale</button>
+        </div>
+        <div id="halls-list" class="repeater-list"></div>
+        <p class="status">${escapeHtml(statusMessage)}</p>
+      </div>
+    `;
+
+    bindRepeaterButtons();
+    renderHallsList();
+  }
+
+  function renderContactPanel(statusMessage = "") {
+    const panel = document.querySelector("#contact-panel");
+    if (!panel) return;
+    const company = state.content.company || {};
+
+    panel.innerHTML = `
+      <p class="pill">Kontakt</p>
+      <h2>Dane kontaktowe</h2>
+      <p class="section-intro">Te pola zasilaja dane kontaktowe w serwisie i panelu.</p>
+      <div class="stack">
+        <div class="field-grid">
+          <label class="field"><span>Nazwa</span><input id="company-name" value="${escapeAttribute(company.name || "")}" /></label>
+          <label class="field"><span>Telefon</span><input id="company-phone" value="${escapeAttribute(company.phone || "")}" /></label>
+          <label class="field"><span>E-mail</span><input id="company-email" value="${escapeAttribute(company.email || "")}" /></label>
+          <label class="field"><span>Adres</span><input id="company-address" value="${escapeAttribute(company.address || "")}" /></label>
+          <label class="field-full"><span>Haslo pod logo</span><input id="company-tagline" value="${escapeAttribute(company.tagline || "")}" /></label>
+        </div>
+        <p class="status">${escapeHtml(statusMessage)}</p>
+      </div>
+    `;
   }
 
   function renderSubmissionsPanel() {
@@ -1057,6 +1494,7 @@
 
   function renderGalleryPanel(statusMessage = "") {
     const panel = document.querySelector("#gallery-panel");
+    if (!panel) return;
     const mediaEnabled = state.capabilities?.mediaStorageEnabled === true;
     panel.innerHTML = `
       <p class="pill">Galeria</p>
@@ -1200,6 +1638,7 @@
 
   function renderRestaurantMenuPanel(statusMessage = "") {
     const panel = document.querySelector("#restaurant-menu-panel");
+    if (!panel) return;
     const menu = state.content.restaurant?.menu || [];
 
     panel.innerHTML = `
@@ -1863,6 +2302,7 @@
 
   function renderRestaurantGalleryPanel(statusMessage = "") {
     const panel = document.querySelector("#restaurant-gallery-panel");
+    if (!panel) return;
     const gallery = state.content.restaurant?.gallery || [];
 
     panel.innerHTML = `
@@ -1966,6 +2406,7 @@
 
   function renderHotelRoomGalleriesPanel(statusMessage = "") {
     const panel = document.querySelector("#hotel-room-galleries-panel");
+    if (!panel) return;
     const roomGalleries = state.content.hotel?.roomGalleries || {
       "1-osobowe": [],
       "2-osobowe": [],
@@ -1979,17 +2420,21 @@
       { key: "3-osobowe", label: "Pokoje 3-osobowe" },
       { key: "4-osobowe", label: "Pokoje 4-osobowe" },
     ];
+    const activeRoomType = getActiveAdminTile("hotel");
+    const visibleRoomTypes = roomTypes.some((roomType) => roomType.key === activeRoomType)
+      ? roomTypes.filter((roomType) => roomType.key === activeRoomType)
+      : roomTypes;
 
     panel.innerHTML = `
       <p class="pill">Hotel</p>
       <h2>Galeria Pokoi</h2>
-      <p class="section-intro">Zarzadzaj zdjeciami dla poszczegolnych typow pokoi. Mozesz dodawac, usuwac i zmieniac kolejnosc zdjec.</p>
+      <p class="section-intro">Zarzadzaj zdjeciami dla wybranego typu pokoju. Mozesz dodawac, usuwac i zmieniac kolejnosc zdjec.</p>
       <p class="status">${escapeHtml(statusMessage)}</p>
       <div class="grid">
-        ${roomTypes
+        ${visibleRoomTypes
           .map(
             (roomType) => `
-              <div class="col-6">
+              <div class="col-12">
                 <div class="repeater-item">
                   <h3>${escapeHtml(roomType.label)}</h3>
                   <form class="stack" data-upload-room-gallery="${escapeAttribute(roomType.key)}">
@@ -2105,6 +2550,7 @@
 
   function renderEventsHallGalleriesPanel(statusMessage = "") {
     const panel = document.querySelector("#events-hall-galleries-panel");
+    if (!panel) return;
     const hallGalleries = state.content.events?.hallGalleries || {
       "1": [],
       "2": [],
@@ -2247,6 +2693,7 @@
 
   function renderDocumentsPanel(statusMessage = "") {
     const panel = document.querySelector("#documents-panel");
+    if (!panel) return;
     const documentsMenu = state.content.documentsMenu || { title: "", intro: "", sections: [] };
     const mediaEnabled = state.capabilities?.mediaStorageEnabled === true;
     panel.innerHTML = `
@@ -2418,6 +2865,7 @@
 
   function renderCalendarPanel(statusMessage = "") {
     const panel = document.querySelector("#calendar-panel");
+    if (!panel) return;
     panel.innerHTML = `
       <p class="pill">Kalendarz sal</p>
       <h2>Blokady terminow</h2>
@@ -2525,7 +2973,7 @@
     state.capabilities = data.capabilities || { mediaStorageEnabled: false };
     renderDashboard();
     if (message) {
-      renderContentPanel(message);
+      renderActiveAdminTile(message);
     }
   }
 

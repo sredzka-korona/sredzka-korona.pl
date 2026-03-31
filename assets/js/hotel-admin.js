@@ -197,8 +197,11 @@
       </div>`;
   }
 
-  async function renderHotelAdminPanel(container) {
+  async function renderHotelAdminPanel(container, options = {}) {
     if (!container) return;
+    if (options.defaultTab) {
+      hotelSubTab = options.defaultTab;
+    }
     container.innerHTML = `<p class="status">Ładowanie modułu Hotel…</p>`;
     try {
       await loadRooms();

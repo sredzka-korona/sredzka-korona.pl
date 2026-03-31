@@ -236,8 +236,11 @@
       </div>`;
   }
 
-  async function renderRestaurantAdminPanel(container) {
+  async function renderRestaurantAdminPanel(container, options = {}) {
     if (!container) return;
+    if (options.defaultTab) {
+      restSubTab = options.defaultTab;
+    }
     container.innerHTML = `<p class="status">Ładowanie modułu Restauracja…</p>`;
     try {
       await loadSettings();
