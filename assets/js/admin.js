@@ -101,6 +101,7 @@
       ],
     },
   ];
+  const HOME_TAB_ORDER = ["hotel", "restauracja", "przyjecia", "rezerwacje", "dokumenty", "kontakt"];
   const INLINE_IMAGE_MAX_BYTES = 320 * 1024;
   const API_IMAGE_MAX_BYTES = 1_700_000;
   const DOCUMENT_MAX_BYTES = 1_700_000;
@@ -681,8 +682,11 @@
             }
           </div>
           <div class="admin-topbar-center">
-            <p class="pill">Panel administratora</p>
-            <h1>Sredzka Korona</h1>
+            <a href="../index.html" class="admin-brand-link" aria-label="Przejdz do strony glownej Sredzka Korona">
+              <span class="admin-brand-text">SREDZKA</span>
+              <img class="admin-brand-logo" src="../ikony/logo-korona.png" alt="" aria-hidden="true" />
+              <span class="admin-brand-text">KORONA</span>
+            </a>
           </div>
           <div class="admin-topbar-side admin-topbar-side-end">
             <button class="button danger icon-button" id="logout-button" type="button" aria-label="Wyloguj">⎋</button>
@@ -725,15 +729,10 @@
               </div>
             `
               : `
-              <div class="admin-workspace-head">
-                <div>
-                  <p class="pill">Panel glowny</p>
-                  <h2>Wybierz sekcje</h2>
-                  <p class="section-intro">Po kliknieciu kafelka przejdziesz do zarzadzania dana czescia strony.</p>
-                </div>
-              </div>
               <div class="admin-tile-grid admin-entry-grid" aria-label="Glowne sekcje panelu administracyjnego">
-                ${ADMIN_TABS.map(
+                ${HOME_TAB_ORDER.map((tabKey) => ADMIN_TABS.find((tab) => tab.key === tabKey))
+                  .filter(Boolean)
+                  .map(
                   (tab) => `
                     <button
                       type="button"
@@ -744,7 +743,8 @@
                       <span class="admin-tile-copy">${escapeHtml(tab.description)}</span>
                     </button>
                   `
-                ).join("")}
+                )
+                  .join("")}
               </div>
             `
           }
