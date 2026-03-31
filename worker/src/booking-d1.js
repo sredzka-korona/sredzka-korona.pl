@@ -62,6 +62,19 @@ function ymdHmToMs(ymd, hm) {
   return Date.UTC(y, m - 1, d, hh, mm, 0, 0);
 }
 
+function todayYmdInWarsaw() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Warsaw",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value || "1970";
+  const month = parts.find((part) => part.type === "month")?.value || "01";
+  const day = parts.find((part) => part.type === "day")?.value || "01";
+  return `${year}-${month}-${day}`;
+}
+
 function formatHm(ms) {
   if (!Number.isFinite(ms)) return "";
   return new Date(ms).toLocaleTimeString("pl-PL", {
@@ -606,18 +619,197 @@ async function loadRestaurantSettings(env) {
   };
 }
 
-function buildTimeSlots(open, close, stepMinutes) {
-  if (!isHm(open) || !isHm(close)) return [];
-  const [oh, om] = open.split(":").map((x) => Number(x));
-  const [ch, cm] = close.split(":").map((x) => Number(x));
-  const start = oh * 60 + om;
-  const end = ch * 60 + cm;
+function normalizeComparableText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeHmLabel(minutes) {
+  const normalized = ((Number(minutes) % 1440) + 1440) % 1440;
+  const hh = Math.floor(normalized / 60);
+  const mm = normalized % 60;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+function parseHmToMinutes(value, { allow24 = false } = {}) {
+  const raw = String(value || "").trim().replace(".", ":");
+  const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hh = Number(match[1]);
+  const mm = Number(match[2]);
+  if (Number.isNaN(hh) || Number.isNaN(mm) || mm < 0 || mm > 59) {
+    return null;
+  }
+  if (hh === 24 && mm === 0 && allow24) {
+    return 1440;
+  }
+  if (hh < 0 || hh > 23) {
+    return null;
+  }
+  return hh * 60 + mm;
+}
+
+function resolveOpeningHoursDayIndexes(dayValue) {
+  const OPENING_HOURS_DAY_ALIASES = [
+    ["monday", "poniedzialek", "poniedziałek"],
+    ["tuesday", "wtorek"],
+    ["wednesday", "sroda", "środa"],
+    ["thursday", "czwartek"],
+    ["friday", "piatek", "piątek"],
+    ["saturday", "sobota"],
+    ["sunday", "niedziela"],
+  ];
+  const normalized = normalizeComparableText(dayValue)
+    .replace(/[–—]/g, "-")
+    .replace(/\s*-\s*/g, "-");
+  if (!normalized) return [];
+  if (normalized === "codziennie" || normalized === "daily") {
+    return [0, 1, 2, 3, 4, 5, 6];
+  }
+
+  const aliasToIndex = new Map();
+  OPENING_HOURS_DAY_ALIASES.forEach((aliases, index) => {
+    aliases.forEach((alias) => aliasToIndex.set(alias, index));
+  });
+  if (aliasToIndex.has(normalized)) {
+    return [aliasToIndex.get(normalized)];
+  }
+
+  const rangeMatch = normalized.match(/^(.+?)-(.+)$/);
+  if (rangeMatch) {
+    const from = aliasToIndex.get(rangeMatch[1]?.trim());
+    const to = aliasToIndex.get(rangeMatch[2]?.trim());
+    if (from == null || to == null) return [];
+    const start = Math.min(from, to);
+    const end = Math.max(from, to);
+    return Array.from({ length: end - start + 1 }, (_, offset) => start + offset);
+  }
+  return [];
+}
+
+function parseOpeningHoursRange(hoursValue) {
+  const raw = String(hoursValue || "").trim();
+  if (!raw) {
+    return { closed: true };
+  }
+  const normalized = normalizeComparableText(raw);
+  if (["nieczynne", "zamkniete", "zamknięte", "closed"].includes(normalized)) {
+    return { closed: true };
+  }
+  const match = raw.match(/(\d{1,2}[:.]\d{2})\s*[-–—]\s*(\d{1,2}[:.]\d{2})/);
+  if (!match) {
+    return { closed: true };
+  }
+  const openMinutes = parseHmToMinutes(match[1], { allow24: false });
+  const closeMinutesRaw = parseHmToMinutes(match[2], { allow24: true });
+  if (openMinutes == null || closeMinutesRaw == null) {
+    return { closed: true };
+  }
+  const closeMinutes = closeMinutesRaw <= openMinutes ? closeMinutesRaw + 1440 : closeMinutesRaw;
+  return {
+    closed: false,
+    openMinutes,
+    closeMinutes,
+    openLabel: normalizeHmLabel(openMinutes),
+    closeLabel: normalizeHmLabel(closeMinutesRaw),
+  };
+}
+
+function weekdayIndexMondayFirst(reservationDate) {
+  if (!isYmd(reservationDate)) return null;
+  const [y, m, d] = reservationDate.split("-").map((part) => Number(part));
+  const jsDay = new Date(Date.UTC(y, m - 1, d, 12, 0, 0, 0)).getUTCDay(); // 0..6, 0=niedziela
+  return jsDay === 0 ? 6 : jsDay - 1; // 0..6, 0=poniedzialek
+}
+
+function resolveOpeningHoursWindowForDate(openingHours, reservationDate) {
+  const targetDayIndex = weekdayIndexMondayFirst(reservationDate);
+  if (targetDayIndex == null) {
+    return null;
+  }
+  if (!Array.isArray(openingHours) || !openingHours.length) {
+    return null;
+  }
+
+  const dayWindows = new Map();
+  for (const item of openingHours) {
+    const dayValue =
+      item && typeof item === "object"
+        ? item.day
+        : String(item || "")
+            .split(":")[0]
+            .trim();
+    const hoursValue =
+      item && typeof item === "object"
+        ? item.hours
+        : String(item || "")
+            .split(":")
+            .slice(1)
+            .join(":")
+            .trim();
+    const dayIndexes = resolveOpeningHoursDayIndexes(dayValue);
+    const range = parseOpeningHoursRange(hoursValue);
+    dayIndexes.forEach((index) => dayWindows.set(index, range));
+  }
+
+  const dayRange = dayWindows.get(targetDayIndex);
+  if (!dayRange) return null;
+  if (dayRange.closed) {
+    return { closed: true, source: "company" };
+  }
+  return { ...dayRange, source: "company" };
+}
+
+async function loadCompanyOpeningHours(env) {
+  const row = await env.DB.prepare("SELECT content_json FROM site_content WHERE id = 1").first();
+  if (!row?.content_json) {
+    return null;
+  }
+  const parsed = parseJson(row.content_json, null);
+  const openingHours = parsed?.company?.openingHours;
+  return Array.isArray(openingHours) ? openingHours : null;
+}
+
+function fallbackWindowFromSettings(settings) {
+  const openMinutes = parseHmToMinutes(settings?.reservationOpenTime || "12:00", { allow24: false });
+  const closeMinutesRaw = parseHmToMinutes(settings?.reservationCloseTime || "22:00", { allow24: true });
+  const normalizedOpen = openMinutes == null ? 12 * 60 : openMinutes;
+  const normalizedCloseRaw = closeMinutesRaw == null ? 22 * 60 : closeMinutesRaw;
+  const normalizedClose =
+    normalizedCloseRaw <= normalizedOpen ? normalizedCloseRaw + 1440 : normalizedCloseRaw;
+  return {
+    closed: false,
+    openMinutes: normalizedOpen,
+    closeMinutes: normalizedClose,
+    openLabel: normalizeHmLabel(normalizedOpen),
+    closeLabel: normalizeHmLabel(normalizedCloseRaw),
+    source: "settings",
+  };
+}
+
+async function resolveRestaurantWindowForDate(env, settings, reservationDate) {
+  const openingHours = await loadCompanyOpeningHours(env);
+  const dynamic = resolveOpeningHoursWindowForDate(openingHours, reservationDate);
+  if (dynamic) {
+    return dynamic;
+  }
+  return fallbackWindowFromSettings(settings);
+}
+
+function buildTimeSlotsFromMinutes(openMinutes, closeMinutes, stepMinutes) {
+  if (!Number.isFinite(openMinutes) || !Number.isFinite(closeMinutes) || closeMinutes <= openMinutes) {
+    return [];
+  }
+  // W formularzu `reservationDate + HH:MM` nie reprezentujemy startu po północy kolejnego dnia.
+  const latestStartBoundary = Math.min(closeMinutes, 1440);
   const step = Math.max(15, Number(stepMinutes || 30));
   const out = [];
-  for (let m = start; m <= end; m += step) {
-    const hh = Math.floor(m / 60);
-    const mm = m % 60;
-    out.push(`${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`);
+  for (let m = openMinutes; m < latestStartBoundary; m += step) {
+    out.push(normalizeHmLabel(m));
   }
   return out;
 }
@@ -679,24 +871,31 @@ async function assertRestaurantAvailability(env, payload, excludeId = null) {
   if (!Number.isFinite(durationHours) || durationHours <= 0) {
     throw new Error("Nieprawidłowy czas trwania.");
   }
+  const dayWindow = await resolveRestaurantWindowForDate(env, settings, reservationDate);
+  if (dayWindow.closed) {
+    throw new Error("Restauracja jest nieczynna w wybranym dniu.");
+  }
   const startMs = ymdHmToMs(reservationDate, startTime);
   const endMs = startMs + durationHours * 3600000;
-  const [openH, openM] = String(settings.reservationOpenTime || "12:00")
-    .split(":")
-    .map((x) => Number(x));
-  const [closeH, closeM] = String(settings.reservationCloseTime || "22:00")
-    .split(":")
-    .map((x) => Number(x));
-  const openMinutes = openH * 60 + openM;
-  const closeMinutes = closeH * 60 + closeM;
   const startMinutes = toInt(startTime.slice(0, 2), 0) * 60 + toInt(startTime.slice(3, 5), 0);
   const endMinutes = startMinutes + Math.round(durationHours * 60);
-  if (startMinutes < openMinutes || endMinutes > closeMinutes) {
-    throw new Error(`Rezerwacje tylko w godzinach ${settings.reservationOpenTime}-${settings.reservationCloseTime}.`);
+  if (startMinutes < dayWindow.openMinutes || endMinutes > dayWindow.closeMinutes) {
+    throw new Error(`Rezerwacje tylko w godzinach ${dayWindow.openLabel}-${dayWindow.closeLabel}.`);
   }
   const availableIds = await restaurantAvailableTableIds(env, startMs, endMs, tablesCount, excludeId);
   const ok = availableIds.length >= tablesCount;
-  return { ok, availableIds, startMs, endMs, settings, reservationDate, startTime, durationHours, tablesCount };
+  return {
+    ok,
+    availableIds,
+    startMs,
+    endMs,
+    settings,
+    reservationDate,
+    startTime,
+    durationHours,
+    tablesCount,
+    dayWindow,
+  };
 }
 
 function mapRestaurantReservation(row, tableMap) {
@@ -1177,18 +1376,31 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
     return { status: 200, data: { ok: true, service: "restaurantApi-d1" } };
   }
   if (op === "public-settings" && request.method === "GET") {
+    const url = new URL(request.url);
+    const requestedDate = cleanString(url.searchParams.get("reservationDate"), 10);
+    const reservationDate = isYmd(requestedDate) ? requestedDate : todayYmdInWarsaw();
     const settings = await loadRestaurantSettings(env);
     const tables = await restaurantTables(env, false);
-    const slots = buildTimeSlots(settings.reservationOpenTime, settings.reservationCloseTime, settings.timeSlotMinutes);
+    const dayWindow = await resolveRestaurantWindowForDate(env, settings, reservationDate);
+    const slots = dayWindow.closed
+      ? []
+      : buildTimeSlotsFromMinutes(dayWindow.openMinutes, dayWindow.closeMinutes, settings.timeSlotMinutes);
     return {
       status: 200,
       data: {
         maxGuestsPerTable: Number(settings.maxGuestsPerTable || 4),
         tableCount: tables.length,
-        reservationOpenTime: settings.reservationOpenTime || "12:00",
-        reservationCloseTime: settings.reservationCloseTime || "22:00",
+        selectedDate: reservationDate,
+        closedForDay: Boolean(dayWindow.closed),
+        reservationOpenTime: dayWindow.closed ? "" : dayWindow.openLabel,
+        reservationCloseTime: dayWindow.closed ? "" : dayWindow.closeLabel,
+        reservationHoursSource: dayWindow.source || "settings",
         timeSlotMinutes: Number(settings.timeSlotMinutes || 30),
-        timeSlots: slots.length ? slots : ["12:00", "13:00", "14:00", "18:00", "19:00", "20:00"],
+        timeSlots: dayWindow.closed
+          ? []
+          : slots.length
+            ? slots
+            : ["12:00", "13:00", "14:00", "18:00", "19:00", "20:00"],
         restaurantName: "Średzka Korona — Restauracja",
       },
     };

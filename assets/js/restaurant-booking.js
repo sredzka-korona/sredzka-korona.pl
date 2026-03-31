@@ -22,7 +22,16 @@
     if (!base) {
       throw new Error("Brak restaurantApiBase / firebaseProjectId w assets/js/config.js");
     }
-    const url = `${base}?op=${encodeURIComponent(op)}`;
+    const query = options.query && typeof options.query === "object" ? options.query : null;
+    const params = new URLSearchParams({ op: String(op || "") });
+    if (query) {
+      Object.entries(query).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          params.set(key, String(value));
+        }
+      });
+    }
+    const url = `${base}?${params.toString()}`;
     const method = String(options.method || "GET").toUpperCase();
     const headers = { ...(options.headers || {}) };
     let body;
@@ -73,6 +82,61 @@
     customerNote: "",
     customer: {},
   };
+
+  function todayYmdLocal() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function hmToMinutes(value) {
+    const match = String(value || "").match(/^(\d{2}):(\d{2})$/);
+    if (!match) return null;
+    const hh = Number(match[1]);
+    const mm = Number(match[2]);
+    if (Number.isNaN(hh) || Number.isNaN(mm) || hh < 0 || hh > 24 || mm < 0 || mm > 59) return null;
+    if (hh === 24 && mm !== 0) return null;
+    return hh * 60 + mm;
+  }
+
+  function getDayWindow() {
+    const openRaw = state.publicSettings?.reservationOpenTime || "";
+    const closeRaw = state.publicSettings?.reservationCloseTime || "";
+    const openMinutes = hmToMinutes(openRaw);
+    const closeMinutesRaw = hmToMinutes(closeRaw);
+    if (openMinutes == null || closeMinutesRaw == null) return null;
+    return {
+      openMinutes,
+      closeMinutes: closeMinutesRaw <= openMinutes ? closeMinutesRaw + 1440 : closeMinutesRaw,
+      openRaw,
+      closeRaw,
+    };
+  }
+
+  function durationAwareSlots() {
+    const baseSlots = Array.isArray(state.publicSettings?.timeSlots) ? state.publicSettings.timeSlots : [];
+    const window = getDayWindow();
+    if (!window) return baseSlots;
+    const durationMinutes = Math.max(1, Math.round(Number(state.durationHours || 0) * 60));
+    return baseSlots.filter((slot) => {
+      const startMinutes = hmToMinutes(slot);
+      if (startMinutes == null) return false;
+      return startMinutes >= window.openMinutes && startMinutes + durationMinutes <= window.closeMinutes;
+    });
+  }
+
+  function syncStartTimeWithSlots() {
+    const slots = durationAwareSlots();
+    if (!slots.length) {
+      state.startTime = "";
+      return;
+    }
+    if (!slots.includes(state.startTime)) {
+      state.startTime = slots[0];
+    }
+  }
 
   function escapeHtml(s) {
     return String(s ?? "")
@@ -130,7 +194,10 @@
   }
 
   function timeOptionsHtml() {
-    const slots = state.publicSettings?.timeSlots || [];
+    const slots = durationAwareSlots();
+    if (!slots.length) {
+      return `<option value="">Brak dostępnych godzin</option>`;
+    }
     return slots
       .map(
         (t) =>
@@ -158,13 +225,22 @@
 
     let inner = "";
     if (state.step === 1) {
+      const slots = durationAwareSlots();
+      const dayWindow = getDayWindow();
+      const dayHoursLabel =
+        state.publicSettings?.closedForDay
+          ? "Restauracja jest nieczynna w wybranym dniu."
+          : dayWindow
+            ? `Godziny dla wybranego dnia: ${dayWindow.openRaw}-${dayWindow.closeRaw}.`
+            : "";
       inner = `
         <h3>Termin</h3>
         <p class="booking-hint">Wybierz datę, godzinę rozpoczęcia i czas trwania rezerwacji.</p>
+        ${dayHoursLabel ? `<p class="booking-hint">${escapeHtml(dayHoursLabel)}</p>` : ""}
         <div class="booking-field-grid">
           <label>Data<input type="date" id="rb-date" value="${escapeHtml(state.reservationDate)}" required /></label>
           <label>Godzina rozpoczęcia
-            <select id="rb-start">${timeOptionsHtml()}</select>
+            <select id="rb-start" ${slots.length ? "" : "disabled"}>${timeOptionsHtml()}</select>
           </label>
         </div>
         <label>Czas trwania (godziny)
@@ -264,15 +340,18 @@
       modal.innerHTML = "<p>Ładowanie…</p>";
     }
     try {
-      const data = await api("public-settings", { method: "GET" });
-      state.publicSettings = data;
       if (!state.reservationDate) {
-        const today = new Date().toISOString().slice(0, 10);
-        state.reservationDate = today;
+        state.reservationDate = todayYmdLocal();
       }
-      if (!state.startTime && data.timeSlots?.length) {
-        state.startTime = data.timeSlots[0];
+      const data = await api("public-settings", {
+        method: "GET",
+        query: { reservationDate: state.reservationDate },
+      });
+      state.publicSettings = data;
+      if (data.selectedDate) {
+        state.reservationDate = String(data.selectedDate);
       }
+      syncStartTimeWithSlots();
       renderBody();
     } catch (e) {
       if (modal) {
@@ -292,8 +371,17 @@
       function validate() {
         const d = dateEl?.value;
         const t = startEl?.value;
-        const today = new Date().toISOString().slice(0, 10);
-        if (!d || !t) {
+        const today = todayYmdLocal();
+        const slots = durationAwareSlots();
+        if (!d || !slots.length || !t) {
+          if (d && !slots.length) {
+            err.hidden = false;
+            err.textContent = state.publicSettings?.closedForDay
+              ? "Restauracja jest nieczynna w wybranym dniu."
+              : "Brak dostępnych godzin dla wybranego czasu trwania.";
+          } else {
+            err.hidden = true;
+          }
           next.disabled = true;
           return;
         }
@@ -306,10 +394,29 @@
         err.hidden = true;
         next.disabled = false;
       }
-      dateEl?.addEventListener("change", validate);
+      dateEl?.addEventListener("change", async () => {
+        state.reservationDate = dateEl.value || "";
+        try {
+          const data = await api("public-settings", {
+            method: "GET",
+            query: { reservationDate: state.reservationDate },
+          });
+          state.publicSettings = data;
+          if (data.selectedDate) {
+            state.reservationDate = String(data.selectedDate);
+          }
+          syncStartTimeWithSlots();
+          renderBody();
+        } catch (e) {
+          err.hidden = false;
+          err.textContent = e.message || "Nie udało się odświeżyć godzin.";
+        }
+      });
       startEl?.addEventListener("change", validate);
       durEl?.addEventListener("change", () => {
         state.durationHours = Number(durEl.value);
+        syncStartTimeWithSlots();
+        renderBody();
       });
       validate();
       next?.addEventListener("click", async () => {
