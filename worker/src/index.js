@@ -203,6 +203,18 @@ export default {
       }
 
       if (
+        url.pathname.match(/^\/api\/public\/legacy-bookings\/(hotel|restaurant|hall)$/) &&
+        ["GET", "POST"].includes(request.method)
+      ) {
+        const service = url.pathname.split("/").pop();
+        const op = String(url.searchParams.get("op") || "").trim();
+        if (!isAllowedPublicLegacyBookingOp(op)) {
+          return jsonResponse({ error: "Niedozwolona operacja publiczna." }, 403, request, env);
+        }
+        return proxyLegacyBookingApi(service, request, url, env);
+      }
+
+      if (
         url.pathname.match(/^\/api\/admin\/legacy-bookings\/(hotel|restaurant|hall)$/) &&
         ["GET", "POST", "PUT", "PATCH", "DELETE"].includes(request.method)
       ) {
@@ -1054,6 +1066,13 @@ function getLegacyBookingApiBase(service, env) {
     hall: env.HALL_API_BASE,
   };
   return String(byEnv[service] || defaults[service] || "").trim();
+}
+
+function isAllowedPublicLegacyBookingOp(op) {
+  if (!op) {
+    return false;
+  }
+  return op === "health" || op.startsWith("public-");
 }
 
 async function proxyLegacyBookingApi(service, request, url, env) {

@@ -98,15 +98,19 @@
   function bookingFnBase(moduleKey) {
     const cfg = window.SREDZKA_CONFIG || {};
     const map = {
-      restaurant: { cfgKey: "restaurantApiBase", fnName: "restaurantApi" },
-      hotel: { cfgKey: "hotelApiBase", fnName: "hotelApi" },
-      events: { cfgKey: "hallApiBase", fnName: "hallApi" },
+      restaurant: { cfgKey: "restaurantApiBase", fnName: "restaurantApi", service: "restaurant" },
+      hotel: { cfgKey: "hotelApiBase", fnName: "hotelApi", service: "hotel" },
+      events: { cfgKey: "hallApiBase", fnName: "hallApi", service: "hall" },
     };
     const item = map[moduleKey];
     if (!item) return "";
     const explicit = String(cfg[item.cfgKey] || "").trim();
     if (explicit) {
       return explicit.replace(/\/$/, "");
+    }
+    const apiBase = String(cfg.apiBase || "").trim();
+    if (apiBase) {
+      return `${apiBase.replace(/\/$/, "")}/api/public/legacy-bookings/${item.service}`;
     }
     const projectId = String(cfg.firebaseProjectId || "").trim();
     if (!projectId) return "";

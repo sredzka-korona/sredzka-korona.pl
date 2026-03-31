@@ -8,6 +8,9 @@
     if (config.hallApiBase) {
       return String(config.hallApiBase).replace(/\/$/, "");
     }
+    if (config.apiBase) {
+      return `${String(config.apiBase).replace(/\/$/, "")}/api/public/legacy-bookings/hall`;
+    }
     if (config.firebaseProjectId) {
       return `https://europe-west1-${config.firebaseProjectId}.cloudfunctions.net/hallApi`;
     }

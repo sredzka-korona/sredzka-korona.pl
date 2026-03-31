@@ -9,6 +9,9 @@
     if (config.hotelApiBase) {
       return String(config.hotelApiBase).replace(/\/$/, "");
     }
+    if (config.apiBase) {
+      return `${String(config.apiBase).replace(/\/$/, "")}/api/public/legacy-bookings/hotel`;
+    }
     if (config.firebaseProjectId) {
       return `https://europe-west1-${config.firebaseProjectId}.cloudfunctions.net/hotelApi`;
     }

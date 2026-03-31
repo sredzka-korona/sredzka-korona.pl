@@ -8,6 +8,9 @@
     if (config.restaurantApiBase) {
       return String(config.restaurantApiBase).replace(/\/$/, "");
     }
+    if (config.apiBase) {
+      return `${String(config.apiBase).replace(/\/$/, "")}/api/public/legacy-bookings/restaurant`;
+    }
     if (config.firebaseProjectId) {
       return `https://europe-west1-${config.firebaseProjectId}.cloudfunctions.net/restaurantApi`;
     }

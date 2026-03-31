@@ -803,6 +803,19 @@ body.admin-modal-open {
   justify-content: flex-start;
 }
 
+.menu-editor-modal-head {
+  justify-content: flex-start;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+}
+
+.menu-editor-modal-title {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .menu-editor-modal .field input,
 .menu-editor-modal .field-full input,
 .menu-editor-modal .field select,
@@ -1009,6 +1022,10 @@ body.admin-modal-open {
     justify-content: stretch;
   }
 
+  .menu-editor-modal-head {
+    flex-wrap: wrap;
+  }
+
   .menu-editor-product-actions {
     width: 100%;
     justify-content: flex-start;
@@ -1090,6 +1107,12 @@ body.admin-modal-open {
   margin: 0 auto;
   padding: 0 0 2rem;
   justify-items: center;
+}
+
+.admin-workspace-home {
+  min-height: calc(100vh - 9.25rem);
+  align-content: center;
+  padding-block: 0.8rem 2rem;
 }
 
 .admin-workspace-head {
@@ -1404,6 +1427,11 @@ body.admin-modal-open {
   .admin-hotel-wrap,
   .admin-workspace {
     padding-inline: 0;
+  }
+
+  .admin-workspace-home {
+    min-height: auto;
+    align-content: start;
   }
 
   .brand-row {
