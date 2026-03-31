@@ -1267,6 +1267,51 @@
         }
       }
 
+      @media (max-width: 900px) and (orientation: landscape) {
+        .restaurant-content {
+          align-items: stretch;
+        }
+
+        .restaurant-info {
+          max-width: none;
+        }
+
+        .action-buttons {
+          display: grid;
+          grid-template-columns: none;
+          grid-auto-flow: column;
+          grid-auto-columns: minmax(138px, 1fr);
+          gap: 0.85rem;
+          overflow-x: auto;
+          overflow-y: hidden;
+          margin: 1.5rem -0.15rem 1.25rem;
+          padding: 0 0.15rem 0.55rem;
+          scroll-snap-type: x proximity;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(232, 216, 184, 0.9) rgba(255, 255, 255, 0.18);
+        }
+
+        .action-buttons::-webkit-scrollbar {
+          height: 9px;
+        }
+
+        .action-buttons::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.16);
+          border-radius: 999px;
+        }
+
+        .action-buttons::-webkit-scrollbar-thumb {
+          background: rgba(232, 216, 184, 0.92);
+          border-radius: 999px;
+        }
+
+        .action-button {
+          min-width: 138px;
+          scroll-snap-align: start;
+        }
+      }
+
       .floating-contact-button {
         position: fixed;
         right: 2rem;
