@@ -1664,6 +1664,9 @@
                 restaurantGallery = payload.content.restaurant.gallery;
               }
             }
+            if (payload.content?.company?.phone) {
+              companyPhone = payload.content.company.phone;
+            }
             if (payload.content?.company?.openingHours) {
               // Konwertuj różne formaty na jednolity format {day, hours}
               openingHours = payload.content.company.openingHours.map(item => {
@@ -1692,6 +1695,7 @@
         }
 
         let selectedCategoryIndex = 0;
+        let companyPhone = "+48 600 700 800";
         let restaurantOrderButtonText = "Rezerwacja stolika";
 
         function renderMenuItems(items) {
@@ -1855,6 +1859,24 @@
           `;
         }
 
+        function renderOrdersInfo() {
+          return `
+            <div class="modal-body">
+              <div class="modal-header">
+                <h2>Zamówienia</h2>
+                <button class="modal-close" id="close-orders" aria-label="Zamknij">×</button>
+              </div>
+              <div class="opening-hours-list">
+                <div class="opening-hours-row" style="display: block; text-align: left; line-height: 1.7;">
+                  Dowozimy za darmo w odległości do 5 km od restauracji.<br />
+                  Zamówienia przyjmujemy pod numerem telefonu:
+                  <a href="tel:${encodeURIComponent(companyPhone)}" style="color: var(--text); font-weight: 700; text-decoration: underline;">${escapeHtml(companyPhone)}</a>.
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
         app.innerHTML = `
           <div class="restaurant-background"></div>
           <div class="shell">
@@ -1875,12 +1897,15 @@
                   <button class="action-button" id="menu-button">
                     <div class="action-button-title">MENU</div>
                   </button>
+                  <button class="action-button" id="gallery-button">
+                    <div class="action-button-title">GALERIA</div>
+                  </button>
+                  <button class="action-button" id="orders-button">
+                    <div class="action-button-title">ZAMÓWIENIA</div>
+                  </button>
                   <button class="action-button" id="hours-button">
                     <div class="action-button-title">GODZINY</div>
                     <div class="action-button-label">Otwarcia</div>
-                  </button>
-                  <button class="action-button" id="gallery-button">
-                    <div class="action-button-title">ZDJĘCIA</div>
                   </button>
                 </div>
               </div>
@@ -1905,6 +1930,7 @@
         const menuButton = document.querySelector("#menu-button");
         const hoursButton = document.querySelector("#hours-button");
         const galleryButton = document.querySelector("#gallery-button");
+        const ordersButton = document.querySelector("#orders-button");
 
         function openMenu() {
           selectedCategoryIndex = 0; // Reset do pierwszej kategorii przy otwieraniu
@@ -1964,6 +1990,15 @@
           });
         }
 
+        function openOrdersInfo() {
+          modal.innerHTML = renderOrdersInfo();
+          modal.classList.add("open");
+          document.querySelector("#close-orders")?.addEventListener("click", closeModal);
+          modal.addEventListener("click", (e) => {
+            if (e.target === modal) closeModal();
+          });
+        }
+
         function closeModal() {
           modal.classList.remove("open");
         }
@@ -1971,8 +2006,9 @@
         // Inicjalizacja po załadowaniu danych
         loadRestaurantData().then(() => {
           menuButton.addEventListener("click", openMenu);
-          hoursButton.addEventListener("click", openOpeningHours);
           galleryButton.addEventListener("click", openGallery);
+          ordersButton.addEventListener("click", openOrdersInfo);
+          hoursButton.addEventListener("click", openOpeningHours);
         });
 
         const nav = document.querySelector("#floating-nav");

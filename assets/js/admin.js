@@ -24,7 +24,7 @@
       mediaStorageEnabled: false,
     },
     ui: {
-      topTab: "rezerwacje",
+      topTab: onlineBookingsEnabled ? "rezerwacje" : "hotel",
       tileByTab: {
         rezerwacje: "hotel",
         hotel: "1-osobowe",
@@ -421,13 +421,13 @@
 
   function renderAdminStageMarkup(tabKey, tileKey) {
     if (tabKey === "rezerwacje" && tileKey === "hotel") {
-      return `<div id="admin-panel-hotel" class="admin-hotel-wrap admin-stage-panel"></div>`;
+      return `<div id="admin-panel-hotel" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
     }
     if (tabKey === "rezerwacje" && tileKey === "restaurant") {
-      return `<div id="admin-panel-restaurant" class="admin-hotel-wrap admin-stage-panel"></div>`;
+      return `<div id="admin-panel-restaurant" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
     }
     if (tabKey === "rezerwacje" && tileKey === "events") {
-      return `<div id="admin-panel-hall" class="admin-hotel-wrap admin-stage-panel"></div>`;
+      return `<div id="admin-panel-hall" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
     }
     if (tabKey === "hotel" && ["1-osobowe", "2-osobowe", "3-osobowe", "4-osobowe"].includes(tileKey)) {
       return `<section class="panel col-12" id="hotel-room-galleries-panel"></section>`;
@@ -489,11 +489,54 @@
     });
   }
 
+  function renderOnlineBookingsUnavailable(panelSelector, options = {}) {
+    const panel = document.querySelector(panelSelector);
+    if (!panel) return;
+    const { title, copy, statusMessage = "" } = options;
+    panel.innerHTML = `
+      <section class="panel col-12">
+        <p class="pill">Rezerwacje</p>
+        <h2>${escapeHtml(title)}</h2>
+        <p class="section-intro">${escapeHtml(copy)}</p>
+        <div class="stack">
+          <p class="panel-note">
+            Ten modul probowalby laczyc sie z Firebase Functions, ale w tej konfiguracji strony rezerwacje online sa wylaczone.
+          </p>
+          <p class="helper">Aby uruchomic ten widok, trzeba wlaczyc <code>enableOnlineBookings</code> i wdrozyc odpowiedni backend rezerwacji.</p>
+          <p class="status">${escapeHtml(statusMessage)}</p>
+        </div>
+      </section>
+    `;
+  }
+
   function renderActiveAdminTile(statusMessage = "") {
     const topTab = state.ui.topTab;
     const tileKey = getActiveAdminTile(topTab);
 
     if (topTab === "rezerwacje") {
+      if (!onlineBookingsEnabled) {
+        if (tileKey === "hotel") {
+          renderOnlineBookingsUnavailable("#admin-panel-hotel", {
+            title: "Rezerwacja hotel",
+            copy: "Panel obslugi rezerwacji pokoi pojawi sie tutaj po wdrozeniu backendu hotelowego.",
+            statusMessage,
+          });
+        } else if (tileKey === "restaurant") {
+          renderOnlineBookingsUnavailable("#admin-panel-restaurant", {
+            title: "Rezerwacja restauracja",
+            copy: "Panel obslugi rezerwacji stolikow pojawi sie tutaj po wdrozeniu backendu restauracji.",
+            statusMessage,
+          });
+        } else if (tileKey === "events") {
+          renderOnlineBookingsUnavailable("#admin-panel-hall", {
+            title: "Rezerwacje przyjecia",
+            copy: "Panel obslugi zapytan o sale pojawi sie tutaj po wdrozeniu backendu przyjec.",
+            statusMessage,
+          });
+        }
+        return;
+      }
+
       const options = { defaultTab: "reservations" };
       if (tileKey === "hotel" && typeof window.renderHotelAdminPanel === "function") {
         window.renderHotelAdminPanel(document.querySelector("#admin-panel-hotel"), options);
