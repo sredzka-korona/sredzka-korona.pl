@@ -336,10 +336,23 @@ function withHotelRoomGalleries(content, roomGalleries) {
   };
 }
 
+function isMissingHotelRoomImagesTableError(error) {
+  const message = String(error?.message || "");
+  return /no such table:\s*hotel_room_images/i.test(message);
+}
+
 async function listHotelRoomGalleries(env, url) {
-  const result = await env.DB.prepare(
-    "SELECT id, room_type AS roomType, alt_text AS altText FROM hotel_room_images ORDER BY room_type ASC, sort_order ASC, id ASC"
-  ).all();
+  let result;
+  try {
+    result = await env.DB.prepare(
+      "SELECT id, room_type AS roomType, alt_text AS altText FROM hotel_room_images ORDER BY room_type ASC, sort_order ASC, id ASC"
+    ).all();
+  } catch (error) {
+    if (isMissingHotelRoomImagesTableError(error)) {
+      return emptyHotelRoomGalleries();
+    }
+    throw error;
+  }
   const galleries = emptyHotelRoomGalleries();
   for (const item of result.results || []) {
     if (!galleries[item.roomType]) {
@@ -531,11 +544,19 @@ async function uploadHotelRoomImages(roomType, request, env) {
     throw badRequest("Wybierz co najmniej jedno zdjecie.");
   }
 
-  const orderRow = await env.DB.prepare(
-    "SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM hotel_room_images WHERE room_type = ?"
-  )
-    .bind(normalizedRoomType)
-    .first();
+  let orderRow;
+  try {
+    orderRow = await env.DB.prepare(
+      "SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM hotel_room_images WHERE room_type = ?"
+    )
+      .bind(normalizedRoomType)
+      .first();
+  } catch (error) {
+    if (isMissingHotelRoomImagesTableError(error)) {
+      throw badRequest("Brak migracji bazy: utworz tabele hotel_room_images w D1.");
+    }
+    throw error;
+  }
   let nextOrder = Number(orderRow?.maxOrder ?? -1) + 1;
 
   for (const file of files) {
@@ -560,11 +581,19 @@ async function uploadHotelRoomImages(roomType, request, env) {
 }
 
 async function deleteHotelRoomImage(imageId, env) {
-  const image = await env.DB.prepare(
-    "SELECT id, room_type AS roomType FROM hotel_room_images WHERE id = ?"
-  )
-    .bind(imageId)
-    .first();
+  let image;
+  try {
+    image = await env.DB.prepare(
+      "SELECT id, room_type AS roomType FROM hotel_room_images WHERE id = ?"
+    )
+      .bind(imageId)
+      .first();
+  } catch (error) {
+    if (isMissingHotelRoomImagesTableError(error)) {
+      throw badRequest("Brak migracji bazy: utworz tabele hotel_room_images w D1.");
+    }
+    throw error;
+  }
   if (!image) {
     throw badRequest("Zdjecie nie istnieje.");
   }
@@ -582,11 +611,19 @@ async function reorderHotelRoomImages(roomType, imageIds, env) {
   if (!ids.length) {
     throw badRequest("Brak listy zdjec do ustawienia kolejnosci.");
   }
-  const existing = await env.DB.prepare(
-    "SELECT id FROM hotel_room_images WHERE room_type = ? ORDER BY sort_order ASC, id ASC"
-  )
-    .bind(normalizedRoomType)
-    .all();
+  let existing;
+  try {
+    existing = await env.DB.prepare(
+      "SELECT id FROM hotel_room_images WHERE room_type = ? ORDER BY sort_order ASC, id ASC"
+    )
+      .bind(normalizedRoomType)
+      .all();
+  } catch (error) {
+    if (isMissingHotelRoomImagesTableError(error)) {
+      throw badRequest("Brak migracji bazy: utworz tabele hotel_room_images w D1.");
+    }
+    throw error;
+  }
   const existingIds = (existing.results || []).map((row) => Number(row.id));
   if (existingIds.length !== ids.length) {
     throw badRequest("Lista zdjec ma nieprawidlowa dlugosc.");
@@ -605,11 +642,19 @@ async function reorderHotelRoomImages(roomType, imageIds, env) {
 
 async function compactHotelRoomImageOrder(roomType, env) {
   const normalizedRoomType = normalizeHotelRoomType(roomType);
-  const result = await env.DB.prepare(
-    "SELECT id FROM hotel_room_images WHERE room_type = ? ORDER BY sort_order ASC, id ASC"
-  )
-    .bind(normalizedRoomType)
-    .all();
+  let result;
+  try {
+    result = await env.DB.prepare(
+      "SELECT id FROM hotel_room_images WHERE room_type = ? ORDER BY sort_order ASC, id ASC"
+    )
+      .bind(normalizedRoomType)
+      .all();
+  } catch (error) {
+    if (isMissingHotelRoomImagesTableError(error)) {
+      return;
+    }
+    throw error;
+  }
   const ids = (result.results || []).map((row) => Number(row.id));
   for (let index = 0; index < ids.length; index += 1) {
     await env.DB.prepare("UPDATE hotel_room_images SET sort_order = ? WHERE id = ?")
@@ -716,11 +761,19 @@ async function streamDocument(documentId, download, env, request) {
 }
 
 async function streamHotelRoomImage(imageId, env, request) {
-  const image = await env.DB.prepare(
-    "SELECT blob_data AS blobData, mime_type AS mimeType FROM hotel_room_images WHERE id = ?"
-  )
-    .bind(Number(imageId))
-    .first();
+  let image;
+  try {
+    image = await env.DB.prepare(
+      "SELECT blob_data AS blobData, mime_type AS mimeType FROM hotel_room_images WHERE id = ?"
+    )
+      .bind(Number(imageId))
+      .first();
+  } catch (error) {
+    if (isMissingHotelRoomImagesTableError(error)) {
+      return jsonResponse({ error: "Zdjecia pokoi nie sa jeszcze skonfigurowane." }, 404, request, env);
+    }
+    throw error;
+  }
   if (!image) {
     return jsonResponse({ error: "Zdjecie nie istnieje." }, 404, request, env);
   }
