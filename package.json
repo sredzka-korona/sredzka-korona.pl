@@ -7,4 +7,3 @@
     "seo:generate": "node scripts/generate-seo.mjs"
   }
 }
-

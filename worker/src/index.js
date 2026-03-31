@@ -1,5 +1,6 @@
 import { DEFAULT_CONTENT } from "./default-content.js";
 import { parseAdminEmailAllowlist, verifyFirebaseIdToken } from "./firebase-verify.js";
+import { handleD1BookingApi } from "./booking-d1.js";
 
 const MAX_MEDIA_FILE_BYTES = 1_700_000;
 
@@ -211,6 +212,19 @@ export default {
         if (!isAllowedPublicLegacyBookingOp(op)) {
           return jsonResponse({ error: "Niedozwolona operacja publiczna." }, 403, request, env);
         }
+        const native = await handleD1BookingApi({
+          service,
+          op,
+          request,
+          env,
+          isAdmin: false,
+          verifyTurnstileToken: env.TURNSTILE_SECRET
+            ? async (token) => verifyTurnstile(token, request, env)
+            : null,
+        });
+        if (native) {
+          return jsonResponse(native.data, native.status || 200, request, env);
+        }
         return proxyLegacyBookingApi(service, request, url, env);
       }
 
@@ -220,6 +234,18 @@ export default {
       ) {
         await requireFirebaseAdmin(request, env);
         const service = url.pathname.split("/").pop();
+        const op = String(url.searchParams.get("op") || "").trim();
+        const native = await handleD1BookingApi({
+          service,
+          op,
+          request,
+          env,
+          isAdmin: true,
+          verifyTurnstileToken: null,
+        });
+        if (native) {
+          return jsonResponse(native.data, native.status || 200, request, env);
+        }
         return proxyLegacyBookingApi(service, request, url, env);
       }
 

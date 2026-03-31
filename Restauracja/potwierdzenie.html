@@ -59,6 +59,9 @@
       (function () {
         function restaurantApiBase() {
           const c = window.SREDZKA_CONFIG || {};
+          if (c.apiBase) {
+            return String(c.apiBase).replace(/\/$/, "") + "/api/public/legacy-bookings/restaurant";
+          }
           if (c.restaurantApiBase) return String(c.restaurantApiBase).replace(/\/$/, "");
           if (c.firebaseProjectId) {
             return "https://europe-west1-" + c.firebaseProjectId + ".cloudfunctions.net/restaurantApi";

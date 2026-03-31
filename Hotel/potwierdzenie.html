@@ -59,6 +59,9 @@
       (function () {
         function hotelApiBase() {
           const c = window.SREDZKA_CONFIG || {};
+          if (c.apiBase) {
+            return String(c.apiBase).replace(/\/$/, "") + "/api/public/legacy-bookings/hotel";
+          }
           if (c.hotelApiBase) return String(c.hotelApiBase).replace(/\/$/, "");
           if (c.firebaseProjectId) {
             return "https://europe-west1-" + c.firebaseProjectId + ".cloudfunctions.net/hotelApi";

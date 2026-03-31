@@ -2876,7 +2876,7 @@
     orderedSubcategories.forEach((name) => {
       groupsByKey.set(name, {
         key: name,
-        name: name || "Bez podkategorii",
+        name: name || "Inne",
         isUncategorized: name === "",
         entries: [],
       });
@@ -2885,7 +2885,7 @@
     items.forEach((item, index) => {
       const key = String(item?.subcategory || "").trim();
       if (!groupsByKey.has(key)) {
-        groupsByKey.set(key, { key, name: key || "Bez podkategorii", isUncategorized: !key, entries: [] });
+        groupsByKey.set(key, { key, name: key || "Inne", isUncategorized: !key, entries: [] });
       }
       groupsByKey.get(key).entries.push({ item, index });
     });
@@ -2898,7 +2898,7 @@
     const counts = new Map(groups.map((group) => [group.key, group.entries.length]));
     return getMenuEditorSectionSubcategoryOrder(section).map((name) => ({
       key: name,
-      label: name || "Bez podkategorii",
+      label: name || "Inne",
       isDefault: name === "",
       count: counts.get(name) || 0,
     }));
@@ -3307,7 +3307,7 @@
         ? null
         : groupedItems.find((group) => group.key === activeSubcategory) || {
             key: activeSubcategory,
-            name: activeSubcategory || "Bez podkategorii",
+            name: activeSubcategory || "Inne",
             entries: [],
           };
 
@@ -3334,21 +3334,27 @@
                   <div class="stack menu-editor-subcategory-cards">
                     ${subcategoryEntries
                       .map(
-                        (entry, subcategoryIndex) => `
-                          <article class="list-item menu-editor-subcategory-card">
+                        (entry, subcategoryIndex) => {
+                          const canMoveUp = !entry.isDefault && subcategoryIndex > 0;
+                          const canMoveDown =
+                            !entry.isDefault &&
+                            subcategoryIndex < subcategoryEntries.length - 1 &&
+                            !subcategoryEntries[subcategoryIndex + 1]?.isDefault;
+                          return `
+                          <article class="list-item menu-editor-subcategory-card" data-open-menu-subcategory="${escapeAttribute(entry.key)}" tabindex="0" role="button" aria-label="Otworz podkategorie ${escapeAttribute(entry.label)}">
                             <div class="list-head">
                               <div>
                                 <strong>${escapeHtml(entry.label)}</strong>
                                 <p class="helper">${entry.count} ${entry.count === 1 ? "produkt" : "produkty"}${entry.isDefault ? " • domyslna (tylko admin)" : ""}</p>
                               </div>
                               <div class="inline-actions">
-                                <button class="button secondary" type="button" data-open-menu-subcategory="${escapeAttribute(entry.key)}">Otworz</button>
-                                <button class="button secondary menu-editor-card-move" type="button" data-move-menu-subcategory-up="${escapeAttribute(entry.key)}" aria-label="Przesun podkategorie wyzej" ${subcategoryIndex === 0 ? "disabled" : ""}>↑</button>
-                                <button class="button secondary menu-editor-card-move" type="button" data-move-menu-subcategory-down="${escapeAttribute(entry.key)}" aria-label="Przesun podkategorie nizej" ${subcategoryIndex === subcategoryEntries.length - 1 ? "disabled" : ""}>↓</button>
+                                <button class="button secondary menu-editor-card-move" type="button" data-menu-card-action data-move-menu-subcategory-up="${escapeAttribute(entry.key)}" aria-label="Przesun podkategorie wyzej" ${canMoveUp ? "" : "disabled"}>↑</button>
+                                <button class="button secondary menu-editor-card-move" type="button" data-menu-card-action data-move-menu-subcategory-down="${escapeAttribute(entry.key)}" aria-label="Przesun podkategorie nizej" ${canMoveDown ? "" : "disabled"}>↓</button>
                               </div>
                             </div>
                           </article>
-                        `
+                        `;
+                        }
                       )
                       .join("")}
                   </div>
@@ -3366,17 +3372,16 @@
                             const item = entry.item;
                             const itemIndex = entry.index;
                             return `
-                              <article class="list-item menu-editor-product-card">
+                              <article class="list-item menu-editor-product-card" data-open-menu-item="${itemIndex}" tabindex="0" role="button" aria-label="Otworz produkt ${escapeAttribute(item.name || `${config.productLabel} ${itemIndex + 1}`)}">
                                 <div class="list-head">
                                   <div>
                                     <strong>${escapeHtml(item.name || `${config.productLabel} ${itemIndex + 1}`)}</strong>
                                     <p class="helper">${escapeHtml(buildMenuEditorItemMeta(item, config.includePrice) || "Bez dodatkowych informacji")}</p>
                                   </div>
                                   <div class="inline-actions menu-editor-product-actions">
-                                    <button class="button secondary menu-editor-card-move" type="button" data-move-menu-item-up="${itemIndex}" aria-label="Przesun produkt wyzej" ${groupItemIndex === 0 ? "disabled" : ""}>↑</button>
-                                    <button class="button secondary menu-editor-card-move" type="button" data-move-menu-item-down="${itemIndex}" aria-label="Przesun produkt nizej" ${groupItemIndex === activeGroup.entries.length - 1 ? "disabled" : ""}>↓</button>
-                                    <button class="button secondary" type="button" data-open-menu-item="${itemIndex}">Otworz</button>
-                                    <button class="button danger" type="button" data-remove-menu-item="${itemIndex}">Usun</button>
+                                    <button class="button secondary menu-editor-card-move" type="button" data-menu-card-action data-move-menu-item-up="${itemIndex}" aria-label="Przesun produkt wyzej" ${groupItemIndex === 0 ? "disabled" : ""}>↑</button>
+                                    <button class="button secondary menu-editor-card-move" type="button" data-menu-card-action data-move-menu-item-down="${itemIndex}" aria-label="Przesun produkt nizej" ${groupItemIndex === activeGroup.entries.length - 1 ? "disabled" : ""}>↓</button>
+                                    <button class="button danger" type="button" data-menu-card-action data-remove-menu-item="${itemIndex}">Usun</button>
                                   </div>
                                 </div>
                                 <p>${escapeHtml(truncateMenuEditorText(item.description || "", 180) || "Brak opisu produktu.")}</p>
@@ -3579,6 +3584,14 @@
             activeSubcategory: String(button.dataset.openMenuSubcategory || ""),
           });
         });
+        button.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openMenuEditorSectionModal(modal.kind, modal.sectionIndex, {
+              activeSubcategory: String(button.dataset.openMenuSubcategory || ""),
+            });
+          }
+        });
       });
       root.querySelectorAll("[data-open-menu-item]").forEach((button) => {
         button.addEventListener("click", () => {
@@ -3590,6 +3603,27 @@
               activeSubcategory: typeof modal.activeSubcategory === "string" ? modal.activeSubcategory : null,
             },
           });
+        });
+        button.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openMenuEditorItemModal(modal.kind, modal.sectionIndex, Number(button.dataset.openMenuItem), {
+              returnTo: {
+                kind: modal.kind,
+                type: "section",
+                sectionIndex: modal.sectionIndex,
+                activeSubcategory: typeof modal.activeSubcategory === "string" ? modal.activeSubcategory : null,
+              },
+            });
+          }
+        });
+      });
+      root.querySelectorAll("[data-menu-card-action]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+        });
+        button.addEventListener("keydown", (event) => {
+          event.stopPropagation();
         });
       });
       root.querySelectorAll("[data-remove-menu-item]").forEach((button) => {
@@ -3771,9 +3805,11 @@
     const section = getMenuSectionsByKind(kind)[sectionIndex];
     if (!section) return;
     const subcategories = getMenuEditorSectionSubcategoryOrder(section);
+    if (subcategoryName === "") return;
     const currentIndex = subcategories.indexOf(subcategoryName);
     const targetIndex = currentIndex + direction;
     if (currentIndex < 0 || targetIndex < 0 || targetIndex >= subcategories.length) return;
+    if (subcategories[targetIndex] === "") return;
 
     [subcategories[currentIndex], subcategories[targetIndex]] = [subcategories[targetIndex], subcategories[currentIndex]];
     section.subcategoryOrder = subcategories.map(encodeMenuEditorSubcategoryOrderValue);

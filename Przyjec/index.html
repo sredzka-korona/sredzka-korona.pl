@@ -2757,7 +2757,8 @@
         let occasionMenu = [];
         let selectedOccasionCategoryIndex = 0;
 
-        function renderOccasionMenuItems(items) {
+        function renderOccasionMenuItems(section) {
+          const items = Array.isArray(section?.items) ? section.items : [];
           if (!items || items.length === 0) {
             return `<p style="color: var(--muted); font-style: italic; padding: 2rem; text-align: center;">Brak pozycji w tej kategorii.</p>`;
           }
@@ -2793,7 +2794,20 @@
             if (!grouped[subcat]) grouped[subcat] = [];
             grouped[subcat].push(item);
           });
-          return Object.keys(grouped)
+          const configuredOrder = Array.isArray(section?.subcategoryOrder)
+            ? section.subcategoryOrder
+                .map((value) =>
+                  String(value || "").trim() === "__menu_editor_uncategorized__" ? "" : String(value || "").trim()
+                )
+                .filter((value, index, source) => source.indexOf(value) === index)
+            : [];
+          const groupedKeys = Object.keys(grouped);
+          const orderedKeys = configuredOrder
+            .map((value) => (value === "" ? "Inne" : value))
+            .filter((value) => groupedKeys.includes(value));
+          const missingKeys = groupedKeys.filter((value) => !orderedKeys.includes(value));
+
+          return [...orderedKeys, ...missingKeys]
             .map((subcategory) => {
               const subcategoryItems = grouped[subcategory];
               return `
@@ -2874,7 +2888,7 @@
                   <div class="menu-section">
                     <h3 class="menu-section-title">${escapeHtml(selectedCategory.section || "")}</h3>
                     <div class="menu-items-container">
-                      ${renderOccasionMenuItems(selectedCategory.items || [])}
+                      ${renderOccasionMenuItems(selectedCategory)}
                     </div>
                   </div>
                 </div>
@@ -2944,7 +2958,7 @@
                   <div class="menu-section">
                     <h3 class="menu-section-title">${escapeHtml(selectedCategory.section || "")}</h3>
                     <div class="menu-items-container">
-                      ${renderOccasionMenuItems(selectedCategory.items || [])}
+                      ${renderOccasionMenuItems(selectedCategory)}
                     </div>
                   </div>
                 `;

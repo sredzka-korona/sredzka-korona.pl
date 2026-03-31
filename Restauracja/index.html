@@ -1834,7 +1834,8 @@
         let restaurantOrdersInfoText =
           "Zamówienia indywidualne są tymczasowo wstrzymane. Catering zamawiany poprzez kontakt telefoniczny i mailowy.";
 
-        function renderMenuItems(items) {
+        function renderMenuItems(section) {
+          const items = Array.isArray(section?.items) ? section.items : [];
           if (!items || items.length === 0) {
             return `<p style="color: var(--muted); font-style: italic; padding: 2rem; text-align: center;">Brak pozycji w tej kategorii.</p>`;
           }
@@ -1873,7 +1874,20 @@
           });
 
           // Renderuj z nagłówkami podkategorii
-          return Object.keys(grouped).map(subcategory => {
+          const configuredOrder = Array.isArray(section?.subcategoryOrder)
+            ? section.subcategoryOrder
+                .map((value) =>
+                  String(value || "").trim() === "__menu_editor_uncategorized__" ? "" : String(value || "").trim()
+                )
+                .filter((value, index, source) => source.indexOf(value) === index)
+            : [];
+          const groupedKeys = Object.keys(grouped);
+          const orderedKeys = configuredOrder
+            .map((value) => (value === "" ? "Inne" : value))
+            .filter((value) => groupedKeys.includes(value));
+          const missingKeys = groupedKeys.filter((value) => !orderedKeys.includes(value));
+
+          return [...orderedKeys, ...missingKeys].map(subcategory => {
             const subcategoryItems = grouped[subcategory];
             return `
               <div class="menu-subcategory">
@@ -1945,7 +1959,7 @@
                   <div class="menu-section">
                     <h3 class="menu-section-title">${escapeHtml(selectedCategory.section || '')}</h3>
                     <div class="menu-items-container">
-                      ${renderMenuItems(selectedCategory.items || [])}
+                      ${renderMenuItems(selectedCategory)}
                     </div>
                   </div>
                 </div>
@@ -2102,7 +2116,7 @@
                     <div class="menu-section">
                       <h3 class="menu-section-title">${escapeHtml(selectedCategory.section || '')}</h3>
                       <div class="menu-items-container">
-                        ${renderMenuItems(selectedCategory.items || [])}
+                        ${renderMenuItems(selectedCategory)}
                       </div>
                     </div>
                   `;

@@ -59,6 +59,9 @@
       (function () {
         function hallApiBase() {
           const c = window.SREDZKA_CONFIG || {};
+          if (c.apiBase) {
+            return String(c.apiBase).replace(/\/$/, "") + "/api/public/legacy-bookings/hall";
+          }
           if (c.hallApiBase) return String(c.hallApiBase).replace(/\/$/, "");
           if (c.firebaseProjectId) {
             return "https://europe-west1-" + c.firebaseProjectId + ".cloudfunctions.net/hallApi";
