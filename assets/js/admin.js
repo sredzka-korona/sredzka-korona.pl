@@ -218,8 +218,17 @@
       return ranges;
     }
 
-    const fallback = normalizePauseRanges([{ from: fallbackFrom, to: fallbackTo }]);
-    return fallback;
+    const from = String(fallbackFrom || "").trim().slice(0, 10);
+    const to = String(fallbackTo || "").trim().slice(0, 10);
+    if (
+      from &&
+      to &&
+      /^\d{4}-\d{2}-\d{2}$/.test(from) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(to)
+    ) {
+      return from <= to ? [{ from, to }] : [{ from: to, to: from }];
+    }
+    return [];
   }
 
   function renderPauseRangesEditorMarkup(domainKey, ranges, { disabled = false, label = "Przerwy" } = {}) {
