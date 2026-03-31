@@ -8,7 +8,7 @@ window.SREDZKA_CONFIG = {
    * W wariancie bez Firebase Functions zostaw false.
    * Ustaw true dopiero po wdrozeniu backendu rezerwacji online.
    */
-  enableOnlineBookings: false,
+  enableOnlineBookings: true,
   turnstileSiteKey: "0x4AAAAAACyIQzt5qiD-IVXQ",
   /** Konfiguracja Firebase Authentication (panel admina) — z konsoli Firebase: Project settings */
   firebaseApiKey: "AIzaSyDvKjj2Lu_aGBFIOId5KU4rONguQMj2sxc",

@@ -11,12 +11,282 @@
     : hostname && !isGithubPages
       ? "https://api." + hostname.replace(/^www\./, "")
       : "";
+  const OPENING_HOURS_DAYS = [
+    { key: "monday", label: "Poniedziałek", aliases: ["poniedzialek", "poniedziałek"] },
+    { key: "tuesday", label: "Wtorek", aliases: ["wtorek"] },
+    { key: "wednesday", label: "Środa", aliases: ["sroda", "środa"] },
+    { key: "thursday", label: "Czwartek", aliases: ["czwartek"] },
+    { key: "friday", label: "Piątek", aliases: ["piatek", "piątek"] },
+    { key: "saturday", label: "Sobota", aliases: ["sobota"] },
+    { key: "sunday", label: "Niedziela", aliases: ["niedziela"] },
+  ];
+
+  function normalizeComparableText(value) {
+    return String(value || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function normalizeOpeningHoursTime(value) {
+    const raw = String(value || "").trim().replace(".", ":");
+    const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) {
+      return "";
+    }
+    return `${match[1].padStart(2, "0")}:${match[2]}`;
+  }
+
+  function resolveOpeningHoursDayIndexes(dayValue) {
+    const normalized = normalizeComparableText(dayValue)
+      .replace(/[–—]/g, "-")
+      .replace(/\s*-\s*/g, "-");
+
+    if (!normalized) {
+      return [];
+    }
+
+    if (normalized === "codziennie" || normalized === "daily") {
+      return OPENING_HOURS_DAYS.map((_, index) => index);
+    }
+
+    const aliases = OPENING_HOURS_DAYS.flatMap((day, index) =>
+      day.aliases.map((alias) => ({ alias, index }))
+    );
+
+    const matchedAlias = aliases.find(({ alias }) => normalized === alias);
+    if (matchedAlias) {
+      return [matchedAlias.index];
+    }
+
+    const rangeMatch = normalized.match(/^(.+?)-(.+)$/);
+    if (rangeMatch) {
+      const start = aliases.find(({ alias }) => rangeMatch[1].trim() === alias);
+      const end = aliases.find(({ alias }) => rangeMatch[2].trim() === alias);
+      if (start && end) {
+        const from = Math.min(start.index, end.index);
+        const to = Math.max(start.index, end.index);
+        return OPENING_HOURS_DAYS.slice(from, to + 1).map((_, offset) => from + offset);
+      }
+    }
+
+    return [];
+  }
+
+  function parseOpeningHoursRange(hoursValue) {
+    const raw = String(hoursValue || "").trim();
+    if (!raw) {
+      return { from: "", to: "" };
+    }
+
+    const normalized = normalizeComparableText(raw);
+    if (["nieczynne", "zamkniete", "zamknięte", "closed"].includes(normalized)) {
+      return { from: "", to: "" };
+    }
+
+    const match = raw.match(/(\d{1,2}[:.]\d{2})\s*[-–—]\s*(\d{1,2}[:.]\d{2})/);
+    if (!match) {
+      return { from: "", to: "" };
+    }
+
+    return {
+      from: normalizeOpeningHoursTime(match[1]),
+      to: normalizeOpeningHoursTime(match[2]),
+    };
+  }
+
+  function normalizeOpeningHours(items) {
+    const schedule = OPENING_HOURS_DAYS.map((day) => ({
+      day: day.label,
+      hours: "Nieczynne",
+    }));
+
+    (Array.isArray(items) ? items : []).forEach((item) => {
+      const dayValue =
+        item && typeof item === "object"
+          ? item.day
+          : String(item || "")
+              .split(":")[0]
+              .trim();
+      const hoursValue =
+        item && typeof item === "object"
+          ? item.hours
+          : String(item || "")
+              .split(":")
+              .slice(1)
+              .join(":")
+              .trim();
+      const dayIndexes = resolveOpeningHoursDayIndexes(dayValue);
+      const range = parseOpeningHoursRange(hoursValue);
+      const normalizedHours =
+        range.from && range.to ? `${range.from} - ${range.to}` : "Nieczynne";
+
+      dayIndexes.forEach((dayIndex) => {
+        schedule[dayIndex] = {
+          day: OPENING_HOURS_DAYS[dayIndex].label,
+          hours: normalizedHours,
+        };
+      });
+    });
+
+    return schedule;
+  }
+
+  function getOpeningHoursEditorState(items) {
+    return normalizeOpeningHours(items).map((entry, index) => {
+      const range = parseOpeningHoursRange(entry.hours);
+      return {
+        index,
+        key: OPENING_HOURS_DAYS[index].key,
+        day: OPENING_HOURS_DAYS[index].label,
+        from: range.from,
+        to: range.to,
+      };
+    });
+  }
+
+  function renderOpeningHoursEditorMarkup(items, options = {}) {
+    const { idPrefix = "company-opening-hours", intro = "" } = options;
+    const schedule = getOpeningHoursEditorState(items);
+
+    return `
+      <div class="stack">
+        <div>
+          <strong>Godziny otwarcia</strong>
+          <p class="helper">${escapeHtml(intro || "Kazdy dzien ma osobne pola od i do. Puste pola oznaczaja, ze lokal jest nieczynny.")}</p>
+        </div>
+        <div class="stack">
+          ${schedule
+            .map(
+              (entry) => `
+                <div class="repeater-item opening-hours-day-card">
+                  <div class="repeater-head">
+                    <strong>${escapeHtml(entry.day)}</strong>
+                    <span class="helper">Pozostaw puste, aby oznaczyc dzien jako nieczynny.</span>
+                  </div>
+                  <div class="field-grid">
+                    <label class="field">
+                      <span>Od</span>
+                      <input type="time" id="${escapeAttribute(`${idPrefix}-${entry.key}-from`)}" value="${escapeAttribute(entry.from)}" />
+                    </label>
+                    <label class="field">
+                      <span>Do</span>
+                      <input type="time" id="${escapeAttribute(`${idPrefix}-${entry.key}-to`)}" value="${escapeAttribute(entry.to)}" />
+                    </label>
+                  </div>
+                </div>
+              `
+            )
+            .join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function collectOpeningHoursFromEditor(getTrimmedValue, idPrefix = "company-opening-hours") {
+    return OPENING_HOURS_DAYS.map((day) => {
+      const from = normalizeOpeningHoursTime(getTrimmedValue(`#${idPrefix}-${day.key}-from`) || "");
+      const to = normalizeOpeningHoursTime(getTrimmedValue(`#${idPrefix}-${day.key}-to`) || "");
+      return {
+        day: day.label,
+        hours: from && to ? `${from} - ${to}` : "Nieczynne",
+      };
+    });
+  }
+
+  function normalizeAdminContent(rawContent) {
+    const content = structuredClone(rawContent || {});
+
+    if (!content.company) {
+      content.company = {};
+    }
+
+    content.company.openingHours = normalizeOpeningHours(content.company.openingHours);
+
+    if (!content.restaurant) {
+      content.restaurant = {};
+    }
+
+    if (!Array.isArray(content.restaurant.menu) && Array.isArray(content.restaurant.menuSections)) {
+      content.restaurant.menu = content.restaurant.menuSections.map((section) => ({
+        section: section?.title || "",
+        items: Array.isArray(section?.items)
+          ? section.items
+              .map((item) => {
+                if (item && typeof item === "object") {
+                  const normalizedItem = {
+                    name: item.name || "",
+                    price: item.price || "",
+                    description: item.description || "",
+                    ingredients: Array.isArray(item.ingredients) ? item.ingredients : [],
+                  };
+                  if (item.subcategory) {
+                    normalizedItem.subcategory = item.subcategory;
+                  }
+                  return normalizedItem;
+                }
+                return {
+                  name: String(item || ""),
+                  price: "",
+                  description: "",
+                  ingredients: [],
+                };
+              })
+              .filter((item) => item.name)
+          : [],
+      }));
+    }
+
+    if (!content.events) {
+      content.events = {};
+    }
+    content.events.halls = normalizeEventHalls(content.events.halls);
+    content.events.hallGalleries = normalizeEventHallGalleries(content.events.hallGalleries);
+
+    return content;
+  }
+
+  function normalizeEventHalls(halls) {
+    const hallList = Array.isArray(halls) ? halls : [];
+    const byKey = new Map(hallList.map((hall) => [String(hall?.key || "").toLowerCase(), hall || {}]));
+    const firstHall = hallList[0] || {};
+    const secondHall = hallList[1] || {};
+    const largeSource = byKey.get("duza") || byKey.get("duża") || byKey.get("krolewska") || firstHall;
+    const smallSource = byKey.get("mala") || byKey.get("mała") || byKey.get("zlota") || secondHall;
+
+    return [
+      {
+        key: "duza",
+        name: String(largeSource?.name || "Sala Duza"),
+        capacity: String(largeSource?.capacity || ""),
+        description: String(largeSource?.description || ""),
+      },
+      {
+        key: "mala",
+        name: String(smallSource?.name || "Sala Mala"),
+        capacity: String(smallSource?.capacity || ""),
+        description: String(smallSource?.description || ""),
+      },
+    ];
+  }
+
+  function normalizeEventHallGalleries(hallGalleries) {
+    const source = hallGalleries && typeof hallGalleries === "object" ? hallGalleries : {};
+    return {
+      "1": Array.isArray(source["1"]) ? source["1"] : [],
+      "2": Array.isArray(source["2"]) ? source["2"] : [],
+    };
+  }
+
+  const normalizedDefaultContent = normalizeAdminContent(defaultContent);
 
   const state = {
     apiBase: config.apiBase || fallbackApiBase,
     loggedIn: false,
-    content: defaultContent,
-    lastSavedContent: structuredClone(defaultContent),
+    content: normalizedDefaultContent,
+    lastSavedContent: structuredClone(normalizedDefaultContent),
     documents: [],
     galleryAlbums: [],
     calendarBlocks: [],
@@ -126,6 +396,181 @@
     return escapeHtml(value).replaceAll("`", "&#96;");
   }
 
+  function sanitizeOfertaEditorHtml(rawHtml) {
+    const template = document.createElement("template");
+    template.innerHTML = String(rawHtml || "");
+    const allowedTags = new Set(["p", "ul", "ol", "li", "strong", "em", "u", "a", "br", "span", "div", "h1", "h2", "h3"]);
+    const allowedStyleProps = new Set(["text-align", "font-size", "color", "font-weight", "font-style", "text-decoration"]);
+    const urlPattern = /^(https?:|mailto:|tel:|\/|#)/i;
+
+    const sanitizeStyle = (styleValue) => {
+      const normalized = String(styleValue || "")
+        .split(";")
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) => {
+          const separatorIndex = part.indexOf(":");
+          if (separatorIndex === -1) return "";
+          const property = part.slice(0, separatorIndex).trim().toLowerCase();
+          const value = part.slice(separatorIndex + 1).trim();
+          if (!allowedStyleProps.has(property) || !value) return "";
+          return `${property}: ${value}`;
+        })
+        .filter(Boolean);
+      return normalized.join("; ");
+    };
+
+    const sanitizeNode = (node) => {
+      if (node.nodeType === Node.TEXT_NODE) return;
+      if (node.nodeType !== Node.ELEMENT_NODE) {
+        node.remove();
+        return;
+      }
+      const tagName = node.tagName.toLowerCase();
+      if (tagName === "script" || tagName === "style" || tagName === "iframe" || tagName === "object") {
+        node.remove();
+        return;
+      }
+      if (tagName === "b") {
+        const strong = document.createElement("strong");
+        strong.innerHTML = node.innerHTML;
+        node.replaceWith(strong);
+        node = strong;
+      } else if (tagName === "i") {
+        const em = document.createElement("em");
+        em.innerHTML = node.innerHTML;
+        node.replaceWith(em);
+        node = em;
+      } else if (!allowedTags.has(tagName)) {
+        const fragment = document.createDocumentFragment();
+        while (node.firstChild) {
+          fragment.appendChild(node.firstChild);
+        }
+        node.replaceWith(fragment);
+        return;
+      }
+
+      Array.from(node.attributes).forEach((attribute) => {
+        const attrName = attribute.name.toLowerCase();
+        const attrValue = attribute.value;
+        if (attrName === "style") {
+          const safeStyle = sanitizeStyle(attrValue);
+          if (safeStyle) {
+            node.setAttribute("style", safeStyle);
+          } else {
+            node.removeAttribute("style");
+          }
+          return;
+        }
+        if (tagName === "a" && attrName === "href") {
+          const safeHref = String(attrValue || "").trim();
+          if (!safeHref || !urlPattern.test(safeHref)) {
+            node.removeAttribute("href");
+          } else {
+            node.setAttribute("href", safeHref);
+          }
+          return;
+        }
+        if (tagName === "a" && (attrName === "target" || attrName === "rel")) {
+          if (attrName === "target" && attrValue !== "_blank") {
+            node.removeAttribute("target");
+          }
+          return;
+        }
+        node.removeAttribute(attribute.name);
+      });
+
+      if (tagName === "a" && node.getAttribute("target") === "_blank") {
+        node.setAttribute("rel", "noopener noreferrer");
+      }
+
+      Array.from(node.childNodes).forEach(sanitizeNode);
+    };
+
+    Array.from(template.content.childNodes).forEach(sanitizeNode);
+    return template.innerHTML;
+  }
+
+  function applyOfertaFontSize(editor, sizeValue) {
+    if (!editor || !sizeValue) return;
+    editor.focus();
+    document.execCommand("fontSize", false, "7");
+    editor.querySelectorAll('font[size="7"]').forEach((fontTag) => {
+      const span = document.createElement("span");
+      span.style.fontSize = sizeValue;
+      span.innerHTML = fontTag.innerHTML;
+      fontTag.replaceWith(span);
+    });
+  }
+
+  function initOfertaRichTextEditor() {
+    const textarea = document.querySelector("#events-oferta-modal-html");
+    const editor = document.querySelector("#events-oferta-modal-editor");
+    const toolbar = document.querySelector("#events-oferta-editor-toolbar");
+    if (!textarea || !editor || !toolbar) return;
+
+    const syncToTextarea = () => {
+      const sanitized = sanitizeOfertaEditorHtml(editor.innerHTML);
+      textarea.value = sanitized;
+      if (editor.innerHTML !== sanitized) {
+        editor.innerHTML = sanitized;
+      }
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+
+    editor.innerHTML = sanitizeOfertaEditorHtml(textarea.value || "");
+    if (!editor.innerHTML.trim()) {
+      editor.innerHTML = "<p></p>";
+    }
+
+    toolbar.querySelectorAll("[data-richtext-command]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const command = button.dataset.richtextCommand;
+        editor.focus();
+        if (command === "createLink") {
+          const link = window.prompt("Podaj adres linku (https://...):");
+          if (link) {
+            document.execCommand("createLink", false, link.trim());
+          }
+        } else {
+          document.execCommand(command, false, null);
+        }
+        syncToTextarea();
+      });
+    });
+
+    toolbar.querySelectorAll("[data-richtext-block]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const blockTag = button.dataset.richtextBlock;
+        if (!blockTag) return;
+        editor.focus();
+        document.execCommand("formatBlock", false, blockTag);
+        syncToTextarea();
+      });
+    });
+
+    const fontSizeSelect = toolbar.querySelector("[data-richtext-font-size]");
+    if (fontSizeSelect) {
+      fontSizeSelect.addEventListener("change", () => {
+        const value = fontSizeSelect.value;
+        if (!value) return;
+        applyOfertaFontSize(editor, value);
+        syncToTextarea();
+      });
+    }
+
+    editor.addEventListener("input", syncToTextarea);
+    editor.addEventListener("blur", syncToTextarea);
+    editor.addEventListener("paste", (event) => {
+      event.preventDefault();
+      const clipboardHtml = event.clipboardData?.getData("text/html");
+      const clipboardText = event.clipboardData?.getData("text/plain") || "";
+      const safeHtml = sanitizeOfertaEditorHtml(clipboardHtml || clipboardText.replace(/\n/g, "<br>"));
+      document.execCommand("insertHTML", false, safeHtml);
+      syncToTextarea();
+    });
+  }
+
   function replaceFileExtension(name, ext) {
     return String(name || "plik")
       .replace(/\.[^/.]+$/, "")
@@ -176,9 +621,16 @@
 
     const image = await readImageElement(file);
     let scale = Math.min(1, maxDimension / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
-    const qualities = [0.86, 0.78, 0.7, 0.62, 0.55];
+    const qualities = [0.86, 0.78, 0.7, 0.62, 0.55, 0.48, 0.4];
+    const outputCandidates = [
+      { type: "image/webp", ext: ".webp" },
+      { type: "image/jpeg", ext: ".jpg" },
+    ];
+    let bestBlob = null;
+    let bestType = "";
+    let bestExt = ".webp";
 
-    for (let attempt = 0; attempt < 4; attempt += 1) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
       const width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
       const height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
       const canvas = document.createElement("canvas");
@@ -190,14 +642,25 @@
       }
       ctx.drawImage(image, 0, 0, width, height);
 
-      for (const quality of qualities) {
-        const blob = await canvasToBlob(canvas, "image/webp", quality);
-        if (blob.size <= maxBytes) {
-          return new File([blob], replaceFileExtension(file.name, ".webp"), { type: "image/webp" });
+      for (const output of outputCandidates) {
+        for (const quality of qualities) {
+          const blob = await canvasToBlob(canvas, output.type, quality);
+          if (!bestBlob || blob.size < bestBlob.size) {
+            bestBlob = blob;
+            bestType = blob.type || output.type;
+            bestExt = output.ext;
+          }
+          if (blob.size <= maxBytes) {
+            return new File([blob], replaceFileExtension(file.name, output.ext), { type: blob.type || output.type });
+          }
         }
       }
 
-      scale *= 0.82;
+      scale *= 0.75;
+    }
+
+    if (bestBlob && bestBlob.size <= maxBytes) {
+      return new File([bestBlob], replaceFileExtension(file.name, bestExt), { type: bestType || bestBlob.type });
     }
 
     throw new Error(`Nie udalo sie zmniejszyc obrazu "${file.name}" do bezpiecznego rozmiaru.`);
@@ -769,6 +1232,7 @@
   function renderContentPanel(statusMessage = "") {
     const content = state.content;
     const panel = document.querySelector("#content-panel");
+    if (!panel) return;
     panel.innerHTML = `
       <p class="pill">Tresci strony</p>
       <h2>Edycja glownej oferty</h2>
@@ -784,7 +1248,9 @@
             <label class="field-full"><span>Haslo pod logo</span><input id="company-tagline" value="${escapeAttribute(content.company.tagline)}" /></label>
             <label class="field-full"><span>Naglowek hero</span><input id="company-hero-title" value="${escapeAttribute(content.company.heroTitle)}" /></label>
             <label class="field-full"><span>Tekst hero</span><textarea id="company-hero-text">${escapeHtml(content.company.heroText)}</textarea></label>
-            <label class="field-full"><span>Godziny otwarcia (format: Dzień: Godziny, np. Poniedziałek: 12:00 - 22:00)</span><textarea id="company-opening-hours">${escapeHtml((content.company.openingHours || []).map(item => typeof item === 'object' ? `${item.day}: ${item.hours}` : item).join("\n"))}</textarea></label>
+            <div class="field-full">
+              ${renderOpeningHoursEditorMarkup(content.company.openingHours)}
+            </div>
           </div>
         </div>
         <div class="repeater-item">
@@ -1031,19 +1497,19 @@
   function renderHallsList() {
     const target = document.querySelector("#halls-list");
     if (!target) return;
-    target.innerHTML = state.content.events.halls
+    const hallLabels = ["Sala duza", "Sala mala"];
+    const halls = normalizeEventHalls(state.content.events?.halls);
+    target.innerHTML = halls
       .map(
         (hall, index) => `
           <div class="repeater-item">
             <div class="repeater-head">
-              <strong>Sala ${index + 1}</strong>
-              <button class="button danger" type="button" data-remove-array="halls" data-index="${index}">Usun</button>
+              <strong>${hallLabels[index] || `Sala ${index + 1}`}</strong>
             </div>
             <div class="field-grid">
-              <label class="field"><span>Klucz techniczny</span><input data-hall-key="${index}" value="${escapeAttribute(hall.key)}" /></label>
-              <label class="field"><span>Nazwa</span><input data-hall-name="${index}" value="${escapeAttribute(hall.name)}" /></label>
-              <label class="field"><span>Pojemnosc</span><input data-hall-capacity="${index}" value="${escapeAttribute(hall.capacity)}" /></label>
-              <label class="field-full"><span>Opis</span><textarea data-hall-description="${index}">${escapeHtml(hall.description)}</textarea></label>
+              <label class="field"><span>Nazwa</span><input data-hall-name-fixed="${index}" value="${escapeAttribute(hall.name)}" /></label>
+              <label class="field"><span>Pojemnosc</span><input data-hall-capacity-fixed="${index}" value="${escapeAttribute(hall.capacity)}" /></label>
+              <label class="field-full"><span>Opis</span><textarea data-hall-description-fixed="${index}">${escapeHtml(hall.description)}</textarea></label>
             </div>
           </div>`
       )
@@ -1139,22 +1605,28 @@
     const companyHeroText = getTrimmedValue("#company-hero-text");
     if (companyHeroText !== null) content.company.heroText = companyHeroText;
 
-    const openingHoursRaw = getTrimmedValue("#company-opening-hours");
-    if (openingHoursRaw !== null) {
-      const openingHoursText = openingHoursRaw
-        .split("\n")
-        .map((item) => item.trim())
-        .filter(Boolean);
-      content.company.openingHours = openingHoursText.map((item) => {
-        const colonIndex = item.indexOf(":");
-        if (colonIndex > 0) {
-          return {
-            day: item.substring(0, colonIndex).trim(),
-            hours: item.substring(colonIndex + 1).trim(),
-          };
-        }
-        return item;
-      });
+    if (document.querySelector("#company-opening-hours-monday-from")) {
+      content.company.openingHours = collectOpeningHoursFromEditor(getTrimmedValue);
+    } else {
+      const openingHoursRaw = getTrimmedValue("#company-opening-hours");
+      if (openingHoursRaw !== null) {
+        const openingHoursText = openingHoursRaw
+          .split("\n")
+          .map((item) => item.trim())
+          .filter(Boolean);
+        content.company.openingHours = normalizeOpeningHours(
+          openingHoursText.map((item) => {
+            const colonIndex = item.indexOf(":");
+            if (colonIndex > 0) {
+              return {
+                day: item.substring(0, colonIndex).trim(),
+                hours: item.substring(colonIndex + 1).trim(),
+              };
+            }
+            return item;
+          })
+        );
+      }
     }
 
     const homeAboutText = getTrimmedValue("#home-about-text");
@@ -1231,9 +1703,9 @@
         .map((item) => item.trim())
         .filter(Boolean);
     }
-    const restaurantOrderButtonText = getTrimmedValue("#restaurant-order-button-text");
-    if (restaurantOrderButtonText !== null) {
-      content.restaurant.orderButtonText = restaurantOrderButtonText;
+    const restaurantOrdersInfoText = getTrimmedValue("#restaurant-orders-info-text");
+    if (restaurantOrdersInfoText !== null) {
+      content.restaurant.ordersInfoText = restaurantOrdersInfoText;
     }
 
     if (document.querySelector("#restaurant-menu-panel")) {
@@ -1288,13 +1760,21 @@
     if (ofertaEl) {
       content.events.ofertaModalBodyHtml = ofertaEl.value;
     }
-    if (document.querySelector("[data-hall-key]")) {
-      content.events.halls = Array.from(document.querySelectorAll("[data-hall-key]")).map((element, index) => ({
-        key: element.value.trim(),
-        name: document.querySelector(`[data-hall-name="${index}"]`)?.value.trim() || "",
-        capacity: document.querySelector(`[data-hall-capacity="${index}"]`)?.value.trim() || "",
-        description: document.querySelector(`[data-hall-description="${index}"]`)?.value.trim() || "",
-      }));
+    if (document.querySelector("[data-hall-name-fixed]")) {
+      content.events.halls = [
+        {
+          key: "duza",
+          name: document.querySelector('[data-hall-name-fixed="0"]')?.value.trim() || "Sala Duza",
+          capacity: document.querySelector('[data-hall-capacity-fixed="0"]')?.value.trim() || "",
+          description: document.querySelector('[data-hall-description-fixed="0"]')?.value.trim() || "",
+        },
+        {
+          key: "mala",
+          name: document.querySelector('[data-hall-name-fixed="1"]')?.value.trim() || "Sala Mala",
+          capacity: document.querySelector('[data-hall-capacity-fixed="1"]')?.value.trim() || "",
+          description: document.querySelector('[data-hall-description-fixed="1"]')?.value.trim() || "",
+        },
+      ];
     }
 
     if (document.querySelector("#events-menu-panel")) {
@@ -1365,18 +1845,11 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      state.content = data.content;
-      state.lastSavedContent = structuredClone(data.content);
-      renderContentPanel("Tresci zostaly zapisane.");
-      if (document.querySelector("#restaurant-menu-panel")) {
-        renderRestaurantMenuPanel("Menu zostalo zapisane.");
-      }
-      if (document.querySelector("#events-menu-panel")) {
-        renderEventsMenuPanel("Menu okolicznosciowe zostalo zapisane.");
-      }
-      if (document.querySelector("#restaurant-gallery-panel")) {
-        renderRestaurantGalleryPanel("Galeria zostala zapisana.");
-      }
+      const normalizedContent = normalizeAdminContent(data.content);
+      state.content = normalizedContent;
+      state.lastSavedContent = structuredClone(normalizedContent);
+      renderActiveAdminTile("Zmiany zostaly zapisane.");
+      refreshSaveDockVisibility();
     } catch (error) {
       renderActiveAdminTile(error.message);
     }
@@ -1481,19 +1954,15 @@
   function renderRestaurantOpeningHoursPanel(statusMessage = "") {
     const panel = document.querySelector("#restaurant-opening-hours-panel");
     if (!panel) return;
-    const openingHours = (state.content.company?.openingHours || [])
-      .map((item) => (typeof item === "object" ? `${item.day}: ${item.hours}` : item))
-      .join("\n");
 
     panel.innerHTML = `
       <p class="pill">Restauracja</p>
       <h2>Godziny otwarcia</h2>
       <p class="section-intro">Te godziny pojawiaja sie w kafelku "Godziny" na stronie restauracji.</p>
       <div class="stack">
-        <label class="field-full">
-          <span>Godziny otwarcia (jedna linia = jeden dzien)</span>
-          <textarea id="company-opening-hours" rows="10">${escapeHtml(openingHours)}</textarea>
-        </label>
+        ${renderOpeningHoursEditorMarkup(state.content.company?.openingHours, {
+          intro: "Ustaw godzine otwarcia i zamkniecia dla kazdego dnia osobno. Puste pola zapisza dzien jako nieczynny.",
+        })}
         <p class="status">${escapeHtml(statusMessage)}</p>
       </div>
     `;
@@ -1502,16 +1971,18 @@
   function renderRestaurantOrderPanel(statusMessage = "") {
     const panel = document.querySelector("#restaurant-order-panel");
     if (!panel) return;
-    const currentLabel = state.content.restaurant?.orderButtonText || "Rezerwacja stolika";
+    const currentInfoText =
+      state.content.restaurant?.ordersInfoText ||
+      "Dowozimy za darmo w odleglosci do 5 km od restauracji.";
 
     panel.innerHTML = `
       <p class="pill">Restauracja</p>
       <h2>Obecny modul zamowien jedzenia</h2>
-      <p class="section-intro">Edytuj tekst widoczny w obecnym kafelku / przycisku CTA na stronie restauracji.</p>
+      <p class="section-intro">Edytuj tresc widoczna w kafelku "Zamowienia" na stronie restauracji.</p>
       <div class="stack">
         <label class="field-full">
-          <span>Tresc przycisku</span>
-          <input id="restaurant-order-button-text" value="${escapeAttribute(currentLabel)}" />
+          <span>Tresc kafelka</span>
+          <textarea id="restaurant-orders-info-text" rows="4">${escapeHtml(currentInfoText)}</textarea>
         </label>
         <p class="status">${escapeHtml(statusMessage)}</p>
       </div>
@@ -1527,14 +1998,41 @@
       <h2>Oferta</h2>
       <p class="section-intro">Edytujesz tresc modala otwieranego z kafelka "Oferta" na stronie Przyjecia.</p>
       <div class="stack">
-        <label class="field-full">
-          <span>HTML oferty</span>
-          <textarea id="events-oferta-modal-html" rows="18">${escapeHtml(state.content.events?.ofertaModalBodyHtml || "")}</textarea>
-        </label>
-        <p class="helper">Dozwolone znaczniki: p, ul, li, strong, a.</p>
+        <div class="field-full">
+          <span>Treść oferty</span>
+          <div class="admin-richtext">
+            <div class="admin-richtext-toolbar" id="events-oferta-editor-toolbar">
+              <button class="button secondary" type="button" data-richtext-command="bold" title="Pogrubienie"><strong>B</strong></button>
+              <button class="button secondary" type="button" data-richtext-command="italic" title="Kursywa"><em>I</em></button>
+              <button class="button secondary" type="button" data-richtext-command="underline" title="Podkreslenie"><span style="text-decoration: underline;">U</span></button>
+              <button class="button secondary" type="button" data-richtext-block="h2" title="Naglowek">H2</button>
+              <button class="button secondary" type="button" data-richtext-block="p" title="Akapit">Akapit</button>
+              <button class="button secondary" type="button" data-richtext-command="insertUnorderedList" title="Lista punktowana">Lista</button>
+              <button class="button secondary" type="button" data-richtext-command="justifyLeft" title="Do lewej">Lewo</button>
+              <button class="button secondary" type="button" data-richtext-command="justifyCenter" title="Wysrodkuj">Srodek</button>
+              <button class="button secondary" type="button" data-richtext-command="justifyRight" title="Do prawej">Prawo</button>
+              <button class="button secondary" type="button" data-richtext-command="createLink" title="Wstaw link">Link</button>
+              <label class="admin-richtext-size">
+                <span>Rozmiar</span>
+                <select data-richtext-font-size>
+                  <option value="">--</option>
+                  <option value="0.9rem">Maly</option>
+                  <option value="1rem">Normalny</option>
+                  <option value="1.1rem">Sredni</option>
+                  <option value="1.25rem">Duzy</option>
+                  <option value="1.5rem">XL</option>
+                </select>
+              </label>
+            </div>
+            <div class="admin-richtext-editor" id="events-oferta-modal-editor" contenteditable="true"></div>
+            <textarea id="events-oferta-modal-html" rows="18" hidden>${escapeHtml(state.content.events?.ofertaModalBodyHtml || "")}</textarea>
+          </div>
+        </div>
+        <p class="helper">Edytor wizualny zapisuje gotowy wyglad tresci modala "Oferta".</p>
         <p class="status">${escapeHtml(statusMessage)}</p>
       </div>
     `;
+    initOfertaRichTextEditor();
   }
 
   function renderEventsHallsPanel(statusMessage = "") {
@@ -1544,12 +2042,9 @@
     panel.innerHTML = `
       <p class="pill">Przyjecia</p>
       <h2>Sale</h2>
-      <p class="section-intro">Zarzadzaj nazwami, pojemnosciami i opisami sal widocznymi w panelu i na stronie.</p>
+      <p class="section-intro">W obiekcie sa dwie sale: duza i mala. Tutaj edytujesz ich nazwy, pojemnosci i opisy.</p>
       <div class="stack">
-        <div class="repeater-head">
-          <strong>Lista sal</strong>
-          <button class="button secondary" type="button" data-add-array="halls">Dodaj sale</button>
-        </div>
+        <div class="repeater-head"><strong>Lista sal</strong></div>
         <div id="halls-list" class="repeater-list"></div>
         <p class="status">${escapeHtml(statusMessage)}</p>
       </div>
@@ -1774,668 +2269,533 @@
     await loadDashboard("Zdjecie zostalo usuniete.");
   }
 
-  function renderRestaurantMenuPanel(statusMessage = "") {
-    const panel = document.querySelector("#restaurant-menu-panel");
-    if (!panel) return;
-    const menu = state.content.restaurant?.menu || [];
-
-    panel.innerHTML = `
-      <p class="pill">Restauracja</p>
-      <h2>Menu Restauracji</h2>
-      <p class="section-intro">Zarzadzaj menu restauracji. Mozesz dodawac kategorie (np. Przystawki, Zupy, Dania glowne), pozycje menu z cenami i skladnikami, oraz zmieniac kolejnosc.</p>
-      <p class="status">${escapeHtml(statusMessage)}</p>
-      <div class="stack">
-        <div class="repeater-head">
-          <strong>Kategorie menu</strong>
-          <button class="button secondary" type="button" id="add-menu-section">Dodaj kategorie</button>
-        </div>
-        <div id="menu-sections-list" class="repeater-list"></div>
-      </div>
-    `;
-
-    renderMenuSectionsList();
-    panel.querySelector("#add-menu-section").addEventListener("click", addMenuSection);
-  }
-
-  function renderMenuSectionsList() {
-    const target = document.querySelector("#menu-sections-list");
-    if (!target) return;
-    
-    const menu = state.content.restaurant?.menu || [];
-    target.innerHTML = menu
-      .map(
-        (section, sectionIndex) => `
-          <div class="repeater-item">
-            <div class="repeater-head">
-              <strong>Kategoria ${sectionIndex + 1}: ${escapeHtml(section.section || "")}</strong>
-              <div class="inline-actions">
-                <button class="button secondary" type="button" data-move-menu-section-up="${sectionIndex}" ${sectionIndex === 0 ? 'disabled' : ''}>↑</button>
-                <button class="button secondary" type="button" data-move-menu-section-down="${sectionIndex}" ${sectionIndex === menu.length - 1 ? 'disabled' : ''}>↓</button>
-                <button class="button danger" type="button" data-remove-menu-section="${sectionIndex}">Usun kategorie</button>
-              </div>
-            </div>
-            <div class="field-grid">
-              <label class="field-full"><span>Nazwa kategorii</span><input data-menu-section-name="${sectionIndex}" value="${escapeAttribute(section.section || "")}" placeholder="np. Przystawki, Zupy, Dania główne" /></label>
-            </div>
-            <div class="repeater-head">
-              <strong>Podkategorie</strong>
-              <button class="button secondary" type="button" data-add-menu-subcategory="${sectionIndex}">Dodaj podkategorie</button>
-            </div>
-            <div class="repeater-list" data-menu-section-subcategories="${sectionIndex}">
-              ${(() => {
-                const subcategories = new Set();
-                (section.items || []).forEach(item => {
-                  if (item.subcategory) {
-                    subcategories.add(item.subcategory);
-                  }
-                });
-                return Array.from(subcategories).map((subcat, subcatIndex) => `
-                  <div class="repeater-item">
-                    <div class="repeater-head">
-                      <strong>Podkategoria ${subcatIndex + 1}: ${escapeHtml(subcat)}</strong>
-                      <div class="inline-actions">
-                        <button class="button secondary" type="button" data-move-menu-subcategory-up="${sectionIndex}" data-subcategory="${escapeAttribute(subcat)}" ${subcatIndex === 0 ? 'disabled' : ''}>↑</button>
-                        <button class="button secondary" type="button" data-move-menu-subcategory-down="${sectionIndex}" data-subcategory="${escapeAttribute(subcat)}" ${subcatIndex === subcategories.size - 1 ? 'disabled' : ''}>↓</button>
-                        <button class="button danger" type="button" data-remove-menu-subcategory="${sectionIndex}" data-subcategory="${escapeAttribute(subcat)}">Usun podkategorie</button>
-                      </div>
-                    </div>
-                    <div class="field-grid">
-                      <label class="field-full"><span>Nazwa podkategorii</span><input data-menu-subcategory-name="${sectionIndex}-${subcatIndex}" data-subcategory-old="${escapeAttribute(subcat)}" value="${escapeAttribute(subcat)}" placeholder="np. Na zimno, Na ciepło, Alkohole" /></label>
-                    </div>
-                  </div>
-                `).join('');
-              })()}
-            </div>
-            <div class="repeater-head">
-              <strong>Pozycje menu</strong>
-              <button class="button secondary" type="button" data-add-menu-item="${sectionIndex}">Dodaj pozycje</button>
-            </div>
-            <div class="repeater-list" data-menu-section-items="${sectionIndex}">
-              ${(section.items || []).map((item, itemIndex) => `
-                <div class="repeater-item">
-                  <div class="repeater-head">
-                    <strong>Pozycja ${itemIndex + 1}</strong>
-                    <div class="inline-actions">
-                      <button class="button secondary" type="button" data-move-menu-item-up="${sectionIndex}" data-item-index="${itemIndex}" ${itemIndex === 0 ? 'disabled' : ''}>↑</button>
-                      <button class="button secondary" type="button" data-move-menu-item-down="${sectionIndex}" data-item-index="${itemIndex}" ${itemIndex === section.items.length - 1 ? 'disabled' : ''}>↓</button>
-                      <button class="button danger" type="button" data-remove-menu-item="${sectionIndex}" data-item-index="${itemIndex}">Usun</button>
-                    </div>
-                  </div>
-                  <div class="field-grid">
-                    <label class="field"><span>Nazwa dania</span><input data-menu-item-name="${sectionIndex}-${itemIndex}" value="${escapeAttribute(item.name || "")}" /></label>
-                    <label class="field"><span>Cena</span><input data-menu-item-price="${sectionIndex}-${itemIndex}" value="${escapeAttribute(item.price || "")}" placeholder="np. 45 zł" /></label>
-                    <label class="field"><span>Podkategoria (opcjonalnie)</span>
-                      <select data-menu-item-subcategory="${sectionIndex}-${itemIndex}">
-                        <option value="">Brak podkategorii</option>
-                        ${(() => {
-                          const subcategories = new Set();
-                          (section.items || []).forEach(i => {
-                            if (i.subcategory) {
-                              subcategories.add(i.subcategory);
-                            }
-                          });
-                          return Array.from(subcategories).map(subcat => 
-                            `<option value="${escapeAttribute(subcat)}" ${item.subcategory === subcat ? 'selected' : ''}>${escapeHtml(subcat)}</option>`
-                          ).join('');
-                        })()}
-                      </select>
-                    </label>
-                    <label class="field-full"><span>Opis</span><textarea data-menu-item-description="${sectionIndex}-${itemIndex}">${escapeHtml(item.description || "")}</textarea></label>
-                    <label class="field-full"><span>Skladniki (jeden w linii)</span><textarea data-menu-item-ingredients="${sectionIndex}-${itemIndex}">${escapeHtml((item.ingredients || []).join("\n"))}</textarea></label>
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          </div>`
-      )
-      .join("");
-
-    target.querySelectorAll("[data-add-menu-item]").forEach((button) => {
-      button.addEventListener("click", () => addMenuItem(Number(button.dataset.addMenuItem)));
-    });
-    target.querySelectorAll("[data-remove-menu-item]").forEach((button) => {
-      button.addEventListener("click", () => removeMenuItem(Number(button.dataset.removeMenuItem), Number(button.dataset.itemIndex)));
-    });
-    target.querySelectorAll("[data-move-menu-item-up]").forEach((button) => {
-      button.addEventListener("click", () => moveMenuItem(Number(button.dataset.moveMenuItemUp), Number(button.dataset.itemIndex), -1));
-    });
-    target.querySelectorAll("[data-move-menu-item-down]").forEach((button) => {
-      button.addEventListener("click", () => moveMenuItem(Number(button.dataset.moveMenuItemDown), Number(button.dataset.itemIndex), 1));
-    });
-    target.querySelectorAll("[data-remove-menu-section]").forEach((button) => {
-      button.addEventListener("click", () => removeMenuSection(Number(button.dataset.removeMenuSection)));
-    });
-    target.querySelectorAll("[data-move-menu-section-up]").forEach((button) => {
-      button.addEventListener("click", () => moveMenuSection(Number(button.dataset.moveMenuSectionUp), -1));
-    });
-    target.querySelectorAll("[data-move-menu-section-down]").forEach((button) => {
-      button.addEventListener("click", () => moveMenuSection(Number(button.dataset.moveMenuSectionDown), 1));
-    });
-    target.querySelectorAll("[data-add-menu-subcategory]").forEach((button) => {
-      button.addEventListener("click", () => addMenuSubcategory(Number(button.dataset.addMenuSubcategory)));
-    });
-    target.querySelectorAll("[data-remove-menu-subcategory]").forEach((button) => {
-      button.addEventListener("click", () => removeMenuSubcategory(Number(button.dataset.removeMenuSubcategory), button.dataset.subcategory));
-    });
-    target.querySelectorAll("[data-move-menu-subcategory-up]").forEach((button) => {
-      button.addEventListener("click", () => moveMenuSubcategory(Number(button.dataset.moveMenuSubcategoryUp), button.dataset.subcategory, -1));
-    });
-    target.querySelectorAll("[data-move-menu-subcategory-down]").forEach((button) => {
-      button.addEventListener("click", () => moveMenuSubcategory(Number(button.dataset.moveMenuSubcategoryDown), button.dataset.subcategory, 1));
-    });
-  }
-
-  function addMenuSection() {
-    captureDraftIfPossible();
-    if (!state.content.restaurant) {
-      state.content.restaurant = {};
+  function getMenuEditorConfig(kind) {
+    if (kind === "restaurant") {
+      return {
+        panelSelector: "#restaurant-menu-panel",
+        listSelector: "[data-menu-editor-list]",
+        pill: "Restauracja",
+        title: "Menu Restauracji",
+        intro:
+          "Uproszczony edytor menu: kategorie rozwijane, pozycje w tabeli i szybkie dodawanie przez wklejenie wielu linii naraz.",
+        includePrice: true,
+        quickAddHint:
+          "Format linii: Nazwa | Cena | Opis | skladnik 1, skladnik 2 | Podkategoria",
+        quickAddPlaceholder:
+          "Rosol domowy | 19 zl | Bulion z makaronem | makaron, natka pietruszki | Zupy",
+        emptyState:
+          "Nie ma jeszcze zadnej kategorii. Zacznij od dodania pierwszej kategorii albo wklej pozycje po jej utworzeniu.",
+        itemEmptyText: "Ta kategoria nie ma jeszcze pozycji.",
+      };
     }
-    if (!state.content.restaurant.menu) {
-      state.content.restaurant.menu = [];
+
+    return {
+      panelSelector: "#events-menu-panel",
+      listSelector: "[data-menu-editor-list]",
+      pill: "Przyjecia",
+      title: "Menu okolicznosciowe",
+      intro:
+        "Edytor dla menu okolicznosciowego bez cen: sekcje sa rozwijane, a pozycje wygodnie edytujesz w jednym miejscu.",
+      includePrice: false,
+      quickAddHint:
+        "Format linii: Nazwa | Opis | skladnik 1, skladnik 2 | Podkategoria",
+      quickAddPlaceholder:
+        "Pieczony schab w ziolach | Serwowany z sosem pieczeniowym | schab, rozmaryn, demi-glace | Dania glowne",
+      emptyState:
+        "Nie ma jeszcze zadnej kategorii. Dodaj sekcje i uzupelnij pozycje albo skorzystaj z szybkiego wklejania.",
+      itemEmptyText: "Ta kategoria nie ma jeszcze pozycji.",
+    };
+  }
+
+  function getMenuEditorRoot(kind) {
+    return document.querySelector(getMenuEditorConfig(kind).panelSelector);
+  }
+
+  function getMenuEditorState(kind) {
+    if (!state.ui.menuEditors) {
+      state.ui.menuEditors = {};
     }
-    state.content.restaurant.menu.push({ section: "", items: [] });
-    renderRestaurantMenuPanel();
-  }
-
-  function removeMenuSection(index) {
-    captureDraftIfPossible();
-    if (state.content.restaurant?.menu) {
-      state.content.restaurant.menu.splice(index, 1);
+    if (!state.ui.menuEditors[kind]) {
+      state.ui.menuEditors[kind] = { openSections: {} };
     }
-    renderRestaurantMenuPanel();
+    return state.ui.menuEditors[kind];
   }
 
-  function moveMenuSection(index, direction) {
-    captureDraftIfPossible();
-    if (!state.content.restaurant?.menu) return;
-    const menu = state.content.restaurant.menu;
-    const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= menu.length) return;
-    [menu[index], menu[newIndex]] = [menu[newIndex], menu[index]];
-    renderRestaurantMenuPanel();
-  }
-
-  function addMenuItem(sectionIndex) {
-    captureDraftIfPossible();
-    if (!state.content.restaurant?.menu?.[sectionIndex]) return;
-    if (!state.content.restaurant.menu[sectionIndex].items) {
-      state.content.restaurant.menu[sectionIndex].items = [];
-    }
-    state.content.restaurant.menu[sectionIndex].items.push({
-      name: "",
-      price: "",
-      description: "",
-      ingredients: []
-    });
-    renderRestaurantMenuPanel();
-  }
-
-  function removeMenuItem(sectionIndex, itemIndex) {
-    captureDraftIfPossible();
-    if (state.content.restaurant?.menu?.[sectionIndex]?.items) {
-      state.content.restaurant.menu[sectionIndex].items.splice(itemIndex, 1);
-    }
-    renderRestaurantMenuPanel();
-  }
-
-  function moveMenuItem(sectionIndex, itemIndex, direction) {
-    captureDraftIfPossible();
-    if (!state.content.restaurant?.menu?.[sectionIndex]?.items) return;
-    const items = state.content.restaurant.menu[sectionIndex].items;
-    const newIndex = itemIndex + direction;
-    if (newIndex < 0 || newIndex >= items.length) return;
-    [items[itemIndex], items[newIndex]] = [items[newIndex], items[itemIndex]];
-    renderRestaurantMenuPanel();
-  }
-
-  function collectMenuFromPanel() {
-    const root = document.querySelector("#restaurant-menu-panel");
-    if (!root) return [];
-    const menu = [];
-    const sections = root.querySelectorAll("[data-menu-section-name]");
-    sections.forEach((sectionInput, sectionIndex) => {
-      const sectionName = sectionInput.value.trim();
-      if (!sectionName) return;
-
-      const subcategoryMapping = {};
-      root.querySelectorAll(`[data-menu-subcategory-name^="${sectionIndex}-"]`).forEach((input) => {
-        const oldName = input.dataset.subcategoryOld;
-        const newName = input.value.trim();
-        if (oldName && newName && oldName !== newName) {
-          subcategoryMapping[oldName] = newName;
-        }
-      });
-
-      const items = [];
-      const itemInputs = root.querySelectorAll(`[data-menu-item-name^="${sectionIndex}-"]`);
-      itemInputs.forEach((itemInput) => {
-        const [secIdx, itemIdx] = itemInput.dataset.menuItemName.split("-").map(Number);
-        if (secIdx !== sectionIndex) return;
-
-        const name = itemInput.value.trim();
-        if (!name) return;
-
-        const price = root.querySelector(`[data-menu-item-price="${sectionIndex}-${itemIdx}"]`)?.value.trim() || "";
-        const description = root.querySelector(`[data-menu-item-description="${sectionIndex}-${itemIdx}"]`)?.value.trim() || "";
-        let subcategory = root.querySelector(`[data-menu-item-subcategory="${sectionIndex}-${itemIdx}"]`)?.value.trim() || "";
-
-        if (subcategory && subcategoryMapping[subcategory]) {
-          subcategory = subcategoryMapping[subcategory];
-        }
-
-        const ingredientsText = root.querySelector(`[data-menu-item-ingredients="${sectionIndex}-${itemIdx}"]`)?.value || "";
-        const ingredients = ingredientsText.split("\n").map((i) => i.trim()).filter(Boolean);
-
-        const item = { name, price, description, ingredients };
-        if (subcategory) {
-          item.subcategory = subcategory;
-        }
-        items.push(item);
-      });
-
-      menu.push({ section: sectionName, items });
-    });
-    return menu;
-  }
-
-  function collectEventsMenuFromPanel() {
-    const root = document.querySelector("#events-menu-panel");
-    if (!root) return [];
-    const menu = [];
-    const sections = root.querySelectorAll("[data-ev-menu-section-name]");
-    sections.forEach((sectionInput, sectionIndex) => {
-      const sectionName = sectionInput.value.trim();
-      if (!sectionName) return;
-
-      const subcategoryMapping = {};
-      root.querySelectorAll(`[data-ev-menu-subcategory-name^="${sectionIndex}-"]`).forEach((input) => {
-        const oldName = input.getAttribute("data-ev-subcategory-old");
-        const newName = input.value.trim();
-        if (oldName && newName && oldName !== newName) {
-          subcategoryMapping[oldName] = newName;
-        }
-      });
-
-      const items = [];
-      const itemInputs = root.querySelectorAll(`[data-ev-menu-item-name^="${sectionIndex}-"]`);
-      itemInputs.forEach((itemInput) => {
-        const key = itemInput.getAttribute("data-ev-menu-item-name") || "";
-        const [secIdx, itemIdx] = key.split("-").map(Number);
-        if (secIdx !== sectionIndex) return;
-
-        const name = itemInput.value.trim();
-        if (!name) return;
-
-        const description = root.querySelector(`[data-ev-menu-item-description="${sectionIndex}-${itemIdx}"]`)?.value.trim() || "";
-        let subcategory = root.querySelector(`[data-ev-menu-item-subcategory="${sectionIndex}-${itemIdx}"]`)?.value.trim() || "";
-
-        if (subcategory && subcategoryMapping[subcategory]) {
-          subcategory = subcategoryMapping[subcategory];
-        }
-
-        const ingredientsText = root.querySelector(`[data-ev-menu-item-ingredients="${sectionIndex}-${itemIdx}"]`)?.value || "";
-        const ingredients = ingredientsText.split("\n").map((i) => i.trim()).filter(Boolean);
-
-        const item = { name, description, ingredients };
-        if (subcategory) {
-          item.subcategory = subcategory;
-        }
-        items.push(item);
-      });
-
-      menu.push({ section: sectionName, items });
-    });
-    return menu;
-  }
-
-  function addMenuSubcategory(sectionIndex) {
-    captureDraftIfPossible();
-    if (!state.content.restaurant?.menu?.[sectionIndex]) return;
-    if (!state.content.restaurant.menu[sectionIndex].items) {
-      state.content.restaurant.menu[sectionIndex].items = [];
-    }
-    // Dodaj pustą pozycję z nową podkategorią
-    state.content.restaurant.menu[sectionIndex].items.push({
-      name: "",
-      price: "",
-      description: "",
-      ingredients: [],
-      subcategory: "Nowa podkategoria"
-    });
-    renderRestaurantMenuPanel();
-  }
-
-  function removeMenuSubcategory(sectionIndex, subcategoryName) {
-    captureDraftIfPossible();
-    if (!state.content.restaurant?.menu?.[sectionIndex]?.items) return;
-    // Usuń wszystkie pozycje z tą podkategorią
-    state.content.restaurant.menu[sectionIndex].items = state.content.restaurant.menu[sectionIndex].items.filter(
-      item => item.subcategory !== subcategoryName
-    );
-    renderRestaurantMenuPanel();
-  }
-
-  function moveMenuSubcategory(sectionIndex, subcategoryName, direction) {
-    captureDraftIfPossible();
-    if (!state.content.restaurant?.menu?.[sectionIndex]?.items) return;
-    
-    const items = state.content.restaurant.menu[sectionIndex].items;
-    const subcategories = Array.from(new Set(items.map(item => item.subcategory).filter(Boolean)));
-    const currentIndex = subcategories.indexOf(subcategoryName);
-    if (currentIndex === -1) return;
-    
-    const newIndex = currentIndex + direction;
-    if (newIndex < 0 || newIndex >= subcategories.length) return;
-    
-    const targetSubcategory = subcategories[newIndex];
-    
-    // Zamień podkategorie we wszystkich pozycjach
-    items.forEach(item => {
-      if (item.subcategory === subcategoryName) {
-        item.subcategory = targetSubcategory + "_temp";
-      } else if (item.subcategory === targetSubcategory) {
-        item.subcategory = subcategoryName;
+  function getMenuSectionsByKind(kind) {
+    if (kind === "restaurant") {
+      if (!state.content.restaurant) {
+        state.content.restaurant = {};
       }
-    });
-    
-    // Przywróć tymczasową nazwę
-    items.forEach(item => {
-      if (item.subcategory === targetSubcategory + "_temp") {
-        item.subcategory = targetSubcategory;
+      if (!Array.isArray(state.content.restaurant.menu)) {
+        state.content.restaurant.menu = [];
       }
-    });
-    
-    renderRestaurantMenuPanel();
-  }
+      return state.content.restaurant.menu;
+    }
 
-  function renderEventsMenuPanel(statusMessage = "") {
-    const panel = document.querySelector("#events-menu-panel");
-    if (!panel) return;
-    const menu = state.content.events?.menu || [];
-
-    panel.innerHTML = `
-      <p class="pill">Przyjecia</p>
-      <h2>Menu okolicznosciowe</h2>
-      <p class="section-intro">Menu okolicznosciowe: kategorie, pozycje (nazwy dań), opisy, skladniki, podkategorie i kolejnosc — <strong>bez cen</strong> na stronie (wycena indywidualnie).</p>
-      <p class="status">${escapeHtml(statusMessage)}</p>
-      <div class="stack">
-        <div class="repeater-head">
-          <strong>Kategorie menu</strong>
-          <button class="button secondary" type="button" id="add-ev-menu-section">Dodaj kategorie</button>
-        </div>
-        <div id="ev-menu-sections-list" class="repeater-list"></div>
-      </div>
-    `;
-
-    renderEventsMenuSectionsList();
-    panel.querySelector("#add-ev-menu-section").addEventListener("click", addEventsMenuSection);
-  }
-
-  function renderEventsMenuSectionsList() {
-    const target = document.querySelector("#ev-menu-sections-list");
-    if (!target) return;
-
-    const menu = state.content.events?.menu || [];
-    target.innerHTML = menu
-      .map(
-        (section, sectionIndex) => `
-          <div class="repeater-item">
-            <div class="repeater-head">
-              <strong>Kategoria ${sectionIndex + 1}: ${escapeHtml(section.section || "")}</strong>
-              <div class="inline-actions">
-                <button class="button secondary" type="button" data-ev-move-menu-section-up="${sectionIndex}" ${sectionIndex === 0 ? "disabled" : ""}>↑</button>
-                <button class="button secondary" type="button" data-ev-move-menu-section-down="${sectionIndex}" ${sectionIndex === menu.length - 1 ? "disabled" : ""}>↓</button>
-                <button class="button danger" type="button" data-ev-remove-menu-section="${sectionIndex}">Usun kategorie</button>
-              </div>
-            </div>
-            <div class="field-grid">
-              <label class="field-full"><span>Nazwa kategorii</span><input data-ev-menu-section-name="${sectionIndex}" value="${escapeAttribute(section.section || "")}" placeholder="np. Przystawki, Zupy, Dania główne" /></label>
-            </div>
-            <div class="repeater-head">
-              <strong>Podkategorie</strong>
-              <button class="button secondary" type="button" data-ev-add-menu-subcategory="${sectionIndex}">Dodaj podkategorie</button>
-            </div>
-            <div class="repeater-list" data-ev-menu-section-subcategories="${sectionIndex}">
-              ${(() => {
-                const subcategories = new Set();
-                (section.items || []).forEach((item) => {
-                  if (item.subcategory) {
-                    subcategories.add(item.subcategory);
-                  }
-                });
-                return Array.from(subcategories)
-                  .map(
-                    (subcat, subcatIndex) => `
-                  <div class="repeater-item">
-                    <div class="repeater-head">
-                      <strong>Podkategoria ${subcatIndex + 1}: ${escapeHtml(subcat)}</strong>
-                      <div class="inline-actions">
-                        <button class="button secondary" type="button" data-ev-move-menu-subcategory-up="${sectionIndex}" data-subcategory="${escapeAttribute(subcat)}" ${subcatIndex === 0 ? "disabled" : ""}>↑</button>
-                        <button class="button secondary" type="button" data-ev-move-menu-subcategory-down="${sectionIndex}" data-subcategory="${escapeAttribute(subcat)}" ${subcatIndex === subcategories.size - 1 ? "disabled" : ""}>↓</button>
-                        <button class="button danger" type="button" data-ev-remove-menu-subcategory="${sectionIndex}" data-subcategory="${escapeAttribute(subcat)}">Usun podkategorie</button>
-                      </div>
-                    </div>
-                    <div class="field-grid">
-                      <label class="field-full"><span>Nazwa podkategorii</span><input data-ev-menu-subcategory-name="${sectionIndex}-${subcatIndex}" data-ev-subcategory-old="${escapeAttribute(subcat)}" value="${escapeAttribute(subcat)}" placeholder="np. Na zimno, Na ciepło, Alkohole" /></label>
-                    </div>
-                  </div>
-                `
-                  )
-                  .join("");
-              })()}
-            </div>
-            <div class="repeater-head">
-              <strong>Pozycje menu</strong>
-              <button class="button secondary" type="button" data-ev-add-menu-item="${sectionIndex}">Dodaj pozycje</button>
-            </div>
-            <div class="repeater-list" data-ev-menu-section-items="${sectionIndex}">
-              ${(section.items || [])
-                .map(
-                  (item, itemIndex) => `
-                <div class="repeater-item">
-                  <div class="repeater-head">
-                    <strong>Pozycja ${itemIndex + 1}</strong>
-                    <div class="inline-actions">
-                      <button class="button secondary" type="button" data-ev-move-menu-item-up="${sectionIndex}" data-item-index="${itemIndex}" ${itemIndex === 0 ? "disabled" : ""}>↑</button>
-                      <button class="button secondary" type="button" data-ev-move-menu-item-down="${sectionIndex}" data-item-index="${itemIndex}" ${itemIndex === section.items.length - 1 ? "disabled" : ""}>↓</button>
-                      <button class="button danger" type="button" data-ev-remove-menu-item="${sectionIndex}" data-item-index="${itemIndex}">Usun</button>
-                    </div>
-                  </div>
-                  <div class="field-grid">
-                    <label class="field"><span>Nazwa dania</span><input data-ev-menu-item-name="${sectionIndex}-${itemIndex}" value="${escapeAttribute(item.name || "")}" /></label>
-                    <label class="field"><span>Podkategoria (opcjonalnie)</span>
-                      <select data-ev-menu-item-subcategory="${sectionIndex}-${itemIndex}">
-                        <option value="">Brak podkategorii</option>
-                        ${(() => {
-                          const subcategories = new Set();
-                          (section.items || []).forEach((i) => {
-                            if (i.subcategory) {
-                              subcategories.add(i.subcategory);
-                            }
-                          });
-                          return Array.from(subcategories)
-                            .map(
-                              (subcat) =>
-                                `<option value="${escapeAttribute(subcat)}" ${item.subcategory === subcat ? "selected" : ""}>${escapeHtml(subcat)}</option>`
-                            )
-                            .join("");
-                        })()}
-                      </select>
-                    </label>
-                    <label class="field-full"><span>Opis</span><textarea data-ev-menu-item-description="${sectionIndex}-${itemIndex}">${escapeHtml(item.description || "")}</textarea></label>
-                    <label class="field-full"><span>Skladniki (jeden w linii)</span><textarea data-ev-menu-item-ingredients="${sectionIndex}-${itemIndex}">${escapeHtml((item.ingredients || []).join("\n"))}</textarea></label>
-                  </div>
-                </div>
-              `
-                )
-                .join("")}
-            </div>
-          </div>`
-      )
-      .join("");
-
-    target.querySelectorAll("[data-ev-add-menu-item]").forEach((button) => {
-      button.addEventListener("click", () => addEventsMenuItem(Number(button.getAttribute("data-ev-add-menu-item"))));
-    });
-    target.querySelectorAll("[data-ev-remove-menu-item]").forEach((button) => {
-      button.addEventListener("click", () =>
-        removeEventsMenuItem(Number(button.getAttribute("data-ev-remove-menu-item")), Number(button.getAttribute("data-item-index")))
-      );
-    });
-    target.querySelectorAll("[data-ev-move-menu-item-up]").forEach((button) => {
-      button.addEventListener("click", () =>
-        moveEventsMenuItem(Number(button.getAttribute("data-ev-move-menu-item-up")), Number(button.getAttribute("data-item-index")), -1)
-      );
-    });
-    target.querySelectorAll("[data-ev-move-menu-item-down]").forEach((button) => {
-      button.addEventListener("click", () =>
-        moveEventsMenuItem(Number(button.getAttribute("data-ev-move-menu-item-down")), Number(button.getAttribute("data-item-index")), 1)
-      );
-    });
-    target.querySelectorAll("[data-ev-remove-menu-section]").forEach((button) => {
-      button.addEventListener("click", () => removeEventsMenuSection(Number(button.getAttribute("data-ev-remove-menu-section"))));
-    });
-    target.querySelectorAll("[data-ev-move-menu-section-up]").forEach((button) => {
-      button.addEventListener("click", () => moveEventsMenuSection(Number(button.getAttribute("data-ev-move-menu-section-up")), -1));
-    });
-    target.querySelectorAll("[data-ev-move-menu-section-down]").forEach((button) => {
-      button.addEventListener("click", () => moveEventsMenuSection(Number(button.getAttribute("data-ev-move-menu-section-down")), 1));
-    });
-    target.querySelectorAll("[data-ev-add-menu-subcategory]").forEach((button) => {
-      button.addEventListener("click", () => addEventsMenuSubcategory(Number(button.getAttribute("data-ev-add-menu-subcategory"))));
-    });
-    target.querySelectorAll("[data-ev-remove-menu-subcategory]").forEach((button) => {
-      button.addEventListener("click", () =>
-        removeEventsMenuSubcategory(Number(button.getAttribute("data-ev-remove-menu-subcategory")), button.getAttribute("data-subcategory"))
-      );
-    });
-    target.querySelectorAll("[data-ev-move-menu-subcategory-up]").forEach((button) => {
-      button.addEventListener("click", () =>
-        moveEventsMenuSubcategory(Number(button.getAttribute("data-ev-move-menu-subcategory-up")), button.getAttribute("data-subcategory"), -1)
-      );
-    });
-    target.querySelectorAll("[data-ev-move-menu-subcategory-down]").forEach((button) => {
-      button.addEventListener("click", () =>
-        moveEventsMenuSubcategory(Number(button.getAttribute("data-ev-move-menu-subcategory-down")), button.getAttribute("data-subcategory"), 1)
-      );
-    });
-  }
-
-  function addEventsMenuSection() {
-    captureDraftIfPossible();
     if (!state.content.events) {
       state.content.events = {};
     }
-    if (!state.content.events.menu) {
+    if (!Array.isArray(state.content.events.menu)) {
       state.content.events.menu = [];
     }
-    state.content.events.menu.push({ section: "", items: [] });
-    renderEventsMenuPanel();
+    return state.content.events.menu;
   }
 
-  function removeEventsMenuSection(index) {
-    captureDraftIfPossible();
-    if (state.content.events?.menu) {
-      state.content.events.menu.splice(index, 1);
-    }
-    renderEventsMenuPanel();
+  function createMenuEditorItem(kind, overrides = {}) {
+    const baseItem =
+      kind === "restaurant"
+        ? { name: "", price: "", description: "", ingredients: [] }
+        : { name: "", description: "", ingredients: [] };
+    return { ...baseItem, ...overrides };
   }
 
-  function moveEventsMenuSection(index, direction) {
-    captureDraftIfPossible();
-    if (!state.content.events?.menu) return;
-    const menu = state.content.events.menu;
-    const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= menu.length) return;
-    [menu[index], menu[newIndex]] = [menu[newIndex], menu[index]];
-    renderEventsMenuPanel();
-  }
-
-  function addEventsMenuItem(sectionIndex) {
-    captureDraftIfPossible();
-    if (!state.content.events?.menu?.[sectionIndex]) return;
-    if (!state.content.events.menu[sectionIndex].items) {
-      state.content.events.menu[sectionIndex].items = [];
-    }
-    state.content.events.menu[sectionIndex].items.push({
-      name: "",
-      description: "",
-      ingredients: [],
+  function syncMenuEditorOpenSections(kind) {
+    const editorState = getMenuEditorState(kind);
+    const sections = getMenuSectionsByKind(kind);
+    const nextOpenSections = {};
+    sections.forEach((section, index) => {
+      const persisted = editorState.openSections[index];
+      const hasContent = Boolean(section?.section || (section?.items || []).length);
+      nextOpenSections[index] = typeof persisted === "boolean" ? persisted : hasContent || sections.length <= 2;
     });
-    renderEventsMenuPanel();
+    editorState.openSections = nextOpenSections;
   }
 
-  function removeEventsMenuItem(sectionIndex, itemIndex) {
-    captureDraftIfPossible();
-    if (state.content.events?.menu?.[sectionIndex]?.items) {
-      state.content.events.menu[sectionIndex].items.splice(itemIndex, 1);
-    }
-    renderEventsMenuPanel();
-  }
-
-  function moveEventsMenuItem(sectionIndex, itemIndex, direction) {
-    captureDraftIfPossible();
-    if (!state.content.events?.menu?.[sectionIndex]?.items) return;
-    const items = state.content.events.menu[sectionIndex].items;
-    const newIndex = itemIndex + direction;
-    if (newIndex < 0 || newIndex >= items.length) return;
-    [items[itemIndex], items[newIndex]] = [items[newIndex], items[itemIndex]];
-    renderEventsMenuPanel();
-  }
-
-  function addEventsMenuSubcategory(sectionIndex) {
-    captureDraftIfPossible();
-    if (!state.content.events?.menu?.[sectionIndex]) return;
-    if (!state.content.events.menu[sectionIndex].items) {
-      state.content.events.menu[sectionIndex].items = [];
-    }
-    state.content.events.menu[sectionIndex].items.push({
-      name: "",
-      description: "",
-      ingredients: [],
-      subcategory: "Nowa podkategoria",
+  function rememberMenuEditorOpenSections(kind) {
+    const root = getMenuEditorRoot(kind);
+    if (!root) return;
+    const editorState = getMenuEditorState(kind);
+    root.querySelectorAll("[data-menu-editor-section-index]").forEach((details) => {
+      const index = Number(details.getAttribute("data-menu-editor-section-index"));
+      if (Number.isNaN(index)) return;
+      editorState.openSections[index] = details.open;
     });
-    renderEventsMenuPanel();
   }
 
-  function removeEventsMenuSubcategory(sectionIndex, subcategoryName) {
-    captureDraftIfPossible();
-    if (!state.content.events?.menu?.[sectionIndex]?.items) return;
-    state.content.events.menu[sectionIndex].items = state.content.events.menu[sectionIndex].items.filter(
-      (item) => item.subcategory !== subcategoryName
+  function countMenuEditorSubcategories(items) {
+    return new Set((items || []).map((item) => item?.subcategory).filter(Boolean)).size;
+  }
+
+  function buildMenuEditorSummary(section) {
+    const items = Array.isArray(section?.items) ? section.items.length : 0;
+    const subcategories = countMenuEditorSubcategories(section?.items || []);
+    return `${items} pozycji${subcategories ? ` • ${subcategories} podkategorii` : ""}`;
+  }
+
+  function parseMenuEditorIngredients(value) {
+    return String(value || "")
+      .split(/\r?\n|,|;/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  function parseQuickAddMenuItems(text, kind) {
+    const includePrice = getMenuEditorConfig(kind).includePrice;
+    return String(text || "")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const parts = line.split("|").map((part) => part.trim());
+        if (includePrice) {
+          const [name = "", price = "", description = "", ingredientsText = "", subcategory = ""] = parts;
+          if (!name) return null;
+          const item = createMenuEditorItem(kind, {
+            name,
+            price,
+            description,
+            ingredients: parseMenuEditorIngredients(ingredientsText),
+          });
+          if (subcategory) {
+            item.subcategory = subcategory;
+          }
+          return item;
+        }
+
+        const [name = "", description = "", ingredientsText = "", subcategory = ""] = parts;
+        if (!name) return null;
+        const item = createMenuEditorItem(kind, {
+          name,
+          description,
+          ingredients: parseMenuEditorIngredients(ingredientsText),
+        });
+        if (subcategory) {
+          item.subcategory = subcategory;
+        }
+        return item;
+      })
+      .filter(Boolean);
+  }
+
+  function renderMenuEditorPanel(kind, statusMessage = "") {
+    const config = getMenuEditorConfig(kind);
+    const panel = document.querySelector(config.panelSelector);
+    if (!panel) return;
+
+    const sections = getMenuSectionsByKind(kind);
+    const itemCount = sections.reduce((sum, section) => sum + (section.items || []).length, 0);
+    const subcategoryCount = sections.reduce(
+      (sum, section) => sum + countMenuEditorSubcategories(section.items || []),
+      0
     );
-    renderEventsMenuPanel();
+
+    syncMenuEditorOpenSections(kind);
+
+    panel.innerHTML = `
+      <p class="pill">${escapeHtml(config.pill)}</p>
+      <h2>${escapeHtml(config.title)}</h2>
+      <p class="section-intro">${escapeHtml(config.intro)}</p>
+      <div class="menu-editor-toolbar">
+        <div class="menu-editor-stats">
+          <div class="menu-editor-stat">
+            <strong>${sections.length}</strong>
+            <span>Kategorie</span>
+          </div>
+          <div class="menu-editor-stat">
+            <strong>${itemCount}</strong>
+            <span>Pozycje</span>
+          </div>
+          <div class="menu-editor-stat">
+            <strong>${subcategoryCount}</strong>
+            <span>Podkategorie</span>
+          </div>
+        </div>
+        <div class="inline-actions menu-editor-toolbar-actions">
+          <button class="button secondary" type="button" data-menu-editor-expand>Rozwin wszystko</button>
+          <button class="button secondary" type="button" data-menu-editor-collapse>Zwin wszystko</button>
+          <button class="button" type="button" data-menu-editor-add-section>Dodaj kategorie</button>
+        </div>
+      </div>
+      <p class="status">${escapeHtml(statusMessage)}</p>
+      <div class="repeater-list menu-editor-list" data-menu-editor-list></div>
+    `;
+
+    renderMenuEditorSectionsList(kind);
+
+    panel.querySelector("[data-menu-editor-add-section]")?.addEventListener("click", () => addMenuEditorSection(kind));
+    panel.querySelector("[data-menu-editor-expand]")?.addEventListener("click", () => setMenuEditorSectionsOpen(kind, true));
+    panel.querySelector("[data-menu-editor-collapse]")?.addEventListener("click", () => setMenuEditorSectionsOpen(kind, false));
   }
 
-  function moveEventsMenuSubcategory(sectionIndex, subcategoryName, direction) {
+  function renderMenuEditorSectionsList(kind) {
+    const config = getMenuEditorConfig(kind);
+    const root = getMenuEditorRoot(kind);
+    const target = root?.querySelector(config.listSelector);
+    if (!target) return;
+
+    const sections = getMenuSectionsByKind(kind);
+    const editorState = getMenuEditorState(kind);
+
+    if (!sections.length) {
+      target.innerHTML = `
+        <div class="repeater-item menu-editor-empty-state">
+          <strong>Menu jest jeszcze puste</strong>
+          <p class="helper">${escapeHtml(config.emptyState)}</p>
+        </div>
+      `;
+      return;
+    }
+
+    target.innerHTML = sections
+      .map((section, sectionIndex) => {
+        const items = Array.isArray(section.items) ? section.items : [];
+        const isOpen = editorState.openSections[sectionIndex] !== false;
+        const columnCount = config.includePrice ? 6 : 5;
+
+        return `
+          <details class="menu-editor-section" data-menu-editor-section-index="${sectionIndex}" ${isOpen ? "open" : ""}>
+            <summary class="menu-editor-summary">
+              <div class="menu-editor-summary-copy">
+                <span class="menu-editor-summary-label">Kategoria ${sectionIndex + 1}</span>
+                <strong>${escapeHtml(section.section || "Nowa kategoria")}</strong>
+                <span class="menu-editor-summary-meta">${escapeHtml(buildMenuEditorSummary(section))}</span>
+              </div>
+            </summary>
+            <div class="menu-editor-section-body">
+              <div class="inline-actions menu-editor-section-actions">
+                <button class="button secondary" type="button" data-move-menu-section-up="${sectionIndex}" ${sectionIndex === 0 ? "disabled" : ""}>Przesun wyzej</button>
+                <button class="button secondary" type="button" data-move-menu-section-down="${sectionIndex}" ${sectionIndex === sections.length - 1 ? "disabled" : ""}>Przesun nizej</button>
+                <button class="button danger" type="button" data-remove-menu-section="${sectionIndex}">Usun kategorie</button>
+              </div>
+
+              <div class="field-grid">
+                <label class="field-full">
+                  <span>Nazwa kategorii</span>
+                  <input data-menu-section-name="${sectionIndex}" value="${escapeAttribute(section.section || "")}" placeholder="np. Przystawki, Zupy, Dania glowne" />
+                </label>
+              </div>
+
+              <div class="menu-editor-quick-add">
+                <div class="menu-editor-quick-add-copy">
+                  <strong>Szybkie dodawanie pozycji</strong>
+                  <p class="helper">${escapeHtml(config.quickAddHint)}</p>
+                  <p class="helper">Kolejnosc podkategorii na stronie wynika z pierwszego wystapienia pozycji z dana nazwa podkategorii.</p>
+                </div>
+                <label class="field-full">
+                  <span>Wklej wiele pozycji naraz</span>
+                  <textarea
+                    rows="4"
+                    data-menu-quick-add="${sectionIndex}"
+                    placeholder="${escapeAttribute(config.quickAddPlaceholder)}"
+                  ></textarea>
+                </label>
+                <button class="button secondary" type="button" data-apply-menu-quick-add="${sectionIndex}">Dodaj linie do kategorii</button>
+              </div>
+
+              <div class="repeater-head menu-editor-items-head">
+                <strong>Pozycje w kategorii</strong>
+                <button class="button secondary" type="button" data-add-menu-item="${sectionIndex}">Dodaj pozycje</button>
+              </div>
+
+              <div class="table-scroll menu-editor-table-scroll">
+                <table class="hotel-table menu-editor-table">
+                  <thead>
+                    <tr>
+                      <th>Nazwa</th>
+                      ${config.includePrice ? "<th>Cena</th>" : ""}
+                      <th>Podkategoria</th>
+                      <th>Opis</th>
+                      <th>Skladniki</th>
+                      <th>Akcje</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${
+                      items.length
+                        ? items
+                            .map(
+                              (item, itemIndex) => `
+                                <tr>
+                                  <td>
+                                    <input data-menu-item-name="${sectionIndex}-${itemIndex}" value="${escapeAttribute(item.name || "")}" placeholder="np. Krem z pomidorow" />
+                                  </td>
+                                  ${
+                                    config.includePrice
+                                      ? `<td><input data-menu-item-price="${sectionIndex}-${itemIndex}" value="${escapeAttribute(item.price || "")}" placeholder="np. 24 zl" /></td>`
+                                      : ""
+                                  }
+                                  <td>
+                                    <input data-menu-item-subcategory="${sectionIndex}-${itemIndex}" value="${escapeAttribute(item.subcategory || "")}" placeholder="opcjonalnie" />
+                                  </td>
+                                  <td>
+                                    <textarea rows="2" data-menu-item-description="${sectionIndex}-${itemIndex}" placeholder="Krotki opis">${escapeHtml(item.description || "")}</textarea>
+                                  </td>
+                                  <td>
+                                    <input data-menu-item-ingredients="${sectionIndex}-${itemIndex}" value="${escapeAttribute((item.ingredients || []).join(", "))}" placeholder="np. pomidory, bazylia, smietana" />
+                                  </td>
+                                  <td class="menu-editor-actions-cell">
+                                    <div class="menu-editor-row-actions">
+                                      <button class="button secondary" type="button" data-move-menu-item-up="${sectionIndex}" data-item-index="${itemIndex}" ${itemIndex === 0 ? "disabled" : ""}>↑</button>
+                                      <button class="button secondary" type="button" data-move-menu-item-down="${sectionIndex}" data-item-index="${itemIndex}" ${itemIndex === items.length - 1 ? "disabled" : ""}>↓</button>
+                                      <button class="button danger" type="button" data-remove-menu-item="${sectionIndex}" data-item-index="${itemIndex}">Usun</button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              `
+                            )
+                            .join("")
+                        : `<tr><td colspan="${columnCount}" class="menu-editor-empty-row">${escapeHtml(config.itemEmptyText)}</td></tr>`
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </details>
+        `;
+      })
+      .join("");
+
+    target.querySelectorAll("[data-menu-editor-section-index]").forEach((details) => {
+      details.addEventListener("toggle", () => {
+        const index = Number(details.getAttribute("data-menu-editor-section-index"));
+        if (Number.isNaN(index)) return;
+        getMenuEditorState(kind).openSections[index] = details.open;
+      });
+    });
+    target.querySelectorAll("[data-add-menu-item]").forEach((button) => {
+      button.addEventListener("click", () => addMenuEditorItem(kind, Number(button.dataset.addMenuItem)));
+    });
+    target.querySelectorAll("[data-remove-menu-item]").forEach((button) => {
+      button.addEventListener("click", () => removeMenuEditorItem(kind, Number(button.dataset.removeMenuItem), Number(button.dataset.itemIndex)));
+    });
+    target.querySelectorAll("[data-move-menu-item-up]").forEach((button) => {
+      button.addEventListener("click", () => moveMenuEditorItem(kind, Number(button.dataset.moveMenuItemUp), Number(button.dataset.itemIndex), -1));
+    });
+    target.querySelectorAll("[data-move-menu-item-down]").forEach((button) => {
+      button.addEventListener("click", () => moveMenuEditorItem(kind, Number(button.dataset.moveMenuItemDown), Number(button.dataset.itemIndex), 1));
+    });
+    target.querySelectorAll("[data-remove-menu-section]").forEach((button) => {
+      button.addEventListener("click", () => removeMenuEditorSection(kind, Number(button.dataset.removeMenuSection)));
+    });
+    target.querySelectorAll("[data-move-menu-section-up]").forEach((button) => {
+      button.addEventListener("click", () => moveMenuEditorSection(kind, Number(button.dataset.moveMenuSectionUp), -1));
+    });
+    target.querySelectorAll("[data-move-menu-section-down]").forEach((button) => {
+      button.addEventListener("click", () => moveMenuEditorSection(kind, Number(button.dataset.moveMenuSectionDown), 1));
+    });
+    target.querySelectorAll("[data-apply-menu-quick-add]").forEach((button) => {
+      button.addEventListener("click", () => applyQuickAddToMenuSection(kind, Number(button.dataset.applyMenuQuickAdd)));
+    });
+  }
+
+  function setMenuEditorSectionsOpen(kind, isOpen) {
+    const editorState = getMenuEditorState(kind);
+    const sections = getMenuSectionsByKind(kind);
+    editorState.openSections = sections.reduce((acc, section, index) => {
+      acc[index] = isOpen;
+      return acc;
+    }, {});
+    renderMenuEditorPanel(kind);
+  }
+
+  function addMenuEditorSection(kind) {
     captureDraftIfPossible();
-    if (!state.content.events?.menu?.[sectionIndex]?.items) return;
+    rememberMenuEditorOpenSections(kind);
+    const sections = getMenuSectionsByKind(kind);
+    sections.push({ section: "", items: [] });
+    getMenuEditorState(kind).openSections[sections.length - 1] = true;
+    renderMenuEditorPanel(kind);
+  }
 
-    const items = state.content.events.menu[sectionIndex].items;
-    const subcategories = Array.from(new Set(items.map((item) => item.subcategory).filter(Boolean)));
-    const currentIndex = subcategories.indexOf(subcategoryName);
-    if (currentIndex === -1) return;
+  function removeMenuEditorSection(kind, index) {
+    captureDraftIfPossible();
+    rememberMenuEditorOpenSections(kind);
+    const sections = getMenuSectionsByKind(kind);
+    sections.splice(index, 1);
+    renderMenuEditorPanel(kind);
+  }
 
-    const newIndex = currentIndex + direction;
-    if (newIndex < 0 || newIndex >= subcategories.length) return;
+  function moveMenuEditorSection(kind, index, direction) {
+    captureDraftIfPossible();
+    rememberMenuEditorOpenSections(kind);
+    const sections = getMenuSectionsByKind(kind);
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= sections.length) return;
+    [sections[index], sections[newIndex]] = [sections[newIndex], sections[index]];
+    const editorState = getMenuEditorState(kind);
+    [editorState.openSections[index], editorState.openSections[newIndex]] = [
+      editorState.openSections[newIndex],
+      editorState.openSections[index],
+    ];
+    renderMenuEditorPanel(kind);
+  }
 
-    const targetSubcategory = subcategories[newIndex];
+  function addMenuEditorItem(kind, sectionIndex) {
+    captureDraftIfPossible();
+    rememberMenuEditorOpenSections(kind);
+    const section = getMenuSectionsByKind(kind)[sectionIndex];
+    if (!section) return;
+    if (!Array.isArray(section.items)) {
+      section.items = [];
+    }
+    section.items.push(createMenuEditorItem(kind));
+    renderMenuEditorPanel(kind);
+  }
 
-    items.forEach((item) => {
-      if (item.subcategory === subcategoryName) {
-        item.subcategory = targetSubcategory + "_temp";
-      } else if (item.subcategory === targetSubcategory) {
-        item.subcategory = subcategoryName;
-      }
-    });
+  function removeMenuEditorItem(kind, sectionIndex, itemIndex) {
+    captureDraftIfPossible();
+    rememberMenuEditorOpenSections(kind);
+    const section = getMenuSectionsByKind(kind)[sectionIndex];
+    if (!section?.items) return;
+    section.items.splice(itemIndex, 1);
+    renderMenuEditorPanel(kind);
+  }
 
-    items.forEach((item) => {
-      if (item.subcategory === targetSubcategory + "_temp") {
-        item.subcategory = targetSubcategory;
-      }
-    });
+  function moveMenuEditorItem(kind, sectionIndex, itemIndex, direction) {
+    captureDraftIfPossible();
+    rememberMenuEditorOpenSections(kind);
+    const section = getMenuSectionsByKind(kind)[sectionIndex];
+    if (!section?.items) return;
+    const newIndex = itemIndex + direction;
+    if (newIndex < 0 || newIndex >= section.items.length) return;
+    [section.items[itemIndex], section.items[newIndex]] = [section.items[newIndex], section.items[itemIndex]];
+    renderMenuEditorPanel(kind);
+  }
 
-    renderEventsMenuPanel();
+  function applyQuickAddToMenuSection(kind, sectionIndex) {
+    captureDraftIfPossible();
+    rememberMenuEditorOpenSections(kind);
+    const root = getMenuEditorRoot(kind);
+    const textarea = root?.querySelector(`[data-menu-quick-add="${sectionIndex}"]`);
+    const items = parseQuickAddMenuItems(textarea?.value || "", kind);
+    if (!items.length) {
+      renderMenuEditorPanel(kind, "Nie znaleziono poprawnych linii do dodania.");
+      return;
+    }
+    const section = getMenuSectionsByKind(kind)[sectionIndex];
+    if (!section) return;
+    if (!Array.isArray(section.items)) {
+      section.items = [];
+    }
+    section.items.push(...items);
+    renderMenuEditorPanel(kind, `Dodano ${items.length} pozycji do kategorii.`);
+  }
+
+  function collectMenuEditorFromPanel(kind) {
+    const root = getMenuEditorRoot(kind);
+    if (!root) return [];
+    const config = getMenuEditorConfig(kind);
+    const includePrice = config.includePrice;
+    const itemInputs = Array.from(root.querySelectorAll("[data-menu-item-name]"));
+
+    return Array.from(root.querySelectorAll("[data-menu-section-name]"))
+      .map((sectionInput, sectionIndex) => {
+        const sectionName = sectionInput.value.trim();
+        if (!sectionName) return null;
+
+        const items = itemInputs
+          .map((itemInput) => {
+            const [rawSectionIndex, rawItemIndex] = String(itemInput.dataset.menuItemName || "")
+              .split("-")
+              .map(Number);
+            if (rawSectionIndex !== sectionIndex || Number.isNaN(rawItemIndex)) {
+              return null;
+            }
+
+            const name = itemInput.value.trim();
+            if (!name) return null;
+
+            const description =
+              root.querySelector(`[data-menu-item-description="${sectionIndex}-${rawItemIndex}"]`)?.value.trim() || "";
+            const subcategory =
+              root.querySelector(`[data-menu-item-subcategory="${sectionIndex}-${rawItemIndex}"]`)?.value.trim() || "";
+            const ingredients = parseMenuEditorIngredients(
+              root.querySelector(`[data-menu-item-ingredients="${sectionIndex}-${rawItemIndex}"]`)?.value || ""
+            );
+
+            const item = createMenuEditorItem(kind, { name, description, ingredients });
+            if (includePrice) {
+              item.price =
+                root.querySelector(`[data-menu-item-price="${sectionIndex}-${rawItemIndex}"]`)?.value.trim() || "";
+            }
+            if (subcategory) {
+              item.subcategory = subcategory;
+            } else {
+              delete item.subcategory;
+            }
+            return item;
+          })
+          .filter(Boolean);
+
+        return { section: sectionName, items };
+      })
+      .filter(Boolean);
+  }
+
+  function renderRestaurantMenuPanel(statusMessage = "") {
+    renderMenuEditorPanel("restaurant", statusMessage);
+  }
+
+  function collectMenuFromPanel() {
+    return collectMenuEditorFromPanel("restaurant");
+  }
+
+  function renderEventsMenuPanel(statusMessage = "") {
+    renderMenuEditorPanel("events", statusMessage);
+  }
+
+  function collectEventsMenuFromPanel() {
+    return collectMenuEditorFromPanel("events");
   }
 
   function renderRestaurantGalleryPanel(statusMessage = "") {
@@ -2689,20 +3049,11 @@
   function renderEventsHallGalleriesPanel(statusMessage = "") {
     const panel = document.querySelector("#events-hall-galleries-panel");
     if (!panel) return;
-    const hallGalleries = state.content.events?.hallGalleries || {
-      "1": [],
-      "2": [],
-      "3": [],
-      "4": [],
-      "5": [],
-    };
+    const hallGalleries = normalizeEventHallGalleries(state.content.events?.hallGalleries);
 
     const hallTypes = [
-      { key: "1", label: "Sala 1" },
-      { key: "2", label: "Sala 2" },
-      { key: "3", label: "Sala 3" },
-      { key: "4", label: "Sala 4" },
-      { key: "5", label: "Sala 5" },
+      { key: "1", label: "Sala Duza" },
+      { key: "2", label: "Sala Mala" },
     ];
 
     panel.innerHTML = `
@@ -2784,15 +3135,7 @@
       if (!state.content.events) {
         state.content.events = {};
       }
-      if (!state.content.events.hallGalleries) {
-        state.content.events.hallGalleries = {
-          "1": [],
-          "2": [],
-          "3": [],
-          "4": [],
-          "5": [],
-        };
-      }
+      state.content.events.hallGalleries = normalizeEventHallGalleries(state.content.events.hallGalleries);
 
       if (!state.content.events.hallGalleries[hallNumber]) {
         state.content.events.hallGalleries[hallNumber] = [];
@@ -2957,7 +3300,9 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: state.content }),
       });
-      state.content = data.content;
+      const normalizedContent = normalizeAdminContent(data.content);
+      state.content = normalizedContent;
+      state.lastSavedContent = structuredClone(normalizedContent);
       renderDocumentsPanel("Menu okolicznosciowe zostalo zapisane.");
     } catch (error) {
       renderDocumentsPanel(error.message);
@@ -3106,8 +3451,9 @@
 
   async function loadDashboard(message = "") {
     const data = await api("/api/admin/dashboard");
-    state.content = data.content;
-    state.lastSavedContent = structuredClone(data.content);
+    const normalizedContent = normalizeAdminContent(data.content);
+    state.content = normalizedContent;
+    state.lastSavedContent = structuredClone(normalizedContent);
     state.documents = data.documents;
     state.galleryAlbums = data.galleryAlbums;
     state.calendarBlocks = data.calendarBlocks;

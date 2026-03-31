@@ -352,6 +352,58 @@ a {
   resize: vertical;
 }
 
+.admin-richtext {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.admin-richtext-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.55rem;
+  border: 1px solid rgba(200, 170, 120, 0.28);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.admin-richtext-toolbar .button {
+  padding: 0.5rem 0.7rem;
+  min-height: 38px;
+}
+
+.admin-richtext-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.1rem 0.2rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.admin-richtext-size select {
+  border: 1px solid rgba(200, 170, 120, 0.34);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 0.4rem 0.6rem;
+}
+
+.admin-richtext-editor {
+  min-height: 320px;
+  padding: 0.9rem 0.95rem;
+  border: 1px solid rgba(200, 170, 120, 0.3);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--text);
+  overflow-y: auto;
+  line-height: 1.6;
+}
+
+.admin-richtext-editor:focus {
+  outline: 2px solid rgba(139, 101, 48, 0.24);
+  outline-offset: 1px;
+}
+
 .helper {
   color: var(--muted);
   font-size: 0.94rem;
@@ -395,6 +447,11 @@ a {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 0.75rem;
+}
+
+.opening-hours-day-card .repeater-head {
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .status {
@@ -460,6 +517,174 @@ a {
 .admin-topbar .inline-actions {
   justify-content: flex-end;
   gap: 0.6rem;
+}
+
+.menu-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.menu-editor-toolbar-actions {
+  justify-content: flex-end;
+}
+
+.menu-editor-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(110px, 1fr));
+  gap: 0.8rem;
+  flex: 1 1 320px;
+}
+
+.menu-editor-stat {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(200, 170, 120, 0.22);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.menu-editor-stat strong {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.menu-editor-stat span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.menu-editor-list {
+  gap: 1rem;
+}
+
+.menu-editor-empty-state {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.menu-editor-empty-state strong {
+  font-size: 1.05rem;
+}
+
+.menu-editor-section {
+  border: 1px solid rgba(200, 170, 120, 0.24);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 16px 28px rgba(79, 55, 22, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  overflow: hidden;
+}
+
+.menu-editor-section[open] {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.menu-editor-summary {
+  display: block;
+  cursor: pointer;
+  list-style: none;
+  padding: 1rem 1.15rem;
+}
+
+.menu-editor-summary::-webkit-details-marker {
+  display: none;
+}
+
+.menu-editor-summary-copy {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.menu-editor-summary-copy strong {
+  font-size: 1.15rem;
+  color: #3d2b1d;
+}
+
+.menu-editor-summary-label,
+.menu-editor-summary-meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.menu-editor-section-body {
+  display: grid;
+  gap: 1rem;
+  padding: 0 1.15rem 1.15rem;
+}
+
+.menu-editor-section-actions {
+  justify-content: flex-end;
+}
+
+.menu-editor-quick-add {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px dashed rgba(200, 170, 120, 0.42);
+  border-radius: 18px;
+  background: rgba(249, 246, 239, 0.82);
+}
+
+.menu-editor-quick-add-copy {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.menu-editor-items-head {
+  margin-bottom: 0;
+}
+
+.menu-editor-table-scroll {
+  padding-bottom: 0.35rem;
+}
+
+.menu-editor-table {
+  min-width: 980px;
+}
+
+.menu-editor-table input,
+.menu-editor-table textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(200, 170, 120, 0.26);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--text);
+  padding: 0.7rem 0.78rem;
+}
+
+.menu-editor-table textarea {
+  min-height: 78px;
+  resize: vertical;
+}
+
+.menu-editor-actions-cell {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.menu-editor-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.menu-editor-row-actions .button {
+  min-width: 44px;
+  padding-inline: 0.8rem;
+}
+
+.menu-editor-empty-row {
+  color: var(--muted);
+  text-align: center;
+  font-style: italic;
 }
 
 .admin-toggle-group {
@@ -547,6 +772,25 @@ a {
     align-items: flex-start;
   }
 
+  .menu-editor-toolbar {
+    align-items: stretch;
+  }
+
+  .menu-editor-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .menu-editor-toolbar-actions,
+  .menu-editor-section-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .menu-editor-toolbar-actions .button,
+  .menu-editor-section-actions .button {
+    flex: 1 1 180px;
+  }
+
   .admin-topbar-simple {
     grid-template-columns: 1fr;
     gap: 0.5rem;
@@ -621,7 +865,7 @@ a {
 .admin-tile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.75rem;
+  gap: 1.15rem;
 }
 
 .admin-tile {
@@ -686,8 +930,9 @@ a {
 }
 
 .admin-entry-grid {
-  margin-top: 0.35rem;
-  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  margin: 0 auto;
+  grid-template-columns: repeat(3, minmax(220px, 320px));
+  justify-content: center;
 }
 
 .admin-entry-tile {
@@ -948,7 +1193,7 @@ a {
   }
 
   .admin-entry-grid {
-    grid-template-columns: repeat(2, minmax(220px, 1fr));
+    grid-template-columns: repeat(2, minmax(220px, 320px));
   }
 
   .hotel-filters {

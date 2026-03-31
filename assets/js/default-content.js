@@ -12,9 +12,13 @@ window.SREDZKA_DEFAULT_CONTENT = {
     heroText:
       "Tworzymy przestrzen, w ktorej doswiadczenie restauracyjne, wypoczynek hotelowy i organizacja przyjec sa prowadzone z ta sama dbaloscia o detal.",
     openingHours: [
-      "Poniedzialek - Czwartek: 12:00 - 22:00",
-      "Piatek - Sobota: 12:00 - 24:00",
-      "Niedziela: 12:00 - 21:00",
+      { day: "Poniedziałek", hours: "12:00 - 22:00" },
+      { day: "Wtorek", hours: "12:00 - 22:00" },
+      { day: "Środa", hours: "12:00 - 22:00" },
+      { day: "Czwartek", hours: "12:00 - 22:00" },
+      { day: "Piątek", hours: "12:00 - 24:00" },
+      { day: "Sobota", hours: "12:00 - 24:00" },
+      { day: "Niedziela", hours: "12:00 - 21:00" },
     ],
   },
   home: {
@@ -58,6 +62,8 @@ window.SREDZKA_DEFAULT_CONTENT = {
     heroText:
       "Restauracja Sredzka Korona laczy elegancje sali, staranna obsluge i kuchnie, ktora dobrze sprawdza sie zarowno podczas codziennych kolacji, jak i okazji specjalnych.",
     orderButtonText: "Rezerwacja stolika",
+    ordersInfoText:
+      "Zamówienia indywidualne realizowane są w godzinach 14:00-23:00. Catering zamawiany poprzez kontakt telefoniczny i mailowy.",
     menuSections: [
       {
         title: "Przystawki",
@@ -132,42 +138,21 @@ window.SREDZKA_DEFAULT_CONTENT = {
       "Prowadzimy wydarzenia rodzinne i firmowe od kameralnych spotkan po duze przyjecia z pelna oprawa gastronomiczna.",
     halls: [
       {
-        key: "krolewska",
-        name: "Sala Krolewska",
+        key: "duza",
+        name: "Sala Duza",
         capacity: "do 160 osob",
         description: "Najwieksza sala na wesela, gale i duze wydarzenia.",
       },
       {
-        key: "zlota",
-        name: "Sala Zlota",
+        key: "mala",
+        name: "Sala Mala",
         capacity: "do 90 osob",
         description: "Elegancka przestrzen na komunie, chrzciny i jubileusze.",
-      },
-      {
-        key: "kominkowa",
-        name: "Sala Kominkowa",
-        capacity: "do 40 osob",
-        description: "Kameralne przyjecia i kolacje rodzinne.",
-      },
-      {
-        key: "biznesowa",
-        name: "Sala Biznesowa",
-        capacity: "do 28 osob",
-        description: "Szkolenia, warsztaty i spotkania zarzadowe.",
-      },
-      {
-        key: "ogrodowa",
-        name: "Strefa Ogrodowa",
-        capacity: "do 120 osob",
-        description: "Eventy letnie i przyjecia z otwarciem na zewnatrz.",
       },
     ],
     hallGalleries: {
       "1": [],
       "2": [],
-      "3": [],
-      "4": [],
-      "5": [],
     },
     packages: [
       "Kompleksowa obsluga wesel i przyjec rodzinnych",

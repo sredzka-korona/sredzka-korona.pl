@@ -1351,7 +1351,8 @@
       .watermark {
         position: fixed;
         bottom: 1rem;
-        left: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
         z-index: 50;
         font-size: 0.75rem;
         color: rgba(255, 255, 255, 0.34);
@@ -1379,7 +1380,7 @@
         .watermark {
           font-size: 0.65rem;
           bottom: 0.75rem;
-          left: 0.75rem;
+          left: 50%;
         }
       }
     </style>
@@ -1657,6 +1658,9 @@
               if (payload.content.restaurant.orderButtonText) {
                 restaurantOrderButtonText = payload.content.restaurant.orderButtonText;
               }
+              if (payload.content.restaurant.ordersInfoText) {
+                restaurantOrdersInfoText = payload.content.restaurant.ordersInfoText;
+              }
               if (payload.content.restaurant.menu) {
                 restaurantMenu = payload.content.restaurant.menu;
               }
@@ -1666,6 +1670,9 @@
             }
             if (payload.content?.company?.phone) {
               companyPhone = payload.content.company.phone;
+            }
+            if (payload.content?.company?.email) {
+              companyEmail = payload.content.company.email;
             }
             if (payload.content?.company?.openingHours) {
               // Konwertuj różne formaty na jednolity format {day, hours}
@@ -1696,7 +1703,10 @@
 
         let selectedCategoryIndex = 0;
         let companyPhone = "+48 600 700 800";
+        let companyEmail = "kontakt@sredzkakorona.pl";
         let restaurantOrderButtonText = "Rezerwacja stolika";
+        let restaurantOrdersInfoText =
+          "Zamówienia indywidualne realizowane są w godzinach 14:00-23:00. Catering zamawiany poprzez kontakt telefoniczny i mailowy.";
 
         function renderMenuItems(items) {
           if (!items || items.length === 0) {
@@ -1868,9 +1878,11 @@
               </div>
               <div class="opening-hours-list">
                 <div class="opening-hours-row" style="display: block; text-align: left; line-height: 1.7;">
-                  Dowozimy za darmo w odległości do 5 km od restauracji.<br />
-                  Zamówienia przyjmujemy pod numerem telefonu:
-                  <a href="tel:${encodeURIComponent(companyPhone)}" style="color: var(--text); font-weight: 700; text-decoration: underline;">${escapeHtml(companyPhone)}</a>.
+                  ${escapeHtml(restaurantOrdersInfoText)}<br />
+                  Kontakt telefoniczny:
+                  <a href="tel:${encodeURIComponent(companyPhone)}" style="color: var(--text); font-weight: 700; text-decoration: underline;">${escapeHtml(companyPhone)}</a>.<br />
+                  Kontakt mailowy:
+                  <a href="mailto:${encodeURIComponent(companyEmail)}" style="color: var(--text); font-weight: 700; text-decoration: underline;">${escapeHtml(companyEmail)}</a>.
                 </div>
               </div>
             </div>
@@ -1901,7 +1913,7 @@
                     <div class="action-button-title">GALERIA</div>
                   </button>
                   <button class="action-button" id="orders-button">
-                    <div class="action-button-title">ZAMÓWIENIA</div>
+                    <div class="action-button-title">ZAMÓWIENIA / CATERING</div>
                   </button>
                   <button class="action-button" id="hours-button">
                     <div class="action-button-title">GODZINY</div>
