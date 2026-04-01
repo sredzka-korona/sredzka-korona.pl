@@ -911,8 +911,17 @@
         border: 1px solid rgba(200, 170, 120, 0.35);
         background: #fff;
       }
-      .booking-field-grid .booking-prefix-input {
-        max-width: 110px;
+      .booking-phone-grid {
+        grid-template-columns: minmax(110px, 150px) minmax(0, 1fr);
+        align-items: end;
+      }
+      .booking-phone-grid .booking-phone-prefix,
+      .booking-phone-grid .booking-phone-number {
+        margin: 0;
+      }
+      .booking-phone-grid .booking-prefix-input {
+        max-width: none;
+        width: 100%;
       }
       .booking-room-list {
         display: flex;

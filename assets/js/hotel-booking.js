@@ -228,7 +228,7 @@
         </div>
         <div class="booking-cart-summary">
           <strong>Koszyk:</strong> ${cartRoomIds().length ? cartRoomIds().map((id) => state.roomsById[id]?.name || id).join(", ") : "—"}
-          <br /><strong>Suma (szacunek):</strong> ${totalPrice()} PLN
+          <br /><strong>Suma:</strong> ${totalPrice()} PLN
         </div>
         <p class="booking-error" id="booking-step-error" hidden></p>
         <div class="booking-actions">
@@ -242,9 +242,9 @@
           <input type="text" name="hpCompanyWebsite" id="bf-hp" value="" tabindex="-1" autocomplete="off" class="booking-honeypot" aria-hidden="true" />
           <label>Imię i nazwisko<input name="fullName" required maxlength="120" /></label>
           <label>E-mail<input name="email" type="email" required /></label>
-          <div class="booking-field-grid">
-            <label>Prefiks telefonu<input name="phonePrefix" class="booking-prefix-input" type="text" inputmode="tel" autocomplete="tel-country-code" value="+48" required pattern="\\+[0-9]{1,4}" maxlength="5" /></label>
-            <label>Numer (bez prefiksu)<input name="phoneNational" inputmode="numeric" required pattern="[0-9]{6,15}" placeholder="np. 501234567" /></label>
+          <div class="booking-field-grid booking-phone-grid">
+            <label class="booking-phone-prefix">Prefiks telefonu<input name="phonePrefix" class="booking-prefix-input" type="text" inputmode="tel" autocomplete="tel-country-code" value="+48" required pattern="\\+[0-9]{1,4}" maxlength="5" /></label>
+            <label class="booking-phone-number">Numer (bez prefiksu)<input name="phoneNational" inputmode="numeric" required pattern="[0-9]{6,15}" placeholder="np. 501234567" /></label>
           </div>
           <label>Uwagi do rezerwacji<textarea name="customerNote" rows="3" maxlength="2000" required></textarea></label>
           <p class="booking-error" id="booking-step-error" hidden></p>
