@@ -1,7 +1,7 @@
 const { FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { enumerateNights, nightsCount, parseYmd, todayYmd } = require("./dates");
 
-const BLOCKING = new Set(["pending", "confirmed", "manual_block"]);
+const BLOCKING = new Set(["email_verification_pending", "pending", "confirmed", "manual_block"]);
 
 /** roomId nie powinien zawierać „__”; dateStr = YYYY-MM-DD */
 function nightDocId(roomId, dateStr) {

@@ -57,6 +57,17 @@ function toMimeHeader(value) {
   return /^[\x20-\x7E]*$/.test(input) ? input : `=?UTF-8?B?${base64Utf8(input)}?=`;
 }
 
+function formatAddressHeader(rawValue) {
+  const raw = cleanString(rawValue, 500);
+  const match = raw.match(/^(.*)<([^>]+)>\s*$/);
+  if (!match) return raw;
+  const display = cleanString(match[1], 200).replace(/^"+|"+$/g, "").trim();
+  const email = cleanString(match[2], 320);
+  if (!email) return raw;
+  if (!display) return email;
+  return `${toMimeHeader(display)} <${email}>`;
+}
+
 function base64Lines(value, lineLen = 76) {
   const raw = base64Utf8(value);
   const out = [];
@@ -198,11 +209,13 @@ async function sendMailViaSmtp(env, { to, subject, html, replyTo }) {
 
     const htmlNormalized = normalizeCrlf(html || "");
     const body64 = base64Lines(htmlNormalized);
+    const messageId = `<${crypto.randomUUID()}@${cleanString(env.SMTP_EHLO_HOST, 200) || "sredzka-korona.pl"}>`;
     const headers = [
-      `From: ${toMimeHeader(from)}`,
-      `To: ${toMimeHeader(toAddress)}`,
+      `From: ${formatAddressHeader(from)}`,
+      `To: ${toAddress}`,
       `Subject: ${toMimeHeader(subject || "")}`,
       `Date: ${new Date().toUTCString()}`,
+      `Message-ID: ${messageId}`,
       "MIME-Version: 1.0",
       "Content-Type: text/html; charset=UTF-8",
       "Content-Transfer-Encoding: base64",
@@ -679,7 +692,7 @@ async function hotelRooms(env) {
 async function hotelBlockingReservations(env, dateFrom, dateTo, excludeId = null) {
   const rows = await env.DB.prepare(
     `SELECT id, room_ids_json AS roomIdsJson FROM hotel_reservations
-     WHERE status IN ('pending','confirmed','manual_block')
+     WHERE status IN ('email_verification_pending','pending','confirmed','manual_block')
        AND date_from < ?
        AND date_to > ?
        ${excludeId ? "AND id != ?" : ""}`
@@ -1046,7 +1059,7 @@ async function restaurantBlockingRows(env, startMs, endMs, excludeId = null) {
   const rows = await env.DB.prepare(
     `SELECT id, assigned_table_ids_json AS assignedTableIdsJson
      FROM restaurant_reservations
-     WHERE status IN ('pending','confirmed','manual_block')
+     WHERE status IN ('email_verification_pending','pending','confirmed','manual_block')
        AND start_ms < ?
        AND end_ms > ?
        ${excludeId ? "AND id != ?" : ""}`
@@ -1266,7 +1279,7 @@ async function hallAvailability(env, payload, excludeId = null) {
     `SELECT id, guests_count AS guestsCount, exclusive, full_block AS fullBlock, start_ms AS startMs, end_ms AS endMs
      FROM venue_reservations
      WHERE hall_id = ?
-       AND status IN ('pending','confirmed','manual_block')
+       AND status IN ('email_verification_pending','pending','confirmed','manual_block')
        ${excludeId ? "AND id != ?" : ""}`
   )
     .bind(...(excludeId ? [hall.id, excludeId] : [hall.id]))

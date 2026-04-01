@@ -240,11 +240,13 @@
         <h3>Dane rezerwującego</h3>
         <form id="booking-form-customer" class="booking-form">
           <input type="text" name="hpCompanyWebsite" id="bf-hp" value="" tabindex="-1" autocomplete="off" class="booking-honeypot" aria-hidden="true" />
-          <label>Imię i nazwisko<input name="fullName" required maxlength="120" /></label>
-          <label>E-mail<input name="email" type="email" required /></label>
+          <div class="booking-field-grid booking-customer-name-email">
+            <label>Imię i nazwisko<input name="fullName" required maxlength="120" /></label>
+            <label>E-mail<input name="email" type="email" required /></label>
+          </div>
           <div class="booking-field-grid booking-phone-grid">
             <label class="booking-phone-prefix">Prefiks telefonu<input name="phonePrefix" class="booking-prefix-input" type="text" inputmode="tel" autocomplete="tel-country-code" value="+48" required pattern="\\+[0-9]{1,4}" maxlength="5" /></label>
-            <label class="booking-phone-number">Numer (bez prefiksu)<input name="phoneNational" inputmode="numeric" required pattern="[0-9]{6,15}" placeholder="np. 501234567" /></label>
+            <label class="booking-phone-number">Numer<input name="phoneNational" inputmode="numeric" required pattern="[0-9]{6,15}" placeholder="np. 501234567" /></label>
           </div>
           <label>Uwagi do rezerwacji<textarea name="customerNote" rows="3" maxlength="2000" required></textarea></label>
           <p class="booking-error" id="booking-step-error" hidden></p>

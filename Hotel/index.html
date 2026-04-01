@@ -894,6 +894,9 @@
         .booking-field-grid {
           grid-template-columns: 1fr;
         }
+        .booking-field-grid.booking-phone-grid {
+          grid-template-columns: minmax(77px, 105px) minmax(0, 1fr);
+        }
       }
       .booking-field-grid label,
       .booking-form label {
@@ -912,7 +915,7 @@
         background: #fff;
       }
       .booking-phone-grid {
-        grid-template-columns: minmax(110px, 150px) minmax(0, 1fr);
+        grid-template-columns: minmax(77px, 105px) minmax(0, 1fr);
         align-items: end;
       }
       .booking-phone-grid .booking-phone-prefix,

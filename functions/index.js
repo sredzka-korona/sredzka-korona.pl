@@ -324,6 +324,12 @@ exports.hotelApi = onRequest(
         const confirmationLink = `${publicSiteUrl()}/Hotel/potwierdzenie.html?token=${encodeURIComponent(token)}`;
 
         await db.runTransaction(async (tx) => {
+          const nk = await claimNightsInTransactionAsync(tx, db, {
+            reservationId: resRef.id,
+            roomIds,
+            nights,
+            statusForLocks: "email_verification_pending",
+          });
           tx.set(resRef, {
             humanNumber,
             status: "email_verification_pending",
@@ -340,7 +346,7 @@ exports.hotelApi = onRequest(
             confirmationTokenHash: tokenHash,
             emailVerificationExpiresAt: Timestamp.fromMillis(now + EMAIL_LINK_MS),
             pendingExpiresAt: null,
-            nightKeys: [],
+            nightKeys: nk,
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
             source: "web",
@@ -973,6 +979,7 @@ exports.hotelExpireCron = onSchedule(
     if (expEmail && !expEmail.empty) {
       for (const d of expEmail.docs) {
         const data = d.data();
+        await releaseNightsForReservation(db, d.id);
         await db.collection("hotelReservations").doc(d.id).update({
           status: "expired",
           updatedAt: FieldValue.serverTimestamp(),
