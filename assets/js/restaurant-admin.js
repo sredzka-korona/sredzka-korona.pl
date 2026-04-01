@@ -65,12 +65,29 @@
     return `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
   }
 
-  let restSubTab = "settings";
+  let restSubTab = "reservations";
+  let restResFilter = "active";
   let settingsData = {};
   let tablesData = [];
   let reservationsData = [];
+  let blockListData = [];
   let templatesData = {};
   let countdownTimer = null;
+
+  const REST_TEMPLATE_LABELS = {
+    restaurant_confirm_email: "Link potwierdzający adres e-mail po wysłaniu formularza rezerwacji stolika.",
+    rest_confirm_email: "To samo co powyżej (alternatywny klucz szablonu).",
+    restaurant_pending_client: "Klient — rezerwacja czeka na decyzję restauracji.",
+    rest_pending_client: "To samo — wariant skrócony.",
+    restaurant_pending_admin: "Powiadomienie dla obsługi — nowa rezerwacja stolika.",
+    rest_pending_admin: "To samo — wariant skrócony.",
+    restaurant_confirmed_client: "Klient — stolik potwierdzony.",
+    rest_confirmed_client: "To samo — wariant skrócony.",
+    restaurant_cancelled_client: "Klient — rezerwacja anulowana.",
+    rest_cancelled_client: "To samo — wariant skrócony.",
+    restaurant_changed_client: "Po edycji rezerwacji przez admina (opcjonalna wysyłka).",
+    rest_changed_client: "To samo — wariant skrócony.",
+  };
 
   async function loadSettings() {
     const d = await restaurantApi("admin-settings", { method: "GET" });
@@ -83,7 +100,8 @@
   }
 
   async function loadReservations(status) {
-    const q = status && status !== "all" ? `&status=${encodeURIComponent(status)}` : "";
+    const mode = status && String(status).length ? status : "active";
+    const q = `&status=${encodeURIComponent(mode)}`;
     const base = restaurantApiBase();
     const token = await firebase.auth().currentUser.getIdToken();
     const res = await fetch(`${base}?op=admin-reservations-list${q}`, {
@@ -92,6 +110,17 @@
     const d = await res.json();
     if (!res.ok) throw new Error(d.error || "Błąd");
     reservationsData = d.reservations || [];
+  }
+
+  async function loadBlockList() {
+    const base = restaurantApiBase();
+    const token = await firebase.auth().currentUser.getIdToken();
+    const res = await fetch(`${base}?op=admin-reservations-list&status=${encodeURIComponent("manual_block")}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || "Błąd");
+    blockListData = d.reservations || [];
   }
 
   async function loadTemplates() {
@@ -156,7 +185,7 @@
       .map(
         (r) => `
       <tr>
-        <td>${escapeHtml(r.humanNumber || r.id)}</td>
+        <td>${escapeHtml(r.humanNumberLabel || r.humanNumber || r.id)}</td>
         <td>${escapeHtml(r.reservationDate || "")}</td>
         <td>${formatMs(r.startDateTime)}</td>
         <td>${formatMs(r.endDateTime)}</td>
@@ -171,25 +200,34 @@
         <td class="rest-countdown" data-pending="${r.pendingExpiresAt || ""}" data-email-exp="${r.emailVerificationExpiresAt || ""}" data-status="${escapeHtml(r.status)}">${r.status === "pending" ? countdown(r.pendingExpiresAt) : r.status === "email_verification_pending" ? countdown(r.emailVerificationExpiresAt) : "—"}</td>
         <td>${escapeHtml(r.statusLabel || r.status)}</td>
         <td>${formatMs(r.createdAtMs)}</td>
-        <td><button type="button" class="button secondary rest-res-detail" data-id="${escapeHtml(r.id)}">Szczegóły</button></td>
+        <td class="admin-row-actions">
+          <button type="button" class="button secondary rest-res-edit" data-id="${escapeHtml(r.id)}">Edytuj</button>
+          <button type="button" class="button secondary danger-muted rest-res-cancel" data-id="${escapeHtml(r.id)}">Anuluj</button>
+        </td>
       </tr>`
       )
       .join("");
     return `
       <div class="hotel-subpanel">
         <h3>Rezerwacje restauracji</h3>
-        <div class="hotel-filters">
-          <button type="button" class="button secondary" id="rest-res-new">Nowa rezerwacja</button>
-          <label>Filtr <select id="rest-res-filter">
-            <option value="all">Wszystkie</option>
-            <option value="pending">Oczekujące</option>
-            <option value="confirmed">Zarezerwowane</option>
+        <p class="helper">Domyślnie: rezerwacje <strong>oczekujące</strong> i <strong>zarezerwowane</strong>. Pozostałe statusy — z listy.</p>
+        <div class="admin-toolbar-row hotel-filters">
+          <div class="admin-toolbar-filters">
+            <label>Status <select id="rest-res-filter">
+            <option value="active">Aktywne (oczekujące + zarezerwowane)</option>
+            <option value="all">Wszystkie statusy</option>
+            <option value="pending">Tylko oczekujące</option>
+            <option value="confirmed">Tylko zarezerwowane</option>
             <option value="cancelled">Anulowane</option>
             <option value="expired">Wygasłe</option>
             <option value="email_verification_pending">E-mail do potwierdzenia</option>
-            <option value="manual_block">Blokady</option>
+            <option value="manual_block">Blokady stolików</option>
           </select></label>
-          <button type="button" class="button" id="rest-res-refresh">Odśwież</button>
+          </div>
+          <div class="admin-toolbar-actions">
+            <button type="button" class="button secondary icon-btn" id="rest-res-refresh" title="Odśwież" aria-label="Odśwież">↻</button>
+            <button type="button" class="button" id="rest-res-new">Utwórz rezerwację</button>
+          </div>
         </div>
         <div class="table-scroll">
           <table class="hotel-table">
@@ -205,15 +243,15 @@
     return `
       <div class="hotel-subpanel">
         <h3>Szablony mailingowe — restauracja</h3>
-        <p class="helper">Zmienne: {{reservationId}}, {{reservationNumber}}, {{fullName}}, {{email}}, {{phone}}, {{date}}, {{timeFrom}}, {{timeTo}}, {{durationHours}}, {{tablesCount}}, {{tablesList}}, {{guestsCount}}, {{joinTables}}, {{customerNote}}, {{adminNote}}, {{confirmationLink}}, {{restaurantName}}</p>
+        <p class="helper">Zmienne: <code>{{reservationNumber}}</code> (np. 5/2026), <code>{{fullName}}</code>, <code>{{email}}</code>, <code>{{phone}}</code>, <code>{{date}}</code>, <code>{{timeFrom}}</code>, <code>{{timeTo}}</code>, <code>{{durationHours}}</code>, <code>{{tablesList}}</code>, <code>{{guestsCount}}</code>, <code>{{customerNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{restaurantName}}</code>.</p>
         <div id="rest-template-forms">
           ${keys
             .map(
               (k) => `
             <details class="hotel-template-card">
-              <summary>${escapeHtml(k)}</summary>
+              <summary><span class="tpl-key">${escapeHtml(k)}</span>${REST_TEMPLATE_LABELS[k] ? `<span class="tpl-desc"> — ${escapeHtml(REST_TEMPLATE_LABELS[k])}</span>` : ""}</summary>
               <label>Temat<input type="text" data-rest-tpl-key="${escapeHtml(k)}" data-field="subject" value="${escapeHtml(templatesData[k]?.subject || "")}" /></label>
-              <label>Treść HTML<textarea data-rest-tpl-key="${escapeHtml(k)}" data-field="bodyHtml" rows="8">${escapeHtml(templatesData[k]?.bodyHtml || "")}</textarea></label>
+              <label>Treść HTML<textarea data-rest-tpl-key="${escapeHtml(k)}" data-field="bodyHtml" rows="10">${escapeHtml(templatesData[k]?.bodyHtml || "")}</textarea></label>
               <button type="button" class="button rest-save-tpl" data-key="${escapeHtml(k)}">Zapisz szablon</button>
             </details>`
             )
@@ -223,19 +261,55 @@
   }
 
   function renderBlockForm() {
+    const tableChecks = tablesData
+      .map(
+        (t) => `
+      <label class="admin-check-line">
+        <input type="checkbox" name="tableId" value="${escapeHtml(t.id)}" />
+        <span>Stół ${escapeHtml(String(t.number))} <span class="muted">(${escapeHtml(t.id)})</span></span>
+      </label>`
+      )
+      .join("");
+    const blockRows = blockListData
+      .map(
+        (b) => `
+      <tr>
+        <td>${escapeHtml(b.humanNumberLabel || b.humanNumber || b.id)}</td>
+        <td>${escapeHtml(b.reservationDate || "")}</td>
+        <td>${formatMs(b.startDateTime)} – ${formatMs(b.endDateTime)}</td>
+        <td>${escapeHtml(b.assignedTablesLabel || "—")}</td>
+        <td>${escapeHtml(b.adminNote || b.customerNote || "—")}</td>
+      </tr>`
+      )
+      .join("");
     return `
       <div class="hotel-subpanel">
-        <h3>Ręczna blokada stolików</h3>
+        <h3>Blokada stolików</h3>
+        <p class="helper">Blokada zajmuje wybrane stoliki w wybranym przedziale czasu (wpis ze statusem „Blokada” — np. impreza zamknięta, serwis). To nie jest rezerwacja gościa z formularza.</p>
         <form id="rest-block-form" class="stack">
           <label>Data<input name="reservationDate" type="date" required /></label>
           <div class="field-grid">
             <label>Od (HH:MM)<input name="startTime" required placeholder="18:00" /></label>
             <label>Do (HH:MM)<input name="endTime" required placeholder="22:00" /></label>
           </div>
-          <label>ID stolików (przecinek, np. table-1,table-2)<input name="tableIds" required placeholder="table-1" /></label>
-          <label>Notatka<input name="note" /></label>
+          <fieldset class="admin-room-fieldset">
+            <legend>Stoliki</legend>
+            <label class="admin-check-line admin-check-all">
+              <input type="checkbox" id="rest-block-all-tables" />
+              <span>Zaznacz / odznacz wszystkie</span>
+            </label>
+            <div class="admin-room-checks">${tableChecks || "<p class=\"helper\">Brak stolików — ustaw liczbę stolików w Ustawieniach.</p>"}</div>
+          </fieldset>
+          <label>Notatka<input name="note" placeholder="np. wieczór zamknięty" /></label>
           <button type="submit" class="button">Utwórz blokadę</button>
         </form>
+        <h4 class="admin-subheading">Utworzone blokady</h4>
+        <div class="table-scroll">
+          <table class="hotel-table">
+            <thead><tr><th>Nr</th><th>Data</th><th>Godziny</th><th>Stoliki</th><th>Notatka</th></tr></thead>
+            <tbody>${blockRows || "<tr><td colspan='5'>Brak</td></tr>"}</tbody>
+          </table>
+        </div>
       </div>`;
   }
 
@@ -244,11 +318,14 @@
     if (options.defaultTab) {
       restSubTab = options.defaultTab;
     }
+    const allowedTabs = Array.isArray(options.allowedTabs) && options.allowedTabs.length
+      ? options.allowedTabs.map((tab) => String(tab || "").trim()).filter(Boolean)
+      : null;
     container.innerHTML = `<p class="status">Ładowanie modułu Restauracja…</p>`;
     try {
       await loadSettings();
       await loadTables();
-      await loadReservations("all");
+      await loadReservations("active");
       await loadTemplates();
     } catch (e) {
       container.innerHTML = `<p class="status">${escapeHtml(e.message)}</p>`;
@@ -263,30 +340,47 @@
         templates: renderTemplates(),
         block: renderBlockForm(),
       };
+      const availableTabs = [
+        { key: "reservations", label: "Rezerwacje" },
+        { key: "block", label: "Blokada stolików" },
+        { key: "tables", label: "Stoliki" },
+        { key: "settings", label: "Ustawienia" },
+        { key: "templates", label: "Szablony mailingowe" },
+      ].filter((tab) => !allowedTabs || allowedTabs.includes(tab.key));
+      if (!availableTabs.length) {
+        container.innerHTML = `<section class="panel col-12"><p class="status">Brak dostepnych widokow tego modulu.</p></section>`;
+        return;
+      }
+      if (!availableTabs.some((tab) => tab.key === restSubTab)) {
+        restSubTab = availableTabs[0].key;
+      }
       container.innerHTML = `
         <section class="panel col-12">
           <p class="pill">Restauracja</p>
           <h2>Rezerwacje stolików</h2>
-          <div class="hotel-nav">
-            <button type="button" class="button ${restSubTab === "settings" ? "" : "secondary"}" data-rsub="settings">Ustawienia</button>
-            <button type="button" class="button ${restSubTab === "tables" ? "" : "secondary"}" data-rsub="tables">Stoliki</button>
-            <button type="button" class="button ${restSubTab === "reservations" ? "" : "secondary"}" data-rsub="reservations">Rezerwacje</button>
-            <button type="button" class="button ${restSubTab === "templates" ? "" : "secondary"}" data-rsub="templates">Szablony mailingowe</button>
-            <button type="button" class="button ${restSubTab === "block" ? "" : "secondary"}" data-rsub="block">Blokada stolików</button>
+          <div class="hotel-nav${availableTabs.length === 1 ? " is-single" : ""}">
+            ${availableTabs
+              .map(
+                (tab) =>
+                  `<button type="button" class="button ${restSubTab === tab.key ? "" : "secondary"}" data-rsub="${escapeHtml(tab.key)}">${escapeHtml(tab.label)}</button>`
+              )
+              .join("")}
           </div>
           <div id="rest-sub-content">${sub[restSubTab]}</div>
         </section>
       `;
 
+      const fs = document.querySelector("#rest-res-filter");
+      if (fs) fs.value = restResFilter;
+
       container.querySelectorAll("[data-rsub]").forEach((b) => {
         b.addEventListener("click", async () => {
           restSubTab = b.getAttribute("data-rsub");
-          if (restSubTab === "reservations") {
-            try {
-              await loadReservations(document.querySelector("#rest-res-filter")?.value || "all");
-            } catch (err) {
-              alert(err.message);
-            }
+          try {
+            if (restSubTab === "reservations") await loadReservations(restResFilter);
+            if (restSubTab === "block") await loadBlockList();
+          } catch (err) {
+            alert(err.message);
           }
           paint();
         });
@@ -356,63 +450,28 @@
       });
 
       document.querySelector("#rest-res-filter")?.addEventListener("change", async () => {
-        await loadReservations(document.querySelector("#rest-res-filter").value);
+        restResFilter = document.querySelector("#rest-res-filter").value;
+        await loadReservations(restResFilter);
         document.querySelector("#rest-sub-content").innerHTML = renderReservations();
+        const f = document.querySelector("#rest-res-filter");
+        if (f) f.value = restResFilter;
         bindSub();
       });
       document.querySelector("#rest-res-refresh")?.addEventListener("click", async () => {
-        await loadReservations(document.querySelector("#rest-res-filter")?.value || "all");
+        await loadReservations(restResFilter);
         document.querySelector("#rest-sub-content").innerHTML = renderReservations();
+        const f = document.querySelector("#rest-res-filter");
+        if (f) f.value = restResFilter;
         bindSub();
       });
 
-      document.querySelector("#rest-res-new")?.addEventListener("click", async () => {
-        const reservationDate = prompt("Data (YYYY-MM-DD)");
-        if (!reservationDate) return;
-        const startTime = prompt("Godzina startu (HH:MM)", "18:00");
-        if (!startTime) return;
-        const durationHours = Number(prompt("Czas trwania (godziny)", "2"));
-        if (!durationHours) return;
-        const tablesCount = Number(prompt("Liczba stolików", "1"));
-        const guestsCount = Number(prompt("Liczba gości", "2"));
-        const fullName = prompt("Imię i nazwisko");
-        if (!fullName) return;
-        const email = prompt("E-mail");
-        if (!email) return;
-        const phonePrefix = prompt("Prefiks", "+48");
-        const phoneNational = prompt("Numer");
-        if (!phoneNational) return;
-        const st = confirm("OK = oczekująca, Anuluj = od razu zarezerwowana") ? "pending" : "confirmed";
-        try {
-          await restaurantApi("admin-reservation-create", {
-            method: "POST",
-            body: {
-              reservationDate,
-              startTime,
-              durationHours,
-              tablesCount,
-              guestsCount,
-              joinTables: false,
-              fullName,
-              email,
-              phonePrefix: phonePrefix || "+48",
-              phoneNational,
-              customerNote: "",
-              adminNote: "",
-              status: st,
-            },
-          });
-          alert("Utworzono.");
-          await loadReservations(document.querySelector("#rest-res-filter")?.value || "all");
-          document.querySelector("#rest-sub-content").innerHTML = renderReservations();
-          bindSub();
-        } catch (err) {
-          alert(err.message);
-        }
-      });
+      document.querySelector("#rest-res-new")?.addEventListener("click", () => openManualRestaurantModal());
 
-      document.querySelectorAll(".rest-res-detail").forEach((btn) => {
-        btn.addEventListener("click", () => openReservationDetail(btn.getAttribute("data-id")));
+      document.querySelectorAll(".rest-res-edit").forEach((btn) => {
+        btn.addEventListener("click", () => openRestaurantEditorModal(btn.getAttribute("data-id")));
+      });
+      document.querySelectorAll(".rest-res-cancel").forEach((btn) => {
+        btn.addEventListener("click", () => quickCancelRestaurant(btn.getAttribute("data-id")));
       });
 
       document.querySelectorAll(".rest-save-tpl").forEach((btn) => {
@@ -429,13 +488,20 @@
         });
       });
 
+      document.querySelector("#rest-block-all-tables")?.addEventListener("change", (ev) => {
+        const on = ev.target.checked;
+        document.querySelectorAll('#rest-block-form input[name="tableId"]').forEach((cb) => {
+          cb.checked = on;
+        });
+      });
       document.querySelector("#rest-block-form")?.addEventListener("submit", async (ev) => {
         ev.preventDefault();
         const fd = new FormData(ev.target);
-        const ids = String(fd.get("tableIds") || "")
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
+        const ids = Array.from(ev.target.querySelectorAll('input[name="tableId"]:checked')).map((cb) => cb.value);
+        if (!ids.length) {
+          alert("Zaznacz co najmniej jeden stolik.");
+          return;
+        }
         try {
           await restaurantApi("admin-manual-block", {
             method: "POST",
@@ -449,6 +515,9 @@
           });
           alert("Blokada utworzona.");
           ev.target.reset();
+          await loadBlockList();
+          restSubTab = "block";
+          paint();
         } catch (err) {
           alert(err.message);
         }
@@ -468,7 +537,101 @@
       }, 1000);
     }
 
-    async function openReservationDetail(id) {
+    function closeRestExtraModal() {
+      document.getElementById("rest-extra-modal-mount")?.remove();
+      document.body.classList.remove("admin-modal-open");
+    }
+
+    async function quickCancelRestaurant(id) {
+      if (!confirm("Anulować tę rezerwację? Klient może otrzymać e-mail.")) return;
+      try {
+        await restaurantApi("admin-reservation-cancel", { method: "POST", body: { id } });
+        await loadReservations(restResFilter);
+        document.querySelector("#rest-sub-content").innerHTML = renderReservations();
+        const f = document.querySelector("#rest-res-filter");
+        if (f) f.value = restResFilter;
+        bindSub();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function openManualRestaurantModal() {
+      closeRestExtraModal();
+      const host = document.createElement("div");
+      host.id = "rest-extra-modal-mount";
+      host.innerHTML = `
+        <div class="admin-modal-overlay" data-rest-extra-overlay>
+          <section class="admin-modal menu-editor-modal hotel-room-editor-modal" role="dialog" aria-modal="true">
+            <form id="rest-manual-form" class="stack">
+              <div class="admin-modal-head menu-editor-modal-head">
+                <h3>Utwórz rezerwację</h3>
+                <button type="button" class="button secondary" data-rest-extra-close>Zamknij</button>
+              </div>
+              <p class="helper">Domyślnie od razu <strong>zarezerwowana</strong>. Zaznacz niżej, jeśli ma czekać na akceptację.</p>
+              <label>Data<input name="reservationDate" type="date" required /></label>
+              <label>Start (HH:MM)<input name="startTime" required placeholder="18:00" /></label>
+              <label>Czas trwania (h)<input name="durationHours" type="number" step="0.5" min="0.5" value="2" required /></label>
+              <div class="field-grid">
+                <label>Liczba stolików<input name="tablesCount" type="number" min="1" value="1" required /></label>
+                <label>Liczba gości<input name="guestsCount" type="number" min="1" value="2" required /></label>
+              </div>
+              <label class="admin-check-line"><input type="checkbox" name="joinTables" /> <span>Łączyć stoliki (jeśli możliwe)</span></label>
+              <label>Imię i nazwisko<input name="fullName" required /></label>
+              <label>E-mail<input name="email" type="email" required /></label>
+              <div class="field-grid">
+                <label>Prefiks<input name="phonePrefix" value="+48" /></label>
+                <label>Numer<input name="phoneNational" required /></label>
+              </div>
+              <label>Uwagi<textarea name="customerNote" rows="2"></textarea></label>
+              <label class="admin-check-line"><input type="checkbox" name="asPending" /> <span>Oczekuje na akceptację</span></label>
+              <div class="admin-modal-footer hotel-room-editor-footer">
+                <button type="button" class="button secondary" data-rest-extra-close>Anuluj</button>
+                <button type="submit" class="button">Utwórz</button>
+              </div>
+            </form>
+          </section>
+        </div>`;
+      document.body.appendChild(host);
+      document.body.classList.add("admin-modal-open");
+      host.querySelectorAll("[data-rest-extra-close]").forEach((b) => b.addEventListener("click", closeRestExtraModal));
+      host.querySelector("[data-rest-extra-overlay]")?.addEventListener("click", (ev) => {
+        if (ev.target === ev.currentTarget) closeRestExtraModal();
+      });
+      host.querySelector("#rest-manual-form")?.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const fd = new FormData(ev.target);
+        const status = fd.get("asPending") === "on" ? "pending" : "confirmed";
+        try {
+          await restaurantApi("admin-reservation-create", {
+            method: "POST",
+            body: {
+              reservationDate: fd.get("reservationDate"),
+              startTime: fd.get("startTime"),
+              durationHours: Number(fd.get("durationHours")),
+              tablesCount: Number(fd.get("tablesCount")),
+              guestsCount: Number(fd.get("guestsCount")),
+              joinTables: fd.get("joinTables") === "on",
+              fullName: fd.get("fullName"),
+              email: fd.get("email"),
+              phonePrefix: fd.get("phonePrefix") || "+48",
+              phoneNational: fd.get("phoneNational"),
+              customerNote: fd.get("customerNote") || "",
+              adminNote: "",
+              status,
+            },
+          });
+          closeRestExtraModal();
+          await loadReservations(restResFilter);
+          restSubTab = "reservations";
+          paint();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+    }
+
+    async function openRestaurantEditorModal(id) {
       const base = restaurantApiBase();
       const token = await firebase.auth().currentUser.getIdToken();
       const res = await fetch(`${base}?op=admin-reservation-get&id=${encodeURIComponent(id)}`, {
@@ -480,46 +643,101 @@
         return;
       }
       const r = d.reservation;
-      alert(
-        `Nr: ${r.humanNumber}\n${r.fullName}\n${r.email}\n${r.reservationDate} ${formatMs(r.startDateTime)} – ${formatMs(r.endDateTime)}\n${r.statusLabel}\nStoliki: ${r.assignedTablesLabel}\nUwagi: ${r.customerNote || ""}\nNotatka admina: ${r.adminNote || ""}`
-      );
-      const note = prompt("Notatka administratora (zapis)", r.adminNote || "");
-      if (note === null) return;
-      try {
-        await restaurantApi("admin-reservation-update", {
-          method: "PATCH",
-          body: { id, adminNote: note },
-        });
-      } catch (err) {
-        alert(err.message);
-        return;
-      }
-      if (r.status === "pending") {
-        if (confirm("Potwierdzić rezerwację (status: zarezerwowane)?")) {
-          try {
-            await restaurantApi("admin-reservation-confirm", { method: "POST", body: { id } });
-            alert("Potwierdzono — wysłano mail do klienta.");
-          } catch (err) {
-            alert(err.message);
-          }
-        } else if (confirm("Anulować rezerwację i zwolnić stoliki?")) {
-          try {
-            await restaurantApi("admin-reservation-cancel", { method: "POST", body: { id } });
-            alert("Anulowano.");
-          } catch (err) {
-            alert(err.message);
-          }
-        }
-      } else if (r.status === "confirmed" && confirm("Anulować rezerwację?")) {
+      closeRestExtraModal();
+      const host = document.createElement("div");
+      host.id = "rest-extra-modal-mount";
+      host.innerHTML = `
+        <div class="admin-modal-overlay" data-rest-extra-overlay>
+          <section class="admin-modal menu-editor-modal hotel-room-editor-modal" role="dialog" aria-modal="true">
+            <form id="rest-edit-form" class="stack">
+              <div class="admin-modal-head menu-editor-modal-head">
+                <div>
+                  <p class="pill">${escapeHtml(r.humanNumberLabel || r.humanNumber)}</p>
+                  <h3>Edycja rezerwacji</h3>
+                  <p class="helper">${escapeHtml(r.statusLabel || r.status)} · Stoliki: ${escapeHtml(r.assignedTablesLabel || "—")}</p>
+                </div>
+                <button type="button" class="button secondary" data-rest-extra-close>Zamknij</button>
+              </div>
+              <label>Data<input name="reservationDate" type="date" value="${escapeHtml(r.reservationDate || "")}" required /></label>
+              <label>Start (HH:MM)<input name="startTime" value="${escapeHtml(r.startTime || "")}" required /></label>
+              <label>Czas trwania (h)<input name="durationHours" type="number" step="0.5" min="0.5" value="${escapeHtml(String(r.durationHours || 2))}" required /></label>
+              <div class="field-grid">
+                <label>Liczba stolików<input name="tablesCount" type="number" min="1" value="${escapeHtml(String(r.tablesCount || 1))}" required /></label>
+                <label>Goście<input name="guestsCount" type="number" min="1" value="${escapeHtml(String(r.guestsCount || 1))}" required /></label>
+              </div>
+              <label class="admin-check-line"><input type="checkbox" name="joinTables" ${r.joinTables ? "checked" : ""} /> <span>Łączyć stoliki</span></label>
+              <label>Imię i nazwisko<input name="fullName" value="${escapeHtml(r.fullName || "")}" required /></label>
+              <label>E-mail<input name="email" type="email" value="${escapeHtml(r.email || "")}" required /></label>
+              <div class="field-grid">
+                <label>Prefiks<input name="phonePrefix" value="${escapeHtml(r.phonePrefix || "+48")}" /></label>
+                <label>Numer<input name="phoneNational" value="${escapeHtml(r.phoneNational || "")}" required /></label>
+              </div>
+              <label>Uwagi<textarea name="customerNote" rows="2">${escapeHtml(r.customerNote || "")}</textarea></label>
+              <label>Notatka wewn.<textarea name="adminNote" rows="2">${escapeHtml(r.adminNote || "")}</textarea></label>
+              <div class="admin-modal-footer hotel-room-editor-footer" style="flex-wrap:wrap;gap:0.5rem">
+                <button type="button" class="button secondary" data-rest-extra-close>Anuluj</button>
+                ${r.status === "pending" ? `<button type="button" class="button secondary" id="rest-confirm-quick">Potwierdź</button>` : ""}
+                <button type="submit" class="button">Zapisz zmiany</button>
+              </div>
+            </form>
+          </section>
+        </div>`;
+      document.body.appendChild(host);
+      document.body.classList.add("admin-modal-open");
+      host.querySelectorAll("[data-rest-extra-close]").forEach((b) => b.addEventListener("click", closeRestExtraModal));
+      host.querySelector("[data-rest-extra-overlay]")?.addEventListener("click", (ev) => {
+        if (ev.target === ev.currentTarget) closeRestExtraModal();
+      });
+      host.querySelector("#rest-confirm-quick")?.addEventListener("click", async () => {
+        if (!confirm("Potwierdzić i wysłać e-mail do klienta?")) return;
         try {
-          await restaurantApi("admin-reservation-cancel", { method: "POST", body: { id } });
+          await restaurantApi("admin-reservation-confirm", { method: "POST", body: { id } });
+          closeRestExtraModal();
+          await loadReservations(restResFilter);
+          document.querySelector("#rest-sub-content").innerHTML = renderReservations();
+          const f = document.querySelector("#rest-res-filter");
+          if (f) f.value = restResFilter;
+          bindSub();
         } catch (err) {
           alert(err.message);
         }
-      }
-      await loadReservations(document.querySelector("#rest-res-filter")?.value || "all");
-      document.querySelector("#rest-sub-content").innerHTML = renderReservations();
-      bindSub();
+      });
+      host.querySelector("#rest-edit-form")?.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const fd = new FormData(ev.target);
+        const notifyClient = confirm(
+          "Wysłać e-mail o zmianach do klienta?\n\nOK — tak\nAnuluj — tylko zapis"
+        );
+        try {
+          await restaurantApi("admin-reservation-update", {
+            method: "PATCH",
+            body: {
+              id,
+              reservationDate: fd.get("reservationDate"),
+              startTime: fd.get("startTime"),
+              durationHours: Number(fd.get("durationHours")),
+              tablesCount: Number(fd.get("tablesCount")),
+              guestsCount: Number(fd.get("guestsCount")),
+              joinTables: fd.get("joinTables") === "on",
+              fullName: fd.get("fullName"),
+              email: fd.get("email"),
+              phonePrefix: fd.get("phonePrefix") || "+48",
+              phoneNational: fd.get("phoneNational"),
+              customerNote: fd.get("customerNote") || "",
+              adminNote: fd.get("adminNote") || "",
+              notifyClient,
+            },
+          });
+          closeRestExtraModal();
+          await loadReservations(restResFilter);
+          document.querySelector("#rest-sub-content").innerHTML = renderReservations();
+          const f = document.querySelector("#rest-res-filter");
+          if (f) f.value = restResFilter;
+          bindSub();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
     }
 
     paint();

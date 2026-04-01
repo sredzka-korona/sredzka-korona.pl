@@ -238,17 +238,18 @@
     } else if (state.step === 3) {
       inner = `
         <h3>Dane rezerwującego</h3>
-        <form id="booking-form-customer" class="booking-form">
+        <form id="booking-form-customer" class="booking-form booking-form--customer">
           <input type="text" name="hpCompanyWebsite" id="bf-hp" value="" tabindex="-1" autocomplete="off" class="booking-honeypot" aria-hidden="true" />
-          <div class="booking-field-grid booking-customer-name-email">
-            <label>Imię i nazwisko<input name="fullName" required maxlength="120" /></label>
-            <label>E-mail<input name="email" type="email" required /></label>
+          <div class="booking-field-grid booking-name-row">
+            <label>Imię<input name="firstName" required maxlength="60" autocomplete="given-name" /></label>
+            <label>Nazwisko<input name="lastName" required maxlength="60" autocomplete="family-name" /></label>
           </div>
-          <div class="booking-field-grid booking-phone-grid">
+          <div class="booking-field-grid booking-contact-row">
+            <label class="booking-contact-email">E-mail<input name="email" type="email" required autocomplete="email" /></label>
             <label class="booking-phone-prefix">Prefiks telefonu<input name="phonePrefix" class="booking-prefix-input" type="text" inputmode="tel" autocomplete="tel-country-code" value="+48" required pattern="\\+[0-9]{1,4}" maxlength="5" /></label>
-            <label class="booking-phone-number">Numer<input name="phoneNational" inputmode="numeric" required pattern="[0-9]{6,15}" placeholder="np. 501234567" /></label>
+            <label class="booking-phone-number">Numer<input name="phoneNational" inputmode="numeric" required pattern="[0-9]{6,15}" placeholder="np. 501234567" autocomplete="tel-national" /></label>
           </div>
-          <label>Uwagi do rezerwacji<textarea name="customerNote" rows="3" maxlength="2000" required></textarea></label>
+          <label class="booking-note-field">Uwagi do rezerwacji<textarea name="customerNote" class="booking-customer-note" maxlength="2000" required></textarea></label>
           <p class="booking-error" id="booking-step-error" hidden></p>
           <div class="booking-actions">
             <button type="button" class="booking-btn secondary" id="booking-back-3">Wstecz</button>
@@ -393,8 +394,11 @@
         if (fd.get("hpCompanyWebsite")) {
           return;
         }
+        const firstName = String(fd.get("firstName") || "").trim();
+        const lastName = String(fd.get("lastName") || "").trim();
+        const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
         state.customer = {
-          fullName: String(fd.get("fullName") || "").trim(),
+          fullName,
           email: String(fd.get("email") || "").trim(),
           phonePrefix: String(fd.get("phonePrefix") || "").trim(),
           phoneNational: String(fd.get("phoneNational") || "").trim(),

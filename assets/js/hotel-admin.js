@@ -1,5 +1,5 @@
 /**
- * Panel admina — moduł Hotel (Firestore przez Cloud Functions hotelApi).
+ * Panel admina — moduł Hotel (API rezerwacji / D1).
  * Wymaga: firebase (auth), SREDZKA_CONFIG.hotelApiBase lub firebaseProjectId.
  */
 (function () {
@@ -92,11 +92,22 @@
     return `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
   }
 
-  let hotelSubTab = "rooms";
+  let hotelSubTab = "reservations";
+  let hotelResFilter = "active";
   let roomsData = [];
   let reservationsData = [];
+  let blockListData = [];
   let templatesData = {};
   let countdownTimer = null;
+
+  const HOTEL_TEMPLATE_LABELS = {
+    confirm_email: "Link potwierdzający — pierwszy e-mail po wysłaniu formularza (klient klika, żeby potwierdzić adres e-mail).",
+    pending_client: "Klient — rezerwacja przyjęta, czeka na akceptację recepcji.",
+    pending_admin: "Powiadomienie dla obsługi — nowa rezerwacja wymaga decyzji w panelu.",
+    confirmed_client: "Klient — rezerwacja zaakceptowana (pokoje zarezerwowane).",
+    cancelled_client: "Klient — rezerwacja anulowana przez hotel lub po upływie czasu.",
+    changed_client: "Klient — po edycji rezerwacji przez administratora (wysyłane tylko gdy zaznaczysz wysyłkę).",
+  };
 
   async function loadRooms() {
     const d = await hotelApi("admin-rooms-list", { method: "GET" });
@@ -104,7 +115,8 @@
   }
 
   async function loadReservations(status) {
-    const q = status && status !== "all" ? `&status=${encodeURIComponent(status)}` : "";
+    const mode = status && String(status).length ? status : "active";
+    const q = `&status=${encodeURIComponent(mode)}`;
     const base = hotelApiBase();
     const token = await firebase.auth().currentUser.getIdToken();
     const res = await fetch(`${base}?op=admin-reservations-list${q}`, {
@@ -118,6 +130,17 @@
   async function loadTemplates() {
     const d = await hotelApi("admin-mail-templates", { method: "GET" });
     templatesData = d.templates || {};
+  }
+
+  async function loadBlockList() {
+    const base = hotelApiBase();
+    const token = await firebase.auth().currentUser.getIdToken();
+    const res = await fetch(`${base}?op=admin-reservations-list&status=${encodeURIComponent("manual_block")}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || "Błąd");
+    blockListData = d.reservations || [];
   }
 
   function toInt(v) {
@@ -136,18 +159,23 @@
         <td>${escapeHtml([toInt(r.bedsSingle) && `${toInt(r.bedsSingle)}×1os.`, toInt(r.bedsDouble) && `${toInt(r.bedsDouble)}×2os.`, toInt(r.bedsChild) && `${toInt(r.bedsChild)}×dz.`].filter(Boolean).join(", ") || "—")}</td>
         <td>${r.active !== false ? "tak" : "nie"}</td>
         <td>${escapeHtml(String(r.sortOrder ?? 0))}</td>
-        <td><button type="button" class="button secondary hotel-edit-room" data-id="${escapeHtml(r.id)}">Edytuj</button></td>
+        <td class="admin-row-actions">
+          <button type="button" class="button secondary hotel-edit-room" data-id="${escapeHtml(r.id)}">Edytuj</button>
+          <button type="button" class="button secondary danger-muted hotel-delete-room" data-id="${escapeHtml(r.id)}" data-name="${escapeHtml(r.name || r.id)}">Usuń</button>
+        </td>
       </tr>`
       )
       .join("");
     return `
       <div class="hotel-subpanel">
-        <div class="hotel-rooms-heading">
+        <div class="admin-toolbar-row hotel-rooms-heading">
           <div>
             <h3>Pokoje (${roomsData.length})</h3>
-            <p class="helper">Ceny i parametry zapisują się w Firestore — wpływają na nowe rezerwacje i widok na stronie.</p>
+            <p class="helper">Ceny i parametry zapisują się w bazie — wpływają na nowe rezerwacje i widok na stronie.</p>
           </div>
-          <button type="button" class="button" id="hotel-add-room">Dodaj pokój</button>
+          <div class="admin-toolbar-actions">
+            <button type="button" class="button" id="hotel-add-room">Dodaj pokój</button>
+          </div>
         </div>
         <div class="table-scroll">
           <table class="hotel-table">
@@ -163,14 +191,15 @@
       .map(
         (r) => `
       <tr>
-        <td>${escapeHtml(r.humanNumber || r.id)}</td>
+        <td>${escapeHtml(r.humanNumberLabel || r.humanNumber || r.id)}</td>
         <td>${escapeHtml(r.customerName || "")}</td>
         <td>${escapeHtml(r.statusLabel || r.status)}</td>
         <td>${escapeHtml(r.dateFrom)} → ${escapeHtml(r.dateTo)}</td>
         <td>${escapeHtml(String(r.totalPrice ?? ""))}</td>
         <td class="hotel-countdown" data-pending="${r.pendingExpiresAt || ""}" data-email-exp="${r.emailVerificationExpiresAt || ""}" data-status="${escapeHtml(r.status)}">${r.status === "pending" ? countdown(r.pendingExpiresAt) : r.status === "email_verification_pending" ? countdown(r.emailVerificationExpiresAt) : "—"}</td>
-        <td>
-          <button type="button" class="button secondary hotel-res-detail" data-id="${escapeHtml(r.id)}">Szczegóły</button>
+        <td class="admin-row-actions">
+          <button type="button" class="button secondary hotel-res-edit" data-id="${escapeHtml(r.id)}">Edytuj</button>
+          <button type="button" class="button secondary danger-muted hotel-res-cancel" data-id="${escapeHtml(r.id)}">Anuluj</button>
         </td>
       </tr>`
       )
@@ -178,18 +207,24 @@
     return `
       <div class="hotel-subpanel">
         <h3>Rezerwacje</h3>
-        <div class="hotel-filters">
-          <button type="button" class="button secondary" id="hotel-res-manual-new">Nowa rezerwacja (ręczna)</button>
-          <label>Filtr <select id="hotel-res-filter">
-            <option value="all">Wszystkie</option>
-            <option value="pending">Oczekujące</option>
-            <option value="confirmed">Zarezerwowane</option>
+        <p class="helper">Domyślnie widać tylko rezerwacje <strong>oczekujące</strong> i <strong>zarezerwowane</strong>, posortowane tak, że najpierw kończące się terminy; najpierw status „Oczekujące”. Pozostałe statusy wybierz z listy.</p>
+        <div class="admin-toolbar-row hotel-filters">
+          <div class="admin-toolbar-filters">
+            <label>Status <select id="hotel-res-filter">
+            <option value="active">Aktywne (oczekujące + zarezerwowane)</option>
+            <option value="all">Wszystkie statusy</option>
+            <option value="pending">Tylko oczekujące</option>
+            <option value="confirmed">Tylko zarezerwowane</option>
             <option value="cancelled">Anulowane</option>
             <option value="expired">Wygasłe</option>
             <option value="email_verification_pending">E-mail do potwierdzenia</option>
-            <option value="manual_block">Blokady</option>
+            <option value="manual_block">Blokady terminów</option>
           </select></label>
-          <button type="button" class="button" id="hotel-res-refresh">Odśwież</button>
+          </div>
+          <div class="admin-toolbar-actions">
+            <button type="button" class="button secondary icon-btn" id="hotel-res-refresh" title="Odśwież listę" aria-label="Odśwież listę">↻</button>
+            <button type="button" class="button" id="hotel-res-manual-new">Utwórz rezerwację</button>
+          </div>
         </div>
         <div class="table-scroll">
           <table class="hotel-table">
@@ -205,15 +240,15 @@
     return `
       <div class="hotel-subpanel">
         <h3>Szablony mailingowe</h3>
-        <p class="helper">Zmienne: {{reservationId}}, {{fullName}}, {{email}}, {{phone}}, {{roomsList}}, {{dateFrom}}, {{dateTo}}, {{nights}}, {{totalPrice}}, {{customerNote}}, {{adminNote}}, {{confirmationLink}}, {{hotelName}}, {{reservationNumber}}</p>
+        <p class="helper">Zmienne we wszystkich szablonach: <code>{{reservationNumber}}</code> (numer w formacie np. 12/2026), <code>{{fullName}}</code>, <code>{{email}}</code>, <code>{{phone}}</code>, <code>{{roomsList}}</code>, <code>{{dateFrom}}</code>, <code>{{dateTo}}</code>, <code>{{nights}}</code>, <code>{{totalPrice}}</code>, <code>{{customerNote}}</code>, <code>{{adminNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{hotelName}}</code>.</p>
         <div id="hotel-template-forms">
           ${keys
             .map(
               (k) => `
             <details class="hotel-template-card">
-              <summary>${escapeHtml(k)}</summary>
+              <summary><span class="tpl-key">${escapeHtml(k)}</span>${HOTEL_TEMPLATE_LABELS[k] ? `<span class="tpl-desc"> — ${escapeHtml(HOTEL_TEMPLATE_LABELS[k])}</span>` : ""}</summary>
               <label>Temat<input type="text" data-tpl-key="${escapeHtml(k)}" data-field="subject" value="${escapeHtml(templatesData[k]?.subject || "")}" /></label>
-              <label>Treść HTML<textarea data-tpl-key="${escapeHtml(k)}" data-field="bodyHtml" rows="8">${escapeHtml(templatesData[k]?.bodyHtml || "")}</textarea></label>
+              <label>Treść HTML<textarea data-tpl-key="${escapeHtml(k)}" data-field="bodyHtml" rows="10">${escapeHtml(templatesData[k]?.bodyHtml || "")}</textarea></label>
               <button type="button" class="button hotel-save-tpl" data-key="${escapeHtml(k)}">Zapisz szablon</button>
             </details>`
             )
@@ -223,18 +258,54 @@
   }
 
   function renderBlockForm() {
+    const roomChecks = roomsData
+      .map(
+        (room) => `
+      <label class="admin-check-line">
+        <input type="checkbox" name="roomId" value="${escapeHtml(room.id)}" />
+        <span>${escapeHtml(room.name || room.id)} <span class="muted">(${escapeHtml(room.id)})</span></span>
+      </label>`
+      )
+      .join("");
+    const blockRows = blockListData
+      .map(
+        (b) => `
+      <tr>
+        <td>${escapeHtml(b.humanNumberLabel || b.humanNumber || b.id)}</td>
+        <td>${escapeHtml(b.dateFrom)} → ${escapeHtml(b.dateTo)}</td>
+        <td>${escapeHtml((b.roomIds || []).join(", "))}</td>
+        <td>${escapeHtml(b.adminNote || b.customerNote || "—")}</td>
+      </tr>`
+      )
+      .join("");
     return `
       <div class="hotel-subpanel">
-        <h3>Ręczna blokada terminu</h3>
+        <h3>Blokada terminu</h3>
+        <p class="helper">Blokada zapisuje się jako wpis ze statusem „Blokada terminu”: zajmuje wybrane pokoje w kalendarzu (goście nie mogą zarezerwować tych pokoi). To nie jest rezerwacja gościa — służy np. remontowi, pobytowi poza systemem lub pracom.</p>
         <form id="hotel-block-form" class="stack">
           <div class="field-grid">
-            <label>Od<input name="dateFrom" type="date" required /></label>
-            <label>Do<input name="dateTo" type="date" required /></label>
+            <label>Od (dzień przyjazdu)<input name="dateFrom" type="date" required /></label>
+            <label>Do (dzień wyjazdu)<input name="dateTo" type="date" required /></label>
           </div>
-          <label>ID pokoi (oddzielone przecinkiem, np. room-01,room-02)<input name="roomIds" required placeholder="room-01" /></label>
-          <label>Notatka<input name="note" /></label>
+          <p class="helper">Jeden dzień noclegu: ten sam dzień w obu polach albo np. przyjazd 02.03, wyjazd 03.03. Jeśli wpiszesz ten sam dzień w „Od” i „Do”, system potraktuje to jako jedną noc (wyjazd następnego dnia).</p>
+          <fieldset class="admin-room-fieldset">
+            <legend>Pokoje do zablokowania</legend>
+            <label class="admin-check-line admin-check-all">
+              <input type="checkbox" id="hotel-block-all-rooms" />
+              <span>Zaznacz / odznacz wszystkie</span>
+            </label>
+            <div class="admin-room-checks">${roomChecks || "<p class=\"helper\">Brak pokoi — dodaj pokoje w zakładce Pokoje.</p>"}</div>
+          </fieldset>
+          <label>Notatka (opcjonalnie)<input name="note" placeholder="np. remont, wynajem poza systemem" /></label>
           <button type="submit" class="button">Utwórz blokadę</button>
         </form>
+        <h4 class="admin-subheading">Utworzone blokady</h4>
+        <div class="table-scroll">
+          <table class="hotel-table">
+            <thead><tr><th>Nr</th><th>Termin</th><th>Pokoje</th><th>Notatka</th></tr></thead>
+            <tbody>${blockRows || "<tr><td colspan='4'>Brak blokad</td></tr>"}</tbody>
+          </table>
+        </div>
       </div>`;
   }
 
@@ -243,10 +314,13 @@
     if (options.defaultTab) {
       hotelSubTab = options.defaultTab;
     }
+    const allowedTabs = Array.isArray(options.allowedTabs) && options.allowedTabs.length
+      ? options.allowedTabs.map((tab) => String(tab || "").trim()).filter(Boolean)
+      : null;
     container.innerHTML = `<p class="status">Ładowanie modułu Hotel…</p>`;
     try {
       await loadRooms();
-      await loadReservations("all");
+      await loadReservations("active");
       await loadTemplates();
     } catch (e) {
       container.innerHTML = `<p class="status">${escapeHtml(e.message)}</p>`;
@@ -260,29 +334,50 @@
         templates: renderTemplatesEditor(),
         block: renderBlockForm(),
       };
+      const availableTabs = [
+        { key: "reservations", label: "Rezerwacje" },
+        { key: "block", label: "Blokada terminu" },
+        { key: "rooms", label: "Pokoje" },
+        { key: "templates", label: "Szablony mailingowe" },
+      ].filter((tab) => !allowedTabs || allowedTabs.includes(tab.key));
+      if (!availableTabs.length) {
+        container.innerHTML = `<section class="panel col-12"><p class="status">Brak dostepnych widokow tego modulu.</p></section>`;
+        return;
+      }
+      if (!availableTabs.some((tab) => tab.key === hotelSubTab)) {
+        hotelSubTab = availableTabs[0].key;
+      }
       container.innerHTML = `
         <section class="panel col-12">
           <p class="pill">Hotel</p>
           <h2>Rezerwacje pokoi i pokoje</h2>
-          <div class="hotel-nav">
-            <button type="button" class="button ${hotelSubTab === "rooms" ? "" : "secondary"}" data-hsub="rooms">Pokoje</button>
-            <button type="button" class="button ${hotelSubTab === "reservations" ? "" : "secondary"}" data-hsub="reservations">Rezerwacje</button>
-            <button type="button" class="button ${hotelSubTab === "templates" ? "" : "secondary"}" data-hsub="templates">Szablony mailingowe</button>
-            <button type="button" class="button ${hotelSubTab === "block" ? "" : "secondary"}" data-hsub="block">Blokada terminu</button>
+          <div class="hotel-nav${availableTabs.length === 1 ? " is-single" : ""}">
+            ${availableTabs
+              .map(
+                (tab) =>
+                  `<button type="button" class="button ${hotelSubTab === tab.key ? "" : "secondary"}" data-hsub="${escapeHtml(tab.key)}">${escapeHtml(tab.label)}</button>`
+              )
+              .join("")}
           </div>
           <div id="hotel-sub-content">${sub[hotelSubTab]}</div>
         </section>
       `;
 
+      const filterSel = document.querySelector("#hotel-res-filter");
+      if (filterSel) filterSel.value = hotelResFilter;
+
       container.querySelectorAll("[data-hsub]").forEach((b) => {
         b.addEventListener("click", async () => {
           hotelSubTab = b.getAttribute("data-hsub");
-          if (hotelSubTab === "reservations") {
-            try {
-              await loadReservations(document.querySelector("#hotel-res-filter")?.value || "all");
-            } catch (e) {
-              alert(e.message);
+          try {
+            if (hotelSubTab === "reservations") {
+              await loadReservations(hotelResFilter);
             }
+            if (hotelSubTab === "block") {
+              await loadBlockList();
+            }
+          } catch (e) {
+            alert(e.message);
           }
           paint();
         });
@@ -303,73 +398,70 @@
         });
       });
       document.querySelector("#hotel-add-room")?.addEventListener("click", () => openRoomEditorModal(null));
+      document.querySelectorAll(".hotel-delete-room").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-id");
+          const name = btn.getAttribute("data-name") || id;
+          if (!confirm(`Usunąć pokój „${name}” (${id})? Nie można tego cofnąć.`)) return;
+          const base = hotelApiBase();
+          try {
+            const token = await firebase.auth().currentUser.getIdToken();
+            const res = await fetch(`${base}?op=admin-room-delete&id=${encodeURIComponent(id)}`, {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || "Błąd usuwania.");
+            await loadRooms();
+            hotelSubTab = "rooms";
+            paint();
+          } catch (e) {
+            alert(e.message);
+          }
+        });
+      });
       const filter = document.querySelector("#hotel-res-filter");
       if (filter) {
         filter.addEventListener("change", async () => {
-          await loadReservations(filter.value);
+          hotelResFilter = filter.value;
+          await loadReservations(hotelResFilter);
           document.querySelector("#hotel-sub-content").innerHTML = renderReservations();
+          const fs = document.querySelector("#hotel-res-filter");
+          if (fs) fs.value = hotelResFilter;
           bindSub();
         });
       }
-      document.querySelector("#hotel-res-manual-new")?.addEventListener("click", async () => {
-        const dateFrom = prompt("Data przyjazdu (YYYY-MM-DD)");
-        if (!dateFrom) return;
-        const dateTo = prompt("Data wyjazdu (YYYY-MM-DD)");
-        if (!dateTo) return;
-        const roomIdsStr = prompt("ID pokoi, przecinek (np. room-01,room-02)");
-        if (!roomIdsStr) return;
-        const roomIds = roomIdsStr.split(",").map((s) => s.trim()).filter(Boolean);
-        const fullName = prompt("Imię i nazwisko");
-        if (!fullName) return;
-        const email = prompt("E-mail");
-        if (!email) return;
-        const phonePrefix = prompt("Prefiks telefonu (np. +48)", "+48");
-        const phoneNational = prompt("Numer krajowy (bez +)");
-        if (!phoneNational) return;
-        const customerNote = prompt("Uwagi klienta", "") || "";
-        const st = confirm("Status początkowy: OK = oczekujące (pending), Anuluj = od razu zarezerwowane (confirmed)") ? "pending" : "confirmed";
-        try {
-          await hotelApi("admin-reservation-create", {
-            method: "POST",
-            body: {
-              dateFrom,
-              dateTo,
-              roomIds,
-              fullName,
-              email,
-              phonePrefix: phonePrefix || "+48",
-              phoneNational,
-              customerNote,
-              status: st,
-              adminNote: "",
-            },
-          });
-          alert("Utworzono rezerwację.");
-          await loadReservations(document.querySelector("#hotel-res-filter")?.value || "all");
-          document.querySelector("#hotel-sub-content").innerHTML = renderReservations();
-          bindSub();
-        } catch (e) {
-          alert(e.message);
-        }
-      });
+      document.querySelector("#hotel-res-manual-new")?.addEventListener("click", () => openManualReservationModal());
       document.querySelector("#hotel-res-refresh")?.addEventListener("click", async () => {
-        await loadReservations(document.querySelector("#hotel-res-filter")?.value || "all");
+        await loadReservations(hotelResFilter);
         document.querySelector("#hotel-sub-content").innerHTML = renderReservations();
+        const fs = document.querySelector("#hotel-res-filter");
+        if (fs) fs.value = hotelResFilter;
         bindSub();
       });
-      document.querySelectorAll(".hotel-res-detail").forEach((btn) => {
-        btn.addEventListener("click", () => openReservationDetail(btn.getAttribute("data-id")));
+      document.querySelectorAll(".hotel-res-edit").forEach((btn) => {
+        btn.addEventListener("click", () => openReservationEditorModal(btn.getAttribute("data-id")));
+      });
+      document.querySelectorAll(".hotel-res-cancel").forEach((btn) => {
+        btn.addEventListener("click", () => quickCancelReservation(btn.getAttribute("data-id")));
       });
       document.querySelectorAll(".hotel-save-tpl").forEach((btn) => {
         btn.addEventListener("click", () => saveTemplate(btn.getAttribute("data-key")));
       });
+      document.querySelector("#hotel-block-all-rooms")?.addEventListener("change", (ev) => {
+        const on = ev.target.checked;
+        document.querySelectorAll('#hotel-block-form input[name="roomId"]').forEach((cb) => {
+          cb.checked = on;
+        });
+      });
       document.querySelector("#hotel-block-form")?.addEventListener("submit", async (ev) => {
         ev.preventDefault();
         const fd = new FormData(ev.target);
-        const roomIds = String(fd.get("roomIds") || "")
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
+        const roomIds = Array.from(ev.target.querySelectorAll('input[name="roomId"]:checked')).map((cb) => cb.value);
+        if (!roomIds.length) {
+          alert("Zaznacz co najmniej jeden pokój.");
+          return;
+        }
         try {
           await hotelApi("admin-manual-block", {
             method: "POST",
@@ -382,6 +474,9 @@
           });
           alert("Blokada utworzona.");
           ev.target.reset();
+          await loadBlockList();
+          hotelSubTab = "block";
+          paint();
         } catch (e) {
           alert(e.message);
         }
@@ -440,7 +535,7 @@
               <p class="status hotel-room-editor-msg" id="hotel-room-editor-msg" hidden></p>
               <div class="field-grid">
                 <label class="field-full">
-                  <span>ID pokoju (Firestore)</span>
+                  <span>ID pokoju (unikalny w systemie)</span>
                   <input name="id" value="${escapeHtml(r.id)}" ${isNew ? "" : "readonly"} required pattern="[a-zA-Z0-9_-]+" placeholder="np. room-01" title="Litery, cyfry, myślnik, podkreślenie" autocomplete="off" />
                 </label>
                 <label class="field-full">
@@ -582,7 +677,117 @@
       }
     }
 
-    async function openReservationDetail(id) {
+    function closeHotelExtraModal() {
+      document.getElementById("hotel-extra-modal-mount")?.remove();
+      document.body.classList.remove("admin-modal-open");
+    }
+
+    async function quickCancelReservation(id) {
+      if (!confirm("Anulować tę rezerwację? Do klienta może zostać wysłany e-mail o anulowaniu.")) return;
+      try {
+        await hotelApi("admin-reservation-cancel", { method: "POST", body: { id } });
+        await loadReservations(hotelResFilter);
+        document.querySelector("#hotel-sub-content").innerHTML = renderReservations();
+        const fs = document.querySelector("#hotel-res-filter");
+        if (fs) fs.value = hotelResFilter;
+        bindSub();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    function openManualReservationModal() {
+      closeHotelExtraModal();
+      const roomChecks = roomsData
+        .map(
+          (room) => `
+        <label class="admin-check-line">
+          <input type="checkbox" name="roomId" value="${escapeHtml(room.id)}" />
+          <span>${escapeHtml(room.name || room.id)}</span>
+        </label>`
+        )
+        .join("");
+      const host = document.createElement("div");
+      host.id = "hotel-extra-modal-mount";
+      host.innerHTML = `
+        <div class="admin-modal-overlay" data-hotel-extra-overlay>
+          <section class="admin-modal menu-editor-modal hotel-room-editor-modal" role="dialog" aria-modal="true">
+            <form id="hotel-manual-res-form" class="stack">
+              <div class="admin-modal-head menu-editor-modal-head">
+                <h3>Utwórz rezerwację</h3>
+                <button type="button" class="button secondary" data-hotel-extra-close>Zamknij</button>
+              </div>
+              <p class="helper">Rezerwacja wprowadzona ręcznie jest od razu <strong>zarezerwowana</strong> (bez e-maila z linkiem potwierdzającym). Możesz zaznaczyć opcję oczekiwania na akceptację poniżej.</p>
+              <div class="field-grid">
+                <label>Przyjazd<input name="dateFrom" type="date" required /></label>
+                <label>Wyjazd<input name="dateTo" type="date" required /></label>
+              </div>
+              <fieldset class="admin-room-fieldset"><legend>Pokoje</legend>
+              <label class="admin-check-line admin-check-all"><input type="checkbox" id="hotel-manual-all-rooms" /><span>Zaznacz / odznacz wszystkie</span></label>
+              <div class="admin-room-checks">${roomChecks || "<p class=\"helper\">Brak pokoi w systemie.</p>"}</div></fieldset>
+              <label>Imię i nazwisko<input name="fullName" required /></label>
+              <label>E-mail<input name="email" type="email" required /></label>
+              <div class="field-grid">
+                <label>Prefiks<input name="phonePrefix" value="+48" /></label>
+                <label>Numer telefonu<input name="phoneNational" required inputmode="numeric" /></label>
+              </div>
+              <label>Uwagi klienta<textarea name="customerNote" rows="3"></textarea></label>
+              <label class="admin-check-line"><input type="checkbox" name="asPending" /> <span>Oczekuje na akceptację (status „oczekujące”) zamiast od razu „zarezerwowane”</span></label>
+              <div class="admin-modal-footer hotel-room-editor-footer">
+                <button type="button" class="button secondary" data-hotel-extra-close>Anuluj</button>
+                <button type="submit" class="button">Utwórz</button>
+              </div>
+            </form>
+          </section>
+        </div>`;
+      document.body.appendChild(host);
+      document.body.classList.add("admin-modal-open");
+      host.querySelector("#hotel-manual-all-rooms")?.addEventListener("change", (ev) => {
+        const on = ev.target.checked;
+        host.querySelectorAll('#hotel-manual-res-form input[name="roomId"]').forEach((cb) => {
+          cb.checked = on;
+        });
+      });
+      host.querySelectorAll("[data-hotel-extra-close]").forEach((b) => b.addEventListener("click", closeHotelExtraModal));
+      host.querySelector("[data-hotel-extra-overlay]")?.addEventListener("click", (ev) => {
+        if (ev.target === ev.currentTarget) closeHotelExtraModal();
+      });
+      host.querySelector("#hotel-manual-res-form")?.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const fd = new FormData(ev.target);
+        const roomIds = Array.from(ev.target.querySelectorAll('input[name="roomId"]:checked')).map((cb) => cb.value);
+        if (!roomIds.length) {
+          alert("Wybierz co najmniej jeden pokój.");
+          return;
+        }
+        const status = fd.get("asPending") === "on" ? "pending" : "confirmed";
+        try {
+          await hotelApi("admin-reservation-create", {
+            method: "POST",
+            body: {
+              dateFrom: fd.get("dateFrom"),
+              dateTo: fd.get("dateTo"),
+              roomIds,
+              fullName: fd.get("fullName"),
+              email: fd.get("email"),
+              phonePrefix: fd.get("phonePrefix") || "+48",
+              phoneNational: fd.get("phoneNational"),
+              customerNote: fd.get("customerNote") || "",
+              adminNote: "",
+              status,
+            },
+          });
+          closeHotelExtraModal();
+          await loadReservations(hotelResFilter);
+          hotelSubTab = "reservations";
+          paint();
+        } catch (e) {
+          alert(e.message);
+        }
+      });
+    }
+
+    async function openReservationEditorModal(id) {
       const base = hotelApiBase();
       const token = await firebase.auth().currentUser.getIdToken();
       const res = await fetch(`${base}?op=admin-reservation-get&id=${encodeURIComponent(id)}`, {
@@ -594,40 +799,111 @@
         return;
       }
       const r = d.reservation;
-      alert(
-        `Nr: ${r.humanNumber}\n${r.customerName}\n${r.email}\n${r.dateFrom} → ${r.dateTo}\n${r.statusLabel}\nKwota: ${r.totalPrice}\nUwagi: ${r.customerNote || ""}`
-      );
-      const note = prompt("Notatka administratora (zapis)", r.adminNote || "");
-      if (note === null) return;
-      try {
-        await hotelApi("admin-reservation-update", {
-          method: "PATCH",
-          body: { id, adminNote: note },
-        });
-      } catch (e) {
-        alert(e.message);
-        return;
-      }
-      if (r.status === "pending") {
-        if (confirm("Potwierdzić rezerwację (status: zarezerwowane)?")) {
-          try {
-            await hotelApi("admin-reservation-confirm", { method: "POST", body: { id } });
-            alert("Potwierdzono — wysłano mail do klienta.");
-          } catch (e) {
-            alert(e.message);
-          }
-        } else if (confirm("Anulować rezerwację i zwolnić terminy?")) {
-          try {
-            await hotelApi("admin-reservation-cancel", { method: "POST", body: { id } });
-            alert("Anulowano.");
-          } catch (e) {
-            alert(e.message);
-          }
+      closeHotelExtraModal();
+      const roomChecks = roomsData
+        .map((room) => {
+          const on = (r.roomIds || []).includes(room.id);
+          return `
+        <label class="admin-check-line">
+          <input type="checkbox" name="roomId" value="${escapeHtml(room.id)}" ${on ? "checked" : ""} />
+          <span>${escapeHtml(room.name || room.id)}</span>
+        </label>`;
+        })
+        .join("");
+      const host = document.createElement("div");
+      host.id = "hotel-extra-modal-mount";
+      host.innerHTML = `
+        <div class="admin-modal-overlay" data-hotel-extra-overlay>
+          <section class="admin-modal menu-editor-modal hotel-room-editor-modal" role="dialog" aria-modal="true">
+            <form id="hotel-res-edit-form" class="stack">
+              <div class="admin-modal-head menu-editor-modal-head">
+                <div>
+                  <p class="pill">Rezerwacja ${escapeHtml(r.humanNumberLabel || r.humanNumber)}</p>
+                  <h3>Edycja rezerwacji</h3>
+                  <p class="helper">Status: ${escapeHtml(r.statusLabel || r.status)}</p>
+                </div>
+                <button type="button" class="button secondary" data-hotel-extra-close>Zamknij</button>
+              </div>
+              <div class="field-grid">
+                <label>Przyjazd<input name="dateFrom" type="date" value="${escapeHtml(r.dateFrom)}" required /></label>
+                <label>Wyjazd<input name="dateTo" type="date" value="${escapeHtml(r.dateTo)}" required /></label>
+              </div>
+              <fieldset class="admin-room-fieldset"><legend>Pokoje</legend>
+              <div class="admin-room-checks">${roomChecks || ""}</div></fieldset>
+              <label>Imię i nazwisko<input name="fullName" value="${escapeHtml(r.customerName || "")}" required /></label>
+              <label>E-mail<input name="email" type="email" value="${escapeHtml(r.email || "")}" required /></label>
+              <div class="field-grid">
+                <label>Prefiks<input name="phonePrefix" value="${escapeHtml(r.phonePrefix || "+48")}" /></label>
+                <label>Numer<input name="phoneNational" value="${escapeHtml(r.phoneNational || "")}" required /></label>
+              </div>
+              <label>Uwagi klienta<textarea name="customerNote" rows="3">${escapeHtml(r.customerNote || "")}</textarea></label>
+              <label>Notatka wewnętrzna<textarea name="adminNote" rows="2">${escapeHtml(r.adminNote || "")}</textarea></label>
+              <div class="admin-modal-footer hotel-room-editor-footer" style="flex-wrap:wrap;gap:0.5rem">
+                <button type="button" class="button secondary" data-hotel-extra-close>Anuluj</button>
+                ${r.status === "pending" ? `<button type="button" class="button secondary" id="hotel-res-confirm-quick">Potwierdź (zarezerwowane)</button>` : ""}
+                <button type="submit" class="button">Zapisz zmiany</button>
+              </div>
+            </form>
+          </section>
+        </div>`;
+      document.body.appendChild(host);
+      document.body.classList.add("admin-modal-open");
+      host.querySelectorAll("[data-hotel-extra-close]").forEach((b) => b.addEventListener("click", closeHotelExtraModal));
+      host.querySelector("[data-hotel-extra-overlay]")?.addEventListener("click", (ev) => {
+        if (ev.target === ev.currentTarget) closeHotelExtraModal();
+      });
+      host.querySelector("#hotel-res-confirm-quick")?.addEventListener("click", async () => {
+        if (!confirm("Potwierdzić rezerwację i wysłać e-mail do klienta?")) return;
+        try {
+          await hotelApi("admin-reservation-confirm", { method: "POST", body: { id } });
+          closeHotelExtraModal();
+          await loadReservations(hotelResFilter);
+          document.querySelector("#hotel-sub-content").innerHTML = renderReservations();
+          const fs = document.querySelector("#hotel-res-filter");
+          if (fs) fs.value = hotelResFilter;
+          bindSub();
+        } catch (e) {
+          alert(e.message);
         }
-      }
-      await loadReservations(document.querySelector("#hotel-res-filter")?.value || "all");
-      document.querySelector("#hotel-sub-content").innerHTML = renderReservations();
-      bindSub();
+      });
+      host.querySelector("#hotel-res-edit-form")?.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const fd = new FormData(ev.target);
+        const roomIds = Array.from(ev.target.querySelectorAll('input[name="roomId"]:checked')).map((cb) => cb.value);
+        if (!roomIds.length) {
+          alert("Wybierz co najmniej jeden pokój.");
+          return;
+        }
+        const notifyClient = confirm(
+          "Wysłać do klienta e-mail o zmianie rezerwacji?\n\nOK — tak, wyślij\nAnuluj — nie, tylko zapisz w systemie"
+        );
+        try {
+          await hotelApi("admin-reservation-update", {
+            method: "PATCH",
+            body: {
+              id,
+              dateFrom: fd.get("dateFrom"),
+              dateTo: fd.get("dateTo"),
+              roomIds,
+              fullName: fd.get("fullName"),
+              email: fd.get("email"),
+              phonePrefix: fd.get("phonePrefix") || "+48",
+              phoneNational: fd.get("phoneNational"),
+              customerNote: fd.get("customerNote") || "",
+              adminNote: fd.get("adminNote") || "",
+              notifyClient,
+            },
+          });
+          closeHotelExtraModal();
+          await loadReservations(hotelResFilter);
+          document.querySelector("#hotel-sub-content").innerHTML = renderReservations();
+          const fs = document.querySelector("#hotel-res-filter");
+          if (fs) fs.value = hotelResFilter;
+          bindSub();
+        } catch (e) {
+          alert(e.message);
+        }
+      });
     }
 
     paint();

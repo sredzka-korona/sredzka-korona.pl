@@ -307,8 +307,17 @@
     if (!content.company) {
       content.company = {};
     }
+    if (!content.home) {
+      content.home = {};
+    }
 
     content.company.openingHours = normalizeOpeningHours(content.company.openingHours);
+    content.home.sectionBlocks = {
+      hotel: Boolean(content.home.sectionBlocks?.hotel),
+      restaurant: Boolean(content.home.sectionBlocks?.restaurant),
+      events: Boolean(content.home.sectionBlocks?.events),
+    };
+    content.home.sectionMedia = normalizeHomeSectionMedia(content.home.sectionMedia);
 
     if (!content.restaurant) {
       content.restaurant = {};
@@ -421,6 +430,55 @@
     };
   }
 
+  const HOME_SECTION_MEDIA_DEFAULTS = {
+    hotel: {
+      imageUrl: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1600&q=80",
+      imageAlt: "Hotel — Średzka Korona, noclegi Środa Śląska",
+      focusX: 50,
+      focusY: 50,
+      zoom: 1,
+    },
+    restaurant: {
+      imageUrl: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=80",
+      imageAlt: "Restauracja — Średzka Korona, Środa Śląska",
+      focusX: 50,
+      focusY: 50,
+      zoom: 1,
+    },
+    events: {
+      imageUrl: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1600&q=80",
+      imageAlt: "Sale na przyjęcia i imprezy okolicznościowe — Średzka Korona",
+      focusX: 50,
+      focusY: 50,
+      zoom: 1,
+    },
+  };
+
+  function clampNumber(value, min, max, fallback) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+    return Math.min(max, Math.max(min, parsed));
+  }
+
+  function normalizeHomeSectionMedia(sectionMedia) {
+    const source = sectionMedia && typeof sectionMedia === "object" ? sectionMedia : {};
+    const out = {};
+    ["hotel", "restaurant", "events"].forEach((key) => {
+      const fallback = HOME_SECTION_MEDIA_DEFAULTS[key];
+      const raw = source[key] || {};
+      out[key] = {
+        imageUrl: String(raw.imageUrl || fallback.imageUrl || ""),
+        imageAlt: String(raw.imageAlt || fallback.imageAlt || ""),
+        focusX: clampNumber(raw.focusX, 0, 100, fallback.focusX),
+        focusY: clampNumber(raw.focusY, 0, 100, fallback.focusY),
+        zoom: clampNumber(raw.zoom, 1, 2.5, fallback.zoom),
+      };
+    });
+    return out;
+  }
+
   const normalizedDefaultContent = normalizeAdminContent(defaultContent);
 
   const state = {
@@ -437,62 +495,78 @@
     },
     ui: {
       view: "home",
-      topTab: onlineBookingsEnabled ? "rezerwacje" : "hotel",
+      topTab: "grafik",
       tileByTab: {
-        rezerwacje: "hotel",
-        hotel: "1-osobowe",
+        grafik: "overview",
+        hotel: "gallery",
         restauracja: "menu",
         przyjecia: "oferta",
         dokumenty: "documents",
         kontakt: "contact",
       },
     },
+    schedule: {
+      monthCursor: getTodayIsoDate().slice(0, 7),
+      selectedDate: getTodayIsoDate(),
+      items: [],
+      pendingItems: [],
+      tomorrowItems: [],
+      roomOptions: [],
+      tableOptions: [],
+      hallOptions: [],
+      isLoading: false,
+      lastError: "",
+    },
   };
   const ADMIN_TABS = [
     {
-      key: "rezerwacje",
-      label: "Rezerwacje",
-      description: "Zgloszenia i obsluga rezerwacji z poszczegolnych modulow.",
+      key: "grafik",
+      label: "Grafik",
+      description: "Centralny terminarz rezerwacji, akceptacje i szybkie operacje dzienne.",
       tiles: [
-        { key: "hotel", label: "Rezerwacja hotel", description: "Rezerwacje pokoi i blokady terminow." },
-        { key: "restaurant", label: "Rezerwacja restauracja", description: "Rezerwacje stolikow i blokady." },
-        { key: "events", label: "Rezerwacje przyjecia", description: "Zgloszenia sal i rezerwacje eventowe." },
+        { key: "overview", label: "Grafik", description: "Oczekujące, jutrzejsze i kalendarz wszystkich rezerwacji." },
       ],
     },
     {
       key: "hotel",
       label: "Hotel",
-      description: "Galerie pokoi i ustawienia formularza hotelowego.",
+      description: "Zarządzanie pokojami, galerią i ustawieniami modułów hotelu.",
       tiles: [
-        { key: "1-osobowe", label: "1 osobowe", description: "Zdjecia i kolejnosc dla pokoi 1-osobowych." },
-        { key: "2-osobowe", label: "2 osobowe", description: "Zdjecia i kolejnosc dla pokoi 2-osobowych." },
-        { key: "3-osobowe", label: "3 osobowe", description: "Zdjecia i kolejnosc dla pokoi 3-osobowych." },
-        { key: "4-osobowe", label: "4 osobowe", description: "Zdjecia i kolejnosc dla pokoi 4-osobowych." },
-        { key: "settings", label: "Ustawienia rezerwacji", description: "Wlaczenie i przerwy w przyjmowaniu rezerwacji." },
+        { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Hotel na stronie głównej (pozycja i zoom)." },
+        { key: "gallery", label: "Galeria", description: "Wspólna galeria pokoi z podziałem na albumy 1/2/3/4-osobowe." },
+        { key: "rooms", label: "Pokoje", description: "Konfiguracja pokoi, cen i parametrów rezerwacyjnych." },
+        { key: "templates", label: "Szablony maili", description: "Wiadomości wysyłane dla rezerwacji hotelowych." },
+        { key: "settings", label: "Ustawienia rezerwacji", description: "Włączenie i przerwy w przyjmowaniu rezerwacji." },
       ],
     },
     {
       key: "restauracja",
       label: "Restauracja",
-      description: "Menu, galeria, godziny i ustawienia restauracji.",
+      description: "Menu, media i konfiguracja systemu rezerwacji restauracji.",
       tiles: [
-        { key: "menu", label: "Menu", description: "Kategorie, pozycje, skladniki i kolejnosc." },
-        { key: "gallery", label: "Galeria", description: "Zdjecia restauracji i ich kolejnosc." },
-        { key: "orders", label: "Zamowienia / Catering", description: "Edycja tresci modala zamowien i cateringu widocznej na stronie restauracji." },
+        { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Restauracja na stronie głównej (pozycja i zoom)." },
+        { key: "menu", label: "Menu", description: "Kategorie, pozycje, składniki i kolejność." },
+        { key: "gallery", label: "Galeria", description: "Zdjęcia restauracji i ich kolejność." },
+        { key: "orders", label: "Zamówienia / Catering", description: "Edycja treści modala zamówień i cateringu widocznej na stronie restauracji." },
         { key: "hours", label: "Godziny otwarcia", description: "Dni i godziny widoczne na stronie restauracji." },
-        { key: "settings", label: "Ustawienia rezerwacji", description: "Wlaczenie i przerwy w przyjmowaniu rezerwacji." },
+        { key: "tables", label: "Stoliki", description: "Konfiguracja stolików i godzin systemu rezerwacji." },
+        { key: "templates", label: "Szablony maili", description: "Wiadomości wysyłane dla rezerwacji restauracji." },
+        { key: "settings", label: "Ustawienia rezerwacji", description: "Włączenie i przerwy w przyjmowaniu rezerwacji." },
       ],
     },
     {
       key: "przyjecia",
-      label: "Przyjecia",
-      description: "Oferta, sale, galerie, menu okolicznosciowe i ustawienia.",
+      label: "Przyjęcia",
+      description: "Oferta, sale, galerie oraz konfiguracja rezerwacji i komunikacji.",
       tiles: [
-        { key: "oferta", label: "Oferta", description: "Edycja tresci kafelka Oferta i modala." },
-        { key: "sale", label: "Sale", description: "Nazwy, opisy i pojemnosci sal." },
-        { key: "gallery", label: "Galeria", description: "Galerie sal i albumy wydarzen." },
-        { key: "menu", label: "Menu okolicznosciowe", description: "Sekcje, pozycje i kolejnosc menu." },
-        { key: "settings", label: "Ustawienia rezerwacji", description: "Wlaczenie rezerwacji i blokady terminow sal." },
+        { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Przyjęcia na stronie głównej (pozycja i zoom)." },
+        { key: "oferta", label: "Oferta", description: "Edycja treści kafelka Oferta i modala." },
+        { key: "sale", label: "Sale", description: "Nazwy, opisy i pojemności sal." },
+        { key: "gallery", label: "Galeria", description: "Galerie sal i albumy wydarzeń." },
+        { key: "menu", label: "Menu okolicznościowe", description: "Sekcje, pozycje i kolejność menu." },
+        { key: "venue", label: "Konfiguracja sal", description: "Parametry sal w silniku rezerwacji." },
+        { key: "templates", label: "Szablony maili", description: "Wiadomości wysyłane dla rezerwacji przyjęć." },
+        { key: "settings", label: "Ustawienia rezerwacji", description: "Włączenie rezerwacji i blokady terminów sal." },
       ],
     },
     {
@@ -512,7 +586,7 @@
       ],
     },
   ];
-  const HOME_TAB_ORDER = ["hotel", "restauracja", "przyjecia", "rezerwacje", "dokumenty", "kontakt"];
+  const HOME_TAB_ORDER = ["hotel", "restauracja", "przyjecia", "dokumenty", "kontakt"];
   const INLINE_IMAGE_MAX_BYTES = 320 * 1024;
   const API_IMAGE_MAX_BYTES = 1_700_000;
   const DOCUMENT_MAX_BYTES = 1_700_000;
@@ -1012,6 +1086,1231 @@
     return response.json().catch(() => null);
   }
 
+  const SCHEDULE_ACTIVE_STATUSES = new Set(["pending", "confirmed", "manual_block"]);
+  const SCHEDULE_SERVICE_LABELS = {
+    hotel: "Hotel",
+    restaurant: "Restauracja",
+    hall: "Przyjęcia",
+  };
+  const SCHEDULE_STATUS_LABELS = {
+    pending: "Do potwierdzenia",
+    confirmed: "Potwierdzona",
+    manual_block: "Blokada",
+    cancelled: "Anulowana",
+    rejected: "Odrzucona",
+  };
+
+  function scheduleServiceLabel(serviceKey) {
+    return SCHEDULE_SERVICE_LABELS[serviceKey] || serviceKey;
+  }
+
+  function scheduleServicePillClass(serviceKey) {
+    if (serviceKey === "hotel") return "schedule-pill-hotel";
+    if (serviceKey === "restaurant") return "schedule-pill-restaurant";
+    return "schedule-pill-hall";
+  }
+
+  function scheduleStatusLabel(statusValue, fallbackLabel = "") {
+    const normalized = String(statusValue || "")
+      .trim()
+      .toLowerCase();
+    if (normalized && SCHEDULE_STATUS_LABELS[normalized]) {
+      return SCHEDULE_STATUS_LABELS[normalized];
+    }
+    if (fallbackLabel) {
+      return String(fallbackLabel);
+    }
+    return normalized || "Nieznany";
+  }
+
+  function scheduleStatusPillClass(statusValue) {
+    const normalized = String(statusValue || "")
+      .trim()
+      .toLowerCase();
+    if (normalized === "pending") return "schedule-status-pending";
+    if (normalized === "confirmed") return "schedule-status-confirmed";
+    if (normalized === "manual_block") return "schedule-status-block";
+    return "";
+  }
+
+  function scheduleEntriesCountLabel(count) {
+    const total = Math.max(0, Number(count) || 0);
+    if (total === 1) return "1 wpis";
+    const mod10 = total % 10;
+    const mod100 = total % 100;
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+      return `${total} wpisy`;
+    }
+    return `${total} wpisów`;
+  }
+
+  function scheduleOverlapWarningMessage(overlapItems) {
+    const entries = Array.isArray(overlapItems) ? overlapItems : [];
+    if (!entries.length) return "";
+    const preview = entries
+      .slice(0, 3)
+      .map((item) => {
+        const title = item.title || item.humanNumberLabel || item.id;
+        const from = scheduleFormatDateTime(item.startMs);
+        const to = scheduleFormatDateTime(item.endMs);
+        return `• ${title} (${from} - ${to})`;
+      })
+      .join("\n");
+    const more = entries.length > 3 ? `\n• ... i ${entries.length - 3} kolejne` : "";
+    return `W wybranym terminie istnieją już ${scheduleEntriesCountLabel(entries.length)}.\nBlokada nie anuluje tych rezerwacji, tylko ograniczy kolejne.\n\n${preview}${more}\n\nCzy mimo to utworzyć blokadę?`;
+  }
+
+  function scheduleYmdToDate(ymd) {
+    return new Date(`${String(ymd || "").slice(0, 10)}T00:00:00`);
+  }
+
+  function scheduleDateToYmd(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function scheduleAddDays(ymd, days) {
+    const base = scheduleYmdToDate(ymd);
+    base.setDate(base.getDate() + Number(days || 0));
+    return scheduleDateToYmd(base);
+  }
+
+  function scheduleFormatDateLabel(ymd) {
+    if (!ymd) return "—";
+    return scheduleYmdToDate(ymd).toLocaleDateString("pl-PL", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  }
+
+  function scheduleFormatDateTime(ms) {
+    if (!Number.isFinite(ms) || ms <= 0) return "—";
+    return new Date(ms).toLocaleString("pl-PL", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function scheduleFormatTime(ms) {
+    if (!Number.isFinite(ms) || ms <= 0) return "—";
+    return new Date(ms).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function scheduleMonthLabel(monthCursor) {
+    const [year, month] = String(monthCursor || "").split("-").map((value) => Number(value));
+    if (!year || !month) return "";
+    return new Date(year, month - 1, 1).toLocaleDateString("pl-PL", {
+      month: "long",
+      year: "numeric",
+    });
+  }
+
+  function scheduleShiftMonth(monthCursor, direction) {
+    const [year, month] = String(monthCursor || "").split("-").map((value) => Number(value));
+    const date = new Date((year || new Date().getFullYear()), (month || 1) - 1, 1);
+    date.setMonth(date.getMonth() + Number(direction || 0));
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  function scheduleDayBounds(ymd) {
+    const start = scheduleYmdToDate(ymd).getTime();
+    const end = start + 24 * 60 * 60 * 1000;
+    return { start, end };
+  }
+
+  function scheduleRangesOverlap(startA, endA, startB, endB) {
+    return Number(startA) < Number(endB) && Number(endA) > Number(startB);
+  }
+
+  function scheduleItemOnDate(item, ymd) {
+    if (!item || !ymd) return false;
+    if (item.service === "hotel") {
+      return ymd >= item.dateFrom && ymd < item.dateTo;
+    }
+    const { start, end } = scheduleDayBounds(ymd);
+    return scheduleRangesOverlap(item.startMs, item.endMs, start, end);
+  }
+
+  function scheduleNormalizeItem(service, row) {
+    if (!row || typeof row !== "object") return null;
+    if (service === "hotel") {
+      const dateFrom = String(row.dateFrom || "").slice(0, 10);
+      const dateTo = String(row.dateTo || "").slice(0, 10);
+      if (!dateFrom || !dateTo) return null;
+      const startMs = scheduleYmdToDate(dateFrom).getTime();
+      const endMs = scheduleYmdToDate(dateTo).getTime();
+      return {
+        key: `${service}:${row.id}`,
+        service,
+        id: row.id,
+        status: row.status,
+        statusLabel: scheduleStatusLabel(row.status, row.statusLabel || row.status),
+        humanNumberLabel: row.humanNumberLabel || row.id,
+        title: row.customerName || "Rezerwacja hotelowa",
+        subtitle: `${dateFrom} - ${dateTo}`,
+        dateFrom,
+        dateTo,
+        startMs,
+        endMs,
+        resourceIds: Array.isArray(row.roomIds) ? row.roomIds : [],
+        raw: row,
+      };
+    }
+    if (service === "restaurant") {
+      const startMs = Number(row.startDateTime || 0);
+      const endMs = Number(row.endDateTime || 0);
+      if (!startMs || !endMs) return null;
+      return {
+        key: `${service}:${row.id}`,
+        service,
+        id: row.id,
+        status: row.status,
+        statusLabel: scheduleStatusLabel(row.status, row.statusLabel || row.status),
+        humanNumberLabel: row.humanNumberLabel || row.id,
+        title: row.fullName || "Rezerwacja restauracji",
+        subtitle: `${row.reservationDate || ""} ${scheduleFormatTime(startMs)} - ${scheduleFormatTime(endMs)}`.trim(),
+        dateFrom: String(row.reservationDate || "").slice(0, 10),
+        dateTo: String(row.reservationDate || "").slice(0, 10),
+        startMs,
+        endMs,
+        resourceIds: Array.isArray(row.assignedTableIds) ? row.assignedTableIds : [],
+        raw: row,
+      };
+    }
+    const startMs = Number(row.startDateTime || 0);
+    const endMs = Number(row.endDateTime || 0);
+    if (!startMs || !endMs) return null;
+    return {
+      key: `${service}:${row.id}`,
+      service,
+      id: row.id,
+      status: row.status,
+      statusLabel: scheduleStatusLabel(row.status, row.statusLabel || row.status),
+      humanNumberLabel: row.humanNumberLabel || row.id,
+      title: row.fullName || row.hallName || "Rezerwacja przyjęcia",
+      subtitle: `${row.hallName || ""} • ${row.reservationDate || ""} ${scheduleFormatTime(startMs)} - ${scheduleFormatTime(endMs)}`
+        .replace(/^ • /, "")
+        .trim(),
+      dateFrom: String(row.reservationDate || "").slice(0, 10),
+      dateTo: String(row.reservationDate || "").slice(0, 10),
+      startMs,
+      endMs,
+      resourceIds: row.hallId ? [row.hallId] : [],
+      raw: row,
+    };
+  }
+
+  function scheduleFindItem(service, id) {
+    return state.schedule.items.find((item) => item.service === service && item.id === id) || null;
+  }
+
+  function scheduleItemsForDate(ymd) {
+    return state.schedule.items
+      .filter((item) => scheduleItemOnDate(item, ymd))
+      .sort((left, right) => left.startMs - right.startMs);
+  }
+
+  async function bookingAdminApi(service, op, options = {}) {
+    const method = String(options.method || "GET").toUpperCase();
+    const queryParams = new URLSearchParams({ op: String(op || "").trim() });
+    const query = options.query && typeof options.query === "object" ? options.query : {};
+    Object.entries(query).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === "") return;
+      queryParams.set(key, String(value));
+    });
+    const path = `/api/admin/legacy-bookings/${encodeURIComponent(service)}?${queryParams.toString()}`;
+    const requestOptions = { method };
+    if (options.body !== undefined) {
+      requestOptions.headers = { "Content-Type": "application/json" };
+      requestOptions.body = JSON.stringify(options.body);
+    }
+    return api(path, requestOptions);
+  }
+
+  async function loadScheduleData({ silent = false } = {}) {
+    if (!onlineBookingsEnabled) {
+      state.schedule.items = [];
+      state.schedule.pendingItems = [];
+      state.schedule.tomorrowItems = [];
+      state.schedule.lastError = "";
+      return;
+    }
+
+    if (!silent) {
+      state.schedule.isLoading = true;
+      state.schedule.lastError = "";
+      if (state.ui.topTab === "grafik" && state.ui.view === "section") {
+        renderSchedulePanel();
+      }
+    }
+
+    try {
+      const [hotelReservations, restaurantReservations, hallReservations, hotelRooms, restaurantTables, hallList] =
+        await Promise.all([
+          bookingAdminApi("hotel", "admin-reservations-list", { query: { status: "all" } }),
+          bookingAdminApi("restaurant", "admin-reservations-list", { query: { status: "all" } }),
+          bookingAdminApi("hall", "admin-reservations-list", { query: { status: "all" } }),
+          bookingAdminApi("hotel", "admin-rooms-list"),
+          bookingAdminApi("restaurant", "admin-tables-list"),
+          bookingAdminApi("hall", "admin-halls-list"),
+        ]);
+
+      const items = [
+        ...((hotelReservations?.reservations || [])
+          .map((row) => scheduleNormalizeItem("hotel", row))
+          .filter(Boolean)),
+        ...((restaurantReservations?.reservations || [])
+          .map((row) => scheduleNormalizeItem("restaurant", row))
+          .filter(Boolean)),
+        ...((hallReservations?.reservations || [])
+          .map((row) => scheduleNormalizeItem("hall", row))
+          .filter(Boolean)),
+      ]
+        .filter((item) => SCHEDULE_ACTIVE_STATUSES.has(item.status))
+        .sort((left, right) => left.startMs - right.startMs);
+
+      const tomorrow = scheduleAddDays(getTodayIsoDate(), 1);
+      state.schedule.items = items;
+      state.schedule.pendingItems = items.filter((item) => item.status === "pending");
+      state.schedule.tomorrowItems = items.filter((item) => scheduleItemOnDate(item, tomorrow));
+      state.schedule.roomOptions = Array.isArray(hotelRooms?.rooms) ? hotelRooms.rooms : [];
+      state.schedule.tableOptions = Array.isArray(restaurantTables?.tables) ? restaurantTables.tables : [];
+      state.schedule.hallOptions = Array.isArray(hallList?.halls) ? hallList.halls : [];
+      state.schedule.lastError = "";
+    } catch (error) {
+      state.schedule.items = [];
+      state.schedule.pendingItems = [];
+      state.schedule.tomorrowItems = [];
+      state.schedule.lastError = error.message || "Nie udało się pobrać danych grafiku.";
+    } finally {
+      state.schedule.isLoading = false;
+      if (state.ui.topTab === "grafik" && state.ui.view === "section") {
+        renderSchedulePanel();
+      }
+    }
+  }
+
+  function scheduleBuildMonthCells(monthCursor) {
+    const [year, month] = String(monthCursor || "").split("-").map((value) => Number(value));
+    const monthStart = new Date((year || new Date().getFullYear()), (month || 1) - 1, 1);
+    const firstDayIndex = (monthStart.getDay() + 6) % 7;
+    const startDate = new Date(monthStart);
+    startDate.setDate(monthStart.getDate() - firstDayIndex);
+    const cells = [];
+    for (let index = 0; index < 42; index += 1) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + index);
+      const ymd = scheduleDateToYmd(date);
+      cells.push({
+        ymd,
+        day: date.getDate(),
+        inCurrentMonth: date.getMonth() === monthStart.getMonth(),
+        count: scheduleItemsForDate(ymd).length,
+      });
+    }
+    return cells;
+  }
+
+  function scheduleQuickListMarkup(items, emptyText) {
+    if (!items.length) {
+      return `<p class="empty">${escapeHtml(emptyText)}</p>`;
+    }
+    return `
+      <div class="schedule-quick-list">
+        ${items
+          .map(
+            (item) => `
+              <article class="schedule-quick-item">
+                <div class="schedule-quick-head">
+                  <strong>${escapeHtml(item.humanNumberLabel || item.id)}</strong>
+                  <span class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</span>
+                  <span class="pill schedule-status-pill ${scheduleStatusPillClass(item.status)}">${escapeHtml(item.statusLabel || scheduleStatusLabel(item.status))}</span>
+                </div>
+                <p>${escapeHtml(item.title || "Rezerwacja")}</p>
+                <p class="helper">${escapeHtml(item.subtitle || "")}</p>
+                <div class="inline-actions">
+                  ${
+                    item.status === "pending"
+                      ? `<button type="button" class="button secondary" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>
+                         <button type="button" class="button secondary danger-muted" data-schedule-action="reject" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odrzuć</button>`
+                      : ""
+                  }
+                  <button type="button" class="button secondary" data-schedule-action="details" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Szczegóły</button>
+                </div>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
+  function renderSchedulePanel(statusMessage = "") {
+    const panel = document.querySelector("#schedule-panel");
+    if (!panel) return;
+    if (!onlineBookingsEnabled) {
+      panel.innerHTML = `
+        <p class="pill">Grafik</p>
+        <h2>Grafik rezerwacji</h2>
+        <p class="section-intro">Ten widok wymaga włączenia backendu rezerwacji online.</p>
+      `;
+      return;
+    }
+
+    if (!state.schedule.items.length && !state.schedule.isLoading && !state.schedule.lastError) {
+      loadScheduleData();
+    }
+
+    const selectedDate = state.schedule.selectedDate || getTodayIsoDate();
+    state.schedule.selectedDate = selectedDate;
+    const monthCursor = state.schedule.monthCursor || selectedDate.slice(0, 7);
+    state.schedule.monthCursor = monthCursor;
+    const monthCells = scheduleBuildMonthCells(monthCursor);
+    const dayItems = scheduleItemsForDate(selectedDate);
+    const pendingPreview = state.schedule.pendingItems.slice(0, 10);
+    const tomorrowPreview = state.schedule.tomorrowItems.slice(0, 10);
+    const tomorrowLabel = scheduleAddDays(getTodayIsoDate(), 1);
+
+    panel.innerHTML = `
+      <p class="pill">Grafik</p>
+      <h2>Centrum rezerwacji</h2>
+      <p class="section-intro">Akceptuj rezerwacje, sprawdzaj jutrzejszy dzień i zarządzaj kalendarzem w jednym miejscu.</p>
+      <div class="schedule-shell">
+        <div class="schedule-summary-grid">
+          <section class="schedule-summary-card">
+            <div class="schedule-summary-head">
+              <h3>Oczekujące na akceptację</h3>
+              <span class="pill">${escapeHtml(String(state.schedule.pendingItems.length))}</span>
+            </div>
+            ${scheduleQuickListMarkup(pendingPreview, "Brak rezerwacji oczekujących na akceptację.")}
+          </section>
+          <section class="schedule-summary-card">
+            <div class="schedule-summary-head">
+              <h3>Jutrzejsze rezerwacje</h3>
+              <span class="pill">${escapeHtml(String(state.schedule.tomorrowItems.length))}</span>
+            </div>
+            <p class="helper">${escapeHtml(scheduleFormatDateLabel(tomorrowLabel))}</p>
+            ${scheduleQuickListMarkup(tomorrowPreview, "Brak pozycji na jutro.")}
+          </section>
+        </div>
+        <section class="schedule-calendar-card">
+          <div class="schedule-calendar-head">
+            <div class="inline-actions">
+              <button type="button" class="button secondary icon-button" data-schedule-month="-1" aria-label="Poprzedni miesiąc">←</button>
+              <h3>${escapeHtml(scheduleMonthLabel(monthCursor))}</h3>
+              <button type="button" class="button secondary icon-button" data-schedule-month="1" aria-label="Następny miesiąc">→</button>
+            </div>
+            <button type="button" class="button secondary" data-schedule-refresh>Odśwież</button>
+          </div>
+          <div class="schedule-weekdays">
+            ${["Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Nd"].map((day) => `<span>${day}</span>`).join("")}
+          </div>
+          <div class="schedule-calendar-grid">
+            ${monthCells
+              .map(
+                (cell) => `
+                  <button
+                    type="button"
+                    class="schedule-day-cell${cell.inCurrentMonth ? "" : " is-outside"}${cell.count === 0 ? " is-empty" : ""}${cell.ymd === selectedDate ? " is-selected" : ""}"
+                    data-schedule-day="${escapeAttribute(cell.ymd)}"
+                  >
+                    <span class="schedule-day-number">${escapeHtml(String(cell.day))}</span>
+                    <span class="schedule-day-count">${cell.count > 0 ? scheduleEntriesCountLabel(cell.count) : "Brak wpisów"}</span>
+                  </button>
+                `
+              )
+              .join("")}
+          </div>
+        </section>
+        <section class="schedule-day-card">
+          <div class="schedule-day-head">
+            <div>
+              <h3>${escapeHtml(scheduleFormatDateLabel(selectedDate))}</h3>
+              <p class="helper">Wszystkie rezerwacje i blokady z wybranego dnia.</p>
+            </div>
+            <button type="button" class="button" data-schedule-add>+ Dodaj</button>
+          </div>
+          <div class="schedule-day-list">
+            ${
+              dayItems.length
+                ? dayItems
+                    .map(
+                      (item) => `
+                        <article class="schedule-day-item">
+                          <div class="schedule-day-item-head">
+                            <strong>${escapeHtml(item.humanNumberLabel || item.id)}</strong>
+                            <span class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</span>
+                            <span class="pill schedule-status-pill ${scheduleStatusPillClass(item.status)}">${escapeHtml(item.statusLabel || scheduleStatusLabel(item.status))}</span>
+                          </div>
+                          <p>${escapeHtml(item.title || "Rezerwacja")}</p>
+                          <p class="helper">${escapeHtml(item.subtitle || "")}</p>
+                          <div class="inline-actions">
+                            ${
+                              item.status === "pending"
+                                ? `<button type="button" class="button secondary" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>
+                                   <button type="button" class="button secondary danger-muted" data-schedule-action="reject" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odrzuć</button>`
+                                : ""
+                            }
+                            <button type="button" class="button secondary" data-schedule-action="details" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Szczegóły</button>
+                          </div>
+                        </article>
+                      `
+                    )
+                    .join("")
+                : `<p class="empty">Brak rezerwacji i blokad dla tego dnia.</p>`
+            }
+          </div>
+        </section>
+      </div>
+      <p class="status">${escapeHtml(
+        state.schedule.lastError || statusMessage || (state.schedule.isLoading ? "Ładowanie grafiku..." : "")
+      )}</p>
+    `;
+
+    panel.querySelectorAll("[data-schedule-month]").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.schedule.monthCursor = scheduleShiftMonth(state.schedule.monthCursor, Number(button.dataset.scheduleMonth || 0));
+        renderSchedulePanel();
+      });
+    });
+    panel.querySelectorAll("[data-schedule-day]").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.schedule.selectedDate = button.dataset.scheduleDay;
+        state.schedule.monthCursor = String(button.dataset.scheduleDay || getTodayIsoDate()).slice(0, 7);
+        renderSchedulePanel();
+      });
+    });
+    panel.querySelector("[data-schedule-refresh]")?.addEventListener("click", () => {
+      loadScheduleData();
+    });
+    panel.querySelector("[data-schedule-add]")?.addEventListener("click", () => {
+      openScheduleCreateModal(state.schedule.selectedDate || getTodayIsoDate());
+    });
+    panel.querySelectorAll("[data-schedule-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        handleScheduleAction(
+          button.dataset.scheduleAction,
+          button.dataset.scheduleService,
+          button.dataset.scheduleId
+        );
+      });
+    });
+  }
+
+  async function handleScheduleAction(action, service, id) {
+    if (!action || !service || !id) return;
+    if (action === "details") {
+      openScheduleDetailsModal(service, id);
+      return;
+    }
+    if (action === "confirm") {
+      await scheduleConfirmReservation(service, id);
+      return;
+    }
+    if (action === "reject") {
+      await scheduleCancelReservation(service, id, "Rezerwacja została odrzucona.");
+    }
+  }
+
+  async function scheduleConfirmReservation(service, id) {
+    try {
+      await bookingAdminApi(service, "admin-reservation-confirm", { method: "POST", body: { id } });
+      await loadScheduleData({ silent: true });
+      renderSchedulePanel("Rezerwacja została potwierdzona.");
+    } catch (error) {
+      renderSchedulePanel(error.message || "Nie udało się potwierdzić rezerwacji.");
+    }
+  }
+
+  async function scheduleCancelReservation(service, id, successMessage = "Rezerwacja została anulowana.") {
+    try {
+      await bookingAdminApi(service, "admin-reservation-cancel", { method: "POST", body: { id } });
+      await loadScheduleData({ silent: true });
+      renderSchedulePanel(successMessage);
+    } catch (error) {
+      renderSchedulePanel(error.message || "Nie udało się anulować rezerwacji.");
+    }
+  }
+
+  function closeScheduleModal() {
+    document.querySelector("#schedule-modal-mount")?.remove();
+    document.body.classList.remove("admin-modal-open");
+  }
+
+  function openScheduleModal(contentMarkup, bindEvents) {
+    closeScheduleModal();
+    const mount = document.createElement("div");
+    mount.id = "schedule-modal-mount";
+    mount.innerHTML = `
+      <div class="admin-modal-overlay" data-schedule-modal-overlay>
+        <section class="admin-modal schedule-modal">${contentMarkup}</section>
+      </div>
+    `;
+    document.body.appendChild(mount);
+    document.body.classList.add("admin-modal-open");
+
+    mount.querySelector("[data-schedule-modal-overlay]")?.addEventListener("click", (event) => {
+      if (event.target === event.currentTarget) {
+        closeScheduleModal();
+      }
+    });
+    mount.querySelectorAll("[data-schedule-modal-close]").forEach((button) => {
+      button.addEventListener("click", closeScheduleModal);
+    });
+    if (typeof bindEvents === "function") {
+      bindEvents(mount);
+    }
+  }
+
+  function scheduleReservationDetailsMarkup(item) {
+    const details = [];
+    details.push(`<li><strong>Numer:</strong> ${escapeHtml(item.humanNumberLabel || item.id)}</li>`);
+    details.push(`<li><strong>Moduł:</strong> ${escapeHtml(scheduleServiceLabel(item.service))}</li>`);
+    details.push(`<li><strong>Status:</strong> ${escapeHtml(item.statusLabel || item.status)}</li>`);
+    if (item.service === "hotel") {
+      details.push(`<li><strong>Termin:</strong> ${escapeHtml(item.raw.dateFrom)} - ${escapeHtml(item.raw.dateTo)}</li>`);
+      details.push(`<li><strong>Pokoje:</strong> ${escapeHtml((item.raw.roomIds || []).join(", ") || "—")}</li>`);
+      details.push(`<li><strong>Klient:</strong> ${escapeHtml(item.raw.customerName || "—")}</li>`);
+      details.push(`<li><strong>E-mail:</strong> ${escapeHtml(item.raw.email || "—")}</li>`);
+      details.push(`<li><strong>Telefon:</strong> ${escapeHtml(item.raw.phone || "—")}</li>`);
+    } else if (item.service === "restaurant") {
+      details.push(`<li><strong>Termin:</strong> ${escapeHtml(scheduleFormatDateTime(item.startMs))} - ${escapeHtml(scheduleFormatDateTime(item.endMs))}</li>`);
+      details.push(`<li><strong>Stoliki:</strong> ${escapeHtml(item.raw.assignedTablesLabel || "—")}</li>`);
+      details.push(`<li><strong>Goście:</strong> ${escapeHtml(String(item.raw.guestsCount || "—"))}</li>`);
+      details.push(`<li><strong>Klient:</strong> ${escapeHtml(item.raw.fullName || "—")}</li>`);
+      details.push(`<li><strong>E-mail:</strong> ${escapeHtml(item.raw.email || "—")}</li>`);
+      details.push(`<li><strong>Telefon:</strong> ${escapeHtml(item.raw.phone || "—")}</li>`);
+    } else {
+      details.push(`<li><strong>Sala:</strong> ${escapeHtml(item.raw.hallName || "—")}</li>`);
+      details.push(`<li><strong>Termin:</strong> ${escapeHtml(scheduleFormatDateTime(item.startMs))} - ${escapeHtml(scheduleFormatDateTime(item.endMs))}</li>`);
+      details.push(`<li><strong>Goście:</strong> ${escapeHtml(String(item.raw.guestsCount || "—"))}</li>`);
+      details.push(`<li><strong>Impreza:</strong> ${escapeHtml(item.raw.eventType || "—")}</li>`);
+      details.push(`<li><strong>Klient:</strong> ${escapeHtml(item.raw.fullName || "—")}</li>`);
+      details.push(`<li><strong>E-mail:</strong> ${escapeHtml(item.raw.email || "—")}</li>`);
+      details.push(`<li><strong>Telefon:</strong> ${escapeHtml(item.raw.phone || "—")}</li>`);
+    }
+    details.push(`<li><strong>Uwagi klienta:</strong> ${escapeHtml(item.raw.customerNote || "—")}</li>`);
+    details.push(`<li><strong>Notatka administratora:</strong> ${escapeHtml(item.raw.adminNote || "—")}</li>`);
+    return `<ul class="schedule-details-list">${details.join("")}</ul>`;
+  }
+
+  function openScheduleDetailsModal(service, id) {
+    const item = scheduleFindItem(service, id);
+    if (!item) return;
+    const isBlock = item.status === "manual_block";
+    openScheduleModal(
+      `
+        <div class="admin-modal-head">
+          <div>
+            <p class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</p>
+            <h3>Szczegóły wpisu</h3>
+          </div>
+          <button type="button" class="button secondary" data-schedule-modal-close>Zamknij</button>
+        </div>
+        ${scheduleReservationDetailsMarkup(item)}
+        <div class="admin-modal-footer">
+          ${
+            item.status === "pending"
+              ? `<button type="button" class="button secondary" data-schedule-details-action="confirm">Potwierdź</button>
+                 <button type="button" class="button secondary danger-muted" data-schedule-details-action="reject">Odrzuć</button>`
+              : ""
+          }
+          <button type="button" class="button secondary" data-schedule-details-action="edit">Edytuj</button>
+          <button type="button" class="button danger" data-schedule-details-action="delete">${isBlock ? "Usuń blokadę" : "Anuluj rezerwację"}</button>
+        </div>
+      `,
+      (mount) => {
+        mount.querySelectorAll("[data-schedule-details-action]").forEach((button) => {
+          button.addEventListener("click", async () => {
+            const action = button.dataset.scheduleDetailsAction;
+            if (action === "edit") {
+              openScheduleEditModal(item);
+              return;
+            }
+            if (action === "confirm") {
+              await scheduleConfirmReservation(item.service, item.id);
+              closeScheduleModal();
+              return;
+            }
+            if (action === "reject") {
+              if (!window.confirm("Czy na pewno odrzucić tę rezerwację?")) return;
+              await scheduleCancelReservation(item.service, item.id, "Rezerwacja została odrzucona.");
+              closeScheduleModal();
+              return;
+            }
+            if (action === "delete") {
+              if (!window.confirm(isBlock ? "Czy na pewno usunąć tę blokadę?" : "Czy na pewno anulować tę rezerwację?")) return;
+              await scheduleCancelReservation(
+                item.service,
+                item.id,
+                isBlock ? "Blokada została usunięta." : "Rezerwacja została anulowana."
+              );
+              closeScheduleModal();
+            }
+          });
+        });
+      }
+    );
+  }
+
+  function scheduleHotelRoomOptionsMarkup(selectedIds) {
+    const chosen = new Set(Array.isArray(selectedIds) ? selectedIds.map((id) => String(id)) : []);
+    return `
+      <fieldset class="admin-room-fieldset">
+        <legend>Pokoje</legend>
+        <div class="admin-room-checks">
+          ${state.schedule.roomOptions
+            .map(
+              (room) => `
+                <label class="admin-check-line">
+                  <input type="checkbox" name="roomIds" value="${escapeAttribute(room.id)}" ${chosen.has(String(room.id)) ? "checked" : ""} />
+                  <span>${escapeHtml(room.name || room.id)}</span>
+                </label>
+              `
+            )
+            .join("")}
+        </div>
+      </fieldset>
+    `;
+  }
+
+  function scheduleRestaurantTableOptionsMarkup(selectedIds) {
+    const chosen = new Set(Array.isArray(selectedIds) ? selectedIds.map((id) => String(id)) : []);
+    return `
+      <fieldset class="admin-room-fieldset">
+        <legend>Stoliki</legend>
+        <div class="admin-room-checks">
+          ${state.schedule.tableOptions
+            .map(
+              (table) => `
+                <label class="admin-check-line">
+                  <input type="checkbox" name="tableIds" value="${escapeAttribute(table.id)}" ${chosen.has(String(table.id)) ? "checked" : ""} />
+                  <span>Stół ${escapeHtml(String(table.number || ""))} (${escapeHtml(table.zone || "sala")})</span>
+                </label>
+              `
+            )
+            .join("")}
+        </div>
+      </fieldset>
+    `;
+  }
+
+  function scheduleHallOptionsMarkup(selectedHallId) {
+    const current = String(selectedHallId || "");
+    return `
+      <label class="field">
+        <span>Sala</span>
+        <select name="hallId" required>
+          ${state.schedule.hallOptions
+            .map(
+              (hall) =>
+                `<option value="${escapeAttribute(hall.id)}" ${current === String(hall.id) ? "selected" : ""}>${escapeHtml(hall.name || hall.id)}</option>`
+            )
+            .join("")}
+        </select>
+      </label>
+    `;
+  }
+
+  function openScheduleEditModal(item) {
+    if (!item) return;
+    const isBlock = item.status === "manual_block";
+    const title = isBlock ? "Edycja blokady" : "Edycja rezerwacji";
+    const raw = item.raw || {};
+    let fieldsMarkup = "";
+
+    if (isBlock) {
+      fieldsMarkup = `
+        <label class="field-full">
+          <span>Notatka administratora</span>
+          <textarea name="adminNote">${escapeHtml(raw.adminNote || "")}</textarea>
+        </label>
+      `;
+    } else if (item.service === "hotel") {
+      fieldsMarkup = `
+        <div class="field-grid">
+          <label class="field"><span>Przyjazd</span><input type="date" name="dateFrom" value="${escapeAttribute(raw.dateFrom || "")}" required /></label>
+          <label class="field"><span>Wyjazd</span><input type="date" name="dateTo" value="${escapeAttribute(raw.dateTo || "")}" required /></label>
+        </div>
+        ${scheduleHotelRoomOptionsMarkup(raw.roomIds || [])}
+        <div class="field-grid">
+          <label class="field"><span>Imię i nazwisko</span><input name="fullName" value="${escapeAttribute(raw.customerName || "")}" required /></label>
+          <label class="field"><span>E-mail</span><input name="email" type="email" value="${escapeAttribute(raw.email || "")}" required /></label>
+          <label class="field"><span>Prefiks</span><input name="phonePrefix" value="${escapeAttribute(raw.phonePrefix || "+48")}" required /></label>
+          <label class="field"><span>Numer telefonu</span><input name="phoneNational" value="${escapeAttribute(raw.phoneNational || "")}" required /></label>
+          <label class="field-full"><span>Uwagi klienta</span><textarea name="customerNote">${escapeHtml(raw.customerNote || "")}</textarea></label>
+          <label class="field-full"><span>Notatka administratora</span><textarea name="adminNote">${escapeHtml(raw.adminNote || "")}</textarea></label>
+        </div>
+      `;
+    } else if (item.service === "restaurant") {
+      fieldsMarkup = `
+        <div class="field-grid">
+          <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(raw.reservationDate || "")}" required /></label>
+          <label class="field"><span>Start</span><input type="time" name="startTime" value="${escapeAttribute(raw.startTime || "")}" required /></label>
+          <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="${escapeAttribute(String(raw.durationHours || 2))}" required /></label>
+          <label class="field"><span>Liczba stolików</span><input type="number" min="1" name="tablesCount" value="${escapeAttribute(String(raw.tablesCount || 1))}" required /></label>
+          <label class="field"><span>Liczba gości</span><input type="number" min="1" name="guestsCount" value="${escapeAttribute(String(raw.guestsCount || 1))}" required /></label>
+          <label class="field"><span>Łączone stoliki</span><select name="joinTables"><option value="0" ${raw.joinTables ? "" : "selected"}>Nie</option><option value="1" ${raw.joinTables ? "selected" : ""}>Tak</option></select></label>
+          <label class="field"><span>Imię i nazwisko</span><input name="fullName" value="${escapeAttribute(raw.fullName || "")}" required /></label>
+          <label class="field"><span>E-mail</span><input name="email" type="email" value="${escapeAttribute(raw.email || "")}" required /></label>
+          <label class="field"><span>Prefiks</span><input name="phonePrefix" value="${escapeAttribute(raw.phonePrefix || "+48")}" required /></label>
+          <label class="field"><span>Numer telefonu</span><input name="phoneNational" value="${escapeAttribute(raw.phoneNational || "")}" required /></label>
+          <label class="field-full"><span>Uwagi klienta</span><textarea name="customerNote">${escapeHtml(raw.customerNote || "")}</textarea></label>
+          <label class="field-full"><span>Notatka administratora</span><textarea name="adminNote">${escapeHtml(raw.adminNote || "")}</textarea></label>
+        </div>
+      `;
+    } else {
+      fieldsMarkup = `
+        <div class="field-grid">
+          ${scheduleHallOptionsMarkup(raw.hallId || "")}
+          <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(raw.reservationDate || "")}" required /></label>
+          <label class="field"><span>Start</span><input type="time" name="startTime" value="${escapeAttribute(raw.startTime || "")}" required /></label>
+          <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="${escapeAttribute(String(raw.durationHours || 2))}" required /></label>
+          <label class="field"><span>Liczba gości</span><input type="number" min="0" name="guestsCount" value="${escapeAttribute(String(raw.guestsCount || 0))}" required /></label>
+          <label class="field"><span>Na wyłączność</span><select name="exclusive"><option value="0" ${raw.exclusive ? "" : "selected"}>Nie</option><option value="1" ${raw.exclusive ? "selected" : ""}>Tak</option></select></label>
+          <label class="field"><span>Typ wydarzenia</span><input name="eventType" value="${escapeAttribute(raw.eventType || "")}" /></label>
+          <label class="field"><span>Imię i nazwisko</span><input name="fullName" value="${escapeAttribute(raw.fullName || "")}" required /></label>
+          <label class="field"><span>E-mail</span><input name="email" type="email" value="${escapeAttribute(raw.email || "")}" required /></label>
+          <label class="field"><span>Prefiks</span><input name="phonePrefix" value="${escapeAttribute(raw.phonePrefix || "+48")}" required /></label>
+          <label class="field"><span>Numer telefonu</span><input name="phoneNational" value="${escapeAttribute(raw.phoneNational || "")}" required /></label>
+          <label class="field-full"><span>Uwagi klienta</span><textarea name="customerNote">${escapeHtml(raw.customerNote || "")}</textarea></label>
+          <label class="field-full"><span>Notatka administratora</span><textarea name="adminNote">${escapeHtml(raw.adminNote || "")}</textarea></label>
+        </div>
+      `;
+    }
+
+    openScheduleModal(
+      `
+        <form class="stack" id="schedule-edit-form">
+          <div class="admin-modal-head">
+            <div>
+              <p class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</p>
+              <h3>${escapeHtml(title)}</h3>
+            </div>
+            <button type="button" class="button secondary" data-schedule-modal-close>Zamknij</button>
+          </div>
+          ${fieldsMarkup}
+          <label class="checkbox-field">
+            <input type="checkbox" name="notifyClient" />
+            <span class="checkbox-copy">
+              <strong>Powiadom klienta e-mailem o zmianie</strong>
+              <span>Zadziała tylko dla standardowych rezerwacji.</span>
+            </span>
+          </label>
+          <div class="admin-modal-footer">
+            <button type="button" class="button secondary" data-schedule-modal-close>Anuluj</button>
+            <button type="submit" class="button">Zapisz</button>
+          </div>
+        </form>
+      `,
+      (mount) => {
+        mount.querySelector("#schedule-edit-form")?.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const formData = new FormData(event.currentTarget);
+          const body = { id: item.id, notifyClient: formData.get("notifyClient") === "on" };
+          if (isBlock) {
+            body.adminNote = String(formData.get("adminNote") || "");
+          } else if (item.service === "hotel") {
+            body.dateFrom = formData.get("dateFrom");
+            body.dateTo = formData.get("dateTo");
+            body.roomIds = formData.getAll("roomIds");
+            body.fullName = formData.get("fullName");
+            body.email = formData.get("email");
+            body.phonePrefix = formData.get("phonePrefix");
+            body.phoneNational = formData.get("phoneNational");
+            body.customerNote = formData.get("customerNote") || "";
+            body.adminNote = formData.get("adminNote") || "";
+          } else if (item.service === "restaurant") {
+            body.reservationDate = formData.get("reservationDate");
+            body.startTime = formData.get("startTime");
+            body.durationHours = Number(formData.get("durationHours") || 0);
+            body.tablesCount = Number(formData.get("tablesCount") || 1);
+            body.guestsCount = Number(formData.get("guestsCount") || 1);
+            body.joinTables = formData.get("joinTables") === "1";
+            body.fullName = formData.get("fullName");
+            body.email = formData.get("email");
+            body.phonePrefix = formData.get("phonePrefix");
+            body.phoneNational = formData.get("phoneNational");
+            body.customerNote = formData.get("customerNote") || "";
+            body.adminNote = formData.get("adminNote") || "";
+          } else {
+            body.hallId = formData.get("hallId");
+            body.reservationDate = formData.get("reservationDate");
+            body.startTime = formData.get("startTime");
+            body.durationHours = Number(formData.get("durationHours") || 0);
+            body.guestsCount = Number(formData.get("guestsCount") || 0);
+            body.exclusive = formData.get("exclusive") === "1";
+            body.eventType = formData.get("eventType") || "";
+            body.fullName = formData.get("fullName");
+            body.email = formData.get("email");
+            body.phonePrefix = formData.get("phonePrefix");
+            body.phoneNational = formData.get("phoneNational");
+            body.customerNote = formData.get("customerNote") || "";
+            body.adminNote = formData.get("adminNote") || "";
+          }
+          try {
+            await bookingAdminApi(item.service, "admin-reservation-update", { method: "PATCH", body });
+            closeScheduleModal();
+            await loadScheduleData({ silent: true });
+            renderSchedulePanel("Zmiany zostały zapisane.");
+          } catch (error) {
+            window.alert(error.message || "Nie udało się zapisać zmian.");
+          }
+        });
+      }
+    );
+  }
+
+  function scheduleBlockOverlapItems(service, startMs, endMs, resourceIds = []) {
+    const selectedResources = new Set(resourceIds.map((value) => String(value)));
+    return state.schedule.items.filter((item) => {
+      if (item.service !== service) return false;
+      if (!scheduleRangesOverlap(startMs, endMs, item.startMs, item.endMs)) return false;
+      if (service === "hall") {
+        return item.resourceIds.some((resourceId) => selectedResources.has(String(resourceId)));
+      }
+      if (!selectedResources.size) return true;
+      return item.resourceIds.some((resourceId) => selectedResources.has(String(resourceId)));
+    });
+  }
+
+  function openScheduleCreateModal(defaultDate) {
+    const model = {
+      service: "",
+      mode: "reservation",
+      date: String(defaultDate || getTodayIsoDate()).slice(0, 10),
+    };
+
+    const renderContent = () => {
+      if (!model.service) {
+        return `
+          <div class="admin-modal-head">
+            <div>
+              <p class="pill">Nowy wpis</p>
+              <h3>Wybierz obszar rezerwacji</h3>
+            </div>
+            <button type="button" class="button secondary" data-schedule-modal-close>Zamknij</button>
+          </div>
+          <div class="schedule-create-services">
+            <button type="button" class="schedule-create-service" data-create-service="hotel"><strong>Hotel</strong><span>Pokoje i pobyty.</span></button>
+            <button type="button" class="schedule-create-service" data-create-service="restaurant"><strong>Restauracja</strong><span>Stoliki i godziny.</span></button>
+            <button type="button" class="schedule-create-service" data-create-service="hall"><strong>Przyjęcia</strong><span>Sale i wydarzenia.</span></button>
+          </div>
+        `;
+      }
+
+      const isHotel = model.service === "hotel";
+      const isRestaurant = model.service === "restaurant";
+      const isHall = model.service === "hall";
+
+      let fields = "";
+      if (isHotel) {
+        fields =
+          model.mode === "block"
+            ? `
+              <div class="field-grid">
+                <label class="field"><span>Od</span><input type="date" name="dateFrom" value="${escapeAttribute(model.date)}" required /></label>
+                <label class="field"><span>Do</span><input type="date" name="dateTo" value="${escapeAttribute(scheduleAddDays(model.date, 1))}" required /></label>
+              </div>
+              ${scheduleHotelRoomOptionsMarkup([])}
+              <label class="field-full"><span>Notatka blokady</span><textarea name="note"></textarea></label>
+            `
+            : `
+              <div class="field-grid">
+                <label class="field"><span>Przyjazd</span><input type="date" name="dateFrom" value="${escapeAttribute(model.date)}" required /></label>
+                <label class="field"><span>Wyjazd</span><input type="date" name="dateTo" value="${escapeAttribute(scheduleAddDays(model.date, 1))}" required /></label>
+              </div>
+              ${scheduleHotelRoomOptionsMarkup([])}
+              <div class="field-grid">
+                <label class="field"><span>Imię i nazwisko</span><input name="fullName" required /></label>
+                <label class="field"><span>E-mail</span><input name="email" type="email" required /></label>
+                <label class="field"><span>Prefiks</span><input name="phonePrefix" value="+48" required /></label>
+                <label class="field"><span>Numer telefonu</span><input name="phoneNational" required /></label>
+                <label class="field"><span>Status</span><select name="status"><option value="pending">Do potwierdzenia</option><option value="confirmed">Potwierdzona (od razu aktywna)</option></select></label>
+                <label class="field-full"><span>Uwagi klienta</span><textarea name="customerNote"></textarea></label>
+              </div>
+            `;
+      } else if (isRestaurant) {
+        fields =
+          model.mode === "block"
+            ? `
+              <div class="field-grid">
+                <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
+                <label class="field"><span>Od</span><input type="time" name="startTime" value="12:00" required /></label>
+                <label class="field"><span>Do</span><input type="time" name="endTime" value="14:00" required /></label>
+              </div>
+              ${scheduleRestaurantTableOptionsMarkup([])}
+              <label class="field-full"><span>Notatka blokady</span><textarea name="note"></textarea></label>
+            `
+            : `
+              <div class="field-grid">
+                <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
+                <label class="field"><span>Start</span><input type="time" name="startTime" value="12:00" required /></label>
+                <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="2" required /></label>
+                <label class="field"><span>Liczba stolików</span><input type="number" min="1" name="tablesCount" value="1" required /></label>
+                <label class="field"><span>Liczba gości</span><input type="number" min="1" name="guestsCount" value="2" required /></label>
+                <label class="field"><span>Łączone stoliki</span><select name="joinTables"><option value="0">Nie</option><option value="1">Tak</option></select></label>
+                <label class="field"><span>Imię i nazwisko</span><input name="fullName" required /></label>
+                <label class="field"><span>E-mail</span><input name="email" type="email" required /></label>
+                <label class="field"><span>Prefiks</span><input name="phonePrefix" value="+48" required /></label>
+                <label class="field"><span>Numer telefonu</span><input name="phoneNational" required /></label>
+                <label class="field"><span>Status</span><select name="status"><option value="pending">Do potwierdzenia</option><option value="confirmed">Potwierdzona (od razu aktywna)</option></select></label>
+                <label class="field-full"><span>Uwagi klienta</span><textarea name="customerNote"></textarea></label>
+              </div>
+            `;
+      } else if (isHall) {
+        fields =
+          model.mode === "block"
+            ? `
+              <div class="field-grid">
+                ${scheduleHallOptionsMarkup(state.schedule.hallOptions[0]?.id || "")}
+                <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
+                <label class="field"><span>Start</span><input type="time" name="startTime" value="12:00" required /></label>
+                <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="3" required /></label>
+              </div>
+              <label class="field-full"><span>Notatka blokady</span><textarea name="note"></textarea></label>
+            `
+            : `
+              <div class="field-grid">
+                ${scheduleHallOptionsMarkup(state.schedule.hallOptions[0]?.id || "")}
+                <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
+                <label class="field"><span>Start</span><input type="time" name="startTime" value="12:00" required /></label>
+                <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="3" required /></label>
+                <label class="field"><span>Liczba gości</span><input type="number" min="1" name="guestsCount" value="40" required /></label>
+                <label class="field"><span>Na wyłączność</span><select name="exclusive"><option value="0">Nie</option><option value="1">Tak</option></select></label>
+                <label class="field"><span>Rodzaj wydarzenia</span><input name="eventType" value="Wydarzenie" /></label>
+                <label class="field"><span>Imię i nazwisko</span><input name="fullName" required /></label>
+                <label class="field"><span>E-mail</span><input name="email" type="email" required /></label>
+                <label class="field"><span>Prefiks</span><input name="phonePrefix" value="+48" required /></label>
+                <label class="field"><span>Numer telefonu</span><input name="phoneNational" required /></label>
+                <label class="field"><span>Status</span><select name="status"><option value="pending">Do potwierdzenia</option><option value="confirmed">Potwierdzona (od razu aktywna)</option></select></label>
+                <label class="field-full"><span>Uwagi klienta</span><textarea name="customerNote"></textarea></label>
+              </div>
+            `;
+      }
+
+      return `
+        <form class="stack" id="schedule-create-form">
+          <div class="admin-modal-head">
+            <div>
+              <p class="pill ${scheduleServicePillClass(model.service)}">${escapeHtml(scheduleServiceLabel(model.service))}</p>
+              <h3>${model.mode === "block" ? "Nowa blokada" : "Nowa rezerwacja"}</h3>
+            </div>
+            <button type="button" class="button secondary" data-schedule-modal-close>Zamknij</button>
+          </div>
+          <div class="schedule-create-mode-switch">
+            <button type="button" class="button secondary" data-create-back>← Zmień obszar</button>
+            <button type="button" class="button ${model.mode === "reservation" ? "" : "secondary"}" data-create-mode="reservation">Rezerwacja</button>
+            <button type="button" class="button ${model.mode === "block" ? "" : "secondary"}" data-create-mode="block">Blokada</button>
+          </div>
+          ${
+            model.mode === "block"
+              ? '<p class="helper schedule-block-helper">Blokada nie usuwa istniejących rezerwacji i działa tylko na kolejne próby rezerwacji.</p>'
+              : ""
+          }
+          ${fields}
+          <div class="admin-modal-footer">
+            <button type="button" class="button secondary" data-schedule-modal-close>Anuluj</button>
+            <button type="submit" class="button">Utwórz</button>
+          </div>
+        </form>
+      `;
+    };
+
+    const attachEvents = (mount) => {
+      mount.querySelectorAll("[data-schedule-modal-close]").forEach((button) => {
+        button.addEventListener("click", closeScheduleModal);
+      });
+      mount.querySelectorAll("[data-create-service]").forEach((button) => {
+        button.addEventListener("click", () => {
+          model.service = button.dataset.createService;
+          rerender();
+        });
+      });
+      mount.querySelectorAll("[data-create-mode]").forEach((button) => {
+        button.addEventListener("click", () => {
+          model.mode = button.dataset.createMode;
+          rerender();
+        });
+      });
+      mount.querySelector("[data-create-back]")?.addEventListener("click", () => {
+        model.service = "";
+        rerender();
+      });
+      mount.querySelector("#schedule-create-form")?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        try {
+          if (model.service === "hotel") {
+            if (model.mode === "block") {
+              const dateFrom = String(formData.get("dateFrom") || "");
+              const dateTo = String(formData.get("dateTo") || "");
+              const roomIds = formData.getAll("roomIds").map((value) => String(value));
+              if (!roomIds.length) throw new Error("Wybierz co najmniej jeden pokój do blokady.");
+              const overlapItems = scheduleBlockOverlapItems(
+                "hotel",
+                scheduleYmdToDate(dateFrom).getTime(),
+                scheduleYmdToDate(dateTo).getTime(),
+                roomIds
+              );
+              if (overlapItems.length) {
+                const accepted = window.confirm(scheduleOverlapWarningMessage(overlapItems));
+                if (!accepted) return;
+              }
+              await bookingAdminApi("hotel", "admin-manual-block", {
+                method: "POST",
+                body: { dateFrom, dateTo, roomIds, note: String(formData.get("note") || "") },
+              });
+            } else {
+              await bookingAdminApi("hotel", "admin-reservation-create", {
+                method: "POST",
+                body: {
+                  dateFrom: formData.get("dateFrom"),
+                  dateTo: formData.get("dateTo"),
+                  roomIds: formData.getAll("roomIds"),
+                  fullName: formData.get("fullName"),
+                  email: formData.get("email"),
+                  phonePrefix: formData.get("phonePrefix"),
+                  phoneNational: formData.get("phoneNational"),
+                  customerNote: formData.get("customerNote") || "",
+                  adminNote: "",
+                  status: formData.get("status") || "pending",
+                },
+              });
+            }
+          } else if (model.service === "restaurant") {
+            if (model.mode === "block") {
+              const reservationDate = String(formData.get("reservationDate") || "");
+              const startTime = String(formData.get("startTime") || "");
+              const endTime = String(formData.get("endTime") || "");
+              const tableIds = formData.getAll("tableIds").map((value) => String(value));
+              if (!tableIds.length) throw new Error("Wybierz co najmniej jeden stolik do blokady.");
+              const startMs = new Date(`${reservationDate}T${startTime}:00`).getTime();
+              const endMs = new Date(`${reservationDate}T${endTime}:00`).getTime();
+              const overlapItems = scheduleBlockOverlapItems("restaurant", startMs, endMs, tableIds);
+              if (overlapItems.length) {
+                const accepted = window.confirm(scheduleOverlapWarningMessage(overlapItems));
+                if (!accepted) return;
+              }
+              await bookingAdminApi("restaurant", "admin-manual-block", {
+                method: "POST",
+                body: {
+                  reservationDate,
+                  startTime,
+                  endTime,
+                  tableIds,
+                  note: String(formData.get("note") || ""),
+                },
+              });
+            } else {
+              await bookingAdminApi("restaurant", "admin-reservation-create", {
+                method: "POST",
+                body: {
+                  reservationDate: formData.get("reservationDate"),
+                  startTime: formData.get("startTime"),
+                  durationHours: Number(formData.get("durationHours") || 0),
+                  tablesCount: Number(formData.get("tablesCount") || 1),
+                  guestsCount: Number(formData.get("guestsCount") || 1),
+                  joinTables: formData.get("joinTables") === "1",
+                  fullName: formData.get("fullName"),
+                  email: formData.get("email"),
+                  phonePrefix: formData.get("phonePrefix"),
+                  phoneNational: formData.get("phoneNational"),
+                  customerNote: formData.get("customerNote") || "",
+                  adminNote: "",
+                  status: formData.get("status") || "pending",
+                },
+              });
+            }
+          } else if (model.service === "hall") {
+            if (model.mode === "block") {
+              const reservationDate = String(formData.get("reservationDate") || "");
+              const startTime = String(formData.get("startTime") || "");
+              const durationHours = Number(formData.get("durationHours") || 0);
+              const hallId = String(formData.get("hallId") || "");
+              const startMs = new Date(`${reservationDate}T${startTime}:00`).getTime();
+              const endMs = startMs + durationHours * 60 * 60 * 1000;
+              const overlapItems = scheduleBlockOverlapItems("hall", startMs, endMs, [hallId]);
+              if (overlapItems.length) {
+                const accepted = window.confirm(scheduleOverlapWarningMessage(overlapItems));
+                if (!accepted) return;
+              }
+              await bookingAdminApi("hall", "admin-reservation-create", {
+                method: "POST",
+                body: {
+                  hallId,
+                  reservationDate,
+                  startTime,
+                  durationHours,
+                  guestsCount: 0,
+                  exclusive: true,
+                  eventType: "Blokada",
+                  fullName: "Blokada terminu",
+                  email: firebase.auth().currentUser?.email || "noreply@local",
+                  phonePrefix: "+48",
+                  phoneNational: "000000000",
+                  customerNote: "",
+                  adminNote: String(formData.get("note") || ""),
+                  status: "manual_block",
+                },
+              });
+            } else {
+              await bookingAdminApi("hall", "admin-reservation-create", {
+                method: "POST",
+                body: {
+                  hallId: formData.get("hallId"),
+                  reservationDate: formData.get("reservationDate"),
+                  startTime: formData.get("startTime"),
+                  durationHours: Number(formData.get("durationHours") || 0),
+                  guestsCount: Number(formData.get("guestsCount") || 0),
+                  exclusive: formData.get("exclusive") === "1",
+                  eventType: formData.get("eventType") || "Wydarzenie",
+                  fullName: formData.get("fullName"),
+                  email: formData.get("email"),
+                  phonePrefix: formData.get("phonePrefix"),
+                  phoneNational: formData.get("phoneNational"),
+                  customerNote: formData.get("customerNote") || "",
+                  adminNote: "",
+                  status: formData.get("status") || "pending",
+                },
+              });
+            }
+          }
+
+          closeScheduleModal();
+          await loadScheduleData({ silent: true });
+          renderSchedulePanel("Nowy wpis został utworzony.");
+        } catch (error) {
+          window.alert(error.message || "Nie udało się utworzyć wpisu.");
+        }
+      });
+    };
+
+    const rerender = () => {
+      const mount = document.querySelector("#schedule-modal-mount");
+      if (!mount) return;
+      mount.querySelector(".schedule-modal").innerHTML = renderContent();
+      attachEvents(mount);
+    };
+
+    openScheduleModal(renderContent(), attachEvents);
+    if (
+      (!state.schedule.roomOptions.length || !state.schedule.tableOptions.length || !state.schedule.hallOptions.length) &&
+      !state.schedule.isLoading
+    ) {
+      loadScheduleData({ silent: true }).then(() => {
+        rerender();
+      });
+    }
+  }
+
   function mapFirebaseError(err) {
     const code = err?.code || "";
     if (code === "auth/invalid-email") {
@@ -1153,23 +2452,29 @@
   }
 
   function renderAdminStageMarkup(tabKey, tileKey) {
-    if (tabKey === "rezerwacje" && tileKey === "hotel") {
-      return `<div id="admin-panel-hotel" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
+    if (tabKey === "grafik") {
+      return `<section class="panel col-12" id="schedule-panel"></section>`;
     }
-    if (tabKey === "rezerwacje" && tileKey === "restaurant") {
-      return `<div id="admin-panel-restaurant" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
-    }
-    if (tabKey === "rezerwacje" && tileKey === "events") {
-      return `<div id="admin-panel-hall" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
-    }
-    if (tabKey === "hotel" && ["1-osobowe", "2-osobowe", "3-osobowe", "4-osobowe"].includes(tileKey)) {
+    if (tabKey === "hotel" && tileKey === "gallery") {
       return `<section class="panel col-12" id="hotel-room-galleries-panel"></section>`;
+    }
+    if (tabKey === "hotel" && tileKey === "home") {
+      return `<section class="panel col-12" id="hotel-home-media-panel"></section>`;
+    }
+    if (tabKey === "hotel" && tileKey === "rooms") {
+      return `<div id="admin-panel-hotel-rooms" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
+    }
+    if (tabKey === "hotel" && tileKey === "templates") {
+      return `<div id="admin-panel-hotel-templates" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
     }
     if (tabKey === "hotel" && tileKey === "settings") {
       return `<section class="panel col-12" id="hotel-booking-settings-panel"></section>`;
     }
     if (tabKey === "restauracja" && tileKey === "menu") {
       return `<section class="panel col-12" id="restaurant-menu-panel"></section>`;
+    }
+    if (tabKey === "restauracja" && tileKey === "home") {
+      return `<section class="panel col-12" id="restaurant-home-media-panel"></section>`;
     }
     if (tabKey === "restauracja" && tileKey === "gallery") {
       return `<section class="panel col-12" id="restaurant-gallery-panel"></section>`;
@@ -1180,11 +2485,20 @@
     if (tabKey === "restauracja" && tileKey === "hours") {
       return `<section class="panel col-12" id="restaurant-opening-hours-panel"></section>`;
     }
+    if (tabKey === "restauracja" && tileKey === "tables") {
+      return `<div id="admin-panel-restaurant-tables" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
+    }
+    if (tabKey === "restauracja" && tileKey === "templates") {
+      return `<div id="admin-panel-restaurant-templates" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
+    }
     if (tabKey === "restauracja" && tileKey === "settings") {
       return `<section class="panel col-12" id="restaurant-booking-settings-panel"></section>`;
     }
     if (tabKey === "przyjecia" && tileKey === "oferta") {
       return `<section class="panel col-12" id="events-offer-panel"></section>`;
+    }
+    if (tabKey === "przyjecia" && tileKey === "home") {
+      return `<section class="panel col-12" id="events-home-media-panel"></section>`;
     }
     if (tabKey === "przyjecia" && tileKey === "sale") {
       return `<section class="panel col-12" id="events-halls-panel"></section>`;
@@ -1198,11 +2512,14 @@
     if (tabKey === "przyjecia" && tileKey === "menu") {
       return `<section class="panel col-12" id="events-menu-panel"></section>`;
     }
+    if (tabKey === "przyjecia" && tileKey === "venue") {
+      return `<div id="admin-panel-hall-venue" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
+    }
+    if (tabKey === "przyjecia" && tileKey === "templates") {
+      return `<div id="admin-panel-hall-templates" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
+    }
     if (tabKey === "przyjecia" && tileKey === "settings") {
-      return `
-        <section class="panel col-12" id="events-booking-settings-panel"></section>
-        <section class="panel col-12" id="calendar-panel"></section>
-      `;
+      return `<section class="panel col-12" id="events-booking-settings-panel"></section>`;
     }
     if (tabKey === "dokumenty") {
       return `<section class="panel col-12" id="documents-panel"></section>`;
@@ -1249,56 +2566,82 @@
     `;
   }
 
+  function mountLegacyBookingModule(panelSelector, service, options = {}, statusMessage = "") {
+    if (!onlineBookingsEnabled) {
+      const titleMap = {
+        hotel: "Rezerwacje hotelu",
+        restaurant: "Rezerwacje restauracji",
+        hall: "Rezerwacje przyjec",
+      };
+      const copyMap = {
+        hotel: "Ten widok wymaga wlaczonego backendu rezerwacji hotelu.",
+        restaurant: "Ten widok wymaga wlaczonego backendu rezerwacji restauracji.",
+        hall: "Ten widok wymaga wlaczonego backendu rezerwacji przyjec.",
+      };
+      renderOnlineBookingsUnavailable(panelSelector, {
+        title: titleMap[service] || "Rezerwacje",
+        copy: copyMap[service] || "Ten widok wymaga wlaczonego backendu rezerwacji.",
+        statusMessage,
+      });
+      return;
+    }
+
+    const panel = document.querySelector(panelSelector);
+    if (!panel) return;
+
+    if (service === "hotel" && typeof window.renderHotelAdminPanel === "function") {
+      window.renderHotelAdminPanel(panel, options);
+      return;
+    }
+    if (service === "restaurant" && typeof window.renderRestaurantAdminPanel === "function") {
+      window.renderRestaurantAdminPanel(panel, options);
+      return;
+    }
+    if (service === "hall" && typeof window.renderHallAdminPanel === "function") {
+      window.renderHallAdminPanel(panel, options);
+      return;
+    }
+    panel.innerHTML = `<section class="panel col-12"><p class="status">Modul nie jest dostepny.</p></section>`;
+  }
+
   function renderActiveAdminTile(statusMessage = "") {
     const topTab = state.ui.topTab;
     const tileKey = getActiveAdminTile(topTab);
 
-    if (topTab === "rezerwacje") {
-      if (!onlineBookingsEnabled) {
-        if (tileKey === "hotel") {
-          renderOnlineBookingsUnavailable("#admin-panel-hotel", {
-            title: "Rezerwacja hotel",
-            copy: "Panel obslugi rezerwacji pokoi pojawi sie tutaj po wdrozeniu backendu hotelowego.",
-            statusMessage,
-          });
-        } else if (tileKey === "restaurant") {
-          renderOnlineBookingsUnavailable("#admin-panel-restaurant", {
-            title: "Rezerwacja restauracja",
-            copy: "Panel obslugi rezerwacji stolikow pojawi sie tutaj po wdrozeniu backendu restauracji.",
-            statusMessage,
-          });
-        } else if (tileKey === "events") {
-          renderOnlineBookingsUnavailable("#admin-panel-hall", {
-            title: "Rezerwacje przyjecia",
-            copy: "Panel obslugi zapytan o sale pojawi sie tutaj po wdrozeniu backendu przyjec.",
-            statusMessage,
-          });
-        }
-        return;
-      }
-
-      const options = { defaultTab: "reservations" };
-      if (tileKey === "hotel" && typeof window.renderHotelAdminPanel === "function") {
-        window.renderHotelAdminPanel(document.querySelector("#admin-panel-hotel"), options);
-      } else if (tileKey === "restaurant" && typeof window.renderRestaurantAdminPanel === "function") {
-        window.renderRestaurantAdminPanel(document.querySelector("#admin-panel-restaurant"), options);
-      } else if (tileKey === "events" && typeof window.renderHallAdminPanel === "function") {
-        window.renderHallAdminPanel(document.querySelector("#admin-panel-hall"), options);
-      }
+    if (topTab === "grafik") {
+      renderSchedulePanel(statusMessage);
       return;
     }
 
     if (topTab === "hotel") {
-      if (tileKey === "settings") {
-        renderHotelBookingSettingsPanel(statusMessage);
-      } else {
+      if (tileKey === "home") {
+        renderHomeSectionMediaPanel("hotel", "#hotel-home-media-panel", "Hotel", statusMessage);
+      } else if (tileKey === "gallery") {
         renderHotelRoomGalleriesPanel(statusMessage);
+      } else if (tileKey === "rooms") {
+        mountLegacyBookingModule(
+          "#admin-panel-hotel-rooms",
+          "hotel",
+          { defaultTab: "rooms", allowedTabs: ["rooms"] },
+          statusMessage
+        );
+      } else if (tileKey === "templates") {
+        mountLegacyBookingModule(
+          "#admin-panel-hotel-templates",
+          "hotel",
+          { defaultTab: "templates", allowedTabs: ["templates"] },
+          statusMessage
+        );
+      } else if (tileKey === "settings") {
+        renderHotelBookingSettingsPanel(statusMessage);
       }
       return;
     }
 
     if (topTab === "restauracja") {
-      if (tileKey === "menu") {
+      if (tileKey === "home") {
+        renderHomeSectionMediaPanel("restaurant", "#restaurant-home-media-panel", "Restauracja", statusMessage);
+      } else if (tileKey === "menu") {
         renderRestaurantMenuPanel(statusMessage);
       } else if (tileKey === "gallery") {
         renderRestaurantGalleryPanel(statusMessage);
@@ -1306,6 +2649,20 @@
         renderRestaurantOrderPanel(statusMessage);
       } else if (tileKey === "hours") {
         renderRestaurantOpeningHoursPanel(statusMessage);
+      } else if (tileKey === "tables") {
+        mountLegacyBookingModule(
+          "#admin-panel-restaurant-tables",
+          "restaurant",
+          { defaultTab: "tables", allowedTabs: ["tables", "settings"] },
+          statusMessage
+        );
+      } else if (tileKey === "templates") {
+        mountLegacyBookingModule(
+          "#admin-panel-restaurant-templates",
+          "restaurant",
+          { defaultTab: "templates", allowedTabs: ["templates"] },
+          statusMessage
+        );
       } else if (tileKey === "settings") {
         renderRestaurantBookingSettingsPanel(statusMessage);
       }
@@ -1313,7 +2670,9 @@
     }
 
     if (topTab === "przyjecia") {
-      if (tileKey === "oferta") {
+      if (tileKey === "home") {
+        renderHomeSectionMediaPanel("events", "#events-home-media-panel", "Przyjecia", statusMessage);
+      } else if (tileKey === "oferta") {
         renderEventsOfferPanel(statusMessage);
       } else if (tileKey === "sale") {
         renderEventsHallsPanel(statusMessage);
@@ -1322,9 +2681,22 @@
         renderGalleryPanel(statusMessage);
       } else if (tileKey === "menu") {
         renderEventsMenuPanel(statusMessage);
+      } else if (tileKey === "venue") {
+        mountLegacyBookingModule(
+          "#admin-panel-hall-venue",
+          "hall",
+          { defaultTab: "halls", allowedTabs: ["halls"] },
+          statusMessage
+        );
+      } else if (tileKey === "templates") {
+        mountLegacyBookingModule(
+          "#admin-panel-hall-templates",
+          "hall",
+          { defaultTab: "templates", allowedTabs: ["templates"] },
+          statusMessage
+        );
       } else if (tileKey === "settings") {
         renderEventsBookingSettingsPanel(statusMessage);
-        renderCalendarPanel(statusMessage);
       }
       return;
     }
@@ -1403,22 +2775,39 @@
               </div>
             `
               : `
-              <div class="admin-tile-grid admin-entry-grid" aria-label="Glowne sekcje panelu administracyjnego">
-                ${HOME_TAB_ORDER.map((tabKey) => ADMIN_TABS.find((tab) => tab.key === tabKey))
-                  .filter(Boolean)
-                  .map(
-                  (tab) => `
+              <div class="admin-home-layout">
+                ${(() => {
+                  const scheduleTab = ADMIN_TABS.find((tab) => tab.key === "grafik");
+                  if (!scheduleTab) return "";
+                  return `
                     <button
                       type="button"
-                      class="admin-tile admin-entry-tile"
-                      data-admin-entry="${escapeAttribute(tab.key)}"
+                      class="admin-tile admin-entry-tile admin-entry-tile--schedule"
+                      data-admin-entry="${escapeAttribute(scheduleTab.key)}"
                     >
-                      <span class="admin-tile-title">${escapeHtml(tab.label)}</span>
-                      <span class="admin-tile-copy">${escapeHtml(tab.description)}</span>
+                      <span class="admin-entry-icon" aria-hidden="true">GR</span>
+                      <span class="admin-tile-title">${escapeHtml(scheduleTab.label)}</span>
+                      <span class="admin-tile-copy">${escapeHtml(scheduleTab.description)}</span>
                     </button>
-                  `
-                )
-                  .join("")}
+                  `;
+                })()}
+                <div class="admin-tile-grid admin-entry-grid" aria-label="Glowne sekcje panelu administracyjnego">
+                  ${HOME_TAB_ORDER.map((tabKey) => ADMIN_TABS.find((tab) => tab.key === tabKey))
+                    .filter(Boolean)
+                    .map(
+                    (tab) => `
+                      <button
+                        type="button"
+                        class="admin-tile admin-entry-tile"
+                        data-admin-entry="${escapeAttribute(tab.key)}"
+                      >
+                        <span class="admin-tile-title">${escapeHtml(tab.label)}</span>
+                        <span class="admin-tile-copy">${escapeHtml(tab.description)}</span>
+                      </button>
+                    `
+                  )
+                    .join("")}
+                </div>
               </div>
             `
           }
@@ -1913,6 +3302,7 @@
       restaurant: elR ? elR.checked : Boolean(prevBlocks.restaurant),
       events: elE ? elE.checked : Boolean(prevBlocks.events),
     };
+    content.home.sectionMedia = normalizeHomeSectionMedia(content.home.sectionMedia);
     if (!content.booking) {
       content.booking = {};
     }
@@ -2251,6 +3641,189 @@
       statusMessage,
       disabled: !onlineBookingsEnabled,
     });
+  }
+
+  function renderHomeSectionMediaPanel(sectionKey, panelSelector, panelLabel, statusMessage = "") {
+    const panel = document.querySelector(panelSelector);
+    if (!panel) return;
+
+    if (!state.content.home) {
+      state.content.home = {};
+    }
+    state.content.home.sectionMedia = normalizeHomeSectionMedia(state.content.home.sectionMedia);
+    const media = state.content.home.sectionMedia[sectionKey];
+    const defaults = HOME_SECTION_MEDIA_DEFAULTS[sectionKey] || HOME_SECTION_MEDIA_DEFAULTS.hotel;
+    const messageId = `home-media-status-${sectionKey}`;
+
+    panel.innerHTML = `
+      <p class="pill">${escapeHtml(panelLabel)}</p>
+      <h2>Strona glowna</h2>
+      <p class="section-intro">Zmiana obrazu kafelka "${escapeHtml(panelLabel)}" na stronie glownej. Ustaw kadrowanie: przesuniecie X/Y oraz zoom.</p>
+      <div class="stack home-media-editor">
+        <form class="stack" data-home-media-upload-form="${escapeAttribute(sectionKey)}">
+          <label class="field-full">
+            <span>Nowe zdjecie sekcji</span>
+            <input type="file" name="image" accept="image/*" required />
+          </label>
+          <div class="inline-actions">
+            <button class="button" type="submit">Wgraj zdjecie</button>
+            <button class="button secondary" type="button" data-home-media-reset="${escapeAttribute(sectionKey)}">Przywroc domyslne</button>
+          </div>
+        </form>
+
+        <label class="field-full">
+          <span>Alt obrazu</span>
+          <input type="text" data-home-media-field="imageAlt" maxlength="200" value="${escapeAttribute(media.imageAlt || "")}" />
+        </label>
+
+        <div class="field-grid home-media-controls">
+          <label class="field-full">
+            <span>Pozycja pozioma (X)</span>
+            <div class="home-media-control-pair">
+              <input type="range" min="0" max="100" step="1" data-home-media-field="focusX" value="${escapeAttribute(String(media.focusX))}" />
+              <input type="number" min="0" max="100" step="1" data-home-media-field="focusX" value="${escapeAttribute(String(media.focusX))}" />
+            </div>
+          </label>
+          <label class="field-full">
+            <span>Pozycja pionowa (Y)</span>
+            <div class="home-media-control-pair">
+              <input type="range" min="0" max="100" step="1" data-home-media-field="focusY" value="${escapeAttribute(String(media.focusY))}" />
+              <input type="number" min="0" max="100" step="1" data-home-media-field="focusY" value="${escapeAttribute(String(media.focusY))}" />
+            </div>
+          </label>
+          <label class="field-full">
+            <span>Zoom</span>
+            <div class="home-media-control-pair">
+              <input type="range" min="1" max="2.5" step="0.01" data-home-media-field="zoom" value="${escapeAttribute(String(media.zoom))}" />
+              <input type="number" min="1" max="2.5" step="0.01" data-home-media-field="zoom" value="${escapeAttribute(String(media.zoom))}" />
+            </div>
+          </label>
+        </div>
+
+        <div class="home-media-preview-shell">
+          <strong>Podglad kafelka</strong>
+          <div class="home-media-preview" id="home-media-preview-${escapeAttribute(sectionKey)}">
+            <img src="${escapeAttribute(media.imageUrl || "")}" alt="${escapeAttribute(media.imageAlt || panelLabel)}" />
+            <div class="home-media-preview-overlay">${escapeHtml(panelLabel)}</div>
+          </div>
+        </div>
+        <p class="status" id="${escapeAttribute(messageId)}">${escapeHtml(statusMessage)}</p>
+      </div>
+    `;
+
+    const statusNode = panel.querySelector(`#${messageId}`);
+    const preview = panel.querySelector(`#home-media-preview-${sectionKey}`);
+    const previewImg = preview?.querySelector("img");
+    const altInput = panel.querySelector('[data-home-media-field="imageAlt"]');
+
+    const setStatus = (text) => {
+      if (statusNode) {
+        statusNode.textContent = text || "";
+      }
+    };
+
+    const applyPreview = () => {
+      if (!preview) return;
+      preview.style.setProperty("--home-media-focus-x", `${media.focusX}%`);
+      preview.style.setProperty("--home-media-focus-y", `${media.focusY}%`);
+      preview.style.setProperty("--home-media-zoom", String(media.zoom));
+      if (previewImg) {
+        previewImg.src = media.imageUrl || defaults.imageUrl;
+        previewImg.alt = media.imageAlt || panelLabel;
+      }
+    };
+
+    const syncFieldInputs = (field, value) => {
+      panel.querySelectorAll(`[data-home-media-field="${field}"]`).forEach((input) => {
+        if (input instanceof HTMLInputElement && input.value !== String(value)) {
+          input.value = String(value);
+        }
+      });
+    };
+
+    const updateMediaField = (field, rawValue) => {
+      if (field === "imageAlt") {
+        media.imageAlt = String(rawValue || "").trim();
+        applyPreview();
+        refreshSaveDockVisibility();
+        return;
+      }
+      if (field === "zoom") {
+        media.zoom = clampNumber(rawValue, 1, 2.5, defaults.zoom);
+        syncFieldInputs(field, media.zoom);
+      } else if (field === "focusX") {
+        media.focusX = clampNumber(rawValue, 0, 100, defaults.focusX);
+        syncFieldInputs(field, media.focusX);
+      } else if (field === "focusY") {
+        media.focusY = clampNumber(rawValue, 0, 100, defaults.focusY);
+        syncFieldInputs(field, media.focusY);
+      }
+      applyPreview();
+      refreshSaveDockVisibility();
+    };
+
+    panel.querySelectorAll('[data-home-media-field="focusX"], [data-home-media-field="focusY"], [data-home-media-field="zoom"]').forEach((input) => {
+      input.addEventListener("input", () => {
+        updateMediaField(input.getAttribute("data-home-media-field"), input.value);
+      });
+      input.addEventListener("change", () => {
+        updateMediaField(input.getAttribute("data-home-media-field"), input.value);
+      });
+    });
+
+    if (altInput) {
+      altInput.addEventListener("input", () => {
+        updateMediaField("imageAlt", altInput.value);
+      });
+    }
+
+    panel.querySelector(`[data-home-media-reset="${sectionKey}"]`)?.addEventListener("click", () => {
+      media.imageUrl = defaults.imageUrl;
+      media.imageAlt = defaults.imageAlt;
+      media.focusX = defaults.focusX;
+      media.focusY = defaults.focusY;
+      media.zoom = defaults.zoom;
+      if (altInput) {
+        altInput.value = media.imageAlt;
+      }
+      syncFieldInputs("focusX", media.focusX);
+      syncFieldInputs("focusY", media.focusY);
+      syncFieldInputs("zoom", media.zoom);
+      applyPreview();
+      refreshSaveDockVisibility();
+      setStatus("Przywrocono domyslne zdjecie i ustawienia kadrowania.");
+    });
+
+    panel.querySelector(`[data-home-media-upload-form="${sectionKey}"]`)?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      if (!(form instanceof HTMLFormElement)) return;
+      const fileInput = form.querySelector('input[name="image"]');
+      const file = fileInput?.files?.[0];
+      if (!file) {
+        setStatus("Wybierz plik graficzny.");
+        return;
+      }
+      try {
+        setStatus("Kompresowanie i przygotowanie zdjecia...");
+        const compressed = await compressImageFile(file, { maxBytes: INLINE_IMAGE_MAX_BYTES });
+        media.imageUrl = await blobToDataUrl(compressed);
+        if (!media.imageAlt) {
+          media.imageAlt = compressed.name.replace(/\.[^/.]+$/, "") || defaults.imageAlt;
+          if (altInput) {
+            altInput.value = media.imageAlt;
+          }
+        }
+        applyPreview();
+        refreshSaveDockVisibility();
+        setStatus("Zdjecie zostalo wgrane do szkicu. Kliknij Zapisz, aby opublikowac.");
+        form.reset();
+      } catch (error) {
+        setStatus(error.message || "Nie udalo sie przygotowac zdjecia.");
+      }
+    });
+
+    applyPreview();
   }
 
   function renderRestaurantOpeningHoursPanel(statusMessage = "") {
@@ -4026,30 +5599,38 @@
       { key: "3-osobowe", label: "Pokoje 3-osobowe" },
       { key: "4-osobowe", label: "Pokoje 4-osobowe" },
     ];
-    const activeRoomType = getActiveAdminTile("hotel");
-    const visibleRoomTypes = roomTypes.some((roomType) => roomType.key === activeRoomType)
-      ? roomTypes.filter((roomType) => roomType.key === activeRoomType)
-      : roomTypes;
 
     panel.innerHTML = `
       <p class="pill">Hotel</p>
       <h2>Galeria Pokoi</h2>
-      <p class="section-intro">Zarzadzaj zdjeciami dla wybranego typu pokoju. Mozesz dodawac, usuwac i zmieniac kolejnosc zdjec.</p>
+      <p class="section-intro">Wspolna galeria pokoi. Przy dodawaniu zdjec wskazujesz album (1/2/3/4-osobowe), a nizej zarzadzasz kolejnoscia i usuwaniem.</p>
+      <form class="repeater-item stack" id="hotel-room-gallery-upload-form">
+        <div class="field-grid">
+          <label class="field">
+            <span>Album</span>
+            <select name="roomType" required>
+              ${roomTypes
+                .map((roomType) => `<option value="${escapeAttribute(roomType.key)}">${escapeHtml(roomType.label)}</option>`)
+                .join("")}
+            </select>
+          </label>
+          <label class="field">
+            <span>Dodaj zdjecia</span>
+            <input type="file" name="images" accept="image/*" multiple required />
+          </label>
+        </div>
+        <div class="inline-actions">
+          <button class="button secondary" type="submit">Wgraj do wybranego albumu</button>
+        </div>
+      </form>
       <p class="status">${escapeHtml(statusMessage)}</p>
       <div class="grid">
-        ${visibleRoomTypes
+        ${roomTypes
           .map(
             (roomType) => `
               <div class="col-12">
                 <div class="repeater-item">
                   <h3>${escapeHtml(roomType.label)}</h3>
-                  <form class="stack upload-room-gallery-form" data-upload-room-gallery="${escapeAttribute(roomType.key)}">
-                    <label class="field-full">
-                      <span>Dodaj zdjecia</span>
-                      <input type="file" name="images" accept="image/*" multiple />
-                    </label>
-                    <button class="button secondary" type="submit">Wgraj zdjecia</button>
-                  </form>
                   <div class="thumb-grid" data-room-gallery="${escapeAttribute(roomType.key)}">
                     ${
                       roomGalleries[roomType.key] && roomGalleries[roomType.key].length
@@ -4076,8 +5657,10 @@
       </div>
     `;
 
-    panel.querySelectorAll("[data-upload-room-gallery]").forEach((form) => {
-      form.addEventListener("submit", (e) => uploadRoomGalleryImages(e, form.dataset.uploadRoomGallery));
+    panel.querySelector("#hotel-room-gallery-upload-form")?.addEventListener("submit", (event) => {
+      const form = event.currentTarget;
+      const selectedRoomType = form?.querySelector('[name="roomType"]')?.value;
+      uploadRoomGalleryImages(event, selectedRoomType);
     });
 
     panel.querySelectorAll("[data-remove-room-image]").forEach((button) => {
@@ -4113,6 +5696,10 @@
 
   async function uploadRoomGalleryImages(event, roomType) {
     event.preventDefault();
+    if (!roomType) {
+      renderHotelRoomGalleriesPanel("Wybierz album docelowy.");
+      return;
+    }
     const form = event.currentTarget;
     const formData = new FormData(form);
     const files = formData.getAll("images");
@@ -4664,6 +6251,11 @@
     state.calendarBlocks = data.calendarBlocks;
     state.submissions = data.submissions;
     state.capabilities = data.capabilities || { mediaStorageEnabled: false };
+    try {
+      await loadScheduleData({ silent: true });
+    } catch (error) {
+      state.schedule.lastError = error.message || "Nie udało się załadować grafiku.";
+    }
     renderDashboard();
     if (message) {
       renderActiveAdminTile(message);

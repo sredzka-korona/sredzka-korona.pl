@@ -65,12 +65,23 @@
     return `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
   }
 
-  let hallSubTab = "halls";
+  let hallSubTab = "reservations";
+  let hallResFilter = "active";
   let hallsData = [];
   let reservationsData = [];
+  let blockListData = [];
   let templatesData = {};
   let venueSettings = {};
   let countdownTimer = null;
+
+  const HALL_TEMPLATE_LABELS = {
+    hall_confirm_email: "E-mail z linkiem po zgłoszeniu z formularza (potwierdzenie adresu).",
+    hall_pending_client: "Klient — zgłoszenie czeka na decyzję obiektu.",
+    hall_pending_admin: "Powiadomienie dla obsługi — nowe zgłoszenie sali.",
+    hall_confirmed_client: "Klient — rezerwacja sali zaakceptowana.",
+    hall_cancelled_client: "Klient — rezerwacja anulowana.",
+    hall_changed_client: "Po edycji zgłoszenia przez admina (opcjonalna wysyłka).",
+  };
 
   async function loadHalls() {
     const d = await hallApi("admin-halls-list", { method: "GET" });
@@ -78,7 +89,8 @@
   }
 
   async function loadReservations(status) {
-    const q = status && status !== "all" ? `&status=${encodeURIComponent(status)}` : "";
+    const mode = status && String(status).length ? status : "active";
+    const q = `&status=${encodeURIComponent(mode)}`;
     const base = hallApiBase();
     const token = await firebase.auth().currentUser.getIdToken();
     const res = await fetch(`${base}?op=admin-reservations-list${q}`, {
@@ -87,6 +99,17 @@
     const d = await res.json();
     if (!res.ok) throw new Error(d.error || "Błąd");
     reservationsData = d.reservations || [];
+  }
+
+  async function loadHallBlockList() {
+    const base = hallApiBase();
+    const token = await firebase.auth().currentUser.getIdToken();
+    const res = await fetch(`${base}?op=admin-reservations-list&status=${encodeURIComponent("manual_block")}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || "Błąd");
+    blockListData = d.reservations || [];
   }
 
   async function loadTemplates() {
@@ -147,7 +170,7 @@
       .map(
         (r) => `
       <tr>
-        <td>${escapeHtml(r.humanNumber || r.id)}</td>
+        <td>${escapeHtml(r.humanNumberLabel || r.humanNumber || r.id)}</td>
         <td>${escapeHtml(r.hallName || "")}</td>
         <td>${escapeHtml(r.reservationDate || "")}</td>
         <td>${formatMs(r.startDateTime)}</td>
@@ -167,25 +190,34 @@
         <td class="hall-countdown" data-pending="${r.pendingExpiresAt || ""}" data-email-exp="${r.emailVerificationExpiresAt || ""}" data-status="${escapeHtml(r.status)}">${r.status === "pending" ? countdown(r.pendingExpiresAt) : r.status === "email_verification_pending" ? countdown(r.emailVerificationExpiresAt) : "—"}</td>
         <td>${r.extendAvailable ? "tak" : "nie"}</td>
         <td>${formatMs(r.createdAtMs)}</td>
-        <td><button type="button" class="button secondary hall-res-detail" data-id="${escapeHtml(r.id)}">Szczegóły</button></td>
+        <td class="admin-row-actions">
+          <button type="button" class="button secondary hall-res-edit" data-id="${escapeHtml(r.id)}">Edytuj</button>
+          <button type="button" class="button secondary danger-muted hall-res-cancel" data-id="${escapeHtml(r.id)}">Anuluj</button>
+        </td>
       </tr>`
       )
       .join("");
     return `
       <div class="hotel-subpanel">
         <h3>Rezerwacje sal</h3>
-        <div class="hotel-filters">
-          <button type="button" class="button secondary" id="hall-res-new">Nowa / blokada</button>
-          <label>Filtr <select id="hall-res-filter">
-            <option value="all">Wszystkie</option>
-            <option value="pending">Oczekujące</option>
-            <option value="confirmed">Zarezerwowane</option>
+        <p class="helper">Domyślnie widać wpisy <strong>oczekujące</strong> i <strong>zarezerwowane</strong>. Pełna blokada sali (status „Blokada”) służy do zajęcia terminu bez gościa z formularza — np. prace, zamknięcie sali.</p>
+        <div class="admin-toolbar-row hotel-filters">
+          <div class="admin-toolbar-filters">
+            <label>Status <select id="hall-res-filter">
+            <option value="active">Aktywne (oczekujące + zarezerwowane)</option>
+            <option value="all">Wszystkie statusy</option>
+            <option value="pending">Tylko oczekujące</option>
+            <option value="confirmed">Tylko zarezerwowane</option>
             <option value="cancelled">Anulowane</option>
             <option value="expired">Wygasłe</option>
             <option value="email_verification_pending">E-mail do potwierdzenia</option>
-            <option value="manual_block">Blokady</option>
+            <option value="manual_block">Blokady terminów</option>
           </select></label>
-          <button type="button" class="button" id="hall-res-refresh">Odśwież</button>
+          </div>
+          <div class="admin-toolbar-actions">
+            <button type="button" class="button secondary icon-btn" id="hall-res-refresh" title="Odśwież" aria-label="Odśwież">↻</button>
+            <button type="button" class="button" id="hall-res-new">Utwórz rezerwację</button>
+          </div>
         </div>
         <div class="table-scroll">
           <table class="hotel-table">
@@ -201,19 +233,59 @@
     return `
       <div class="hotel-subpanel">
         <h3>Szablony mailingowe — sale</h3>
-        <p class="helper">Zmienne: {{reservationId}}, {{reservationNumber}}, {{fullName}}, {{email}}, {{phone}}, {{hallName}}, {{date}}, {{timeFrom}}, {{timeTo}}, {{durationHours}}, {{guestsCount}}, {{eventType}}, {{exclusive}}, {{fullBlockLabel}}, {{customerNote}}, {{adminNote}}, {{confirmationLink}}, {{venueName}}, {{expiresAt}}</p>
+        <p class="helper">Zmienne: <code>{{reservationNumber}}</code>, <code>{{fullName}}</code>, <code>{{hallName}}</code>, <code>{{date}}</code>, <code>{{timeFrom}}</code>, <code>{{timeTo}}</code>, <code>{{durationHours}}</code>, <code>{{guestsCount}}</code>, <code>{{eventType}}</code>, <code>{{exclusive}}</code>, <code>{{customerNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{venueName}}</code>.</p>
         <div id="hall-template-forms">
           ${keys
             .map(
               (k) => `
             <details class="hotel-template-card">
-              <summary>${escapeHtml(k)}</summary>
+              <summary><span class="tpl-key">${escapeHtml(k)}</span>${HALL_TEMPLATE_LABELS[k] ? `<span class="tpl-desc"> — ${escapeHtml(HALL_TEMPLATE_LABELS[k])}</span>` : ""}</summary>
               <label>Temat<input type="text" data-hall-tpl-key="${escapeHtml(k)}" data-field="subject" value="${escapeHtml(templatesData[k]?.subject || "")}" /></label>
-              <label>Treść HTML<textarea data-hall-tpl-key="${escapeHtml(k)}" data-field="bodyHtml" rows="8">${escapeHtml(templatesData[k]?.bodyHtml || "")}</textarea></label>
+              <label>Treść HTML<textarea data-hall-tpl-key="${escapeHtml(k)}" data-field="bodyHtml" rows="10">${escapeHtml(templatesData[k]?.bodyHtml || "")}</textarea></label>
               <button type="button" class="button hall-save-tpl" data-key="${escapeHtml(k)}">Zapisz szablon</button>
             </details>`
             )
             .join("")}
+        </div>
+      </div>`;
+  }
+
+  function renderHallBlockForm() {
+    const hallOpts = hallsData
+      .map((h) => `<option value="${escapeHtml(h.id)}">${escapeHtml(h.name || h.id)}</option>`)
+      .join("");
+    const blockRows = blockListData
+      .map(
+        (b) => `
+      <tr>
+        <td>${escapeHtml(b.humanNumberLabel || b.humanNumber || b.id)}</td>
+        <td>${escapeHtml(b.hallName || "")}</td>
+        <td>${escapeHtml(b.reservationDate || "")}</td>
+        <td>${formatMs(b.startDateTime)} – ${formatMs(b.endDateTime)}</td>
+        <td>${escapeHtml(b.adminNote || b.customerNote || "—")}</td>
+      </tr>`
+      )
+      .join("");
+    return `
+      <div class="hotel-subpanel">
+        <h3>Blokada terminu (sala)</h3>
+        <p class="helper">Tworzy wpis blokujący salę w wybranym czasie — bez rezerwacji gościa z formularza.</p>
+        <form id="hall-block-form" class="stack">
+          <label>Sala<select name="hallId" required>${hallOpts || "<option value=\"\">—</option>"}</select></label>
+          <label>Data<input name="reservationDate" type="date" required /></label>
+          <div class="field-grid">
+            <label>Start (HH:MM)<input name="startTime" required placeholder="12:00" /></label>
+            <label>Czas trwania (h)<input name="durationHours" type="number" step="0.5" min="0.5" value="3" required /></label>
+          </div>
+          <label>Notatka<input name="note" /></label>
+          <button type="submit" class="button">Utwórz blokadę</button>
+        </form>
+        <h4 class="admin-subheading">Lista blokad</h4>
+        <div class="table-scroll">
+          <table class="hotel-table">
+            <thead><tr><th>Nr</th><th>Sala</th><th>Data</th><th>Godziny</th><th>Notatka</th></tr></thead>
+            <tbody>${blockRows || "<tr><td colspan='5'>Brak</td></tr>"}</tbody>
+          </table>
         </div>
       </div>`;
   }
@@ -223,10 +295,13 @@
     if (options.defaultTab) {
       hallSubTab = options.defaultTab;
     }
+    const allowedTabs = Array.isArray(options.allowedTabs) && options.allowedTabs.length
+      ? options.allowedTabs.map((tab) => String(tab || "").trim()).filter(Boolean)
+      : null;
     container.innerHTML = `<p class="status">Ładowanie modułu Sale…</p>`;
     try {
       await loadHalls();
-      await loadReservations("all");
+      await loadReservations("active");
       await loadTemplates();
       await loadVenueSettings();
     } catch (e) {
@@ -236,32 +311,51 @@
 
     function paint() {
       const sub = {
-        halls: renderHalls() + renderVenueSettings(),
         reservations: renderReservations(),
+        block: renderHallBlockForm(),
+        halls: renderHalls() + renderVenueSettings(),
         templates: renderTemplates(),
       };
+      const availableTabs = [
+        { key: "reservations", label: "Rezerwacje" },
+        { key: "block", label: "Blokada terminu" },
+        { key: "halls", label: "Konfiguracja sal" },
+        { key: "templates", label: "Szablony mailingowe" },
+      ].filter((tab) => !allowedTabs || allowedTabs.includes(tab.key));
+      if (!availableTabs.length) {
+        container.innerHTML = `<section class="panel col-12"><p class="status">Brak dostepnych widokow tego modulu.</p></section>`;
+        return;
+      }
+      if (!availableTabs.some((tab) => tab.key === hallSubTab)) {
+        hallSubTab = availableTabs[0].key;
+      }
       container.innerHTML = `
         <section class="panel col-12">
           <p class="pill">Sale</p>
           <h2>Rezerwacje sal</h2>
-          <div class="hotel-nav">
-            <button type="button" class="button ${hallSubTab === "halls" ? "" : "secondary"}" data-hsub="halls">Konfiguracja sal</button>
-            <button type="button" class="button ${hallSubTab === "reservations" ? "" : "secondary"}" data-hsub="reservations">Rezerwacje</button>
-            <button type="button" class="button ${hallSubTab === "templates" ? "" : "secondary"}" data-hsub="templates">Szablony mailingowe</button>
+          <div class="hotel-nav${availableTabs.length === 1 ? " is-single" : ""}">
+            ${availableTabs
+              .map(
+                (tab) =>
+                  `<button type="button" class="button ${hallSubTab === tab.key ? "" : "secondary"}" data-hsub="${escapeHtml(tab.key)}">${escapeHtml(tab.label)}</button>`
+              )
+              .join("")}
           </div>
           <div id="hall-sub-content">${sub[hallSubTab]}</div>
         </section>
       `;
 
+      const hf = document.querySelector("#hall-res-filter");
+      if (hf) hf.value = hallResFilter;
+
       container.querySelectorAll("[data-hsub]").forEach((b) => {
         b.addEventListener("click", async () => {
           hallSubTab = b.getAttribute("data-hsub");
-          if (hallSubTab === "reservations") {
-            try {
-              await loadReservations(document.querySelector("#hall-res-filter")?.value || "all");
-            } catch (err) {
-              alert(err.message);
-            }
+          try {
+            if (hallSubTab === "reservations") await loadReservations(hallResFilter);
+            if (hallSubTab === "block") await loadHallBlockList();
+          } catch (err) {
+            alert(err.message);
           }
           paint();
         });
@@ -333,93 +427,63 @@
       });
 
       document.querySelector("#hall-res-filter")?.addEventListener("change", async () => {
-        await loadReservations(document.querySelector("#hall-res-filter").value);
+        hallResFilter = document.querySelector("#hall-res-filter").value;
+        await loadReservations(hallResFilter);
         document.querySelector("#hall-sub-content").innerHTML =
           hallSubTab === "reservations" ? renderReservations() : "";
+        const hf = document.querySelector("#hall-res-filter");
+        if (hf) hf.value = hallResFilter;
         bindSub();
       });
       document.querySelector("#hall-res-refresh")?.addEventListener("click", async () => {
-        await loadReservations(document.querySelector("#hall-res-filter")?.value || "all");
+        await loadReservations(hallResFilter);
         document.querySelector("#hall-sub-content").innerHTML =
           hallSubTab === "reservations" ? renderReservations() : "";
+        const hf = document.querySelector("#hall-res-filter");
+        if (hf) hf.value = hallResFilter;
         bindSub();
       });
 
-      document.querySelector("#hall-res-new")?.addEventListener("click", async () => {
-        const hallId = prompt("ID sali (hall-small / hall-large)", "hall-large");
-        if (!hallId) return;
-        const reservationDate = prompt("Data (YYYY-MM-DD)");
-        if (!reservationDate) return;
-        const startTime = prompt("Start (HH:MM)", "12:00");
-        if (!startTime) return;
-        const durationHours = Number(prompt("Godziny", "3"));
-        if (!durationHours) return;
-        const block = confirm("OK = blokada terminu (bez gości), Anuluj = zwykła rezerwacja ręczna");
-        if (block) {
-          try {
-            await hallApi("admin-reservation-create", {
-              method: "POST",
-              body: {
-                hallId,
-                reservationDate,
-                startTime,
-                durationHours,
-                guestsCount: 0,
-                exclusive: true,
-                eventType: "Blokada",
-                fullName: "Blokada terminu",
-                email: firebase.auth().currentUser?.email || "noreply@local",
-                phonePrefix: "+48",
-                phoneNational: "501234567",
-                customerNote: "",
-                adminNote: prompt("Notatka blokady", "") || "",
-                status: "manual_block",
-              },
-            });
-            alert("Utworzono blokadę.");
-          } catch (err) {
-            alert(err.message);
-          }
-        } else {
-          const guestsCount = Number(prompt("Liczba gości", "50"));
-          const exclusive = confirm("Sala na wyłączność?");
-          const fullName = prompt("Imię i nazwisko");
-          if (!fullName) return;
-          const email = prompt("E-mail");
-          if (!email) return;
-          const phonePrefix = prompt("Prefiks", "+48");
-          const phoneNational = prompt("Numer");
-          if (!phoneNational) return;
-          const eventType = prompt("Rodzaj imprezy", "Spotkanie") || "—";
-          const st = confirm("OK = oczekująca, Anuluj = od razu zarezerwowana") ? "pending" : "confirmed";
-          try {
-            await hallApi("admin-reservation-create", {
-              method: "POST",
-              body: {
-                hallId,
-                reservationDate,
-                startTime,
-                durationHours,
-                guestsCount,
-                exclusive,
-                eventType,
-                fullName,
-                email,
-                phonePrefix: phonePrefix || "+48",
-                phoneNational,
-                customerNote: "",
-                adminNote: "",
-                status: st,
-              },
-            });
-            alert("Utworzono.");
-          } catch (err) {
-            alert(err.message);
-          }
+      document.querySelector("#hall-res-new")?.addEventListener("click", () => openManualHallModal());
+
+      document.querySelectorAll(".hall-res-edit").forEach((btn) => {
+        btn.addEventListener("click", () => openHallEditorModal(btn.getAttribute("data-id")));
+      });
+      document.querySelectorAll(".hall-res-cancel").forEach((btn) => {
+        btn.addEventListener("click", () => quickCancelHall(btn.getAttribute("data-id")));
+      });
+
+      document.querySelector("#hall-block-form")?.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const fd = new FormData(ev.target);
+        try {
+          await hallApi("admin-reservation-create", {
+            method: "POST",
+            body: {
+              hallId: fd.get("hallId"),
+              reservationDate: fd.get("reservationDate"),
+              startTime: fd.get("startTime"),
+              durationHours: Number(fd.get("durationHours")),
+              guestsCount: 0,
+              exclusive: true,
+              eventType: "Blokada terminu",
+              fullName: "Blokada terminu",
+              email: firebase.auth().currentUser?.email || "noreply@local",
+              phonePrefix: "+48",
+              phoneNational: "501234567",
+              customerNote: "",
+              adminNote: fd.get("note") || "",
+              status: "manual_block",
+            },
+          });
+          alert("Blokada utworzona.");
+          ev.target.reset();
+          await loadHallBlockList();
+          hallSubTab = "block";
+          paint();
+        } catch (err) {
+          alert(err.message);
         }
-        await loadReservations(document.querySelector("#hall-res-filter")?.value || "all");
-        document.querySelector("#hall-sub-content").innerHTML = renderReservations();
-        bindSub();
       });
 
       document.querySelectorAll(".hall-save-tpl").forEach((btn) => {
@@ -436,10 +500,6 @@
         });
       });
 
-      document.querySelectorAll(".hall-res-detail").forEach((btn) => {
-        btn.addEventListener("click", () => openReservationDetail(btn.getAttribute("data-id")));
-      });
-
       countdownTimer = setInterval(() => {
         document.querySelectorAll(".hall-countdown").forEach((el) => {
           const st = el.getAttribute("data-status");
@@ -454,7 +514,106 @@
       }, 1000);
     }
 
-    async function openReservationDetail(id) {
+    function closeHallExtraModal() {
+      document.getElementById("hall-extra-modal-mount")?.remove();
+      document.body.classList.remove("admin-modal-open");
+    }
+
+    async function quickCancelHall(id) {
+      if (!confirm("Anulować tę rezerwację? Klient może otrzymać e-mail.")) return;
+      try {
+        await hallApi("admin-reservation-cancel", { method: "POST", body: { id } });
+        await loadReservations(hallResFilter);
+        document.querySelector("#hall-sub-content").innerHTML = renderReservations();
+        const hf = document.querySelector("#hall-res-filter");
+        if (hf) hf.value = hallResFilter;
+        bindSub();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function openManualHallModal() {
+      closeHallExtraModal();
+      const hallOpts = hallsData
+        .map((h) => `<option value="${escapeHtml(h.id)}">${escapeHtml(h.name || h.id)}</option>`)
+        .join("");
+      const host = document.createElement("div");
+      host.id = "hall-extra-modal-mount";
+      host.innerHTML = `
+        <div class="admin-modal-overlay" data-hall-extra-overlay>
+          <section class="admin-modal menu-editor-modal hotel-room-editor-modal" role="dialog" aria-modal="true">
+            <form id="hall-manual-form" class="stack">
+              <div class="admin-modal-head menu-editor-modal-head">
+                <h3>Utwórz rezerwację</h3>
+                <button type="button" class="button secondary" data-hall-extra-close>Zamknij</button>
+              </div>
+              <p class="helper">Domyślnie status <strong>zarezerwowane</strong>. Odznacz, aby utworzyć jako oczekujące na akceptację.</p>
+              <label>Sala<select name="hallId" required>${hallOpts}</select></label>
+              <label>Data<input name="reservationDate" type="date" required /></label>
+              <div class="field-grid">
+                <label>Start (HH:MM)<input name="startTime" required placeholder="12:00" /></label>
+                <label>Czas (h)<input name="durationHours" type="number" step="0.5" min="0.5" value="3" required /></label>
+              </div>
+              <label>Goście<input name="guestsCount" type="number" min="1" value="20" required /></label>
+              <label class="admin-check-line"><input type="checkbox" name="exclusive" checked /> <span>Sala na wyłączność (tam gdzie dotyczy)</span></label>
+              <label>Rodzaj imprezy<input name="eventType" value="Spotkanie" /></label>
+              <label>Imię i nazwisko<input name="fullName" required /></label>
+              <label>E-mail<input name="email" type="email" required /></label>
+              <div class="field-grid">
+                <label>Prefiks<input name="phonePrefix" value="+48" /></label>
+                <label>Numer<input name="phoneNational" required /></label>
+              </div>
+              <label>Uwagi<textarea name="customerNote" rows="2"></textarea></label>
+              <label class="admin-check-line"><input type="checkbox" name="asPending" /> <span>Oczekuje na akceptację</span></label>
+              <div class="admin-modal-footer hotel-room-editor-footer">
+                <button type="button" class="button secondary" data-hall-extra-close>Anuluj</button>
+                <button type="submit" class="button">Utwórz</button>
+              </div>
+            </form>
+          </section>
+        </div>`;
+      document.body.appendChild(host);
+      document.body.classList.add("admin-modal-open");
+      host.querySelectorAll("[data-hall-extra-close]").forEach((b) => b.addEventListener("click", closeHallExtraModal));
+      host.querySelector("[data-hall-extra-overlay]")?.addEventListener("click", (ev) => {
+        if (ev.target === ev.currentTarget) closeHallExtraModal();
+      });
+      host.querySelector("#hall-manual-form")?.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const fd = new FormData(ev.target);
+        const status = fd.get("asPending") === "on" ? "pending" : "confirmed";
+        try {
+          await hallApi("admin-reservation-create", {
+            method: "POST",
+            body: {
+              hallId: fd.get("hallId"),
+              reservationDate: fd.get("reservationDate"),
+              startTime: fd.get("startTime"),
+              durationHours: Number(fd.get("durationHours")),
+              guestsCount: Number(fd.get("guestsCount")),
+              exclusive: fd.get("exclusive") === "on",
+              eventType: fd.get("eventType") || "—",
+              fullName: fd.get("fullName"),
+              email: fd.get("email"),
+              phonePrefix: fd.get("phonePrefix") || "+48",
+              phoneNational: fd.get("phoneNational"),
+              customerNote: fd.get("customerNote") || "",
+              adminNote: "",
+              status,
+            },
+          });
+          closeHallExtraModal();
+          await loadReservations(hallResFilter);
+          hallSubTab = "reservations";
+          paint();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+    }
+
+    async function openHallEditorModal(id) {
       const base = hallApiBase();
       const token = await firebase.auth().currentUser.getIdToken();
       const res = await fetch(`${base}?op=admin-reservation-get&id=${encodeURIComponent(id)}`, {
@@ -466,58 +625,119 @@
         return;
       }
       const r = d.reservation;
-      alert(
-        `Nr: ${r.humanNumber}\n${r.fullName}\n${r.email}\n${r.reservationDate} ${formatMs(r.startDateTime)} – ${formatMs(r.endDateTime)}\n${r.statusLabel}\nWyłączność: ${r.exclusive}\nGoście: ${r.guestsCount}\n${r.eventType}\nUwagi: ${r.customerNote || ""}\nNotatka admina: ${r.adminNote || ""}`
-      );
-      const note = prompt("Notatka administratora (zapis)", r.adminNote || "");
-      if (note === null) return;
-      try {
-        await hallApi("admin-reservation-update", {
-          method: "PATCH",
-          body: { id, adminNote: note },
-        });
-      } catch (err) {
-        alert(err.message);
-        return;
-      }
-      if (r.status === "pending") {
-        if (r.extendAvailable && confirm('Przedłużyć termin oczekiwania o 7 dni?')) {
-          try {
-            await hallApi("admin-extend-pending", { method: "POST", body: { id } });
-            alert("Przedłużono.");
-            await loadReservations(document.querySelector("#hall-res-filter")?.value || "all");
-            document.querySelector("#hall-sub-content").innerHTML = renderReservations();
-            bindSub();
-            return;
-          } catch (err) {
-            alert(err.message);
-          }
-        }
-        if (confirm("Potwierdzić rezerwację (status: zarezerwowane)?")) {
-          try {
-            await hallApi("admin-reservation-confirm", { method: "POST", body: { id } });
-            alert("Potwierdzono — wysłano mail do klienta.");
-          } catch (err) {
-            alert(err.message);
-          }
-        } else if (confirm("Anulować rezerwację?")) {
-          try {
-            await hallApi("admin-reservation-cancel", { method: "POST", body: { id } });
-            alert("Anulowano.");
-          } catch (err) {
-            alert(err.message);
-          }
-        }
-      } else if (r.status === "confirmed" && confirm("Anulować rezerwację?")) {
+      closeHallExtraModal();
+      const hallOpts = hallsData
+        .map((h) => `<option value="${escapeHtml(h.id)}" ${h.id === r.hallId ? "selected" : ""}>${escapeHtml(h.name || h.id)}</option>`)
+        .join("");
+      const host = document.createElement("div");
+      host.id = "hall-extra-modal-mount";
+      host.innerHTML = `
+        <div class="admin-modal-overlay" data-hall-extra-overlay>
+          <section class="admin-modal menu-editor-modal hotel-room-editor-modal" role="dialog" aria-modal="true">
+            <form id="hall-edit-form" class="stack">
+              <div class="admin-modal-head menu-editor-modal-head">
+                <div>
+                  <p class="pill">${escapeHtml(r.humanNumberLabel || r.humanNumber)}</p>
+                  <h3>Edycja</h3>
+                  <p class="helper">${escapeHtml(r.statusLabel || r.status)}</p>
+                </div>
+                <button type="button" class="button secondary" data-hall-extra-close>Zamknij</button>
+              </div>
+              <label>Sala<select name="hallId" required>${hallOpts}</select></label>
+              <label>Data<input name="reservationDate" type="date" value="${escapeHtml(r.reservationDate || "")}" required /></label>
+              <div class="field-grid">
+                <label>Start<input name="startTime" value="${escapeHtml(r.startTime || "")}" required /></label>
+                <label>Czas (h)<input name="durationHours" type="number" step="0.5" min="0.5" value="${escapeHtml(String(r.durationHours || 2))}" required /></label>
+              </div>
+              <label>Goście<input name="guestsCount" type="number" min="0" value="${escapeHtml(String(r.guestsCount ?? 0))}" required /></label>
+              <label class="admin-check-line"><input type="checkbox" name="exclusive" ${r.exclusive ? "checked" : ""} /> <span>Wyłączność</span></label>
+              <label>Impreza<input name="eventType" value="${escapeHtml(r.eventType || "")}" /></label>
+              <label>Imię i nazwisko<input name="fullName" value="${escapeHtml(r.fullName || "")}" required /></label>
+              <label>E-mail<input name="email" type="email" value="${escapeHtml(r.email || "")}" required /></label>
+              <div class="field-grid">
+                <label>Prefiks<input name="phonePrefix" value="${escapeHtml(r.phonePrefix || "+48")}" /></label>
+                <label>Numer<input name="phoneNational" value="${escapeHtml(r.phoneNational || "")}" required /></label>
+              </div>
+              <label>Uwagi<textarea name="customerNote" rows="2">${escapeHtml(r.customerNote || "")}</textarea></label>
+              <label>Notatka<textarea name="adminNote" rows="2">${escapeHtml(r.adminNote || "")}</textarea></label>
+              <div class="admin-modal-footer hotel-room-editor-footer" style="flex-wrap:wrap;gap:0.5rem">
+                <button type="button" class="button secondary" data-hall-extra-close>Anuluj</button>
+                ${r.status === "pending" && r.extendAvailable ? `<button type="button" class="button secondary" id="hall-extend-pending">Przedłuż oczekiwanie (+7 dni)</button>` : ""}
+                ${r.status === "pending" ? `<button type="button" class="button secondary" id="hall-confirm-quick">Potwierdź</button>` : ""}
+                <button type="submit" class="button">Zapisz zmiany</button>
+              </div>
+            </form>
+          </section>
+        </div>`;
+      document.body.appendChild(host);
+      document.body.classList.add("admin-modal-open");
+      host.querySelectorAll("[data-hall-extra-close]").forEach((b) => b.addEventListener("click", closeHallExtraModal));
+      host.querySelector("[data-hall-extra-overlay]")?.addEventListener("click", (ev) => {
+        if (ev.target === ev.currentTarget) closeHallExtraModal();
+      });
+      host.querySelector("#hall-extend-pending")?.addEventListener("click", async () => {
         try {
-          await hallApi("admin-reservation-cancel", { method: "POST", body: { id } });
+          await hallApi("admin-extend-pending", { method: "POST", body: { id } });
+          alert("Przedłużono.");
+          closeHallExtraModal();
+          await loadReservations(hallResFilter);
+          document.querySelector("#hall-sub-content").innerHTML = renderReservations();
+          const hf = document.querySelector("#hall-res-filter");
+          if (hf) hf.value = hallResFilter;
+          bindSub();
         } catch (err) {
           alert(err.message);
         }
-      }
-      await loadReservations(document.querySelector("#hall-res-filter")?.value || "all");
-      document.querySelector("#hall-sub-content").innerHTML = renderReservations();
-      bindSub();
+      });
+      host.querySelector("#hall-confirm-quick")?.addEventListener("click", async () => {
+        if (!confirm("Potwierdzić i wysłać e-mail?")) return;
+        try {
+          await hallApi("admin-reservation-confirm", { method: "POST", body: { id } });
+          closeHallExtraModal();
+          await loadReservations(hallResFilter);
+          document.querySelector("#hall-sub-content").innerHTML = renderReservations();
+          const hf = document.querySelector("#hall-res-filter");
+          if (hf) hf.value = hallResFilter;
+          bindSub();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+      host.querySelector("#hall-edit-form")?.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const fd = new FormData(ev.target);
+        const notifyClient = confirm("Wysłać e-mail o zmianach do klienta?\n\nOK — tak\nAnuluj — nie");
+        try {
+          await hallApi("admin-reservation-update", {
+            method: "PATCH",
+            body: {
+              id,
+              hallId: fd.get("hallId"),
+              reservationDate: fd.get("reservationDate"),
+              startTime: fd.get("startTime"),
+              durationHours: Number(fd.get("durationHours")),
+              guestsCount: Number(fd.get("guestsCount")),
+              exclusive: fd.get("exclusive") === "on",
+              eventType: fd.get("eventType") || "",
+              fullName: fd.get("fullName"),
+              email: fd.get("email"),
+              phonePrefix: fd.get("phonePrefix") || "+48",
+              phoneNational: fd.get("phoneNational"),
+              customerNote: fd.get("customerNote") || "",
+              adminNote: fd.get("adminNote") || "",
+              notifyClient,
+            },
+          });
+          closeHallExtraModal();
+          await loadReservations(hallResFilter);
+          document.querySelector("#hall-sub-content").innerHTML = renderReservations();
+          const hf = document.querySelector("#hall-res-filter");
+          if (hf) hf.value = hallResFilter;
+          bindSub();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
     }
 
     paint();

@@ -1,15 +1,15 @@
 :root {
-  --bg: #faf9f6;
-  --panel: rgba(255, 253, 250, 0.95);
-  --surface: rgba(255, 255, 255, 0.04);
-  --surface-strong: rgba(255, 255, 255, 0.07);
-  --gold-rgb: 200, 170, 120;
-  --line: rgba(200, 170, 120, 0.3);
-  --gold: #c8aa78;
-  --gold-strong: #8b6530;
-  --text: #1f1712;
-  --muted: #7a6b5a;
-  --danger: #e56e5e;
+  --bg: #edf1f8;
+  --panel: rgba(255, 255, 255, 0.92);
+  --surface: rgba(255, 255, 255, 0.08);
+  --surface-strong: rgba(255, 255, 255, 0.14);
+  --gold-rgb: 193, 160, 103;
+  --line: rgba(131, 107, 69, 0.28);
+  --gold: #c1a067;
+  --gold-strong: #70522d;
+  --text: #161d29;
+  --muted: #5d6779;
+  --danger: #d86252;
   --radius-lg: 24px;
   --radius-md: 16px;
   --shadow: 0 16px 38px rgba(79, 55, 22, 0.08);
@@ -31,10 +31,10 @@ body {
   line-height: 1.5;
   color: var(--text);
   background:
-    radial-gradient(1100px 520px at -10% -8%, rgba(200, 170, 120, 0.24), transparent 56%),
-    radial-gradient(900px 440px at 110% 2%, rgba(121, 40, 45, 0.18), transparent 60%),
-    radial-gradient(760px 420px at 50% 115%, rgba(168, 147, 112, 0.18), transparent 64%),
-    linear-gradient(150deg, #fbfaf8 0%, #f6f3ee 55%, #f2efea 100%);
+    radial-gradient(1200px 640px at 0% -12%, rgba(34, 58, 99, 0.2), transparent 56%),
+    radial-gradient(980px 560px at 100% 0%, rgba(15, 28, 52, 0.16), transparent 62%),
+    radial-gradient(860px 520px at 50% 116%, rgba(151, 117, 67, 0.2), transparent 66%),
+    linear-gradient(150deg, #eef2f9 0%, #e7edf7 50%, #e3eaf4 100%);
   overflow-x: hidden;
 }
 
@@ -49,19 +49,19 @@ body::after {
 
 body::before {
   background:
-    radial-gradient(circle at 90% 10%, rgba(143, 30, 43, 0.12), transparent 32%),
-    radial-gradient(circle at 15% 15%, rgba(232, 218, 188, 0.25), transparent 28%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0));
+    radial-gradient(circle at 90% 10%, rgba(46, 64, 105, 0.16), transparent 36%),
+    radial-gradient(circle at 15% 15%, rgba(238, 224, 195, 0.3), transparent 32%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
 }
 
 body::after {
   background-image:
-    linear-gradient(rgba(139, 101, 48, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(139, 101, 48, 0.04) 1px, transparent 1px),
-    radial-gradient(circle at center, rgba(255, 255, 255, 0.45), transparent 58%);
-  background-size: 72px 72px, 72px 72px, auto;
+    linear-gradient(rgba(59, 77, 114, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 77, 114, 0.06) 1px, transparent 1px),
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.4), transparent 62%);
+  background-size: 54px 54px, 54px 54px, auto;
   mask-image: radial-gradient(circle at center, black 36%, transparent 92%);
-  opacity: 0.82;
+  opacity: 0.9;
 }
 
 #admin-app,
@@ -1243,6 +1243,288 @@ body.admin-modal-open {
   min-height: 176px;
 }
 
+.admin-home-layout {
+  display: grid;
+  gap: 1.4rem;
+  width: min(100%, 1120px);
+  margin: 0 auto;
+}
+
+.admin-entry-tile--schedule {
+  width: min(100%, 1120px);
+  min-height: 220px;
+  margin-top: 1.4rem;
+  padding: 1.35rem 1.4rem 1.45rem;
+  border-radius: 32px;
+  background:
+    linear-gradient(145deg, rgba(28, 43, 74, 0.9), rgba(39, 61, 103, 0.82)),
+    radial-gradient(circle at 100% 0%, rgba(197, 160, 102, 0.3), transparent 46%);
+  border: 1px solid rgba(203, 175, 126, 0.42);
+  box-shadow:
+    0 28px 44px rgba(14, 26, 46, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  color: #f3f6fc;
+}
+
+.admin-entry-tile--schedule .admin-tile-title {
+  color: #f7fbff;
+  font-size: clamp(2.4rem, 4vw, 3.2rem);
+}
+
+.admin-entry-tile--schedule .admin-tile-copy {
+  color: rgba(240, 247, 255, 0.86);
+  max-width: 72ch;
+}
+
+.admin-entry-icon {
+  width: 56px;
+  height: 56px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  font-size: 1.9rem;
+}
+
+.schedule-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.schedule-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.schedule-summary-card,
+.schedule-calendar-card,
+.schedule-day-card {
+  border: 1px solid rgba(93, 110, 143, 0.24);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 0.95rem 1rem;
+  box-shadow: 0 16px 28px rgba(25, 36, 61, 0.08);
+}
+
+.schedule-summary-head,
+.schedule-calendar-head,
+.schedule-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.65rem;
+}
+
+.schedule-summary-head h3,
+.schedule-calendar-head h3,
+.schedule-day-head h3 {
+  margin: 0;
+}
+
+.schedule-quick-list,
+.schedule-day-list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.schedule-quick-item,
+.schedule-day-item {
+  border: 1px solid rgba(131, 107, 69, 0.22);
+  border-radius: 14px;
+  padding: 0.72rem 0.8rem;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.schedule-quick-head,
+.schedule-day-item-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.schedule-day-item p,
+.schedule-quick-item p {
+  margin: 0.35rem 0 0;
+}
+
+.schedule-quick-item .inline-actions,
+.schedule-day-item .inline-actions {
+  margin-top: 0.55rem;
+}
+
+.schedule-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0.7rem 0 0.45rem;
+}
+
+.schedule-weekdays span {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.schedule-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.schedule-day-cell {
+  min-height: 88px;
+  border: 1px solid rgba(112, 132, 170, 0.22);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  text-align: left;
+  padding: 0.55rem 0.58rem;
+  display: grid;
+  align-content: space-between;
+  gap: 0.45rem;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.schedule-day-cell:hover {
+  transform: translateY(-1px);
+  border-color: rgba(112, 82, 45, 0.42);
+  box-shadow: 0 10px 18px rgba(34, 48, 79, 0.12);
+}
+
+.schedule-day-cell:focus-visible {
+  outline: none;
+  border-color: rgba(112, 82, 45, 0.8);
+  box-shadow: 0 0 0 3px rgba(193, 160, 103, 0.26);
+}
+
+.schedule-day-cell.is-empty {
+  opacity: 0.56;
+}
+
+.schedule-day-cell.is-selected {
+  border-color: rgba(112, 82, 45, 0.7);
+  box-shadow: 0 0 0 2px rgba(193, 160, 103, 0.22);
+}
+
+.schedule-day-cell.is-outside {
+  opacity: 0.45;
+}
+
+.schedule-day-number {
+  font-weight: 700;
+}
+
+.schedule-day-count {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.schedule-pill-hotel {
+  background: rgba(203, 169, 112, 0.26);
+}
+
+.schedule-pill-restaurant {
+  background: rgba(79, 151, 117, 0.24);
+}
+
+.schedule-pill-hall {
+  background: rgba(98, 120, 184, 0.22);
+}
+
+.schedule-status-pill {
+  font-weight: 700;
+}
+
+.schedule-status-pending {
+  background: rgba(214, 171, 72, 0.2);
+  color: #6f4e15;
+}
+
+.schedule-status-confirmed {
+  background: rgba(91, 156, 116, 0.2);
+  color: #255b3a;
+}
+
+.schedule-status-block {
+  background: rgba(101, 117, 187, 0.2);
+  color: #2d3f83;
+}
+
+.schedule-modal {
+  width: min(900px, calc(100vw - 1.5rem));
+}
+
+.schedule-details-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.schedule-create-services {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.schedule-create-service {
+  min-height: 130px;
+  text-align: left;
+  border: 1px solid rgba(130, 107, 68, 0.28);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 0.85rem 0.9rem;
+  display: grid;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.schedule-create-service:hover {
+  transform: translateY(-1px);
+  border-color: rgba(130, 107, 68, 0.48);
+  box-shadow: 0 10px 20px rgba(41, 47, 72, 0.12);
+}
+
+.schedule-create-service:focus-visible {
+  outline: none;
+  border-color: rgba(112, 82, 45, 0.8);
+  box-shadow: 0 0 0 3px rgba(193, 160, 103, 0.24);
+}
+
+.schedule-create-service strong {
+  font-size: 1.15rem;
+}
+
+.schedule-create-service span {
+  color: var(--muted);
+}
+
+.schedule-create-mode-switch {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.schedule-block-helper {
+  margin: 0.1rem 0 0;
+}
+
 .admin-hotel-wrap {
   display: grid;
   gap: 0.9rem;
@@ -1304,6 +1586,10 @@ body.admin-modal-open {
   margin: 0.75rem 0;
 }
 
+.hotel-nav.is-single .button {
+  min-width: 220px;
+}
+
 .hotel-subpanel {
   display: grid;
   gap: 0.8rem;
@@ -1332,6 +1618,98 @@ body.admin-modal-open {
   border: 1px solid rgba(200, 170, 120, 0.18);
   border-radius: 16px;
   background: rgba(250, 247, 241, 0.72);
+}
+
+.admin-toolbar-row {
+  justify-content: space-between;
+}
+
+.admin-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.admin-toolbar-filters {
+  flex: 1 1 auto;
+  min-width: min(280px, 100%);
+}
+
+button.icon-btn {
+  min-width: 2.6rem;
+  padding: 0.65rem 0.85rem;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.admin-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.button.danger-muted {
+  color: var(--danger, #c44);
+  border-color: rgba(229, 110, 94, 0.5);
+}
+
+.admin-room-fieldset {
+  border: 1px solid rgba(200, 170, 120, 0.28);
+  border-radius: 14px;
+  padding: 0.75rem 1rem;
+  margin: 0;
+}
+
+.admin-room-fieldset legend {
+  padding: 0 0.35rem;
+  font-weight: 600;
+  color: #443224;
+}
+
+.admin-room-checks {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.admin-check-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.admin-check-line input {
+  margin-top: 0.2rem;
+  accent-color: var(--gold-strong);
+}
+
+.admin-check-all {
+  padding-bottom: 0.35rem;
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid rgba(200, 170, 120, 0.2);
+}
+
+.admin-subheading {
+  margin: 1.1rem 0 0.45rem;
+  font-size: 1rem;
+}
+
+.hotel-template-card summary .tpl-key {
+  font-weight: 700;
+}
+
+.hotel-template-card summary .tpl-desc {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+  font-weight: 400;
 }
 
 .hotel-subpanel form label,
@@ -1455,6 +1833,60 @@ body.admin-modal-open {
   margin-bottom: 0.5rem;
 }
 
+.home-media-editor {
+  gap: 1rem;
+}
+
+.home-media-controls {
+  gap: 0.85rem;
+}
+
+.home-media-control-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.home-media-preview-shell {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.home-media-preview {
+  --home-media-focus-x: 50%;
+  --home-media-focus-y: 50%;
+  --home-media-zoom: 1;
+  position: relative;
+  width: min(100%, 760px);
+  aspect-ratio: 16 / 8;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(200, 170, 120, 0.35);
+  background: rgba(246, 241, 232, 0.85);
+}
+
+.home-media-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--home-media-focus-x) var(--home-media-focus-y);
+  transform: scale(var(--home-media-zoom));
+  transform-origin: center;
+}
+
+.home-media-preview-overlay {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 0.8rem 1rem;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.52));
+  color: #fff;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 @media (max-width: 980px) {
   .admin-shell {
     width: min(100vw - 1rem, 1320px);
@@ -1518,6 +1950,47 @@ body.admin-modal-open {
     width: min(100%, calc(2 * 280px + 1 * 1.15rem));
   }
 
+  .admin-home-layout {
+    gap: 1rem;
+  }
+
+  .admin-entry-tile--schedule {
+    min-height: 190px;
+    margin-top: 0.5rem;
+    padding: 1rem 1.05rem 1.1rem;
+  }
+
+  .admin-entry-icon {
+    width: 48px;
+    height: 48px;
+    font-size: 1.6rem;
+  }
+
+  .schedule-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-calendar-head {
+    align-items: flex-start;
+  }
+
+  .schedule-calendar-grid {
+    gap: 0.35rem;
+  }
+
+  .schedule-day-cell {
+    min-height: 74px;
+    padding: 0.48rem 0.5rem;
+  }
+
+  .schedule-create-services {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-create-mode-switch .button {
+    flex: 1 1 150px;
+  }
+
   .hotel-filters {
     align-items: stretch;
   }
@@ -1535,5 +2008,9 @@ body.admin-modal-open {
   .upload-room-gallery-form .button {
     width: auto;
     justify-self: auto;
+  }
+
+  .home-media-control-pair {
+    grid-template-columns: 1fr;
   }
 }

@@ -8,12 +8,12 @@ const HALL_PENDING_MS = 7 * 24 * 60 * 60 * 1000;
 const HALL_EXTEND_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000;
 
 const STATUS_LABELS = {
-  email_verification_pending: "E-mail do potwierdzenia",
-  pending: "Oczekujące",
-  confirmed: "Zarezerwowane",
+  email_verification_pending: "Do potwierdzenia e-mail (2h)",
+  pending: "Oczekujące na decyzję",
+  confirmed: "Potwierdzone / zarezerwowane",
   cancelled: "Anulowane",
   expired: "Wygasłe",
-  manual_block: "Blokada terminu",
+  manual_block: "Blokada terminu (admin)",
 };
 
 const BLOCKING_STATUSES = ["pending", "confirmed", "manual_block"];
@@ -341,26 +341,53 @@ function normalizePhone(prefix, national) {
 }
 
 function humanNumberKey(service) {
-  if (service === "hotel") return "hotel_human_number";
-  if (service === "restaurant") return "restaurant_human_number";
-  return "hall_human_number";
+  if (service === "hotel") return "hotel_human_seq";
+  if (service === "restaurant") return "restaurant_human_seq";
+  return "hall_human_seq";
 }
 
-function humanNumberStart(service) {
-  if (service === "hotel") return 1000;
-  if (service === "restaurant") return 2000;
-  return 3000;
+function yearFromMsWarsaw(ms) {
+  const t = Number(ms);
+  if (!Number.isFinite(t)) return new Date().getFullYear();
+  return Number(
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Warsaw", year: "numeric" }).format(new Date(t))
+  );
 }
 
-async function nextHumanNumber(env, service) {
-  const key = humanNumberKey(service);
-  const start = humanNumberStart(service);
+function addOneDayYmd(ymd) {
+  const s = String(ymd || "");
+  const [y, m, d] = s.split("-").map((x) => Number(x));
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return s;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+}
+
+async function nextHumanSequenceForYear(env, service, year) {
+  const y = Number(year);
+  if (!Number.isFinite(y) || y < 2000 || y > 2100) {
+    throw new Error("Nieprawidłowy rok numeracji.");
+  }
+  const key = `${humanNumberKey(service)}_${y}`;
   const row = await env.DB.prepare(
-    "INSERT INTO booking_counters (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = value + 1 RETURNING value"
+    `INSERT INTO booking_counters (key, value) VALUES (?, 1)
+     ON CONFLICT(key) DO UPDATE SET value = booking_counters.value + 1
+     RETURNING value`
   )
-    .bind(key, start)
+    .bind(key)
     .first();
-  return Number(row?.value || start);
+  return Number(row?.value || 1);
+}
+
+function formatHumanReservationNumber(row) {
+  if (!row) return "";
+  const seq = Number(row.human_number ?? 0);
+  const hy = row.human_year;
+  const y =
+    hy != null && hy !== ""
+      ? Number(hy)
+      : yearFromMsWarsaw(Number(row.created_at || 0));
+  return `${seq}/${y}`;
 }
 
 async function readBody(request) {
@@ -567,8 +594,49 @@ async function ensureSchema(env) {
       await env.DB.prepare(sql).run();
     }
     await seedDefaults(env);
+    await migrateHumanYearAndTemplates(env);
   })();
   return schemaReadyPromise;
+}
+
+async function migrateHumanYearAndTemplates(env) {
+  for (const tbl of ["hotel_reservations", "restaurant_reservations", "venue_reservations"]) {
+    try {
+      await env.DB.prepare(`ALTER TABLE ${tbl} ADD COLUMN human_year INTEGER`).run();
+    } catch {
+      /* kolumna już istnieje */
+    }
+  }
+  await env.DB.prepare(
+    `UPDATE hotel_reservations SET human_year = CAST(strftime('%Y', created_at/1000, 'unixepoch') AS INTEGER)
+     WHERE human_year IS NULL`
+  ).run();
+  await env.DB.prepare(
+    `UPDATE restaurant_reservations SET human_year = CAST(strftime('%Y', created_at/1000, 'unixepoch') AS INTEGER)
+     WHERE human_year IS NULL`
+  ).run();
+  await env.DB.prepare(
+    `UPDATE venue_reservations SET human_year = CAST(strftime('%Y', created_at/1000, 'unixepoch') AS INTEGER)
+     WHERE human_year IS NULL`
+  ).run();
+
+  const services = ["hotel", "restaurant", "hall"];
+  const now = nowMs();
+  for (const service of services) {
+    const defaults = defaultTemplateMap(service);
+    const existing = await env.DB.prepare("SELECT key FROM booking_mail_templates WHERE service = ?")
+      .bind(service)
+      .all();
+    const have = new Set((existing.results || []).map((r) => r.key));
+    for (const [key, val] of Object.entries(defaults)) {
+      if (have.has(key)) continue;
+      await env.DB.prepare(
+        "INSERT INTO booking_mail_templates (service, key, subject, body_html, updated_at) VALUES (?, ?, ?, ?, ?)"
+      )
+        .bind(service, key, val.subject, val.bodyHtml, now)
+        .run();
+    }
+  }
 }
 
 async function seedDefaults(env) {
@@ -689,6 +757,23 @@ async function hotelRooms(env) {
   }));
 }
 
+async function assertHotelRoomDeletable(env, roomId) {
+  const rid = cleanString(roomId, 80);
+  if (!rid) throw new Error("Brak ID pokoju.");
+  const rows = await env.DB.prepare(
+    `SELECT room_ids_json AS roomIdsJson FROM hotel_reservations
+     WHERE status IN ('email_verification_pending','pending','confirmed','manual_block')`
+  ).all();
+  for (const row of rows.results || []) {
+    const ids = parseJson(row.roomIdsJson, []);
+    if (ids.includes(rid)) {
+      throw new Error(
+        "Nie można usunąć pokoju — jest używany w aktywnej rezerwacji lub blokadzie. Usuń pokój z rezerwacji lub anuluj wpis, potem spróbuj ponownie."
+      );
+    }
+  }
+}
+
 async function hotelBlockingReservations(env, dateFrom, dateTo, excludeId = null) {
   const rows = await env.DB.prepare(
     `SELECT id, room_ids_json AS roomIdsJson FROM hotel_reservations
@@ -743,13 +828,25 @@ async function assertHotelRoomIdsAvailable(env, roomIds, dateFrom, dateTo, exclu
 async function createHotelReservation(env, payload, options = {}) {
   const now = nowMs();
   const id = crypto.randomUUID();
-  const humanNumber = await nextHumanNumber(env, "hotel");
+  const humanYear = yearFromMsWarsaw(now);
+  const humanNumber = await nextHumanSequenceForYear(env, "hotel", humanYear);
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const roomIds = Array.isArray(payload.roomIds) ? payload.roomIds.map((x) => cleanString(x, 80)).filter(Boolean) : [];
   const dateFrom = cleanString(payload.dateFrom, 10);
   const dateTo = cleanString(payload.dateTo, 10);
   assertDateRange(dateFrom, dateTo);
-  const { requested } = await assertHotelRoomIdsAvailable(env, roomIds, dateFrom, dateTo, options.excludeId || null);
+  let requested = [];
+  if (options.skipAvailabilityCheck) {
+    const rooms = await hotelRooms(env);
+    const roomIdsSet = new Set(rooms.map((room) => room.id));
+    requested = roomIds.filter((roomId) => roomIdsSet.has(roomId));
+    if (!requested.length) {
+      throw new Error("Wybrane pokoje nie istnieją.");
+    }
+  } else {
+    const availability = await assertHotelRoomIdsAvailable(env, roomIds, dateFrom, dateTo, options.excludeId || null);
+    requested = availability.requested;
+  }
 
   const activeRooms = await hotelRooms(env);
   const byId = new Map(activeRooms.map((r) => [r.id, r]));
@@ -767,14 +864,15 @@ async function createHotelReservation(env, payload, options = {}) {
   const pendingExp = status === "pending" ? now + HOTEL_PENDING_MS : null;
   await env.DB.prepare(
     `INSERT INTO hotel_reservations (
-      id, human_number, status, customer_name, email, phone_prefix, phone_national, phone_e164,
+      id, human_number, human_year, status, customer_name, email, phone_prefix, phone_national, phone_e164,
       date_from, date_to, total_price, customer_note, admin_note, room_ids_json,
       confirmation_token_hash, email_verification_expires_at, pending_expires_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       id,
       humanNumber,
+      humanYear,
       status,
       cleanString(payload.fullName || payload.customerName || "Gość", 120),
       cleanString(payload.email, 180).toLowerCase(),
@@ -813,8 +911,12 @@ function mapHotelReservation(row) {
   return {
     id: row.id,
     humanNumber: row.human_number,
+    humanYear: row.human_year != null ? Number(row.human_year) : null,
+    humanNumberLabel: formatHumanReservationNumber(row),
     customerName: row.customer_name,
     email: row.email,
+    phonePrefix: row.phone_prefix || "",
+    phoneNational: row.phone_national || "",
     phone: `${row.phone_prefix || ""} ${row.phone_national || ""}`.trim(),
     status: row.status,
     statusLabel: statusLabel(row.status),
@@ -1133,12 +1235,17 @@ function mapRestaurantReservation(row, tableMap) {
   return {
     id: row.id,
     humanNumber: row.human_number,
+    humanYear: row.human_year != null ? Number(row.human_year) : null,
+    humanNumberLabel: formatHumanReservationNumber(row),
     fullName: row.full_name,
     email: row.email,
+    phonePrefix: row.phone_prefix || "",
+    phoneNational: row.phone_national || "",
     phone: `${row.phone_prefix || ""} ${row.phone_national || ""}`.trim(),
     status: row.status,
     statusLabel: statusLabel(row.status),
     reservationDate: row.reservation_date,
+    startTime: row.start_time || "",
     startDateTime: Number(row.start_ms || 0),
     endDateTime: Number(row.end_ms || 0),
     durationHours: Number(row.duration_hours || 0),
@@ -1158,9 +1265,37 @@ function mapRestaurantReservation(row, tableMap) {
 
 async function createRestaurantReservation(env, payload, options = {}) {
   const now = nowMs();
-  const availability = await assertRestaurantAvailability(env, payload, options.excludeId || null);
-  if (!availability.ok) {
-    throw new Error("Brak wolnych stolików w wybranym terminie.");
+  let availability;
+  if (options.skipAvailabilityCheck) {
+    const reservationDate = cleanString(payload.reservationDate, 10);
+    const startTime = cleanString(payload.startTime, 5);
+    const durationHours = Number(payload.durationHours || 2);
+    const tablesCount = Math.max(1, toInt(payload.tablesCount, 1));
+    if (!isYmd(reservationDate) || !isHm(startTime)) {
+      throw new Error("Nieprawidłowa data lub godzina.");
+    }
+    if (!Number.isFinite(durationHours) || durationHours <= 0) {
+      throw new Error("Nieprawidłowy czas trwania.");
+    }
+    const startMs = ymdHmToMs(reservationDate, startTime);
+    const endMs = startMs + durationHours * 3600000;
+    availability = {
+      ok: true,
+      availableIds: [],
+      startMs,
+      endMs,
+      settings: await loadRestaurantSettings(env),
+      reservationDate,
+      startTime,
+      durationHours,
+      tablesCount,
+      dayWindow: { closed: false },
+    };
+  } else {
+    availability = await assertRestaurantAvailability(env, payload, options.excludeId || null);
+    if (!availability.ok) {
+      throw new Error("Brak wolnych stolików w wybranym terminie.");
+    }
   }
   const settings = availability.settings;
   const tablesCount = availability.tablesCount;
@@ -1170,7 +1305,8 @@ async function createRestaurantReservation(env, payload, options = {}) {
     throw new Error(`Maksymalnie ${maxGuests} gości przy ${tablesCount} stolikach.`);
   }
   const id = crypto.randomUUID();
-  const humanNumber = await nextHumanNumber(env, "restaurant");
+  const humanYear = yearFromMsWarsaw(now);
+  const humanNumber = await nextHumanSequenceForYear(env, "restaurant", humanYear);
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const token = options.withConfirmationToken ? randomToken() : "";
   const tokenHash = token ? await sha256Hex(token) : null;
@@ -1180,15 +1316,16 @@ async function createRestaurantReservation(env, payload, options = {}) {
   const pendingExp = status === "pending" ? now + RESTAURANT_PENDING_MS : null;
   await env.DB.prepare(
     `INSERT INTO restaurant_reservations (
-      id, human_number, status, full_name, email, phone_prefix, phone_national, phone_e164,
+      id, human_number, human_year, status, full_name, email, phone_prefix, phone_national, phone_e164,
       reservation_date, start_time, duration_hours, start_ms, end_ms, tables_count, guests_count, join_tables,
       assigned_table_ids_json, customer_note, admin_note, cleanup_buffer_minutes,
       confirmation_token_hash, email_verification_expires_at, pending_expires_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       id,
       humanNumber,
+      humanYear,
       status,
       cleanString(payload.fullName, 120),
       cleanString(payload.email, 180).toLowerCase(),
@@ -1320,12 +1457,34 @@ async function hallAvailability(env, payload, excludeId = null) {
 
 async function createHallReservation(env, payload, options = {}) {
   const now = nowMs();
-  const avail = await hallAvailability(env, payload, options.excludeId || null);
-  if (!avail.ok) {
-    throw new Error("Termin niedostępny.");
+  let avail;
+  if (options.skipAvailabilityCheck) {
+    const halls = await venueHalls(env);
+    const hall = halls.find((entry) => entry.id === cleanString(payload.hallId, 80));
+    if (!hall) {
+      throw new Error("Sala niedostępna.");
+    }
+    const reservationDate = cleanString(payload.reservationDate, 10);
+    const startTime = cleanString(payload.startTime, 5);
+    const durationHours = Number(payload.durationHours || 2);
+    if (!isYmd(reservationDate) || !isHm(startTime) || !Number.isFinite(durationHours) || durationHours <= 0) {
+      throw new Error("Nieprawidłowa data lub godzina.");
+    }
+    const startMs = ymdHmToMs(reservationDate, startTime);
+    const endMs = startMs + durationHours * 3600000;
+    const guestsCount = Math.max(0, toInt(payload.guestsCount, hall.hallKind === "small" ? 1 : 10));
+    const exclusive = hall.hallKind === "small" ? true : Boolean(payload.exclusive);
+    const fullBlock = hallFullBlock(hall, guestsCount, exclusive);
+    avail = { ok: true, hall, startMs, endMs, guestsCount, exclusive, fullBlock };
+  } else {
+    avail = await hallAvailability(env, payload, options.excludeId || null);
+    if (!avail.ok) {
+      throw new Error("Termin niedostępny.");
+    }
   }
   const id = crypto.randomUUID();
-  const humanNumber = await nextHumanNumber(env, "hall");
+  const humanYear = yearFromMsWarsaw(now);
+  const humanNumber = await nextHumanSequenceForYear(env, "hall", humanYear);
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const token = options.withConfirmationToken ? randomToken() : "";
   const tokenHash = token ? await sha256Hex(token) : null;
@@ -1334,16 +1493,17 @@ async function createHallReservation(env, payload, options = {}) {
   const pendingExp = status === "pending" ? now + HALL_PENDING_MS : null;
   await env.DB.prepare(
     `INSERT INTO venue_reservations (
-      id, human_number, status, hall_id, hall_name_snapshot, hall_kind_snapshot, full_block_guest_threshold_snap,
+      id, human_number, human_year, status, hall_id, hall_name_snapshot, hall_kind_snapshot, full_block_guest_threshold_snap,
       full_name, email, phone_prefix, phone_national, phone_e164,
       reservation_date, start_time, duration_hours, start_ms, end_ms, start_time_label, end_time_label,
       guests_count, exclusive, full_block, event_type, customer_note, admin_note,
       confirmation_token_hash, email_verification_expires_at, pending_expires_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       id,
       humanNumber,
+      humanYear,
       status,
       avail.hall.id,
       avail.hall.name,
@@ -1391,6 +1551,10 @@ function mapHallReservation(row, hallMap) {
   return {
     id: row.id,
     humanNumber: row.human_number,
+    humanYear: row.human_year != null ? Number(row.human_year) : null,
+    humanNumberLabel: formatHumanReservationNumber(row),
+    phonePrefix: row.phone_prefix || "",
+    phoneNational: row.phone_national || "",
     hallId: row.hall_id,
     hallName: row.hall_name_snapshot || hall?.name || row.hall_id,
     hallKindSnapshot: row.hall_kind_snapshot,
@@ -1446,6 +1610,11 @@ function defaultTemplateMap(service) {
         subject: "{{hotelName}} — rezerwacja anulowana ({{reservationNumber}})",
         bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została anulowana.</p>",
       },
+      changed_client: {
+        subject: "{{hotelName}} — zmiana w rezerwacji {{reservationNumber}}",
+        bodyHtml:
+          "<p>Witaj {{fullName}},</p><p>Wprowadziliśmy zmiany w rezerwacji <strong>{{reservationNumber}}</strong>.</p><p>Termin pobytu: {{dateFrom}} — {{dateTo}} ({{nights}} nocy).<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>{{customerNote}}</p><p>W razie pytań odpowiedz na tę wiadomość lub skontaktuj się z recepcją.</p>",
+      },
     };
   }
   if (service === "restaurant") {
@@ -1493,6 +1662,16 @@ function defaultTemplateMap(service) {
         subject: "{{restaurantName}} — rezerwacja anulowana ({{reservationNumber}})",
         bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została anulowana.</p>",
       },
+      restaurant_changed_client: {
+        subject: "{{restaurantName}} — zmiana rezerwacji stolika {{reservationNumber}}",
+        bodyHtml:
+          "<p>Witaj {{fullName}},</p><p>Zaktualizowaliśmy Twoją rezerwację <strong>{{reservationNumber}}</strong>.</p><p>Data: {{date}}<br>Godziny: {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Stoliki: {{tablesList}}<br>Liczba gości: {{guestsCount}}</p><p>Uwagi: {{customerNote}}</p><p>W razie pytań odpowiedz na tę wiadomość.</p>",
+      },
+      rest_changed_client: {
+        subject: "{{restaurantName}} — zmiana rezerwacji stolika {{reservationNumber}}",
+        bodyHtml:
+          "<p>Witaj {{fullName}},</p><p>Zaktualizowaliśmy Twoją rezerwację <strong>{{reservationNumber}}</strong>.</p><p>Data: {{date}} · {{timeFrom}}–{{timeTo}}</p>",
+      },
     };
   }
   return {
@@ -1518,6 +1697,11 @@ function defaultTemplateMap(service) {
       subject: "{{venueName}} — rezerwacja sali anulowana ({{reservationNumber}})",
       bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została anulowana.</p>",
     },
+    hall_changed_client: {
+      subject: "{{venueName}} — zmiana rezerwacji sali {{reservationNumber}}",
+      bodyHtml:
+        "<p>Witaj {{fullName}},</p><p>Wprowadziliśmy zmiany w rezerwacji sali <strong>{{reservationNumber}}</strong>.</p><p>Sala: {{hallName}}<br>Data: {{date}}<br>Godziny: {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Goście: {{guestsCount}}<br>Impreza: {{eventType}}</p><p>Uwagi: {{customerNote}}</p>",
+    },
   };
 }
 
@@ -1528,6 +1712,7 @@ const EVENT_TEMPLATE_KEYS = {
     pending_admin: ["pending_admin"],
     confirmed_client: ["confirmed_client"],
     cancelled_client: ["cancelled_client"],
+    changed_client: ["changed_client"],
   },
   restaurant: {
     confirm_email: ["restaurant_confirm_email", "rest_confirm_email"],
@@ -1535,6 +1720,7 @@ const EVENT_TEMPLATE_KEYS = {
     pending_admin: ["restaurant_pending_admin", "rest_pending_admin"],
     confirmed_client: ["restaurant_confirmed_client", "rest_confirmed_client"],
     cancelled_client: ["restaurant_cancelled_client", "rest_cancelled_client"],
+    changed_client: ["restaurant_changed_client", "rest_changed_client"],
   },
   hall: {
     confirm_email: ["hall_confirm_email"],
@@ -1542,6 +1728,7 @@ const EVENT_TEMPLATE_KEYS = {
     pending_admin: ["hall_pending_admin"],
     confirmed_client: ["hall_confirmed_client"],
     cancelled_client: ["hall_cancelled_client"],
+    changed_client: ["hall_changed_client"],
   },
 };
 
@@ -1581,8 +1768,17 @@ async function saveTemplate(env, service, key, subject, bodyHtml) {
 async function resolveTemplateForEvent(env, service, eventKey) {
   const all = await loadTemplates(env, service);
   const candidates = EVENT_TEMPLATE_KEYS[service]?.[eventKey] || [eventKey];
+  const isPlaceholder = (tpl) => {
+    if (!tpl) return true;
+    const subject = cleanString(tpl.subject, 500).toLowerCase();
+    const body = cleanString(tpl.bodyHtml, 5000).toLowerCase();
+    const placeholderSubject = subject === `${service} - ${eventKey}` || subject.includes(" - ");
+    const placeholderBody = body.includes("szablon ") || body === "";
+    return placeholderSubject && placeholderBody;
+  };
   for (const key of candidates) {
-    if (all[key]) return all[key];
+    const tpl = all[key];
+    if (tpl && !isPlaceholder(tpl)) return tpl;
   }
   const defaults = defaultTemplateMap(service);
   for (const key of candidates) {
@@ -1591,11 +1787,31 @@ async function resolveTemplateForEvent(env, service, eventKey) {
   return { subject: `${service} - ${eventKey}`, bodyHtml: `<p>Szablon ${eventKey}</p>` };
 }
 
+function listStatusWhere(status) {
+  const s = cleanString(status, 40) || "active";
+  if (s === "all") return { sql: "", binds: [] };
+  if (s === "active") return { sql: "WHERE status IN ('pending','confirmed')", binds: [] };
+  return { sql: "WHERE status = ?", binds: [s] };
+}
+
 async function listHotelReservations(env, status) {
+  const { sql, binds } = listStatusWhere(status);
   const rows = await env.DB.prepare(
-    `SELECT * FROM hotel_reservations ${status && status !== "all" ? "WHERE status = ?" : ""} ORDER BY created_at DESC LIMIT 500`
+    `SELECT * FROM hotel_reservations ${sql}
+     ORDER BY CASE status
+                WHEN 'pending' THEN 0
+                WHEN 'confirmed' THEN 1
+                WHEN 'email_verification_pending' THEN 2
+                WHEN 'manual_block' THEN 3
+                WHEN 'cancelled' THEN 4
+                WHEN 'expired' THEN 5
+                ELSE 6
+              END ASC,
+              date_to ASC,
+              created_at DESC
+     LIMIT 500`
   )
-    .bind(...(status && status !== "all" ? [status] : []))
+    .bind(...binds)
     .all();
   return (rows.results || []).map(mapHotelReservation);
 }
@@ -1603,10 +1819,23 @@ async function listHotelReservations(env, status) {
 async function listRestaurantReservations(env, status) {
   const tables = await restaurantTables(env, true);
   const map = new Map(tables.map((t) => [t.id, t]));
+  const { sql, binds } = listStatusWhere(status);
   const rows = await env.DB.prepare(
-    `SELECT * FROM restaurant_reservations ${status && status !== "all" ? "WHERE status = ?" : ""} ORDER BY created_at DESC LIMIT 500`
+    `SELECT * FROM restaurant_reservations ${sql}
+     ORDER BY CASE status
+                WHEN 'pending' THEN 0
+                WHEN 'confirmed' THEN 1
+                WHEN 'email_verification_pending' THEN 2
+                WHEN 'manual_block' THEN 3
+                WHEN 'cancelled' THEN 4
+                WHEN 'expired' THEN 5
+                ELSE 6
+              END ASC,
+              end_ms ASC,
+              created_at DESC
+     LIMIT 500`
   )
-    .bind(...(status && status !== "all" ? [status] : []))
+    .bind(...binds)
     .all();
   return (rows.results || []).map((r) => mapRestaurantReservation(r, map));
 }
@@ -1614,10 +1843,23 @@ async function listRestaurantReservations(env, status) {
 async function listHallReservations(env, status) {
   const halls = await venueHalls(env);
   const map = new Map(halls.map((h) => [h.id, h]));
+  const { sql, binds } = listStatusWhere(status);
   const rows = await env.DB.prepare(
-    `SELECT * FROM venue_reservations ${status && status !== "all" ? "WHERE status = ?" : ""} ORDER BY created_at DESC LIMIT 500`
+    `SELECT * FROM venue_reservations ${sql}
+     ORDER BY CASE status
+                WHEN 'pending' THEN 0
+                WHEN 'confirmed' THEN 1
+                WHEN 'email_verification_pending' THEN 2
+                WHEN 'manual_block' THEN 3
+                WHEN 'cancelled' THEN 4
+                WHEN 'expired' THEN 5
+                ELSE 6
+              END ASC,
+              end_ms ASC,
+              created_at DESC
+     LIMIT 500`
   )
-    .bind(...(status && status !== "all" ? [status] : []))
+    .bind(...binds)
     .all();
   return (rows.results || []).map((r) => mapHallReservation(r, map));
 }
@@ -1655,7 +1897,7 @@ async function buildHotelMailVars(env, request, row, token = "") {
   const roomLabels = roomIds.map((id) => roomMap.get(id)?.name || id).join(", ");
   return {
     reservationId: row.id,
-    reservationNumber: String(row.human_number || row.id),
+    reservationNumber: formatHumanReservationNumber(row),
     fullName: row.customer_name || "",
     email: row.email || "",
     phone: `${row.phone_prefix || ""} ${row.phone_national || ""}`.trim(),
@@ -1683,7 +1925,7 @@ async function buildRestaurantMailVars(env, request, row, token = "") {
     .join(", ");
   return {
     reservationId: row.id,
-    reservationNumber: String(row.human_number || row.id),
+    reservationNumber: formatHumanReservationNumber(row),
     fullName: row.full_name || "",
     email: row.email || "",
     phone: `${row.phone_prefix || ""} ${row.phone_national || ""}`.trim(),
@@ -1706,7 +1948,7 @@ async function buildHallMailVars(env, request, row, token = "") {
   const hall = await env.DB.prepare("SELECT name FROM venue_halls WHERE id = ?").bind(row.hall_id).first();
   return {
     reservationId: row.id,
-    reservationNumber: String(row.human_number || row.id),
+    reservationNumber: formatHumanReservationNumber(row),
     fullName: row.full_name || "",
     email: row.email || "",
     phone: `${row.phone_prefix || ""} ${row.phone_national || ""}`.trim(),
@@ -2172,6 +2414,18 @@ async function handleHotelAdmin(env, op, request) {
       .run();
     return { status: 200, data: { ok: true } };
   }
+  if (op === "admin-room-delete" && request.method === "DELETE") {
+    const url = new URL(request.url);
+    const id = cleanString(url.searchParams.get("id"), 80);
+    if (!id) return { status: 400, data: { error: "Brak ID pokoju." } };
+    try {
+      await assertHotelRoomDeletable(env, id);
+      await env.DB.prepare("DELETE FROM hotel_rooms WHERE id = ?").bind(id).run();
+      return { status: 200, data: { ok: true } };
+    } catch (error) {
+      return { status: 400, data: { error: error.message || "Nie można usunąć pokoju." } };
+    }
+  }
   if (op === "admin-reservations-list" && request.method === "GET") {
     const url = new URL(request.url);
     const status = cleanString(url.searchParams.get("status"), 40);
@@ -2188,8 +2442,12 @@ async function handleHotelAdmin(env, op, request) {
   if (op === "admin-reservation-create" && request.method === "POST") {
     const body = await readBody(request);
     try {
-      const status = ["pending", "confirmed", "manual_block"].includes(body.status) ? body.status : "pending";
-      const out = await createHotelReservation(env, body, { status, withConfirmationToken: false });
+      const status = ["pending", "confirmed", "manual_block"].includes(body.status) ? body.status : "confirmed";
+      const out = await createHotelReservation(env, body, {
+        status,
+        withConfirmationToken: false,
+        skipAvailabilityCheck: status === "manual_block",
+      });
       return { status: 200, data: { ok: true, reservationId: out.id, humanNumber: out.humanNumber } };
     } catch (error) {
       return { status: 400, data: { error: error.message || "Błąd tworzenia." } };
@@ -2198,15 +2456,26 @@ async function handleHotelAdmin(env, op, request) {
   if (op === "admin-manual-block" && request.method === "POST") {
     const body = await readBody(request);
     try {
-      const out = await createHotelReservation(env, {
-        ...body,
-        fullName: "Blokada terminu",
-        email: "noreply@local",
-        phonePrefix: "+48",
-        phoneNational: "000000000",
-        customerNote: cleanString(body.note, 2000),
-        adminNote: cleanString(body.note, 2000),
-      }, { status: "manual_block", withConfirmationToken: false });
+      let dateFrom = cleanString(body.dateFrom, 10);
+      let dateTo = cleanString(body.dateTo, 10);
+      if (dateFrom && dateTo && dateFrom === dateTo) {
+        dateTo = addOneDayYmd(dateFrom);
+      }
+      const out = await createHotelReservation(
+        env,
+        {
+          ...body,
+          dateFrom,
+          dateTo,
+          fullName: "Blokada terminu",
+          email: "noreply@local",
+          phonePrefix: "+48",
+          phoneNational: "000000000",
+          customerNote: cleanString(body.note, 2000),
+          adminNote: cleanString(body.note, 2000),
+        },
+        { status: "manual_block", withConfirmationToken: false, skipAvailabilityCheck: true }
+      );
       return { status: 200, data: { ok: true, reservationId: out.id } };
     } catch (error) {
       return { status: 400, data: { error: error.message || "Błąd blokady." } };
@@ -2214,10 +2483,85 @@ async function handleHotelAdmin(env, op, request) {
   }
   if (op === "admin-reservation-update" && request.method === "PATCH") {
     const body = await readBody(request);
-    await env.DB.prepare("UPDATE hotel_reservations SET admin_note=?, updated_at=? WHERE id=?")
-      .bind(cleanString(body.adminNote, 2000), nowMs(), cleanString(body.id, 80))
-      .run();
-    return { status: 200, data: { ok: true } };
+    const id = cleanString(body.id, 80);
+    const row = await getHotelReservation(env, id);
+    if (!row) return { status: 404, data: { error: "Brak rezerwacji." } };
+    const notifyClient = Boolean(body.notifyClient);
+    const fullEdit =
+      body.dateFrom != null ||
+      body.dateTo != null ||
+      Array.isArray(body.roomIds) ||
+      body.fullName != null ||
+      body.email != null ||
+      body.phonePrefix != null ||
+      body.phoneNational != null ||
+      body.customerNote != null;
+    if (!fullEdit) {
+      await env.DB.prepare("UPDATE hotel_reservations SET admin_note=?, updated_at=? WHERE id=?")
+        .bind(cleanString(body.adminNote, 2000), nowMs(), id)
+        .run();
+      return { status: 200, data: { ok: true } };
+    }
+    try {
+      const dateFrom = cleanString(body.dateFrom ?? row.date_from, 10);
+      let dateTo = cleanString(body.dateTo ?? row.date_to, 10);
+      if (dateFrom && dateTo && dateFrom === dateTo) {
+        dateTo = addOneDayYmd(dateFrom);
+      }
+      assertDateRange(dateFrom, dateTo);
+      const roomIds = Array.isArray(body.roomIds)
+        ? body.roomIds.map((x) => cleanString(x, 80)).filter(Boolean)
+        : parseJson(row.room_ids_json, []);
+      await assertHotelRoomIdsAvailable(env, roomIds, dateFrom, dateTo, id);
+      const phone = normalizePhone(body.phonePrefix ?? row.phone_prefix, body.phoneNational ?? row.phone_national);
+      const activeRooms = await hotelRooms(env);
+      const byId = new Map(activeRooms.map((r) => [r.id, r]));
+      const nights = nightsCount(dateFrom, dateTo);
+      let totalPrice = 0;
+      roomIds.forEach((rid) => {
+        const room = byId.get(rid);
+        totalPrice += Number(room?.pricePerNight || 0) * nights;
+      });
+      await env.DB.prepare(
+        `UPDATE hotel_reservations SET
+          customer_name=?, email=?, phone_prefix=?, phone_national=?, phone_e164=?,
+          date_from=?, date_to=?, total_price=?, customer_note=?, admin_note=?,
+          room_ids_json=?, updated_at=?
+         WHERE id=?`
+      )
+        .bind(
+          cleanString(body.fullName ?? row.customer_name, 120),
+          cleanString(body.email ?? row.email, 180).toLowerCase(),
+          phone.prefix,
+          phone.national,
+          phone.e164,
+          dateFrom,
+          dateTo,
+          totalPrice,
+          cleanString(body.customerNote ?? row.customer_note, 2000),
+          cleanString(body.adminNote ?? row.admin_note, 2000),
+          toJson(roomIds),
+          nowMs(),
+          id
+        )
+        .run();
+      if (notifyClient) {
+        try {
+          const updated = await getHotelReservation(env, id);
+          await sendTemplatedBookingMail(env, request, {
+            service: "hotel",
+            eventKey: "changed_client",
+            row: updated,
+            to: updated?.email,
+          });
+        } catch (error) {
+          console.error("Hotel changed mail error:", error);
+        }
+      }
+      return { status: 200, data: { ok: true } };
+    } catch (error) {
+      return { status: 400, data: { error: error.message || "Błąd zapisu." } };
+    }
   }
   if (op === "admin-reservation-confirm" && request.method === "POST") {
     const body = await readBody(request);
@@ -2359,9 +2703,13 @@ async function handleRestaurantAdmin(env, op, request) {
   if (op === "admin-reservation-create" && request.method === "POST") {
     const body = await readBody(request);
     try {
-      const status = ["pending", "confirmed", "manual_block"].includes(body.status) ? body.status : "pending";
+      const status = ["pending", "confirmed", "manual_block"].includes(body.status) ? body.status : "confirmed";
       let assigned = [];
-      if (status !== "email_verification_pending") {
+      if (status === "manual_block") {
+        assigned = Array.isArray(body.assignedTableIds)
+          ? body.assignedTableIds.map((value) => cleanString(value, 80)).filter(Boolean)
+          : [];
+      } else if (status !== "email_verification_pending") {
         const chk = await assertRestaurantAvailability(env, body, null);
         if (!chk.ok) return { status: 409, data: { error: "Brak wolnych stolików." } };
         assigned = chk.availableIds;
@@ -2370,6 +2718,7 @@ async function handleRestaurantAdmin(env, op, request) {
         status,
         withConfirmationToken: false,
         assignedTableIds: assigned,
+        skipAvailabilityCheck: status === "manual_block",
       });
       return { status: 200, data: { ok: true, reservationId: out.id, humanNumber: out.humanNumber } };
     } catch (error) {
@@ -2409,6 +2758,7 @@ async function handleRestaurantAdmin(env, op, request) {
         status: "manual_block",
         withConfirmationToken: false,
         assignedTableIds: tableIds,
+        skipAvailabilityCheck: true,
       });
       return { status: 200, data: { ok: true, reservationId: out.id } };
     } catch (error) {
@@ -2417,10 +2767,93 @@ async function handleRestaurantAdmin(env, op, request) {
   }
   if (op === "admin-reservation-update" && request.method === "PATCH") {
     const body = await readBody(request);
-    await env.DB.prepare("UPDATE restaurant_reservations SET admin_note=?, updated_at=? WHERE id=?")
-      .bind(cleanString(body.adminNote, 2000), nowMs(), cleanString(body.id, 80))
-      .run();
-    return { status: 200, data: { ok: true } };
+    const id = cleanString(body.id, 80);
+    const row = await getRestaurantReservationRow(env, id);
+    if (!row) return { status: 404, data: { error: "Brak rezerwacji." } };
+    const notifyClient = Boolean(body.notifyClient);
+    const fullEdit =
+      body.reservationDate != null ||
+      body.startTime != null ||
+      body.durationHours != null ||
+      body.tablesCount != null ||
+      body.guestsCount != null ||
+      body.joinTables != null ||
+      body.fullName != null ||
+      body.email != null ||
+      body.phonePrefix != null ||
+      body.phoneNational != null ||
+      body.customerNote != null;
+    if (!fullEdit) {
+      await env.DB.prepare("UPDATE restaurant_reservations SET admin_note=?, updated_at=? WHERE id=?")
+        .bind(cleanString(body.adminNote, 2000), nowMs(), id)
+        .run();
+      return { status: 200, data: { ok: true } };
+    }
+    try {
+      const payload = {
+        reservationDate: cleanString(body.reservationDate ?? row.reservation_date, 10),
+        startTime: cleanString(body.startTime ?? row.start_time, 5),
+        durationHours: Number(body.durationHours ?? row.duration_hours),
+        tablesCount: Math.max(1, toInt(body.tablesCount ?? row.tables_count, 1)),
+        guestsCount: Math.max(1, toInt(body.guestsCount ?? row.guests_count, 1)),
+        joinTables: body.joinTables != null ? Boolean(body.joinTables) : Boolean(row.join_tables),
+        fullName: cleanString(body.fullName ?? row.full_name, 120),
+        email: cleanString(body.email ?? row.email, 180),
+        phonePrefix: cleanString(body.phonePrefix ?? row.phone_prefix, 8),
+        phoneNational: cleanString(body.phoneNational ?? row.phone_national, 32),
+        customerNote: cleanString(body.customerNote ?? row.customer_note, 2000),
+        adminNote: cleanString(body.adminNote ?? row.admin_note, 2000),
+      };
+      const chk = await assertRestaurantAvailability(env, payload, id);
+      if (!chk.ok) return { status: 409, data: { error: "Brak wolnych stolików w wybranym terminie." } };
+      const assigned = chk.availableIds;
+      const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
+      await env.DB.prepare(
+        `UPDATE restaurant_reservations SET
+          full_name=?, email=?, phone_prefix=?, phone_national=?, phone_e164=?,
+          reservation_date=?, start_time=?, duration_hours=?, start_ms=?, end_ms=?,
+          tables_count=?, guests_count=?, join_tables=?,
+          assigned_table_ids_json=?, customer_note=?, admin_note=?, updated_at=?
+         WHERE id=?`
+      )
+        .bind(
+          payload.fullName,
+          payload.email.toLowerCase(),
+          phone.prefix,
+          phone.national,
+          phone.e164,
+          chk.reservationDate,
+          chk.startTime,
+          chk.durationHours,
+          chk.startMs,
+          chk.endMs,
+          chk.tablesCount,
+          payload.guestsCount,
+          payload.joinTables ? 1 : 0,
+          toJson(assigned),
+          payload.customerNote,
+          payload.adminNote,
+          nowMs(),
+          id
+        )
+        .run();
+      if (notifyClient) {
+        try {
+          const updated = await getRestaurantReservationRow(env, id);
+          await sendTemplatedBookingMail(env, request, {
+            service: "restaurant",
+            eventKey: "changed_client",
+            row: updated,
+            to: updated?.email,
+          });
+        } catch (error) {
+          console.error("Restaurant changed mail error:", error);
+        }
+      }
+      return { status: 200, data: { ok: true } };
+    } catch (error) {
+      return { status: 400, data: { error: error.message || "Błąd zapisu." } };
+    }
   }
   if (op === "admin-reservation-confirm" && request.method === "POST") {
     const body = await readBody(request);
@@ -2531,8 +2964,12 @@ async function handleHallAdmin(env, op, request) {
   if (op === "admin-reservation-create" && request.method === "POST") {
     const body = await readBody(request);
     try {
-      const status = ["pending", "confirmed", "manual_block"].includes(body.status) ? body.status : "pending";
-      const out = await createHallReservation(env, body, { status, withConfirmationToken: false });
+      const status = ["pending", "confirmed", "manual_block"].includes(body.status) ? body.status : "confirmed";
+      const out = await createHallReservation(env, body, {
+        status,
+        withConfirmationToken: false,
+        skipAvailabilityCheck: status === "manual_block",
+      });
       return { status: 200, data: { ok: true, reservationId: out.id, humanNumber: out.humanNumber } };
     } catch (error) {
       return { status: 400, data: { error: error.message || "Błąd tworzenia." } };
@@ -2540,10 +2977,101 @@ async function handleHallAdmin(env, op, request) {
   }
   if (op === "admin-reservation-update" && request.method === "PATCH") {
     const body = await readBody(request);
-    await env.DB.prepare("UPDATE venue_reservations SET admin_note=?, updated_at=? WHERE id=?")
-      .bind(cleanString(body.adminNote, 2000), nowMs(), cleanString(body.id, 80))
-      .run();
-    return { status: 200, data: { ok: true } };
+    const id = cleanString(body.id, 80);
+    const row = await env.DB.prepare("SELECT * FROM venue_reservations WHERE id=?").bind(id).first();
+    if (!row) return { status: 404, data: { error: "Brak rezerwacji." } };
+    const notifyClient = Boolean(body.notifyClient);
+    const fullEdit =
+      body.hallId != null ||
+      body.reservationDate != null ||
+      body.startTime != null ||
+      body.durationHours != null ||
+      body.guestsCount != null ||
+      body.exclusive != null ||
+      body.eventType != null ||
+      body.fullName != null ||
+      body.email != null ||
+      body.phonePrefix != null ||
+      body.phoneNational != null ||
+      body.customerNote != null;
+    if (!fullEdit) {
+      await env.DB.prepare("UPDATE venue_reservations SET admin_note=?, updated_at=? WHERE id=?")
+        .bind(cleanString(body.adminNote, 2000), nowMs(), id)
+        .run();
+      return { status: 200, data: { ok: true } };
+    }
+    try {
+      const payload = {
+        hallId: cleanString(body.hallId ?? row.hall_id, 80),
+        reservationDate: cleanString(body.reservationDate ?? row.reservation_date, 10),
+        startTime: cleanString(body.startTime ?? row.start_time, 5),
+        durationHours: Number(body.durationHours ?? row.duration_hours),
+        guestsCount: toInt(body.guestsCount ?? row.guests_count, 0),
+        exclusive: body.exclusive != null ? Boolean(body.exclusive) : Boolean(row.exclusive),
+        eventType: cleanString(body.eventType ?? row.event_type, 500),
+        fullName: cleanString(body.fullName ?? row.full_name, 120),
+        email: cleanString(body.email ?? row.email, 180),
+        phonePrefix: cleanString(body.phonePrefix ?? row.phone_prefix, 8),
+        phoneNational: cleanString(body.phoneNational ?? row.phone_national, 32),
+        customerNote: cleanString(body.customerNote ?? row.customer_note, 2000),
+        adminNote: cleanString(body.adminNote ?? row.admin_note, 2000),
+      };
+      const avail = await hallAvailability(env, payload, id);
+      if (!avail.ok) return { status: 409, data: { error: "Termin niedostępny." } };
+      const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
+      await env.DB.prepare(
+        `UPDATE venue_reservations SET
+          hall_id=?, hall_name_snapshot=?, hall_kind_snapshot=?, full_block_guest_threshold_snap=?,
+          full_name=?, email=?, phone_prefix=?, phone_national=?, phone_e164=?,
+          reservation_date=?, start_time=?, duration_hours=?, start_ms=?, end_ms=?,
+          start_time_label=?, end_time_label=?,
+          guests_count=?, exclusive=?, full_block=?, event_type=?, customer_note=?, admin_note=?, updated_at=?
+         WHERE id=?`
+      )
+        .bind(
+          avail.hall.id,
+          avail.hall.name,
+          avail.hall.hallKind,
+          avail.hall.fullBlockGuestThreshold,
+          payload.fullName,
+          payload.email.toLowerCase(),
+          phone.prefix,
+          phone.national,
+          phone.e164,
+          cleanString(payload.reservationDate, 10),
+          cleanString(payload.startTime, 5),
+          Number(payload.durationHours || 2),
+          avail.startMs,
+          avail.endMs,
+          formatHm(avail.startMs),
+          formatHm(avail.endMs),
+          Number(avail.guestsCount || 0),
+          avail.exclusive ? 1 : 0,
+          avail.fullBlock ? 1 : 0,
+          payload.eventType,
+          payload.customerNote,
+          payload.adminNote,
+          nowMs(),
+          id
+        )
+        .run();
+      if (notifyClient) {
+        try {
+          const updated = await getHallReservationRow(env, id);
+          await sendTemplatedBookingMail(env, request, {
+            service: "hall",
+            eventKey: "changed_client",
+            row: updated,
+            to: updated?.email,
+          });
+        } catch (error) {
+          console.error("Hall changed mail error:", error);
+        }
+      }
+      return { status: 200, data: { ok: true } };
+    } catch (error) {
+      return { status: 400, data: { error: error.message || "Błąd zapisu." } };
+    }
   }
   if (op === "admin-reservation-confirm" && request.method === "POST") {
     const body = await readBody(request);

@@ -62,6 +62,29 @@ export const DEFAULT_CONTENT = {
       restaurant: false,
       events: false,
     },
+    sectionMedia: {
+      hotel: {
+        imageUrl: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1600&q=80",
+        imageAlt: "Hotel — Średzka Korona, noclegi Środa Śląska",
+        focusX: 50,
+        focusY: 50,
+        zoom: 1,
+      },
+      restaurant: {
+        imageUrl: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=80",
+        imageAlt: "Restauracja — Średzka Korona, Środa Śląska",
+        focusX: 50,
+        focusY: 50,
+        zoom: 1,
+      },
+      events: {
+        imageUrl: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1600&q=80",
+        imageAlt: "Sale na przyjęcia i imprezy okolicznościowe — Średzka Korona",
+        focusX: 50,
+        focusY: 50,
+        zoom: 1,
+      },
+    },
   },
   restaurant: {
     heroTitle: "Autorska kuchnia i atmosfera wieczoru premium",

@@ -921,6 +921,36 @@ function normalizeBookingPauseRanges(ranges, fallbackFrom, fallbackTo) {
   return [];
 }
 
+function clampNumber(value, min, max, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function normalizeHomeSectionMedia(sectionMedia, fallbackMedia = DEFAULT_CONTENT.home?.sectionMedia || {}) {
+  const source = sectionMedia && typeof sectionMedia === "object" ? sectionMedia : {};
+  const result = {};
+  const keys = ["hotel", "restaurant", "events"];
+
+  for (const key of keys) {
+    const fallback = fallbackMedia?.[key] || {};
+    const raw = source?.[key] || {};
+    const imageUrl = String(raw.imageUrl || fallback.imageUrl || "").trim();
+    const imageAlt = String(raw.imageAlt || fallback.imageAlt || "").trim();
+    result[key] = {
+      imageUrl,
+      imageAlt,
+      focusX: clampNumber(raw.focusX, 0, 100, clampNumber(fallback.focusX, 0, 100, 50)),
+      focusY: clampNumber(raw.focusY, 0, 100, clampNumber(fallback.focusY, 0, 100, 50)),
+      zoom: clampNumber(raw.zoom, 1, 2.5, clampNumber(fallback.zoom, 1, 2.5, 1)),
+    };
+  }
+
+  return result;
+}
+
 function sanitizeContent(content) {
   const rawBooking = content.booking || {};
   const restaurantPauseRanges = normalizeBookingPauseRanges(
@@ -953,6 +983,7 @@ function sanitizeContent(content) {
         ...DEFAULT_CONTENT.home.sectionBlocks,
         ...(content.home?.sectionBlocks || {}),
       },
+      sectionMedia: normalizeHomeSectionMedia(content.home?.sectionMedia, DEFAULT_CONTENT.home?.sectionMedia),
     },
     restaurant: { ...DEFAULT_CONTENT.restaurant, ...(content.restaurant || {}) },
     hotel: {

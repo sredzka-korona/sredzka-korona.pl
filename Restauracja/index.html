@@ -326,180 +326,6 @@
         appearance: none;
       }
 
-      #restaurant-booking-modal {
-        z-index: 220;
-      }
-      /* Wyśrodkowanie okna rezerwacji w pionie i poziomie (bazowy .modal ma start center) */
-      #restaurant-booking-modal.open {
-        place-items: center;
-        align-content: center;
-      }
-      #restaurant-booking-modal .modal-body {
-        margin-top: 0;
-      }
-      #restaurant-booking-modal .booking-modal-wrap {
-        max-width: min(640px, 100%);
-        width: 100%;
-        margin: 0 auto;
-        max-height: min(92vh, calc(100dvh - 2rem));
-        min-height: min(420px, 75vh);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-      }
-      #restaurant-booking-modal .booking-modal-inner {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        overflow-y: auto;
-        padding-top: 0.5rem;
-      }
-      #restaurant-booking-modal .booking-form {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        min-height: 0;
-      }
-      #restaurant-booking-modal .booking-modal-inner .booking-actions,
-      #restaurant-booking-modal .booking-form .booking-actions {
-        margin-top: auto;
-        padding-top: 1.25rem;
-        flex-shrink: 0;
-        border-top: 1px solid rgba(200, 170, 120, 0.22);
-      }
-      .booking-steps {
-        display: flex;
-        gap: 0.5rem;
-        justify-content: center;
-        margin-bottom: 1.25rem;
-        flex-wrap: wrap;
-      }
-      .booking-step {
-        width: 2rem;
-        height: 2rem;
-        border-radius: 50%;
-        display: grid;
-        place-items: center;
-        font-size: 0.85rem;
-        background: rgba(200, 170, 120, 0.2);
-        color: var(--muted);
-      }
-      .booking-step.active {
-        background: var(--gold);
-        color: #1f1712;
-        font-weight: 700;
-      }
-      .booking-step.done {
-        background: rgba(46, 125, 50, 0.25);
-        color: #1b5e20;
-      }
-      .booking-hint {
-        color: var(--muted);
-        font-size: 0.92rem;
-        margin: 0 0 1rem;
-      }
-      .booking-field-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-      }
-      @media (max-width: 540px) {
-        .booking-field-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-      .booking-field-grid label,
-      .booking-form label,
-      .booking-checkbox {
-        display: flex;
-        flex-direction: column;
-        gap: 0.35rem;
-        font-size: 0.9rem;
-      }
-      .booking-checkbox {
-        flex-direction: row;
-        align-items: flex-start;
-        gap: 0.65rem;
-        margin: 0.75rem 0;
-      }
-      .booking-checkbox input {
-        margin-top: 0.2rem;
-      }
-      .booking-field-grid input,
-      .booking-form input,
-      .booking-form textarea,
-      .booking-form select {
-        padding: 0.65rem 0.75rem;
-        border-radius: 12px;
-        border: 1px solid rgba(200, 170, 120, 0.35);
-        background: #fff;
-      }
-      .booking-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.75rem;
-        margin-top: 1rem;
-        width: 100%;
-        box-sizing: border-box;
-        justify-content: space-between;
-        align-items: center;
-      }
-      .booking-actions > :only-child {
-        margin-left: auto;
-      }
-      .booking-btn {
-        padding: 0.65rem 1.25rem;
-        border-radius: 999px;
-        border: none;
-        background: linear-gradient(135deg, #2a241c, #4a3d2e);
-        color: #faf6ef;
-        cursor: pointer;
-        font-weight: 600;
-      }
-      .booking-btn:disabled {
-        opacity: 0.45;
-        cursor: not-allowed;
-      }
-      .booking-btn.secondary {
-        background: transparent;
-        color: var(--text);
-        border: 1px solid rgba(200, 170, 120, 0.5);
-      }
-      .booking-error {
-        color: #b71c1c;
-        font-size: 0.9rem;
-        margin: 0.5rem 0 0;
-      }
-      .booking-honeypot {
-        position: absolute;
-        left: -9999px;
-        width: 1px;
-        height: 1px;
-        opacity: 0;
-      }
-      .booking-terms {
-        display: flex;
-        gap: 0.75rem;
-        align-items: flex-start;
-        font-size: 0.88rem;
-        margin: 1rem 0;
-      }
-      .booking-terms input {
-        margin-top: 0.25rem;
-      }
-      .booking-summary-list {
-        margin: 0 0 1rem;
-        padding-left: 1.25rem;
-      }
-      .booking-success {
-        line-height: 1.6;
-      }
-      .booking-session-expired {
-        text-align: center;
-        padding: 1rem 0;
-      }
-
       .floating-nav {
         position: fixed;
         top: 0;
@@ -2068,21 +1894,12 @@
                   </button>
                 </div>
               </div>
-              <button type="button" class="reservation-info" id="rb-open-booking">
+              <button type="button" class="reservation-info" id="rb-open-booking" data-open-global-booking>
                 ${escapeHtml(restaurantOrderButtonText)}
               </button>
             </div>
           </div>
           <div class="modal" id="restaurant-modal"></div>
-          <div class="modal" id="restaurant-booking-modal">
-            <div class="modal-body booking-modal-wrap">
-              <div class="modal-header">
-                <h2>${escapeHtml(restaurantOrderButtonText)}</h2>
-                <button type="button" class="modal-close" id="rb-modal-close" aria-label="Zamknij">×</button>
-              </div>
-              <div class="booking-modal-inner"></div>
-            </div>
-          </div>
         `;
 
         const modal = document.querySelector("#restaurant-modal");
@@ -2183,7 +2000,7 @@
     </script>
     <script src="../assets/js/config.js"></script>
     <script src="../assets/js/booking-flags.js"></script>
-    <script src="../assets/js/restaurant-booking.js"></script>
+    <script src="../assets/js/global-booking-modal.js"></script>
     <a href="../kontakt/index.html" class="floating-contact-button" aria-label="Kontakt">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>

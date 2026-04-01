@@ -1,0 +1,497 @@
+:root {
+  --gb-text: #f8f2e6;
+  --gb-text-muted: rgba(248, 242, 230, 0.78);
+  --gb-accent: #d8b27a;
+  --gb-accent-strong: #b98f53;
+  --gb-danger: #ef9f9f;
+  --gb-shell-bg: rgba(15, 11, 8, 0.56);
+  --gb-shell-border: rgba(255, 232, 194, 0.28);
+  --gb-card-bg: rgba(255, 248, 235, 0.09);
+  --gb-card-bg-hover: rgba(255, 248, 235, 0.17);
+}
+
+body.gb-modal-open {
+  overflow: hidden;
+}
+
+#gb-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 25000;
+  display: none;
+  padding: max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px))
+    max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
+  background: radial-gradient(circle at 8% 10%, rgba(217, 175, 117, 0.15), transparent 38%),
+    radial-gradient(circle at 92% 86%, rgba(255, 215, 163, 0.12), transparent 45%),
+    rgba(9, 7, 6, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-sizing: border-box;
+}
+
+#gb-modal.gb-open {
+  display: grid;
+  place-items: center;
+}
+
+#gb-modal .gb-shell {
+  width: min(980px, calc(100vw - 2rem));
+  max-height: min(94dvh, 980px);
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid var(--gb-shell-border);
+  background:
+    linear-gradient(160deg, rgba(255, 241, 219, 0.08), rgba(255, 241, 219, 0.02)),
+    url("../img/booking-lux-bg.svg") center / cover no-repeat,
+    var(--gb-shell-bg);
+  box-shadow:
+    0 44px 90px rgba(0, 0, 0, 0.52),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  color: var(--gb-text);
+  position: relative;
+}
+
+#gb-modal .gb-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 18%, transparent 78%, rgba(255, 255, 255, 0.08));
+}
+
+#gb-modal .gb-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.2rem 1.35rem 0.8rem;
+  position: relative;
+  z-index: 1;
+}
+
+#gb-modal .gb-kicker {
+  margin: 0;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  color: rgba(255, 232, 194, 0.76);
+}
+
+#gb-modal .gb-title {
+  margin: 0.3rem 0 0;
+  font-size: clamp(1.25rem, 2vw, 1.72rem);
+  font-weight: 600;
+  color: #fff6e7;
+}
+
+#gb-modal .gb-close {
+  border: 1px solid rgba(255, 231, 190, 0.34);
+  background: rgba(255, 245, 226, 0.14);
+  color: #fff8ee;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+}
+
+#gb-modal .gb-close:hover {
+  background: rgba(255, 245, 226, 0.26);
+}
+
+#gb-modal .gb-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 1.35rem 0.8rem;
+  position: relative;
+  z-index: 1;
+}
+
+#gb-modal .gb-step-dot {
+  width: 2.05rem;
+  height: 2.05rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 230, 187, 0.36);
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  color: rgba(255, 244, 225, 0.82);
+  background: rgba(255, 244, 225, 0.08);
+}
+
+#gb-modal .gb-step-dot.is-active {
+  border-color: rgba(255, 222, 163, 0.8);
+  background: rgba(255, 215, 156, 0.24);
+  color: #fffdf9;
+  font-weight: 700;
+}
+
+#gb-modal .gb-step-dot.is-done {
+  border-color: rgba(182, 227, 182, 0.7);
+  background: rgba(120, 191, 120, 0.26);
+}
+
+#gb-modal .gb-body {
+  padding: 0 1.35rem 1.35rem;
+  max-height: calc(min(94dvh, 980px) - 115px);
+  overflow: auto;
+  position: relative;
+  z-index: 1;
+}
+
+#gb-modal h3 {
+  margin: 0 0 0.45rem;
+  font-size: 1.22rem;
+  font-weight: 600;
+}
+
+#gb-modal .gb-hint {
+  margin: 0 0 0.95rem;
+  color: var(--gb-text-muted);
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
+#gb-modal .gb-error {
+  margin: 0.75rem 0 0;
+  color: var(--gb-danger);
+  font-size: 0.9rem;
+  min-height: 1.2rem;
+}
+
+#gb-modal .gb-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+#gb-modal .gb-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+#gb-modal .gb-field {
+  display: grid;
+  gap: 0.33rem;
+}
+
+#gb-modal .gb-field > span {
+  font-size: 0.82rem;
+  color: rgba(255, 236, 205, 0.88);
+}
+
+#gb-modal input,
+#gb-modal select,
+#gb-modal textarea,
+#gb-modal button {
+  font-family: inherit;
+}
+
+#gb-modal input,
+#gb-modal select,
+#gb-modal textarea {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 229, 184, 0.32);
+  background: rgba(255, 251, 241, 0.92);
+  color: #2a1f14;
+  padding: 0.6rem 0.72rem;
+  font-size: 0.95rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#gb-modal textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+#gb-modal input[type="range"] {
+  accent-color: #b7894d;
+  padding: 0;
+  background: transparent;
+}
+
+#gb-modal .gb-service-tiles,
+#gb-modal .gb-hall-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+#gb-modal .gb-service-tile,
+#gb-modal .gb-hall-tile {
+  border: 1px solid rgba(255, 229, 184, 0.35);
+  border-radius: 16px;
+  background: var(--gb-card-bg);
+  color: #fff9ef;
+  padding: 1rem 0.85rem;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+#gb-modal .gb-service-tile:hover,
+#gb-modal .gb-hall-tile:hover {
+  background: var(--gb-card-bg-hover);
+  border-color: rgba(255, 229, 184, 0.72);
+  transform: translateY(-1px);
+}
+
+#gb-modal .gb-service-tile strong,
+#gb-modal .gb-hall-tile strong {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 1rem;
+}
+
+#gb-modal .gb-service-tile small,
+#gb-modal .gb-hall-tile small {
+  color: rgba(255, 245, 228, 0.78);
+  font-size: 0.8rem;
+}
+
+#gb-modal .gb-service-tile.is-disabled,
+#gb-modal .gb-hall-tile.is-disabled {
+  opacity: 0.46;
+  filter: grayscale(1);
+  cursor: not-allowed;
+  pointer-events: none;
+  background: rgba(190, 190, 190, 0.12);
+}
+
+#gb-modal .gb-service-tile.is-selected,
+#gb-modal .gb-hall-tile.is-selected {
+  border-color: rgba(255, 223, 166, 0.95);
+  background: rgba(255, 228, 179, 0.22);
+}
+
+#gb-modal .gb-room-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+#gb-modal .gb-room-card {
+  border: 1px solid rgba(255, 227, 183, 0.32);
+  border-radius: 15px;
+  background: rgba(255, 245, 226, 0.1);
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+#gb-modal .gb-room-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+#gb-modal .gb-room-price {
+  color: #ffe7bf;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+#gb-modal .gb-room-meta {
+  margin: 0;
+  color: rgba(255, 236, 205, 0.84);
+  font-size: 0.85rem;
+}
+
+#gb-modal .gb-pill-btn {
+  border: 1px solid rgba(255, 231, 191, 0.6);
+  background: rgba(255, 245, 225, 0.2);
+  color: #fffaf1;
+  padding: 0.44rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+  justify-self: flex-start;
+}
+
+#gb-modal .gb-pill-btn.is-active {
+  background: rgba(117, 183, 117, 0.25);
+  border-color: rgba(166, 234, 166, 0.7);
+}
+
+#gb-modal .gb-cart,
+#gb-modal .gb-summary-box {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 225, 179, 0.28);
+  background: rgba(255, 245, 225, 0.1);
+  padding: 0.8rem;
+  margin-top: 0.85rem;
+}
+
+#gb-modal .gb-cart ul,
+#gb-modal .gb-summary-box ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1rem;
+}
+
+#gb-modal .gb-summary-box li {
+  margin: 0.24rem 0;
+}
+
+#gb-modal .gb-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+  color: rgba(255, 241, 216, 0.92);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+#gb-modal .gb-check input {
+  margin-top: 0.2rem;
+  width: auto;
+}
+
+#gb-modal .gb-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+#gb-modal .gb-actions--end {
+  justify-content: flex-end;
+}
+
+#gb-modal .gb-btn {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.56rem 1.15rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: transform 0.2s ease, opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+#gb-modal .gb-btn:hover {
+  transform: translateY(-1px);
+}
+
+#gb-modal .gb-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+#gb-modal .gb-btn-primary {
+  background: linear-gradient(140deg, #e4c188, #bd9053);
+  color: #23180f;
+}
+
+#gb-modal .gb-btn-secondary {
+  background: rgba(255, 245, 226, 0.1);
+  border-color: rgba(255, 223, 170, 0.56);
+  color: #fff5e2;
+}
+
+#gb-modal .gb-countdown {
+  margin-top: 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  padding: 0.42rem 0.75rem;
+  border: 1px solid rgba(255, 231, 188, 0.58);
+  background: rgba(255, 241, 214, 0.12);
+  color: #fff4dc;
+  font-size: 0.9rem;
+}
+
+#gb-modal .gb-session-expired {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 205, 205, 0.45);
+  padding: 1rem;
+  background: rgba(178, 54, 54, 0.16);
+}
+
+#gb-modal .gb-range-wrap {
+  display: grid;
+  gap: 0.3rem;
+}
+
+#gb-modal .gb-range-label {
+  font-size: 0.82rem;
+  color: rgba(255, 237, 206, 0.9);
+}
+
+#gb-modal .gb-range-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+#gb-modal .gb-inline-note {
+  margin: 0.45rem 0 0;
+  color: rgba(255, 239, 211, 0.8);
+  font-size: 0.83rem;
+}
+
+#gb-modal .gb-link {
+  color: #ffe0ad;
+}
+
+@media (max-width: 860px) {
+  #gb-modal .gb-shell {
+    width: min(720px, calc(100vw - 1rem));
+    border-radius: 22px;
+  }
+
+  #gb-modal .gb-service-tiles,
+  #gb-modal .gb-hall-tiles,
+  #gb-modal .gb-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  #gb-modal {
+    padding: 0.5rem;
+  }
+
+  #gb-modal .gb-shell {
+    width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 1rem);
+    border-radius: 18px;
+  }
+
+  #gb-modal .gb-body {
+    padding: 0 0.95rem 1rem;
+    max-height: calc(100dvh - 180px);
+  }
+
+  #gb-modal .gb-header,
+  #gb-modal .gb-progress {
+    padding-left: 0.95rem;
+    padding-right: 0.95rem;
+  }
+
+  #gb-modal .gb-service-tiles,
+  #gb-modal .gb-hall-tiles,
+  #gb-modal .gb-grid-2,
+  #gb-modal .gb-grid-3,
+  #gb-modal .gb-range-pair {
+    grid-template-columns: 1fr;
+  }
+
+  #gb-modal .gb-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  #gb-modal .gb-actions--end {
+    flex-direction: column;
+  }
+}
