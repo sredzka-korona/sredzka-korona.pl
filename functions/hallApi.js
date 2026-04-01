@@ -14,7 +14,13 @@ const {
   HALL_PENDING_MS,
   HALL_EXTEND_THRESHOLD_MS,
 } = require("./lib/bookingConstants");
-const { checkHallAvailability, allocateHallReservationNumber, dtFromDateAndTime, WARSAW } = require("./lib/hallLogic");
+const {
+  checkHallAvailability,
+  allocateHallReservationNumber,
+  dtFromDateAndTime,
+  WARSAW,
+  assertNotPastCalendarDateWarsaw,
+} = require("./lib/hallLogic");
 const {
   renderTemplate,
   getHallMailTemplate,
@@ -308,6 +314,11 @@ const hallApi = onRequest(
           json(res, { error: "Brak parametrów sali lub terminu." }, 400);
           return;
         }
+        const pastCal = assertNotPastCalendarDateWarsaw(reservationDate);
+        if (!pastCal.ok) {
+          json(res, { ok: false, available: false, error: pastCal.error, maxGuests: 0 });
+          return;
+        }
         const hallSnap = await db.collection("venueHalls").doc(hallId).get();
         if (!hallSnap.exists || hallSnap.data().active === false) {
           json(res, { error: "Sala niedostępna." }, 400);
@@ -410,6 +421,12 @@ const hallApi = onRequest(
 
         if (!hallId || !reservationDate || !startTime) {
           json(res, { error: "Wybór sali i terminu jest wymagany." }, 400);
+          return;
+        }
+
+        const pastCalDraft = assertNotPastCalendarDateWarsaw(reservationDate);
+        if (!pastCalDraft.ok) {
+          json(res, { error: pastCalDraft.error }, 400);
           return;
         }
 

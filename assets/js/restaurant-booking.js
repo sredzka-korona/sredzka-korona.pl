@@ -669,17 +669,18 @@
   }
 
   function init() {
-    document.querySelector("#rb-open-booking")?.addEventListener("click", (e) => {
-      e.preventDefault();
-      openModal();
-    });
-    document.querySelector("#restaurant-booking-modal")?.addEventListener("click", (e) => {
-      if (e.target.id === "restaurant-booking-modal") {
-        closeModal();
-      }
-    });
     document.addEventListener("click", (e) => {
-      if (e.target.matches("#rb-modal-close")) {
+      const target = e.target;
+      if (target instanceof Element && target.closest("#rb-open-booking")) {
+        e.preventDefault();
+        openModal();
+        return;
+      }
+      if (target instanceof Element && target.id === "restaurant-booking-modal") {
+        closeModal();
+        return;
+      }
+      if (target instanceof Element && target.matches("#rb-modal-close")) {
         closeModal();
       }
     });

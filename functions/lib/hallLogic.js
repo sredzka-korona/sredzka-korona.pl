@@ -12,6 +12,19 @@ function dtFromDateAndTime(dateStr, timeStr) {
   return t;
 }
 
+/** Data kalendarzowa YYYY-MM-DD nie wcześniejsza niż dziś (strefa Europe/Warsaw). */
+function assertNotPastCalendarDateWarsaw(dateStr) {
+  const d = String(dateStr || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    return { ok: false, error: "Nieprawidłowa data." };
+  }
+  const today = DateTime.now().setZone(WARSAW).toISODate();
+  if (d < today) {
+    return { ok: false, error: "Data rezerwacji nie może być z przeszłości." };
+  }
+  return { ok: true };
+}
+
 /**
  * Koniec zajętości sali dla konfliktów: koniec wydarzenia + bufor (np. przerwa organizacyjna).
  */
@@ -231,6 +244,7 @@ module.exports = {
   WARSAW,
   BLOCKING,
   dtFromDateAndTime,
+  assertNotPastCalendarDateWarsaw,
   computeBlockEndMs,
   rangesOverlap,
   checkHallAvailability,

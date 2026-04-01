@@ -51,6 +51,31 @@
       .replace(/"/g, "&quot;");
   }
 
+  function parseImageUrlsInput(raw) {
+    const s = String(raw ?? "").trim();
+    if (!s) return [];
+    return s
+      .split(/[\n,]+/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+
+  function formatImageUrlsForInput(urls) {
+    if (!Array.isArray(urls) || !urls.length) return "";
+    return urls.join("\n");
+  }
+
+  let hotelRoomModalKeydownHandler = null;
+
+  function closeHotelRoomModal() {
+    document.getElementById("hotel-room-editor-mount")?.remove();
+    document.body.classList.remove("admin-modal-open");
+    if (hotelRoomModalKeydownHandler) {
+      document.removeEventListener("keydown", hotelRoomModalKeydownHandler);
+      hotelRoomModalKeydownHandler = null;
+    }
+  }
+
   function formatMs(ms) {
     if (!ms) return "—";
     const d = new Date(ms);
@@ -95,6 +120,11 @@
     templatesData = d.templates || {};
   }
 
+  function toInt(v) {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  }
+
   function renderRooms(root) {
     const body = roomsData
       .map(
@@ -102,19 +132,27 @@
       <tr data-id="${escapeHtml(r.id)}">
         <td>${escapeHtml(r.name || r.id)}</td>
         <td>${escapeHtml(String(r.pricePerNight ?? ""))}</td>
-        <td>${r.active ? "tak" : "nie"}</td>
+        <td>${escapeHtml(String(r.maxGuests ?? "—"))}</td>
+        <td>${escapeHtml([toInt(r.bedsSingle) && `${toInt(r.bedsSingle)}×1os.`, toInt(r.bedsDouble) && `${toInt(r.bedsDouble)}×2os.`, toInt(r.bedsChild) && `${toInt(r.bedsChild)}×dz.`].filter(Boolean).join(", ") || "—")}</td>
+        <td>${r.active !== false ? "tak" : "nie"}</td>
+        <td>${escapeHtml(String(r.sortOrder ?? 0))}</td>
         <td><button type="button" class="button secondary hotel-edit-room" data-id="${escapeHtml(r.id)}">Edytuj</button></td>
       </tr>`
       )
       .join("");
     return `
       <div class="hotel-subpanel">
-        <h3>Pokoje (${roomsData.length})</h3>
-        <p class="helper">Ceny i parametry zapisują się w Firestore — wpływają na nowe rezerwacje.</p>
+        <div class="hotel-rooms-heading">
+          <div>
+            <h3>Pokoje (${roomsData.length})</h3>
+            <p class="helper">Ceny i parametry zapisują się w Firestore — wpływają na nowe rezerwacje i widok na stronie.</p>
+          </div>
+          <button type="button" class="button" id="hotel-add-room">Dodaj pokój</button>
+        </div>
         <div class="table-scroll">
           <table class="hotel-table">
-            <thead><tr><th>Nazwa</th><th>Cena / noc</th><th>Aktywny</th><th></th></tr></thead>
-            <tbody>${body || "<tr><td colspan='4'>Brak danych — uruchom seed pokoi.</td></tr>"}</tbody>
+            <thead><tr><th>Nazwa</th><th>Cena / noc</th><th>Max os.</th><th>Łóżka</th><th>Aktywny</th><th>Kol.</th><th></th></tr></thead>
+            <tbody>${body || "<tr><td colspan='7'>Brak danych — dodaj pokój lub uruchom seed.</td></tr>"}</tbody>
           </table>
         </div>
       </div>`;
@@ -258,8 +296,13 @@
         countdownTimer = null;
       }
       document.querySelectorAll(".hotel-edit-room").forEach((btn) => {
-        btn.addEventListener("click", () => editRoom(btn.getAttribute("data-id")));
+        btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-id");
+          const found = roomsData.find((x) => x.id === id);
+          if (found) openRoomEditorModal(found);
+        });
       });
+      document.querySelector("#hotel-add-room")?.addEventListener("click", () => openRoomEditorModal(null));
       const filter = document.querySelector("#hotel-res-filter");
       if (filter) {
         filter.addEventListener("change", async () => {
@@ -358,38 +401,170 @@
       }, 1000);
     }
 
-    async function editRoom(id) {
-      const r = roomsData.find((x) => x.id === id);
-      if (!r) return;
-      const name = prompt("Nazwa pokoju", r.name || "");
-      if (name === null) return;
-      const price = prompt("Cena za noc (PLN)", String(r.pricePerNight ?? ""));
-      if (price === null) return;
-      const maxGuests = prompt("Max. osób", String(r.maxGuests ?? 2));
-      const active = confirm("Pokój aktywny (widoczny w wyszukiwarce)?");
-      try {
-        await hotelApi("admin-room-upsert", {
-          method: "PUT",
-          body: {
-            id,
-            name: name.trim(),
-            pricePerNight: Number(price),
-            maxGuests: Number(maxGuests) || 1,
-            bedsSingle: Number(r.bedsSingle ?? 0),
-            bedsDouble: Number(r.bedsDouble ?? 1),
-            bedsChild: Number(r.bedsChild ?? 0),
-            description: r.description || "",
-            imageUrls: r.imageUrls || [],
-            active,
-            sortOrder: r.sortOrder ?? 0,
-          },
-        });
-        await loadRooms();
-        hotelSubTab = "rooms";
-        paint();
-      } catch (e) {
-        alert(e.message);
-      }
+    function openRoomEditorModal(roomOrNull) {
+      const isNew = !roomOrNull;
+      const r = roomOrNull || {
+        id: "",
+        name: "",
+        pricePerNight: "",
+        maxGuests: 2,
+        bedsSingle: 0,
+        bedsDouble: 1,
+        bedsChild: 0,
+        description: "",
+        imageUrls: [],
+        active: true,
+        sortOrder: roomsData.length,
+      };
+
+      closeHotelRoomModal();
+
+      const host = document.createElement("div");
+      host.id = "hotel-room-editor-mount";
+      host.innerHTML = `
+        <div class="admin-modal-overlay" data-hotel-room-modal-overlay>
+          <section class="admin-modal menu-editor-modal hotel-room-editor-modal" role="dialog" aria-modal="true" aria-labelledby="hotel-room-editor-title">
+            <form id="hotel-room-editor-form" class="stack">
+              <div class="admin-modal-head menu-editor-modal-head">
+                <div class="menu-editor-modal-title">
+                  <p class="pill">Hotel — pokoje</p>
+                  <h3 id="hotel-room-editor-title">${isNew ? "Nowy pokój" : "Edycja pokoju"}</h3>
+                  <p class="helper">${
+                    isNew
+                      ? "Unikalny identyfikator dokumentu (np. room-03). Ten sam ID jest używany w rezerwacjach i blokadach."
+                      : `ID dokumentu: ${escapeHtml(r.id)} — nie zmienia się po utworzeniu.`
+                  }</p>
+                </div>
+                <button type="button" class="button secondary" data-hotel-room-modal-close>Zamknij</button>
+              </div>
+              <p class="status hotel-room-editor-msg" id="hotel-room-editor-msg" hidden></p>
+              <div class="field-grid">
+                <label class="field-full">
+                  <span>ID pokoju (Firestore)</span>
+                  <input name="id" value="${escapeHtml(r.id)}" ${isNew ? "" : "readonly"} required pattern="[a-zA-Z0-9_-]+" placeholder="np. room-01" title="Litery, cyfry, myślnik, podkreślenie" autocomplete="off" />
+                </label>
+                <label class="field-full">
+                  <span>Nazwa wyświetlana</span>
+                  <input name="name" value="${escapeHtml(r.name || "")}" required placeholder="np. Pokój dwuosobowy" />
+                </label>
+                <label class="field">
+                  <span>Cena za noc (PLN)</span>
+                  <input name="pricePerNight" type="number" step="0.01" min="0" value="${escapeHtml(String(r.pricePerNight ?? ""))}" required />
+                </label>
+                <label class="field">
+                  <span>Maks. gości</span>
+                  <input name="maxGuests" type="number" min="1" step="1" value="${escapeHtml(String(r.maxGuests ?? 2))}" required />
+                </label>
+                <label class="field">
+                  <span>Łóżka 1-os.</span>
+                  <input name="bedsSingle" type="number" min="0" step="1" value="${escapeHtml(String(r.bedsSingle ?? 0))}" />
+                </label>
+                <label class="field">
+                  <span>Łóżka 2-os.</span>
+                  <input name="bedsDouble" type="number" min="0" step="1" value="${escapeHtml(String(r.bedsDouble ?? 0))}" />
+                </label>
+                <label class="field">
+                  <span>Łóżka dziecięce</span>
+                  <input name="bedsChild" type="number" min="0" step="1" value="${escapeHtml(String(r.bedsChild ?? 0))}" />
+                </label>
+                <label class="field">
+                  <span>Kolejność (sortowanie)</span>
+                  <input name="sortOrder" type="number" step="1" value="${escapeHtml(String(r.sortOrder ?? 0))}" />
+                </label>
+                <label class="field-full">
+                  <span>Opis (strona / rezerwacja)</span>
+                  <textarea name="description" rows="4" placeholder="Krótki opis pokoju">${escapeHtml(r.description || "")}</textarea>
+                </label>
+                <label class="field-full">
+                  <span>Adresy zdjęć (w osobnych liniach lub po przecinku)</span>
+                  <textarea name="imageUrls" rows="3" placeholder="https://...">${escapeHtml(formatImageUrlsForInput(r.imageUrls))}</textarea>
+                </label>
+                <label class="field-full hotel-room-editor-check">
+                  <input name="active" type="checkbox" ${r.active !== false ? "checked" : ""} />
+                  <span>Pokój aktywny (widoczny przy wyszukiwaniu terminów)</span>
+                </label>
+              </div>
+              <div class="admin-modal-footer hotel-room-editor-footer">
+                <button type="button" class="button secondary" data-hotel-room-modal-close>Anuluj</button>
+                <button type="submit" class="button">Zapisz</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      `;
+
+      document.body.appendChild(host);
+      document.body.classList.add("admin-modal-open");
+
+      const overlay = host.querySelector("[data-hotel-room-modal-overlay]");
+      const showMsg = (text, isError) => {
+        const el = host.querySelector("#hotel-room-editor-msg");
+        if (!el) return;
+        el.hidden = !text;
+        el.textContent = text || "";
+        el.style.color = isError ? "var(--danger, #c44)" : "";
+      };
+
+      overlay?.addEventListener("click", (ev) => {
+        if (ev.target === overlay) closeHotelRoomModal();
+      });
+      host.querySelectorAll("[data-hotel-room-modal-close]").forEach((b) => {
+        b.addEventListener("click", () => closeHotelRoomModal());
+      });
+
+      hotelRoomModalKeydownHandler = (ev) => {
+        if (ev.key === "Escape") {
+          ev.preventDefault();
+          closeHotelRoomModal();
+        }
+      };
+      document.addEventListener("keydown", hotelRoomModalKeydownHandler);
+
+      host.querySelector("#hotel-room-editor-form")?.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        showMsg("", false);
+        const fd = new FormData(ev.target);
+        const id = String(fd.get("id") || "").trim();
+        if (!id) {
+          showMsg("Podaj ID pokoju.", true);
+          return;
+        }
+        if (isNew && roomsData.some((x) => x.id === id)) {
+          showMsg("Pokój o tym ID już istnieje — użyj innego identyfikatora albo edytuj istniejący wpis.", true);
+          return;
+        }
+        const pricePerNight = Number(fd.get("pricePerNight"));
+        if (!Number.isFinite(pricePerNight) || pricePerNight < 0) {
+          showMsg("Niepoprawna cena.", true);
+          return;
+        }
+        const sortOrderRaw = Number(fd.get("sortOrder"));
+        const sortOrder = Number.isFinite(sortOrderRaw) ? sortOrderRaw : 0;
+        try {
+          await hotelApi("admin-room-upsert", {
+            method: "PUT",
+            body: {
+              id,
+              name: String(fd.get("name") || "").trim(),
+              pricePerNight,
+              maxGuests: Math.max(1, toInt(fd.get("maxGuests"))),
+              bedsSingle: toInt(fd.get("bedsSingle")),
+              bedsDouble: toInt(fd.get("bedsDouble")),
+              bedsChild: toInt(fd.get("bedsChild")),
+              description: String(fd.get("description") || "").trim(),
+              imageUrls: parseImageUrlsInput(fd.get("imageUrls")),
+              active: fd.get("active") === "on",
+              sortOrder,
+            },
+          });
+          closeHotelRoomModal();
+          await loadRooms();
+          hotelSubTab = "rooms";
+          paint();
+        } catch (e) {
+          showMsg(e.message || "Błąd zapisu.", true);
+        }
+      });
     }
 
     async function saveTemplate(key) {

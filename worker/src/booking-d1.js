@@ -1,3 +1,5 @@
+import { connect } from "cloudflare:sockets";
+
 const SESSION_MS = 30 * 60 * 1000;
 const EMAIL_LINK_MS = 2 * 60 * 60 * 1000;
 const HOTEL_PENDING_MS = 3 * 24 * 60 * 60 * 1000;
@@ -17,6 +19,215 @@ const STATUS_LABELS = {
 const BLOCKING_STATUSES = ["pending", "confirmed", "manual_block"];
 
 let schemaReadyPromise = null;
+
+const SMTP_REQUIRED_FIELDS = ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"];
+
+function hasSmtpConfig(env) {
+  return SMTP_REQUIRED_FIELDS.every((key) => cleanString(env[key], 500));
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderTemplate(template, vars) {
+  if (!template) return "";
+  return String(template).replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
+    const value = vars?.[key];
+    if (value === undefined || value === null) return "";
+    return escapeHtml(String(value));
+  });
+}
+
+function base64Utf8(value) {
+  const bytes = new TextEncoder().encode(String(value ?? ""));
+  let binary = "";
+  bytes.forEach((b) => {
+    binary += String.fromCharCode(b);
+  });
+  return btoa(binary);
+}
+
+function toMimeHeader(value) {
+  const input = String(value ?? "");
+  return /^[\x20-\x7E]*$/.test(input) ? input : `=?UTF-8?B?${base64Utf8(input)}?=`;
+}
+
+function base64Lines(value, lineLen = 76) {
+  const raw = base64Utf8(value);
+  const out = [];
+  for (let i = 0; i < raw.length; i += lineLen) {
+    out.push(raw.slice(i, i + lineLen));
+  }
+  return out.join("\r\n");
+}
+
+function normalizeCrlf(value) {
+  return String(value ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, "\r\n");
+}
+
+function publicSiteUrl(env, request) {
+  const explicit = cleanString(env.PUBLIC_SITE_URL, 1000).replace(/\/$/, "");
+  if (explicit) return explicit;
+  const origin = new URL(request.url).origin;
+  const host = new URL(origin).hostname;
+  if (host.startsWith("api.")) {
+    return `https://${host.slice(4)}`;
+  }
+  return origin;
+}
+
+function serviceConfirmPath(service) {
+  if (service === "hotel") return "/Hotel/potwierdzenie.html";
+  if (service === "restaurant") return "/Restauracja/potwierdzenie.html";
+  return "/Przyjec/potwierdzenie.html";
+}
+
+function buildConfirmationLink(env, request, service, token) {
+  const base = publicSiteUrl(env, request);
+  return `${base}${serviceConfirmPath(service)}?token=${encodeURIComponent(token)}`;
+}
+
+function splitLines(raw) {
+  return String(raw || "").split(/\r?\n/).filter((line) => line !== "");
+}
+
+function extractEmailAddress(value) {
+  const v = cleanString(value, 500);
+  const m = v.match(/<([^>]+)>/);
+  return cleanString(m ? m[1] : v, 320);
+}
+
+function createSmtpLineReader(readable) {
+  const decoder = new TextDecoder();
+  const reader = readable.getReader();
+  let buf = "";
+  return async function readLine() {
+    while (true) {
+      const idx = buf.indexOf("\n");
+      if (idx >= 0) {
+        const line = buf.slice(0, idx).replace(/\r$/, "");
+        buf = buf.slice(idx + 1);
+        return line;
+      }
+      const chunk = await reader.read();
+      if (chunk.done) {
+        if (buf) {
+          const last = buf.replace(/\r$/, "");
+          buf = "";
+          return last;
+        }
+        return null;
+      }
+      buf += decoder.decode(chunk.value, { stream: true });
+    }
+  };
+}
+
+async function smtpReadResponse(readLine) {
+  const lines = [];
+  while (true) {
+    const line = await readLine();
+    if (line == null) {
+      throw new Error("SMTP: połączenie zamknięte przez serwer.");
+    }
+    lines.push(line);
+    if (/^\d{3} /.test(line)) {
+      break;
+    }
+  }
+  const code = Number(lines[lines.length - 1].slice(0, 3));
+  return { code, lines };
+}
+
+async function smtpExpect(readLine, allowedCodes, context) {
+  const res = await smtpReadResponse(readLine);
+  if (!allowedCodes.includes(res.code)) {
+    throw new Error(`SMTP: ${context}. Odpowiedź: ${res.lines.join(" | ")}`);
+  }
+  return res;
+}
+
+async function smtpWrite(writer, line) {
+  const payload = `${line}\r\n`;
+  await writer.write(new TextEncoder().encode(payload));
+}
+
+async function sendMailViaSmtp(env, { to, subject, html, replyTo }) {
+  if (!hasSmtpConfig(env)) {
+    return { skipped: true };
+  }
+  const host = cleanString(env.SMTP_HOST, 500);
+  const port = Number(env.SMTP_PORT || "465");
+  const user = cleanString(env.SMTP_USER, 500);
+  const pass = cleanString(env.SMTP_PASS, 500);
+  const from = cleanString(env.SMTP_FROM, 500) || user;
+  const fromAddress = extractEmailAddress(from);
+  const toAddress = cleanString(to, 500);
+  if (!toAddress) {
+    return { skipped: true };
+  }
+
+  const socket = connect({ hostname: host, port }, { secureTransport: "on" });
+  const readLine = createSmtpLineReader(socket.readable);
+  const writer = socket.writable.getWriter();
+
+  try {
+    await smtpExpect(readLine, [220], "serwer nie przyjął połączenia");
+    await smtpWrite(writer, `EHLO ${cleanString(env.SMTP_EHLO_HOST, 200) || "sredzka-korona.pl"}`);
+    await smtpExpect(readLine, [250], "EHLO odrzucone");
+
+    await smtpWrite(writer, "AUTH LOGIN");
+    await smtpExpect(readLine, [334], "AUTH LOGIN odrzucone");
+    await smtpWrite(writer, btoa(user));
+    await smtpExpect(readLine, [334], "SMTP nie poprosił o hasło");
+    await smtpWrite(writer, btoa(pass));
+    await smtpExpect(readLine, [235], "logowanie SMTP nieudane");
+
+    await smtpWrite(writer, `MAIL FROM:<${fromAddress}>`);
+    await smtpExpect(readLine, [250], "MAIL FROM odrzucone");
+    await smtpWrite(writer, `RCPT TO:<${toAddress}>`);
+    await smtpExpect(readLine, [250, 251], "RCPT TO odrzucone");
+
+    await smtpWrite(writer, "DATA");
+    await smtpExpect(readLine, [354], "DATA odrzucone");
+
+    const htmlNormalized = normalizeCrlf(html || "");
+    const body64 = base64Lines(htmlNormalized);
+    const headers = [
+      `From: ${toMimeHeader(from)}`,
+      `To: ${toMimeHeader(toAddress)}`,
+      `Subject: ${toMimeHeader(subject || "")}`,
+      `Date: ${new Date().toUTCString()}`,
+      "MIME-Version: 1.0",
+      "Content-Type: text/html; charset=UTF-8",
+      "Content-Transfer-Encoding: base64",
+      replyTo ? `Reply-To: ${toMimeHeader(replyTo)}` : null,
+      "",
+      body64,
+      ".",
+    ]
+      .filter(Boolean)
+      .join("\r\n");
+    await writer.write(new TextEncoder().encode(`${headers}\r\n`));
+    await smtpExpect(readLine, [250], "wiadomość nie została przyjęta");
+
+    await smtpWrite(writer, "QUIT");
+    await smtpExpect(readLine, [221], "QUIT odrzucone");
+    return { ok: true };
+  } finally {
+    try {
+      writer.releaseLock();
+    } catch {}
+    try {
+      await socket.close();
+    } catch {}
+  }
+}
 
 function nowMs() {
   return Date.now();
@@ -1197,46 +1408,129 @@ function mapHallReservation(row, hallMap) {
 }
 
 function defaultTemplateMap(service) {
-  const t = {};
-  const keys =
-    service === "hotel"
-      ? [
-          "confirm_email",
-          "pending_client",
-          "pending_admin",
-          "confirmed_client",
-          "cancelled_client",
-          "expired_email_client",
-          "expired_pending_client",
-          "expired_pending_admin",
-        ]
-      : service === "restaurant"
-        ? [
-            "rest_confirm_email",
-            "rest_pending_client",
-            "rest_pending_admin",
-            "rest_confirmed_client",
-            "rest_cancelled_client",
-            "rest_expired_client",
-            "rest_expired_admin",
-          ]
-        : [
-            "hall_confirm_email",
-            "hall_pending_client",
-            "hall_pending_admin",
-            "hall_confirmed_client",
-            "hall_cancelled_client",
-            "hall_expired_client",
-            "hall_expired_admin",
-          ];
-  keys.forEach((k) => {
-    t[k] = {
-      subject: `${service} - ${k}`,
-      bodyHtml: `<p>Szablon ${k}</p>`,
+  if (service === "hotel") {
+    return {
+      confirm_email: {
+        subject: "{{hotelName}} — potwierdź rezerwację ({{reservationNumber}})",
+        bodyHtml:
+          '<p>Witaj {{fullName}},</p><p>Kliknij link, aby potwierdzić rezerwację:</p><p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p><p>Numer: {{reservationNumber}}<br>Termin: {{dateFrom}} — {{dateTo}}</p>',
+      },
+      pending_client: {
+        subject: "{{hotelName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
+        bodyHtml:
+          "<p>Witaj {{fullName}},</p><p>Twoja rezerwacja ma status oczekujący.</p><p>Numer: {{reservationNumber}}</p>",
+      },
+      pending_admin: {
+        subject: "[{{hotelName}}] Nowa rezerwacja oczekująca {{reservationNumber}}",
+        bodyHtml:
+          "<p>Nowa rezerwacja oczekuje na decyzję.</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{dateFrom}} — {{dateTo}}</p>",
+      },
+      confirmed_client: {
+        subject: "{{hotelName}} — rezerwacja potwierdzona ({{reservationNumber}})",
+        bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została potwierdzona.</p>",
+      },
+      cancelled_client: {
+        subject: "{{hotelName}} — rezerwacja anulowana ({{reservationNumber}})",
+        bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została anulowana.</p>",
+      },
     };
-  });
-  return t;
+  }
+  if (service === "restaurant") {
+    return {
+      restaurant_confirm_email: {
+        subject: "{{restaurantName}} — potwierdź rezerwację stolika ({{reservationNumber}})",
+        bodyHtml:
+          '<p>Witaj {{fullName}},</p><p>Kliknij link, aby potwierdzić rezerwację stolika:</p><p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p><p>Termin: {{date}} · {{timeFrom}}–{{timeTo}}</p>',
+      },
+      restaurant_pending_client: {
+        subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
+        bodyHtml: "<p>Witaj {{fullName}},</p><p>Twoja rezerwacja jest oczekująca.</p>",
+      },
+      restaurant_pending_admin: {
+        subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
+        bodyHtml:
+          "<p>Nowa rezerwacja oczekuje na decyzję.</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}}</p>",
+      },
+      restaurant_confirmed_client: {
+        subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
+        bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została potwierdzona.</p>",
+      },
+      restaurant_cancelled_client: {
+        subject: "{{restaurantName}} — rezerwacja anulowana ({{reservationNumber}})",
+        bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została anulowana.</p>",
+      },
+      rest_confirm_email: {
+        subject: "{{restaurantName}} — potwierdź rezerwację stolika ({{reservationNumber}})",
+        bodyHtml:
+          '<p>Witaj {{fullName}},</p><p>Kliknij link, aby potwierdzić rezerwację stolika:</p><p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p>',
+      },
+      rest_pending_client: {
+        subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
+        bodyHtml: "<p>Witaj {{fullName}},</p><p>Twoja rezerwacja jest oczekująca.</p>",
+      },
+      rest_pending_admin: {
+        subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
+        bodyHtml: "<p>Nowa rezerwacja oczekuje na decyzję.</p><p>{{fullName}} · {{email}} · {{phone}}</p>",
+      },
+      rest_confirmed_client: {
+        subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
+        bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została potwierdzona.</p>",
+      },
+      rest_cancelled_client: {
+        subject: "{{restaurantName}} — rezerwacja anulowana ({{reservationNumber}})",
+        bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została anulowana.</p>",
+      },
+    };
+  }
+  return {
+    hall_confirm_email: {
+      subject: "{{venueName}} — potwierdź zgłoszenie rezerwacji sali ({{reservationNumber}})",
+      bodyHtml:
+        '<p>Witaj {{fullName}},</p><p>Kliknij link, aby potwierdzić zgłoszenie:</p><p><a href="{{confirmationLink}}">Potwierdź zgłoszenie</a></p><p>{{date}} · {{timeFrom}}–{{timeTo}}</p>',
+    },
+    hall_pending_client: {
+      subject: "{{venueName}} — zgłoszenie oczekuje na decyzję obiektu ({{reservationNumber}})",
+      bodyHtml: "<p>Witaj {{fullName}},</p><p>Zgłoszenie ma status oczekujące.</p>",
+    },
+    hall_pending_admin: {
+      subject: "[{{venueName}}] Nowe zgłoszenie sali {{reservationNumber}}",
+      bodyHtml:
+        "<p>Nowe zgłoszenie oczekuje na decyzję.</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}}</p>",
+    },
+    hall_confirmed_client: {
+      subject: "{{venueName}} — rezerwacja sali potwierdzona ({{reservationNumber}})",
+      bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została potwierdzona.</p>",
+    },
+    hall_cancelled_client: {
+      subject: "{{venueName}} — rezerwacja sali anulowana ({{reservationNumber}})",
+      bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została anulowana.</p>",
+    },
+  };
 }
+
+const EVENT_TEMPLATE_KEYS = {
+  hotel: {
+    confirm_email: ["confirm_email"],
+    pending_client: ["pending_client"],
+    pending_admin: ["pending_admin"],
+    confirmed_client: ["confirmed_client"],
+    cancelled_client: ["cancelled_client"],
+  },
+  restaurant: {
+    confirm_email: ["restaurant_confirm_email", "rest_confirm_email"],
+    pending_client: ["restaurant_pending_client", "rest_pending_client"],
+    pending_admin: ["restaurant_pending_admin", "rest_pending_admin"],
+    confirmed_client: ["restaurant_confirmed_client", "rest_confirmed_client"],
+    cancelled_client: ["restaurant_cancelled_client", "rest_cancelled_client"],
+  },
+  hall: {
+    confirm_email: ["hall_confirm_email"],
+    pending_client: ["hall_pending_client"],
+    pending_admin: ["hall_pending_admin"],
+    confirmed_client: ["hall_confirmed_client"],
+    cancelled_client: ["hall_cancelled_client"],
+  },
+};
 
 async function loadTemplates(env, service) {
   const rows = await env.DB.prepare(
@@ -1271,6 +1565,19 @@ async function saveTemplate(env, service, key, subject, bodyHtml) {
     .run();
 }
 
+async function resolveTemplateForEvent(env, service, eventKey) {
+  const all = await loadTemplates(env, service);
+  const candidates = EVENT_TEMPLATE_KEYS[service]?.[eventKey] || [eventKey];
+  for (const key of candidates) {
+    if (all[key]) return all[key];
+  }
+  const defaults = defaultTemplateMap(service);
+  for (const key of candidates) {
+    if (defaults[key]) return defaults[key];
+  }
+  return { subject: `${service} - ${eventKey}`, bodyHtml: `<p>Szablon ${eventKey}</p>` };
+}
+
 async function listHotelReservations(env, status) {
   const rows = await env.DB.prepare(
     `SELECT * FROM hotel_reservations ${status && status !== "all" ? "WHERE status = ?" : ""} ORDER BY created_at DESC LIMIT 500`
@@ -1302,6 +1609,126 @@ async function listHallReservations(env, status) {
   return (rows.results || []).map((r) => mapHallReservation(r, map));
 }
 
+async function getRestaurantReservationRow(env, id) {
+  return env.DB.prepare("SELECT * FROM restaurant_reservations WHERE id = ?").bind(id).first();
+}
+
+async function getHallReservationRow(env, id) {
+  return env.DB.prepare("SELECT * FROM venue_reservations WHERE id = ?").bind(id).first();
+}
+
+function hotelDisplayName(env) {
+  return cleanString(env.HOTEL_NAME, 140) || "Średzka Korona";
+}
+
+function restaurantDisplayName(env) {
+  return cleanString(env.RESTAURANT_NAME, 140) || cleanString(env.HOTEL_NAME, 140) || "Średzka Korona — Restauracja";
+}
+
+function hallDisplayName(env) {
+  return cleanString(env.VENUE_NAME, 140) || cleanString(env.HOTEL_NAME, 140) || "Średzka Korona";
+}
+
+function parseAdminNotifyEmails(env) {
+  return splitLines(String(env.ADMIN_NOTIFY_EMAIL || "").replace(/,/g, "\n"))
+    .map((x) => cleanString(x, 320).toLowerCase())
+    .filter((x) => x.includes("@"));
+}
+
+async function buildHotelMailVars(env, request, row, token = "") {
+  const roomIds = parseJson(row.room_ids_json, []);
+  const rooms = await hotelRooms(env);
+  const roomMap = new Map(rooms.map((r) => [r.id, r]));
+  const roomLabels = roomIds.map((id) => roomMap.get(id)?.name || id).join(", ");
+  return {
+    reservationId: row.id,
+    reservationNumber: String(row.human_number || row.id),
+    fullName: row.customer_name || "",
+    email: row.email || "",
+    phone: `${row.phone_prefix || ""} ${row.phone_national || ""}`.trim(),
+    roomsList: roomLabels,
+    dateFrom: row.date_from || "",
+    dateTo: row.date_to || "",
+    nights: String(nightsCount(row.date_from, row.date_to)),
+    totalPrice: String(Number(row.total_price || 0).toFixed(2)),
+    customerNote: row.customer_note || "",
+    adminNote: row.admin_note || "",
+    confirmationLink: token ? buildConfirmationLink(env, request, "hotel", token) : "",
+    hotelName: hotelDisplayName(env),
+  };
+}
+
+async function buildRestaurantMailVars(env, request, row, token = "") {
+  const tables = await restaurantTables(env, true);
+  const tableMap = new Map(tables.map((t) => [t.id, t]));
+  const assigned = parseJson(row.assigned_table_ids_json, []);
+  const tableLabels = assigned
+    .map((id) => {
+      const t = tableMap.get(id);
+      return t ? `Stół ${t.number}${t.zone ? ` (${t.zone})` : ""}` : id;
+    })
+    .join(", ");
+  return {
+    reservationId: row.id,
+    reservationNumber: String(row.human_number || row.id),
+    fullName: row.full_name || "",
+    email: row.email || "",
+    phone: `${row.phone_prefix || ""} ${row.phone_national || ""}`.trim(),
+    date: row.reservation_date || "",
+    timeFrom: row.start_time || "",
+    timeTo: formatHm(Number(row.end_ms || 0)),
+    durationHours: String(row.duration_hours || ""),
+    tablesCount: String(row.tables_count || ""),
+    tablesList: tableLabels,
+    guestsCount: String(row.guests_count || ""),
+    joinTables: Number(row.join_tables) ? "tak" : "nie",
+    customerNote: row.customer_note || "",
+    adminNote: row.admin_note || "",
+    confirmationLink: token ? buildConfirmationLink(env, request, "restaurant", token) : "",
+    restaurantName: restaurantDisplayName(env),
+  };
+}
+
+async function buildHallMailVars(env, request, row, token = "") {
+  const hall = await env.DB.prepare("SELECT name FROM venue_halls WHERE id = ?").bind(row.hall_id).first();
+  return {
+    reservationId: row.id,
+    reservationNumber: String(row.human_number || row.id),
+    fullName: row.full_name || "",
+    email: row.email || "",
+    phone: `${row.phone_prefix || ""} ${row.phone_national || ""}`.trim(),
+    hallName: row.hall_name_snapshot || hall?.name || row.hall_id || "",
+    date: row.reservation_date || "",
+    timeFrom: row.start_time || "",
+    timeTo: formatHm(Number(row.end_ms || 0)),
+    durationHours: String(row.duration_hours || ""),
+    guestsCount: String(row.guests_count || ""),
+    eventType: row.event_type || "",
+    exclusive: Number(row.exclusive) ? "tak" : "nie",
+    customerNote: row.customer_note || "",
+    adminNote: row.admin_note || "",
+    confirmationLink: token ? buildConfirmationLink(env, request, "hall", token) : "",
+    venueName: hallDisplayName(env),
+  };
+}
+
+async function buildMailVarsForService(env, request, service, row, token = "") {
+  if (service === "hotel") return buildHotelMailVars(env, request, row, token);
+  if (service === "restaurant") return buildRestaurantMailVars(env, request, row, token);
+  return buildHallMailVars(env, request, row, token);
+}
+
+async function sendTemplatedBookingMail(env, request, { service, eventKey, row, token, to }) {
+  if (!row) return { skipped: true };
+  const destination = cleanString(to || row.email, 320).toLowerCase();
+  if (!destination || !destination.includes("@")) return { skipped: true };
+  const template = await resolveTemplateForEvent(env, service, eventKey);
+  const vars = await buildMailVarsForService(env, request, service, row, token || "");
+  const subject = renderTemplate(template.subject, vars);
+  const html = renderTemplate(template.bodyHtml, vars);
+  return sendMailViaSmtp(env, { to: destination, subject, html });
+}
+
 async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
   if (op === "health" && request.method === "GET") {
     return { status: 200, data: { ok: true, service: "hotelApi-d1" } };
@@ -1317,6 +1744,9 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
     if (verifyTurnstileToken && !(await verifyTurnstileToken(body.turnstileToken || ""))) {
       return { status: 400, data: { error: "Weryfikacja anty-spam nie powiodła się." } };
     }
+    if (!hasSmtpConfig(env)) {
+      return { status: 503, data: { error: "System mailowy jest chwilowo niedostępny. Spróbuj ponownie później." } };
+    }
     try {
       assertSession(body.sessionStartedAt);
       assertTerms(body.termsAccepted);
@@ -1324,6 +1754,20 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
         return { status: 400, data: { error: "Wypełnij imię i nazwisko oraz poprawny e-mail." } };
       }
       const out = await createHotelReservation(env, body, { withConfirmationToken: true, status: "email_verification_pending" });
+      const row = await getHotelReservation(env, out.id);
+      try {
+        await sendTemplatedBookingMail(env, request, {
+          service: "hotel",
+          eventKey: "confirm_email",
+          row,
+          token: out.token,
+          to: row?.email,
+        });
+      } catch (error) {
+        await env.DB.prepare("DELETE FROM hotel_reservations WHERE id = ?").bind(out.id).run();
+        console.error("Hotel draft mail error:", error);
+        return { status: 502, data: { error: "Nie udało się wysłać wiadomości e-mail z potwierdzeniem." } };
+      }
       return {
         status: 200,
         data: {
@@ -1363,6 +1807,25 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
       )
         .bind(nowMs() + HOTEL_PENDING_MS, nowMs(), row.id)
         .run();
+      try {
+        await sendTemplatedBookingMail(env, request, {
+          service: "hotel",
+          eventKey: "pending_client",
+          row: { ...row, status: "pending" },
+          to: row.email,
+        });
+        const admins = parseAdminNotifyEmails(env);
+        for (const adminEmail of admins) {
+          await sendTemplatedBookingMail(env, request, {
+            service: "hotel",
+            eventKey: "pending_admin",
+            row: { ...row, status: "pending" },
+            to: adminEmail,
+          });
+        }
+      } catch (error) {
+        console.error("Hotel pending mail error:", error);
+      }
       return { status: 200, data: { ok: true, reservationId: row.id, humanNumber: row.human_number } };
     } catch (error) {
       return { status: 409, data: { error: error.message || "Konflikt terminów." } };
@@ -1420,6 +1883,9 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
     if (verifyTurnstileToken && !(await verifyTurnstileToken(body.turnstileToken || ""))) {
       return { status: 400, data: { error: "Weryfikacja anty-spam nie powiodła się." } };
     }
+    if (!hasSmtpConfig(env)) {
+      return { status: 503, data: { error: "System mailowy jest chwilowo niedostępny. Spróbuj ponownie później." } };
+    }
     try {
       assertSession(body.sessionStartedAt);
       assertTerms(body.termsAccepted);
@@ -1427,6 +1893,20 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
         return { status: 400, data: { error: "Wypełnij imię i nazwisko oraz poprawny e-mail." } };
       }
       const out = await createRestaurantReservation(env, body, { withConfirmationToken: true, status: "email_verification_pending" });
+      const row = await getRestaurantReservationRow(env, out.id);
+      try {
+        await sendTemplatedBookingMail(env, request, {
+          service: "restaurant",
+          eventKey: "confirm_email",
+          row,
+          token: out.token,
+          to: row?.email,
+        });
+      } catch (error) {
+        await env.DB.prepare("DELETE FROM restaurant_reservations WHERE id = ?").bind(out.id).run();
+        console.error("Restaurant draft mail error:", error);
+        return { status: 502, data: { error: "Nie udało się wysłać wiadomości e-mail z potwierdzeniem." } };
+      }
       return {
         status: 200,
         data: {
@@ -1474,6 +1954,26 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
       )
         .bind(toJson(assigned), nowMs() + RESTAURANT_PENDING_MS, nowMs(), row.id)
         .run();
+      const rowAfter = await getRestaurantReservationRow(env, row.id);
+      try {
+        await sendTemplatedBookingMail(env, request, {
+          service: "restaurant",
+          eventKey: "pending_client",
+          row: rowAfter,
+          to: rowAfter?.email,
+        });
+        const admins = parseAdminNotifyEmails(env);
+        for (const adminEmail of admins) {
+          await sendTemplatedBookingMail(env, request, {
+            service: "restaurant",
+            eventKey: "pending_admin",
+            row: rowAfter,
+            to: adminEmail,
+          });
+        }
+      } catch (error) {
+        console.error("Restaurant pending mail error:", error);
+      }
       return { status: 200, data: { ok: true, reservationId: row.id, humanNumber: row.human_number } };
     } catch (error) {
       return { status: 409, data: { error: error.message || "Konflikt terminów." } };
@@ -1519,6 +2019,9 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
     if (verifyTurnstileToken && !(await verifyTurnstileToken(body.turnstileToken || ""))) {
       return { status: 400, data: { error: "Weryfikacja anty-spam nie powiodła się." } };
     }
+    if (!hasSmtpConfig(env)) {
+      return { status: 503, data: { error: "System mailowy jest chwilowo niedostępny. Spróbuj ponownie później." } };
+    }
     try {
       assertSession(body.sessionStartedAt);
       assertTerms(body.termsAccepted);
@@ -1529,6 +2032,20 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
         return { status: 400, data: { error: "Podaj rodzaj imprezy." } };
       }
       const out = await createHallReservation(env, body, { withConfirmationToken: true, status: "email_verification_pending" });
+      const row = await getHallReservationRow(env, out.id);
+      try {
+        await sendTemplatedBookingMail(env, request, {
+          service: "hall",
+          eventKey: "confirm_email",
+          row,
+          token: out.token,
+          to: row?.email,
+        });
+      } catch (error) {
+        await env.DB.prepare("DELETE FROM venue_reservations WHERE id = ?").bind(out.id).run();
+        console.error("Hall draft mail error:", error);
+        return { status: 502, data: { error: "Nie udało się wysłać wiadomości e-mail z potwierdzeniem." } };
+      }
       return {
         status: 200,
         data: {
@@ -1579,6 +2096,26 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
       )
         .bind(nowMs() + HALL_PENDING_MS, nowMs(), row.id)
         .run();
+      try {
+        const rowAfter = await getHallReservationRow(env, row.id);
+        await sendTemplatedBookingMail(env, request, {
+          service: "hall",
+          eventKey: "pending_client",
+          row: rowAfter,
+          to: rowAfter?.email,
+        });
+        const admins = parseAdminNotifyEmails(env);
+        for (const adminEmail of admins) {
+          await sendTemplatedBookingMail(env, request, {
+            service: "hall",
+            eventKey: "pending_admin",
+            row: rowAfter,
+            to: adminEmail,
+          });
+        }
+      } catch (error) {
+        console.error("Hall pending mail error:", error);
+      }
       return { status: 200, data: { ok: true, reservationId: row.id, humanNumber: row.human_number } };
     } catch (error) {
       return { status: 409, data: { error: error.message || "Konflikt terminów." } };
@@ -1671,16 +2208,40 @@ async function handleHotelAdmin(env, op, request) {
   }
   if (op === "admin-reservation-confirm" && request.method === "POST") {
     const body = await readBody(request);
+    const id = cleanString(body.id, 80);
     await env.DB.prepare("UPDATE hotel_reservations SET status='confirmed', pending_expires_at=NULL, updated_at=? WHERE id=?")
-      .bind(nowMs(), cleanString(body.id, 80))
+      .bind(nowMs(), id)
       .run();
+    try {
+      const row = await getHotelReservation(env, id);
+      await sendTemplatedBookingMail(env, request, {
+        service: "hotel",
+        eventKey: "confirmed_client",
+        row,
+        to: row?.email,
+      });
+    } catch (error) {
+      console.error("Hotel confirm mail error:", error);
+    }
     return { status: 200, data: { ok: true } };
   }
   if (op === "admin-reservation-cancel" && request.method === "POST") {
     const body = await readBody(request);
+    const id = cleanString(body.id, 80);
     await env.DB.prepare("UPDATE hotel_reservations SET status='cancelled', pending_expires_at=NULL, updated_at=? WHERE id=?")
-      .bind(nowMs(), cleanString(body.id, 80))
+      .bind(nowMs(), id)
       .run();
+    try {
+      const row = await getHotelReservation(env, id);
+      await sendTemplatedBookingMail(env, request, {
+        service: "hotel",
+        eventKey: "cancelled_client",
+        row,
+        to: row?.email,
+      });
+    } catch (error) {
+      console.error("Hotel cancel mail error:", error);
+    }
     return { status: 200, data: { ok: true } };
   }
   if (op === "admin-mail-templates" && request.method === "GET") {
@@ -1850,16 +2411,40 @@ async function handleRestaurantAdmin(env, op, request) {
   }
   if (op === "admin-reservation-confirm" && request.method === "POST") {
     const body = await readBody(request);
+    const id = cleanString(body.id, 80);
     await env.DB.prepare("UPDATE restaurant_reservations SET status='confirmed', pending_expires_at=NULL, updated_at=? WHERE id=?")
-      .bind(nowMs(), cleanString(body.id, 80))
+      .bind(nowMs(), id)
       .run();
+    try {
+      const row = await getRestaurantReservationRow(env, id);
+      await sendTemplatedBookingMail(env, request, {
+        service: "restaurant",
+        eventKey: "confirmed_client",
+        row,
+        to: row?.email,
+      });
+    } catch (error) {
+      console.error("Restaurant confirm mail error:", error);
+    }
     return { status: 200, data: { ok: true } };
   }
   if (op === "admin-reservation-cancel" && request.method === "POST") {
     const body = await readBody(request);
+    const id = cleanString(body.id, 80);
     await env.DB.prepare("UPDATE restaurant_reservations SET status='cancelled', pending_expires_at=NULL, updated_at=? WHERE id=?")
-      .bind(nowMs(), cleanString(body.id, 80))
+      .bind(nowMs(), id)
       .run();
+    try {
+      const row = await getRestaurantReservationRow(env, id);
+      await sendTemplatedBookingMail(env, request, {
+        service: "restaurant",
+        eventKey: "cancelled_client",
+        row,
+        to: row?.email,
+      });
+    } catch (error) {
+      console.error("Restaurant cancel mail error:", error);
+    }
     return { status: 200, data: { ok: true } };
   }
   if (op === "admin-mail-templates" && request.method === "GET") {
@@ -1949,16 +2534,40 @@ async function handleHallAdmin(env, op, request) {
   }
   if (op === "admin-reservation-confirm" && request.method === "POST") {
     const body = await readBody(request);
+    const id = cleanString(body.id, 80);
     await env.DB.prepare("UPDATE venue_reservations SET status='confirmed', pending_expires_at=NULL, updated_at=? WHERE id=?")
-      .bind(nowMs(), cleanString(body.id, 80))
+      .bind(nowMs(), id)
       .run();
+    try {
+      const row = await getHallReservationRow(env, id);
+      await sendTemplatedBookingMail(env, request, {
+        service: "hall",
+        eventKey: "confirmed_client",
+        row,
+        to: row?.email,
+      });
+    } catch (error) {
+      console.error("Hall confirm mail error:", error);
+    }
     return { status: 200, data: { ok: true } };
   }
   if (op === "admin-reservation-cancel" && request.method === "POST") {
     const body = await readBody(request);
+    const id = cleanString(body.id, 80);
     await env.DB.prepare("UPDATE venue_reservations SET status='cancelled', pending_expires_at=NULL, updated_at=? WHERE id=?")
-      .bind(nowMs(), cleanString(body.id, 80))
+      .bind(nowMs(), id)
       .run();
+    try {
+      const row = await getHallReservationRow(env, id);
+      await sendTemplatedBookingMail(env, request, {
+        service: "hall",
+        eventKey: "cancelled_client",
+        row,
+        to: row?.email,
+      });
+    } catch (error) {
+      console.error("Hall cancel mail error:", error);
+    }
     return { status: 200, data: { ok: true } };
   }
   if (op === "admin-extend-pending" && request.method === "POST") {

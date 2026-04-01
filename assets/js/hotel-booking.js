@@ -49,21 +49,6 @@
   }
 
   const SESSION_MS = 30 * 60 * 1000;
-  const PHONE_PREFIXES = [
-    { v: "+48", l: "Polska +48" },
-    { v: "+49", l: "Niemcy +49" },
-    { v: "+420", l: "Czechy +420" },
-    { v: "+43", l: "Austria +43" },
-    { v: "+31", l: "Holandia +31" },
-    { v: "+32", l: "Belgia +32" },
-    { v: "+33", l: "Francja +33" },
-    { v: "+44", l: "Wielka Brytania +44" },
-    { v: "+1", l: "USA/Kanada +1" },
-    { v: "+46", l: "Szwecja +46" },
-    { v: "+47", l: "Norwegia +47" },
-    { v: "+45", l: "Dania +45" },
-  ];
-
   const state = {
     step: 1,
     sessionStartedAt: 0,
@@ -73,6 +58,7 @@
     cart: {},
     roomsById: {},
     customer: {},
+    turnstileToken: "",
   };
 
   function escapeHtml(s) {
@@ -145,6 +131,31 @@
     return Math.round(t * 100) / 100;
   }
 
+  function toInt(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  }
+
+  function roomMetaHtml(room) {
+    const maxGuests = toInt(room.maxGuests);
+    const beds = [
+      { icon: "🛏️", count: toInt(room.bedsSingle), label: "jednoosobowe" },
+      { icon: "🛏️", count: toInt(room.bedsDouble), label: "dwuosobowe" },
+      { icon: "🛏️", count: toInt(room.bedsChild), label: "dziecięce" },
+    ].filter((item) => item.count > 0);
+    const bedsHtml = beds
+      .map(
+        (item) =>
+          `<span class="booking-room-chip"><span class="booking-room-icon" aria-hidden="true">${item.icon}</span>${item.count}× ${escapeHtml(item.label)}</span>`
+      )
+      .join("");
+    return `
+      <div class="booking-room-meta">
+        <span class="booking-room-chip"><span class="booking-room-icon" aria-hidden="true">👤</span>Do ${maxGuests} os.</span>
+        ${bedsHtml ? `<div class="booking-room-beds">${bedsHtml}</div>` : ""}
+      </div>`;
+  }
+
   function renderSteps() {
     return `
       <div class="booking-steps" aria-hidden="true">
@@ -206,7 +217,7 @@
                 <div>
                   <strong>${escapeHtml(r.name)}</strong>
                   <span class="booking-price">${escapeHtml(r.pricePerNight)} PLN / noc</span>
-                  <p class="booking-room-meta">Do ${r.maxGuests} os. · Łóżka: ${r.bedsSingle || 0}×1-os., ${r.bedsDouble || 0}×2-os., ${r.bedsChild || 0} dziec.</p>
+                  ${roomMetaHtml(r)}
                   ${r.description ? `<p class="booking-desc">${escapeHtml(r.description)}</p>` : ""}
                 </div>
                 <button type="button" class="booking-toggle ${on ? "on" : ""}" data-toggle="${escapeHtml(r.id)}">${on ? "W koszyku" : "Dodaj"}</button>
@@ -232,14 +243,10 @@
           <label>Imię i nazwisko<input name="fullName" required maxlength="120" /></label>
           <label>E-mail<input name="email" type="email" required /></label>
           <div class="booking-field-grid">
-            <label>Prefiks telefonu
-              <select name="phonePrefix" required>
-                ${PHONE_PREFIXES.map((p) => `<option value="${escapeHtml(p.v)}">${escapeHtml(p.l)}</option>`).join("")}
-              </select>
-            </label>
+            <label>Prefiks telefonu<input name="phonePrefix" class="booking-prefix-input" type="text" inputmode="tel" autocomplete="tel-country-code" value="+48" required pattern="\\+[0-9]{1,4}" maxlength="5" /></label>
             <label>Numer (bez prefiksu)<input name="phoneNational" inputmode="numeric" required pattern="[0-9]{6,15}" placeholder="np. 501234567" /></label>
           </div>
-          <label>Uwagi do rezerwacji<textarea name="customerNote" rows="3" maxlength="2000"></textarea></label>
+          <label>Uwagi do rezerwacji<textarea name="customerNote" rows="3" maxlength="2000" required></textarea></label>
           <p class="booking-error" id="booking-step-error" hidden></p>
           <div class="booking-actions">
             <button type="button" class="booking-btn secondary" id="booking-back-3">Wstecz</button>
@@ -250,31 +257,37 @@
       const n = nightsCount();
       const lines = cartRoomIds().map((rid) => {
         const r = state.roomsById[rid];
+        const perNight = Number(r.pricePerNight || 0);
         const sub = Number(r.pricePerNight) * n;
-        return `<li>${escapeHtml(r.name)} — ${sub.toFixed(2)} PLN</li>`;
+        return `<li>${escapeHtml(r.name)} -> ${perNight.toFixed(2)} PLN/noc -> ${sub.toFixed(2)} PLN</li>`;
       });
       inner = `
         <h3>Podsumowanie</h3>
-        <ul class="booking-summary-list">${lines.join("")}</ul>
         <p><strong>Termin:</strong> ${escapeHtml(state.dateFrom)} → ${escapeHtml(state.dateTo)} (${n} nocy)</p>
+        <ul class="booking-summary-list">${lines.join("")}</ul>
         <p><strong>Łącznie:</strong> ${totalPrice().toFixed(2)} PLN</p>
         <p><strong>Dane:</strong> ${escapeHtml(state.customer.fullName || "")}, ${escapeHtml(state.customer.email || "")}</p>
         <label class="booking-terms">
           <input type="checkbox" id="bf-terms" required />
           <span>Oświadczam, że zapoznałem/am się z <a href="../dokumenty/index.html#regulamin-rezerwacji-hotel" target="_blank" rel="noopener">regulaminem rezerwacji pokoi hotelowych</a>, rozumiem, że po akceptacji przez hotel rezerwacja jest zobowiązująca oraz zobowiązuję się do zapłaty zgodnie z warunkami obiektu.</span>
         </label>
-        <div id="turnstile-slot-booking"></div>
         <p class="booking-error" id="booking-step-error" hidden></p>
         <div class="booking-actions">
           <button type="button" class="booking-btn secondary" id="booking-back-4">Wstecz</button>
-          <button type="button" class="booking-btn" id="booking-submit">Wyślij i otrzymaj link e-mail</button>
+          <div id="booking-submit-slot">
+            ${
+              config.turnstileSiteKey
+                ? `<div id="turnstile-slot-booking"></div>`
+                : `<button type="button" class="booking-btn" id="booking-submit">Wyślij</button>`
+            }
+          </div>
         </div>`;
     } else {
       inner = `
         <div class="booking-success">
           <h3>Wysłano wiadomość</h3>
-          <p>Na podany adres e-mail wysłaliśmy <strong>link potwierdzający</strong>. Kliknij w niego w ciągu <strong>2 godzin</strong>, inaczej zgłoszenie wygaśnie i nie zablokuje terminów.</p>
-          <p>Po kliknięciu linku rezerwacja otrzyma status <strong>oczekujący na akceptację przez hotel</strong>.</p>
+          <p>Na podany adres e-mail wysłaliśmy link potwierdzający. Kliknij w niego w ciągu 2 godzin, w celu dokończenia rezerwacji.</p>
+          <p>O przyjęciu rezerwacji zostaną Państwo poinformowani mailowo w ciągu 3 dni.</p>
         </div>
         <div class="booking-actions">
           <button type="button" class="booking-btn" id="booking-close-final">Zamknij</button>
@@ -386,9 +399,9 @@
           customerNote: String(fd.get("customerNote") || "").trim(),
           hpCompanyWebsite: String(fd.get("hpCompanyWebsite") || "").trim(),
         };
+        state.turnstileToken = "";
         state.step = 4;
         renderBody();
-        loadTurnstileIfNeeded();
       });
     }
 
@@ -397,57 +410,11 @@
         state.step = 3;
         renderBody();
       });
-      document.querySelector("#booking-submit")?.addEventListener("click", async () => {
-        const terms = document.querySelector("#bf-terms");
-        const errEl = document.querySelector("#booking-step-error");
-        if (!terms?.checked) {
-          errEl.hidden = false;
-          errEl.textContent = "Zaakceptuj regulamin i oświadczenie o płatności.";
-          return;
-        }
-        errEl.hidden = true;
-        const btn = document.querySelector("#booking-submit");
-        btn.disabled = true;
-        let turnstileToken = "";
-        if (config.turnstileSiteKey) {
-          const inp = document.querySelector("[name='cf-turnstile-response']");
-          turnstileToken = inp?.value || "";
-          if (!turnstileToken) {
-            errEl.hidden = false;
-            errEl.textContent = "Potwierdź pole weryfikacji anty-spam.";
-            btn.disabled = false;
-            return;
-          }
-        }
-        try {
-          await api("public-reservation-draft", {
-            method: "POST",
-            body: {
-              dateFrom: state.dateFrom,
-              dateTo: state.dateTo,
-              roomIds: cartRoomIds(),
-              fullName: state.customer.fullName,
-              email: state.customer.email,
-              phonePrefix: state.customer.phonePrefix,
-              phoneNational: state.customer.phoneNational,
-              customerNote: state.customer.customerNote,
-              termsAccepted: true,
-              sessionStartedAt: state.sessionStartedAt,
-              hpCompanyWebsite: state.customer.hpCompanyWebsite || "",
-              turnstileToken,
-            },
-          });
-          state.step = 5;
-          renderBody();
-        } catch (e) {
-          errEl.hidden = false;
-          errEl.textContent = e.message || "Błąd wysyłki.";
-          btn.disabled = false;
-          if (window.turnstile) {
-            window.turnstile.reset();
-          }
-        }
-      });
+      if (config.turnstileSiteKey) {
+        loadTurnstileIfNeeded();
+      } else {
+        bindBookingSubmitButton();
+      }
     }
 
     if (state.step === 5) {
@@ -455,11 +422,103 @@
     }
   }
 
+  function bindBookingSubmitButton() {
+    document.querySelector("#booking-submit")?.addEventListener("click", submitReservation);
+  }
+
+  async function submitReservation() {
+    const terms = document.querySelector("#bf-terms");
+    const errEl = document.querySelector("#booking-step-error");
+    if (!terms?.checked) {
+      errEl.hidden = false;
+      errEl.textContent = "Zaakceptuj regulamin i oświadczenie o płatności.";
+      return;
+    }
+    errEl.hidden = true;
+    const btn = document.querySelector("#booking-submit");
+    if (btn) {
+      btn.disabled = true;
+    }
+    if (config.turnstileSiteKey && !state.turnstileToken) {
+      errEl.hidden = false;
+      errEl.textContent = "Potwierdź pole weryfikacji anty-spam.";
+      if (btn) {
+        btn.disabled = false;
+      }
+      return;
+    }
+    try {
+      await api("public-reservation-draft", {
+        method: "POST",
+        body: {
+          dateFrom: state.dateFrom,
+          dateTo: state.dateTo,
+          roomIds: cartRoomIds(),
+          fullName: state.customer.fullName,
+          email: state.customer.email,
+          phonePrefix: state.customer.phonePrefix,
+          phoneNational: state.customer.phoneNational,
+          customerNote: state.customer.customerNote,
+          termsAccepted: true,
+          sessionStartedAt: state.sessionStartedAt,
+          hpCompanyWebsite: state.customer.hpCompanyWebsite || "",
+          turnstileToken: state.turnstileToken,
+        },
+      });
+      state.step = 5;
+      renderBody();
+    } catch (e) {
+      errEl.hidden = false;
+      errEl.textContent = e.message || "Błąd wysyłki.";
+      if (btn) {
+        btn.disabled = false;
+      }
+      if (config.turnstileSiteKey) {
+        state.turnstileToken = "";
+        const slotWrap = document.querySelector("#booking-submit-slot");
+        if (slotWrap) {
+          slotWrap.innerHTML = `<div id="turnstile-slot-booking"></div>`;
+          loadTurnstileIfNeeded();
+        }
+      }
+    }
+  }
+
   function loadTurnstileIfNeeded() {
     const slot = document.querySelector("#turnstile-slot-booking");
     if (!slot || !config.turnstileSiteKey) return;
+    const errEl = document.querySelector("#booking-step-error");
+    const renderSubmitButton = () => {
+      const slotWrap = document.querySelector("#booking-submit-slot");
+      if (!slotWrap) return;
+      slotWrap.innerHTML = `<button type="button" class="booking-btn" id="booking-submit">Wyślij</button>`;
+      bindBookingSubmitButton();
+    };
+    const renderWidget = () => {
+      slot.innerHTML = "";
+      window.turnstile.render(slot, {
+        sitekey: config.turnstileSiteKey,
+        callback: (token) => {
+          state.turnstileToken = String(token || "");
+          if (errEl) {
+            errEl.hidden = true;
+          }
+          renderSubmitButton();
+        },
+        "expired-callback": () => {
+          state.turnstileToken = "";
+        },
+        "error-callback": () => {
+          state.turnstileToken = "";
+          if (errEl) {
+            errEl.hidden = false;
+            errEl.textContent = "Nie udało się zweryfikować Cloudflare. Spróbuj ponownie.";
+          }
+        },
+      });
+    };
     if (window.turnstile) {
-      slot.innerHTML = `<div class="cf-turnstile" data-sitekey="${config.turnstileSiteKey}"></div>`;
+      renderWidget();
       return;
     }
     const script = document.createElement("script");
@@ -467,7 +526,7 @@
     script.async = true;
     script.defer = true;
     script.onload = () => {
-      slot.innerHTML = `<div class="cf-turnstile" data-sitekey="${config.turnstileSiteKey}"></div>`;
+      renderWidget();
     };
     document.head.appendChild(script);
   }

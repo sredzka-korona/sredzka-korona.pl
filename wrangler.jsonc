@@ -15,6 +15,11 @@
   "vars": {
     "ALLOWED_ORIGIN": "https://sredzka-korona.pl",
     "FIREBASE_PROJECT_ID": "sredzka-korona",
-    "FIREBASE_ADMIN_EMAILS": "kontakt@sredzka-korona.pl"
+    "FIREBASE_ADMIN_EMAILS": "kontakt@sredzka-korona.pl",
+    "PUBLIC_SITE_URL": "https://sredzka-korona.pl",
+    "SMTP_HOST": "smtp.mail.ovh.net",
+    "SMTP_PORT": "465",
+    "SMTP_EHLO_HOST": "sredzka-korona.pl",
+    "ADMIN_NOTIFY_EMAIL": "kontakt@sredzka-korona.pl"
   }
 }

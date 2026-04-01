@@ -48,18 +48,6 @@
   }
 
   const SESSION_MS = 30 * 60 * 1000;
-  const PHONE_PREFIXES = [
-    { v: "+48", l: "Polska +48" },
-    { v: "+49", l: "Niemcy +49" },
-    { v: "+420", l: "Czechy +420" },
-    { v: "+43", l: "Austria +43" },
-    { v: "+31", l: "Holandia +31" },
-    { v: "+32", l: "Belgia +32" },
-    { v: "+33", l: "Francja +33" },
-    { v: "+44", l: "Wielka Brytania +44" },
-    { v: "+1", l: "USA/Kanada +1" },
-  ];
-
   const state = {
     step: 1,
     sessionStartedAt: 0,
@@ -88,6 +76,20 @@
       .replace(/"/g, "&quot;");
   }
 
+  function todayYmdLocal() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function isPastCalendarDate(ymd) {
+    const t = String(ymd || "").trim();
+    if (!t) return true;
+    return t < todayYmdLocal();
+  }
+
   function checkSession() {
     if (!state.sessionStartedAt || Date.now() - state.sessionStartedAt > SESSION_MS) {
       return false;
@@ -101,7 +103,7 @@
     state.hallId = "";
     state.hallKind = "";
     state.hallCapacity = 120;
-    state.reservationDate = new Date().toISOString().slice(0, 10);
+    state.reservationDate = todayYmdLocal();
     state.startTime = "12:00";
     state.durationHours = 2;
     state.guestsCount = 10;
@@ -175,6 +177,7 @@
       @media(max-width:520px){.hb-grid{grid-template-columns:1fr;}}
       .hb-field label{display:block;font-size:.8rem;margin-bottom:.25rem;color:#5c4f42;}
       .hb-field input,.hb-field select,.hb-field textarea{width:100%;padding:.5rem .65rem;border-radius:12px;border:1px solid rgba(200,170,120,.35);background:#fff;}
+      .hb-field input.hb-prefix-input{max-width:110px;}
       .hb-cards{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;}
       .hb-card{border:2px solid rgba(200,170,120,.35);border-radius:16px;padding:1rem;cursor:pointer;text-align:center;transition:border-color .15s,background .15s;}
       .hb-card:hover{border-color:#c8aa78;}
@@ -287,27 +290,32 @@
           <button type="button" class="hb-btn" id="hb-next-1" disabled>Dalej</button>
         </div>`;
     } else if (state.step === 2) {
+      if (isPastCalendarDate(state.reservationDate)) {
+        state.reservationDate = todayYmdLocal();
+      }
       inner = `
         <h3 style="margin-top:0">Termin</h3>
         <p class="hb-hint">Między rezerwacjami obowiązuje przerwa organizacyjna (bufor) — uwzględniamy ją przy sprawdzaniu dostępności.</p>
+        <div class="hb-field">
+          <label>Data<input type="date" id="hb-date" min="${escapeHtml(todayYmdLocal())}" value="${escapeHtml(state.reservationDate)}" /></label>
+        </div>
         <div class="hb-grid">
-          <div class="hb-field"><label>Data<input type="date" id="hb-date" value="${escapeHtml(state.reservationDate)}" /></label></div>
           <div class="hb-field"><label>Godzina startu<select id="hb-start">${timeOptions()
             .map(
               (t) =>
                 `<option value="${t}" ${state.startTime === t ? "selected" : ""}>${t}</option>`
             )
             .join("")}</select></label></div>
-        </div>
-        <div class="hb-field">
-          <label>Czas trwania (godziny)
-            <select id="hb-dur">${[1, 2, 3, 4, 5, 6, 8]
-              .map(
-                (h) =>
-                  `<option value="${h}" ${Number(state.durationHours) === h ? "selected" : ""}>${h} h</option>`
-              )
-              .join("")}</select>
-          </label>
+          <div class="hb-field">
+            <label>Czas trwania (godziny)
+              <select id="hb-dur">${[1, 2, 3, 4, 5, 6, 8]
+                .map(
+                  (h) =>
+                    `<option value="${h}" ${Number(state.durationHours) === h ? "selected" : ""}>${h} h</option>`
+                )
+                .join("")}</select>
+            </label>
+          </div>
         </div>
         <p class="hb-err" id="hb-e2" hidden></p>
         <div class="hb-actions">
@@ -324,16 +332,18 @@
         ${
           state.hallKind === "large"
             ? `<p class="hb-hint">Dostępne miejsca w wybranym terminie: <strong id="hb-max-lbl">${maxG}</strong>. Wycena zostanie ustalona telefonicznie — nie ma stałego cennika online.</p>`
-            : `<p class="hb-hint">Sala mała jest zawsze na wyłączność (max 40 osób).</p>`
+            : ""
         }
-        ${
-          state.hallKind === "large"
-            ? `<div class="hb-field"><label>Liczba gości: <span id="hb-guest-val">${state.guestsCount}</span>
-            <input type="range" class="hb-range" id="hb-guests-range" min="1" max="${maxG}" value="${Math.min(state.guestsCount, maxG)}" /></label></div>`
-            : `<div class="hb-field"><label>Liczba gości (max 40)<input type="number" id="hb-guests-sm" min="1" max="40" value="${Math.min(state.guestsCount, 40)}" /></label></div>`
-        }
-        <div class="hb-field"><label>Rodzaj imprezy<input type="text" id="hb-event" maxlength="500" value="${escapeHtml(state.eventType)}" required /></label></div>
-        <div class="hb-field"><label>Dodatkowe informacje<textarea id="hb-note" rows="3" maxlength="2000">${escapeHtml(state.customerNote)}</textarea></label></div>
+        <div class="hb-grid">
+          <div class="hb-field"><label>Rodzaj imprezy<input type="text" id="hb-event" maxlength="500" value="${escapeHtml(state.eventType)}" required /></label></div>
+          ${
+            state.hallKind === "large"
+              ? `<div class="hb-field"><label>Liczba gości: <span id="hb-guest-val">${state.guestsCount}</span>
+              <input type="range" class="hb-range" id="hb-guests-range" min="1" max="${maxG}" value="${Math.min(state.guestsCount, maxG)}" /></label></div>`
+              : `<div class="hb-field"><label>Liczba gości (max 40)<input type="number" id="hb-guests-sm" min="1" max="40" value="${Math.min(state.guestsCount, 40)}" /></label></div>`
+          }
+        </div>
+        <div class="hb-field"><label>Dodatkowe informacje<textarea id="hb-note" rows="3" maxlength="2000" required>${escapeHtml(state.customerNote)}</textarea></label></div>
         ${
           state.hallKind === "large"
             ? `<label class="hb-terms"><input type="checkbox" id="hb-exc" ${state.exclusive ? "checked" : ""} /> Sala na wyłączność (blokuje całą salę niezależnie od liczby osób)</label>`
@@ -352,7 +362,7 @@
           <label>Imię i nazwisko<input name="fullName" required maxlength="120" /></label>
           <label>E-mail<input name="email" type="email" required /></label>
           <div class="hb-grid">
-            <label>Prefiks<select name="phonePrefix" required>${PHONE_PREFIXES.map((p) => `<option value="${escapeHtml(p.v)}">${escapeHtml(p.l)}</option>`).join("")}</select></label>
+            <label>Prefiks<input name="phonePrefix" class="hb-prefix-input" type="text" inputmode="tel" autocomplete="tel-country-code" value="+48" required pattern="\\+[0-9]{1,4}" maxlength="5" /></label>
             <label>Numer<input name="phoneNational" inputmode="numeric" required pattern="[0-9]{6,15}" placeholder="np. 501234567" /></label>
           </div>
           <p class="hb-err" id="hb-e4" hidden></p>
@@ -402,6 +412,11 @@
 
   function bindHandlers() {
     if (state.step === 1) {
+      const goToStep2 = () => {
+        if (!state.hallId) return;
+        state.step = 2;
+        renderBody();
+      };
       document.querySelectorAll("#hb-hall-cards .hb-card").forEach((el) => {
         el.addEventListener("click", () => {
           state.hallId = el.dataset.id;
@@ -410,19 +425,16 @@
           document.querySelectorAll("#hb-hall-cards .hb-card").forEach((c) => c.classList.remove("selected"));
           el.classList.add("selected");
           document.getElementById("hb-next-1").disabled = false;
+          goToStep2();
         });
       });
-      document.getElementById("hb-next-1")?.addEventListener("click", () => {
-        if (!state.hallId) return;
-        state.step = 2;
-        renderBody();
-      });
+      document.getElementById("hb-next-1")?.addEventListener("click", goToStep2);
     }
     if (state.step === 2) {
       const validate = async () => {
         const err = document.getElementById("hb-e2");
         const next = document.getElementById("hb-next-2");
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayYmdLocal();
         state.reservationDate = document.getElementById("hb-date")?.value || "";
         state.startTime = document.getElementById("hb-start")?.value || "";
         state.durationHours = Number(document.getElementById("hb-dur")?.value || 2);
@@ -433,12 +445,12 @@
           return;
         }
         err.hidden = true;
-        err.textContent = "Sprawdzanie dostępności…";
-        err.hidden = false;
+        err.textContent = "";
         next.disabled = true;
         try {
           await refreshAvailability();
           if (!state.availabilityOk || (state.hallKind === "large" && state.maxGuestsAvailable < 1)) {
+            err.hidden = false;
             err.textContent = "Ten termin nie jest dostępny. Wybierz inną godzinę lub datę.";
             next.disabled = true;
             return;
@@ -446,10 +458,12 @@
           err.hidden = true;
           next.disabled = false;
         } catch (e) {
+          err.hidden = false;
           err.textContent = e.message || "Błąd sprawdzania dostępności.";
           next.disabled = true;
         }
       };
+      document.getElementById("hb-date")?.addEventListener("input", validate);
       document.getElementById("hb-date")?.addEventListener("change", validate);
       document.getElementById("hb-start")?.addEventListener("change", validate);
       document.getElementById("hb-dur")?.addEventListener("change", validate);
@@ -459,6 +473,13 @@
         renderBody();
       });
       document.getElementById("hb-next-2")?.addEventListener("click", async () => {
+        const err = document.getElementById("hb-e2");
+        state.reservationDate = document.getElementById("hb-date")?.value || "";
+        if (isPastCalendarDate(state.reservationDate)) {
+          err.hidden = false;
+          err.textContent = "Wybierz datę nie z przeszłości.";
+          return;
+        }
         await refreshAvailability();
         if (!state.availabilityOk) return;
         if (state.hallKind === "large" && state.maxGuestsAvailable < 1) return;
@@ -503,25 +524,31 @@
       document.getElementById("hb-note")?.addEventListener("input", syncGuests);
       document.getElementById("hb-exc")?.addEventListener("change", syncGuests);
 
-      const validate = async () => {
+      const validate = async (showErrors = false) => {
         await syncGuests();
         const err = document.getElementById("hb-e3");
         const next = document.getElementById("hb-next-3");
         if (!String(state.eventType).trim()) {
-          err.hidden = false;
-          err.textContent = "Podaj rodzaj imprezy.";
+          err.hidden = !showErrors;
+          err.textContent = showErrors ? "Podaj rodzaj imprezy." : "";
+          next.disabled = true;
+          return;
+        }
+        if (!String(state.customerNote).trim()) {
+          err.hidden = !showErrors;
+          err.textContent = showErrors ? "Uzupełnij dodatkowe informacje." : "";
           next.disabled = true;
           return;
         }
         if (state.hallKind === "small" && state.guestsCount > 40) {
-          err.hidden = false;
-          err.textContent = "Max 40 osób w małej sali.";
+          err.hidden = !showErrors;
+          err.textContent = showErrors ? "Max 40 osób w małej sali." : "";
           next.disabled = true;
           return;
         }
         if (state.hallKind === "large" && state.guestsCount > state.maxGuestsAvailable) {
-          err.hidden = false;
-          err.textContent = "Zmniejsz liczbę gości — brak wolnych miejsc w tym terminie.";
+          err.hidden = !showErrors;
+          err.textContent = showErrors ? "Zmniejsz liczbę gości — brak wolnych miejsc w tym terminie." : "";
           next.disabled = true;
           return;
         }
@@ -530,9 +557,15 @@
       };
 
       document.getElementById("hb-next-3")?.addEventListener("click", async () => {
-        await validate();
+        await validate(true);
         const next = document.getElementById("hb-next-3");
         if (next.disabled) return;
+        if (isPastCalendarDate(state.reservationDate)) {
+          const err = document.getElementById("hb-e3");
+          err.hidden = false;
+          err.textContent = "Data rezerwacji nie może być z przeszłości. Wróć do kroku „Termin”.";
+          return;
+        }
         state.step = 4;
         renderBody();
       });
@@ -540,11 +573,14 @@
         state.step = 2;
         renderBody();
       });
-      validate();
+      validate(false);
     }
     if (state.step === 4) {
       document.getElementById("hb-cust")?.addEventListener("submit", (ev) => {
         ev.preventDefault();
+        if (!ev.currentTarget.reportValidity()) {
+          return;
+        }
         const fd = new FormData(ev.target);
         state.customer = {
           fullName: String(fd.get("fullName") || "").trim(),
@@ -576,10 +612,17 @@
           return;
         }
         err.hidden = true;
+        if (isPastCalendarDate(state.reservationDate)) {
+          err.hidden = false;
+          err.textContent = "Data rezerwacji nie może być z przeszłości. Wróć do kroku „Termin”.";
+          return;
+        }
         try {
           const siteKey = config.turnstileSiteKey;
-          if (siteKey && window.turnstile) {
-            state.turnstileToken = ""; // set by widget callback if used
+          if (siteKey && !state.turnstileToken) {
+            err.hidden = false;
+            err.textContent = "Potwierdź weryfikację anty-spam.";
+            return;
           }
           await api("public-reservation-draft", {
             method: "POST",
