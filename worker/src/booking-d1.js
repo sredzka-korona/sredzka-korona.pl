@@ -626,11 +626,41 @@ function reservationSubjectLabel(service, row) {
 }
 
 function yearFromMsWarsaw(ms) {
-  const t = Number(ms);
-  if (!Number.isFinite(t)) return new Date().getFullYear();
+  let t = Number(ms);
+  if (!Number.isFinite(t) || t <= 0) return new Date().getFullYear();
+  if (t < 1e12) t *= 1000;
   return Number(
     new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Warsaw", year: "numeric" }).format(new Date(t))
   );
+}
+
+function extractReservationSequenceAndYear(rawValue) {
+  const raw = cleanString(rawValue, 120);
+  if (!raw) return { sequence: null, year: null };
+
+  const modern = raw.match(/^(\d+)\/(\d{4})\/(?:HOTEL|RESTAURACJA|PRZYJ(?:Ę|E)CIA)$/u);
+  if (modern) {
+    return {
+      sequence: Number(modern[1]),
+      year: Number(modern[2]),
+    };
+  }
+
+  const legacy = raw.match(/^[A-Z]{2}-(\d{4})-(\d+)$/u);
+  if (legacy) {
+    return {
+      sequence: Number(legacy[2]),
+      year: Number(legacy[1]),
+    };
+  }
+
+  if (/^\d+$/u.test(raw)) {
+    return {
+      sequence: Number(raw),
+      year: null,
+    };
+  }
+  return { sequence: null, year: null };
 }
 
 function addOneDayYmd(ymd) {
@@ -717,13 +747,28 @@ async function nextHumanSequenceForYear(env, year) {
 
 function formatHumanReservationNumber(row, service) {
   if (!row) return "";
-  const seq = Number(row.human_number ?? 0);
-  const hy = row.human_year;
-  const y =
-    hy != null && hy !== ""
-      ? Number(hy)
-      : yearFromMsWarsaw(Number(row.created_at || 0));
-  return `${seq}/${y}/${reservationTypeLabel(service)}`;
+  const rawValue = row.human_number ?? row.humanNumber ?? row.humanNumberLabel;
+  const rawText = cleanString(rawValue, 120);
+  if (!rawText) return "";
+
+  const parsed = extractReservationSequenceAndYear(rawText);
+  const explicitYear = Number(row.human_year ?? row.humanYear);
+  const inferredYear =
+    Number.isInteger(explicitYear) && explicitYear >= 2000 && explicitYear <= 2100
+      ? explicitYear
+      : yearFromMsWarsaw(row.created_at ?? row.createdAtMs ?? row.start_ms ?? row.startDateTime);
+
+  if (parsed.sequence && Number.isInteger(inferredYear) && inferredYear >= 2000 && inferredYear <= 2100) {
+    return `${parsed.sequence}/${inferredYear}/${reservationTypeLabel(service)}`;
+  }
+
+  return rawText;
+}
+
+function reservationNumberForRow(row, service) {
+  const formatted = formatHumanReservationNumber(row, service);
+  if (formatted) return formatted;
+  return cleanString(row?.id, 120);
 }
 
 async function readBody(request) {
@@ -1959,11 +2004,6 @@ function legacyDefaultTemplateMap(service) {
         bodyHtml:
           '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie zapytania rezerwacyjnego do <strong>{{hotelName}}</strong>.</p><p>Aby przekazac zgloszenie do dalszej obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz adres e-mail</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}<br>Szacunkowa kwota: {{totalPrice}} PLN</p><p>Jesli to nie Ty wysylales zgloszenie, zignoruj te wiadomosc.</p><p>Pozdrawiamy,<br>Recepcja {{hotelName}}</p>',
       },
-      pending_client: {
-        subject: "{{hotelName}} | rezerwacja {{reservationNumber}} oczekuje na akceptacje",
-        bodyHtml:
-          "<p>Dzien dobry {{fullName}},</p><p>Adres e-mail zostal potwierdzony, a zgloszenie <strong>{{reservationNumber}}</strong> trafilo do recepcji.</p><p>Status rezerwacji: <strong>oczekuje na akceptacje hotelu</strong>.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}<br>Szacunkowa kwota: {{totalPrice}} PLN</p><p>Po decyzji recepcji wyslemy osobna wiadomosc.</p><p>Pozdrawiamy,<br>Recepcja {{hotelName}}</p>",
-      },
       pending_admin: {
         subject: "[{{hotelName}}] Rezerwacja do decyzji: {{reservationNumber}}",
         bodyHtml:
@@ -1993,11 +2033,6 @@ function legacyDefaultTemplateMap(service) {
         bodyHtml:
           '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie rezerwacji stolika do {{restaurantName}}.</p><p>Aby przekazac zgloszenie do obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz rezerwacje</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>',
       },
-      restaurant_pending_client: {
-        subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-        bodyHtml:
-          "<p>Dzien dobry {{fullName}},</p><p>Adres e-mail zostal potwierdzony, a zgloszenie <strong>{{reservationNumber}}</strong> oczekuje teraz na akceptacje restauracji.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
-      },
       restaurant_pending_admin: {
         subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
         bodyHtml:
@@ -2017,11 +2052,6 @@ function legacyDefaultTemplateMap(service) {
         subject: "{{restaurantName}} — potwierdź rezerwację stolika ({{reservationNumber}})",
         bodyHtml:
           '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie rezerwacji stolika do {{restaurantName}}.</p><p>Aby przekazac zgloszenie do obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz rezerwacje</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>',
-      },
-      rest_pending_client: {
-        subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-        bodyHtml:
-          "<p>Dzien dobry {{fullName}},</p><p>Adres e-mail zostal potwierdzony, a zgloszenie <strong>{{reservationNumber}}</strong> oczekuje teraz na akceptacje restauracji.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
       },
       rest_pending_admin: {
         subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
@@ -2056,11 +2086,6 @@ function legacyDefaultTemplateMap(service) {
       bodyHtml:
         '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za przeslanie zgloszenia rezerwacji sali do {{venueName}}.</p><p>To jest zgloszenie rezerwacyjne, a wycena zostanie ustalona indywidualnie po kontakcie z obiektem.</p><p>Aby potwierdzic zgloszenie, kliknij w link:</p><p><a href="{{confirmationLink}}">Potwierdz zgloszenie</a></p><p>Numer: <strong>{{reservationNumber}}</strong><br>Sala: {{hallName}}<br>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Gosci: {{guestsCount}} · {{eventType}}<br>Wylacznosc: {{exclusive}}</p><p>Pozdrawiamy,<br>{{venueName}}</p>',
     },
-    hall_pending_client: {
-      subject: "{{venueName}} — zgłoszenie oczekuje na decyzję obiektu ({{reservationNumber}})",
-      bodyHtml:
-        "<p>Dzien dobry {{fullName}},</p><p>Zgloszenie zostalo potwierdzone linkiem e-mail i oczekuje teraz na decyzje obiektu.</p><p>Wycena zostanie podana telefonicznie lub mailowo po kontakcie z obsluga.</p><p>Numer: {{reservationNumber}} · {{hallName}}<br>{{date}} · {{timeFrom}}–{{timeTo}}</p><p>Pozdrawiamy,<br>{{venueName}}</p>",
-    },
     hall_pending_admin: {
       subject: "[{{venueName}}] Nowe zgłoszenie sali {{reservationNumber}}",
       bodyHtml:
@@ -2091,10 +2116,6 @@ function ultraLegacyDefaultTemplateMap(service) {
       subject: "{{hotelName}} — potwierdź rezerwację ({{reservationNumber}})",
       bodyHtml:
         '<p>Witaj {{fullName}},</p><p>Kliknij link, aby potwierdzić rezerwację:</p><p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p><p>Numer: {{reservationNumber}}<br>Termin: {{dateFrom}} — {{dateTo}}</p>',
-    },
-    pending_client: {
-      subject: "{{hotelName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-      bodyHtml: "<p>Witaj {{fullName}},</p><p>Twoja rezerwacja ma status oczekujący.</p><p>Numer: {{reservationNumber}}</p>",
     },
     pending_admin: {
       subject: "[{{hotelName}}] Nowa rezerwacja oczekująca {{reservationNumber}}",
@@ -2137,20 +2158,6 @@ ${infoCard("Podsumowanie pobytu", [
 ])}
 ${noteCard("<strong>Ważne:</strong> potwierdzenie adresu e-mail nie jest jeszcze ostatecznym potwierdzeniem pobytu. Po weryfikacji dostępności recepcja prześle kolejną wiadomość ze statusem rezerwacji.")}
 <p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>`,
-    },
-    pending_client: {
-      subject: "{{hotelName}} — zgłoszenie oczekuje na decyzję recepcji ({{reservationNumber}})",
-      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>adres e-mail został poprawnie potwierdzony, a zgłoszenie zostało przekazane do recepcji <strong>{{hotelName}}</strong>.</p>
-<p>Na tym etapie rezerwacja ma status <strong>oczekująca na akceptację</strong>. Do czasu wysłania finalnego potwierdzenia termin nie jest jeszcze gwarantowany.</p>
-${infoCard("Podsumowanie zgłoszenia", [
-  ["Numer rezerwacji", "{{reservationNumber}}"],
-  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
-  ["Liczba noclegów", "{{nights}}"],
-  ["Pokoje", "{{roomsList}}"],
-  ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
-])}
-${noteCard("Recepcja wróci do Ciebie z decyzją możliwie szybko. W razie potrzeby możesz odpowiedzieć na tę wiadomość i doprecyzować szczegóły pobytu.")}`,
     },
     pending_admin: {
       subject: "[{{hotelName}}] Nowa rezerwacja do decyzji: {{reservationNumber}}",
@@ -2271,19 +2278,6 @@ ${infoCard("Podsumowanie rezerwacji stolika", [
 ${noteCard("Rezerwacja stolika nie wymaga przedpłaty. <strong>Płatność odbywa się na miejscu</strong>, zgodnie z aktualnym menu i zamówieniem złożonym podczas wizyty.")}
 <p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>`,
     },
-    restaurant_pending_client: {
-      subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>adres e-mail został potwierdzony, a rezerwacja oczekuje teraz na akceptację restauracji.</p>
-${infoCard("Twoja rezerwacja", [
-  ["Numer rezerwacji", "{{reservationNumber}}"],
-  ["Data", "{{date}}"],
-  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
-  ["Liczba gości", "{{guestsCount}}"],
-  ["Przydział stolików", "{{tablesList}}"],
-])}
-${noteCard("Po zatwierdzeniu otrzymasz osobne potwierdzenie. <strong>Płatność za zamówienie realizowana jest na miejscu</strong>, zgodnie z wybranymi daniami i napojami.")}`,
-    },
     restaurant_pending_admin: {
       subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
       bodyHtml: `<p>Do obsługi wpłynęła nowa rezerwacja stolika wymagająca decyzji.</p>
@@ -2380,7 +2374,6 @@ ${noteCard("Stolik nie został zablokowany. Jeśli nadal chcesz dokonać rezerwa
   return {
     ...base,
     rest_confirm_email: structuredClone(base.restaurant_confirm_email),
-    rest_pending_client: structuredClone(base.restaurant_pending_client),
     rest_pending_admin: structuredClone(base.restaurant_pending_admin),
     rest_confirmed_client: structuredClone(base.restaurant_confirmed_client),
     rest_cancelled_client: structuredClone(base.restaurant_cancelled_client),
@@ -2405,21 +2398,6 @@ ${infoCard("Podsumowanie zgłoszenia", [
   ["Wyłączność", "{{exclusive}}"],
 ])}
 ${noteCard("<strong>Wycena przygotowywana jest indywidualnie</strong> po kontakcie z obsługą obiektu. Szczegóły płatności i harmonogram ustalane są na etapie oferty.")}`,
-    },
-    hall_pending_client: {
-      subject: "{{venueName}} — zgłoszenie oczekuje na decyzję obiektu ({{reservationNumber}})",
-      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>adres e-mail został potwierdzony, a zgłoszenie trafiło do opiekuna rezerwacji.</p>
-${infoCard("Twoje zgłoszenie", [
-  ["Numer zgłoszenia", "{{reservationNumber}}"],
-  ["Sala", "{{hallName}}"],
-  ["Data", "{{date}}"],
-  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
-  ["Liczba gości", "{{guestsCount}}"],
-  ["Rodzaj wydarzenia", "{{eventType}}"],
-  ["Wyłączność", "{{exclusive}}"],
-])}
-${noteCard("Obiekt ma do <strong>7 dni</strong> na decyzję. <strong>Wycena ustalana jest indywidualnie</strong> po kontakcie z obsługą i nie jest prezentowana automatycznie w wiadomości.")}`,
     },
     hall_pending_admin: {
       subject: "[{{venueName}}] Nowe zgłoszenie sali {{reservationNumber}}",
@@ -2544,7 +2522,6 @@ function defaultTemplateMap(service) {
 const EVENT_TEMPLATE_KEYS = {
   hotel: {
     confirm_email: ["confirm_email"],
-    pending_client: ["pending_client"],
     pending_admin: ["pending_admin"],
     confirmed_client: ["confirmed_client"],
     cancelled_client: ["cancelled_client"],
@@ -2552,7 +2529,6 @@ const EVENT_TEMPLATE_KEYS = {
   },
   restaurant: {
     confirm_email: ["restaurant_confirm_email", "rest_confirm_email"],
-    pending_client: ["restaurant_pending_client", "rest_pending_client"],
     pending_admin: ["restaurant_pending_admin", "rest_pending_admin"],
     confirmed_client: ["restaurant_confirmed_client", "rest_confirmed_client"],
     cancelled_client: ["restaurant_cancelled_client", "rest_cancelled_client"],
@@ -2560,7 +2536,6 @@ const EVENT_TEMPLATE_KEYS = {
   },
   hall: {
     confirm_email: ["hall_confirm_email"],
-    pending_client: ["hall_pending_client"],
     pending_admin: ["hall_pending_admin"],
     confirmed_client: ["hall_confirmed_client"],
     cancelled_client: ["hall_cancelled_client"],
@@ -2573,7 +2548,7 @@ async function loadTemplates(env, service) {
   const legacyDefaults = legacyDefaultTemplateMap(service);
   const ultraLegacyDefaults = ultraLegacyDefaultTemplateMap(service);
   const rows = await env.DB.prepare(
-    "SELECT key, subject, body_html AS bodyHtml FROM booking_mail_templates WHERE service = ? ORDER BY key ASC"
+    "SELECT key, subject, body_html AS bodyHtml, updated_at AS updatedAt FROM booking_mail_templates WHERE service = ? ORDER BY key ASC"
   )
     .bind(service)
     .all();
@@ -2588,13 +2563,26 @@ async function loadTemplates(env, service) {
     }
     return defaults;
   }
-  const rowMap = new Map((rows.results || []).map((r) => [r.key, { subject: r.subject || "", bodyHtml: r.bodyHtml || "" }]));
+  const rowMap = new Map(
+    (rows.results || []).map((r) => [
+      r.key,
+      {
+        subject: r.subject || "",
+        bodyHtml: r.bodyHtml || "",
+        updatedAt: Number(r.updatedAt || 0),
+      },
+    ])
+  );
   const out = {};
   const now = nowMs();
   for (const [key, template] of Object.entries(defaults)) {
     const existing = rowMap.get(key);
     if (!existing) {
-      out[key] = template;
+      out[key] = {
+        subject: template.subject || "",
+        bodyHtml: template.bodyHtml || "",
+        updatedAt: now,
+      };
       await env.DB.prepare(
         "INSERT INTO booking_mail_templates (service, key, subject, body_html, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(service, key) DO UPDATE SET subject = excluded.subject, body_html = excluded.body_html, updated_at = excluded.updated_at"
       )
@@ -2603,7 +2591,11 @@ async function loadTemplates(env, service) {
       continue;
     }
     if (matchesAnyTemplateShape(existing, [legacyDefaults[key], ultraLegacyDefaults[key]])) {
-      out[key] = template;
+      out[key] = {
+        subject: template.subject || "",
+        bodyHtml: template.bodyHtml || "",
+        updatedAt: now,
+      };
       await env.DB.prepare(
         "INSERT INTO booking_mail_templates (service, key, subject, body_html, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(service, key) DO UPDATE SET subject = excluded.subject, body_html = excluded.body_html, updated_at = excluded.updated_at"
       )
@@ -2634,13 +2626,31 @@ async function resolveTemplateForEvent(env, service, eventKey) {
     if (!tpl) return true;
     const subject = cleanString(tpl.subject, 500).toLowerCase();
     const body = cleanString(tpl.bodyHtml, 5000).toLowerCase();
-    const placeholderSubject = subject === `${service} - ${eventKey}` || subject.includes(" - ");
-    const placeholderBody = body.includes("szablon ") || body === "";
+    const placeholderSubject = subject === `${service} - ${eventKey}`;
+    const placeholderBody =
+      body === "" ||
+      /^szablon [a-z0-9_-]+$/u.test(body) ||
+      /^<p>\s*szablon [a-z0-9_-]+\s*<\/p>$/u.test(body);
     return placeholderSubject && placeholderBody;
   };
-  for (const key of candidates) {
-    const tpl = all[key];
-    if (tpl && !isPlaceholder(tpl)) return tpl;
+
+  const ranked = candidates
+    .map((key, index) => ({
+      index,
+      tpl: all[key],
+      updatedAt: Number(all[key]?.updatedAt || 0),
+    }))
+    .filter((entry) => entry.tpl && !isPlaceholder(entry.tpl))
+    .sort((a, b) => {
+      if (b.updatedAt !== a.updatedAt) return b.updatedAt - a.updatedAt;
+      return a.index - b.index;
+    });
+
+  if (ranked.length) {
+    return {
+      subject: ranked[0].tpl.subject || "",
+      bodyHtml: ranked[0].tpl.bodyHtml || "",
+    };
   }
   const defaults = defaultTemplateMap(service);
   for (const key of candidates) {
@@ -2897,7 +2907,7 @@ async function buildHotelMailVars(env, request, row, token = "") {
   const roomLabels = roomIds.map((id) => roomMap.get(id)?.name || id).join(", ");
   return {
     reservationId: row.id,
-    reservationNumber: formatHumanReservationNumber(row, "hotel"),
+    reservationNumber: reservationNumberForRow(row, "hotel"),
     reservationSubject: reservationSubjectLabel("hotel", row),
     fullName: row.customer_name || "",
     email: row.email || "",
@@ -2927,7 +2937,7 @@ async function buildRestaurantMailVars(env, request, row, token = "") {
     .join(", ");
   return {
     reservationId: row.id,
-    reservationNumber: formatHumanReservationNumber(row, "restaurant"),
+    reservationNumber: reservationNumberForRow(row, "restaurant"),
     reservationSubject: reservationSubjectLabel("restaurant", row),
     fullName: row.full_name || "",
     email: row.email || "",
@@ -2952,7 +2962,7 @@ async function buildHallMailVars(env, request, row, token = "") {
   const hall = await env.DB.prepare("SELECT name FROM venue_halls WHERE id = ?").bind(row.hall_id).first();
   return {
     reservationId: row.id,
-    reservationNumber: formatHumanReservationNumber(row, "hall"),
+    reservationNumber: reservationNumberForRow(row, "hall"),
     reservationSubject: reservationSubjectLabel("hall", row),
     fullName: row.full_name || "",
     email: row.email || "",
@@ -2989,24 +2999,13 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
     ...(extraVars && typeof extraVars === "object" ? extraVars : {}),
   };
   const subject = normalizeRenderedReservationSubject(renderTemplate(template.subject, vars), vars, row);
-  let html = renderTemplate(template.bodyHtml, vars);
+  const templateBodyRaw = String(template.bodyHtml || "");
+  let html = renderTemplate(templateBodyRaw, vars);
   const cancelReason = cleanString(vars.cancelReason, 2000);
   if (eventKey === "cancelled_client" && cancelReason) {
-    html += `<p><strong>Powod anulowania:</strong><br>${escapeHtml(cancelReason).replace(/\n/g, "<br>")}</p>`;
-  }
-  if (eventKey === "pending_admin") {
-    const summaryRows = buildAdminActionDetailRows(service, vars).map(([label, value]) => [
-      escapeHtml(label),
-      escapeHtml(value),
-    ]);
-    if (summaryRows.length) {
-      html += infoCard("Szczegóły rezerwacji", summaryRows);
-    }
-    if (vars.adminActionLink) {
-      const safeLink = escapeHtml(String(vars.adminActionLink));
-      html += noteCard(
-        `Aby szybko potwierdzić rezerwację, kliknij link: <a class="confirm-link-inline" href="${safeLink}">${safeLink}</a>`
-      );
+    const hasCancelReasonPlaceholder = /\{\{\s*cancelReason\s*\}\}/u.test(templateBodyRaw);
+    if (!hasCancelReasonPlaceholder) {
+      html += `<p><strong>Powod anulowania:</strong><br>${escapeHtml(cancelReason).replace(/\n/g, "<br>")}</p>`;
     }
   }
   const siteUrl = publicSiteUrl(env, request);

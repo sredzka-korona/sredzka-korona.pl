@@ -118,7 +118,6 @@
 
   const HOTEL_TEMPLATE_LABELS = {
     confirm_email: "Link potwierdzający — pierwszy e-mail po wysłaniu formularza (klient klika, żeby potwierdzić adres e-mail).",
-    pending_client: "Klient — rezerwacja przyjęta, czeka na akceptację recepcji.",
     pending_admin: "Powiadomienie dla obsługi — nowa rezerwacja wymaga decyzji w panelu.",
     confirmed_client: "Klient — rezerwacja zaakceptowana (pokoje zarezerwowane).",
     cancelled_client: "Klient — rezerwacja anulowana przez hotel lub po upływie czasu.",
@@ -134,11 +133,6 @@
       subject: "{{hotelName}} | potwierdzenie adresu e-mail dla rezerwacji {{reservationNumber}}",
       bodyHtml:
         '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie formularza rezerwacji w obiekcie <strong>{{hotelName}}</strong>.</p><p>Aby przekazac zgloszenie do dalszej obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz adres e-mail</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}</p><p>Jesli to nie Ty wysylales zgloszenie, zignoruj te wiadomosc.</p>',
-    },
-    pending_client: {
-      subject: "{{hotelName}} | rezerwacja {{reservationNumber}} oczekuje na akceptacje",
-      bodyHtml:
-        "<p>Dzien dobry {{fullName}},</p><p>Twoja rezerwacja o numerze <strong>{{reservationNumber}}</strong> zostala zapisana i oczekuje teraz na akceptacje recepcji.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}<br>Orientacyjna kwota: {{totalPrice}} PLN</p><p>Po decyzji recepcji wyslemy osobna wiadomosc.</p>",
     },
     pending_admin: {
       subject: "[{{hotelName}}] Rezerwacja do decyzji: {{reservationNumber}}",
@@ -167,11 +161,6 @@
       subject: "{{hotelName}} — potwierdź rezerwację ({{reservationNumber}})",
       bodyHtml:
         '<p>Witaj {{fullName}},</p><p>Kliknij link, aby potwierdzić rezerwację:</p><p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p><p>Numer: {{reservationNumber}}<br>Termin: {{dateFrom}} — {{dateTo}}</p>',
-    },
-    pending_client: {
-      subject: "{{hotelName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-      bodyHtml:
-        "<p>Witaj {{fullName}},</p><p>Twoja rezerwacja ma status oczekujący.</p><p>Numer: {{reservationNumber}}</p>",
     },
     pending_admin: {
       subject: "[{{hotelName}}] Nowa rezerwacja oczekująca {{reservationNumber}}",
@@ -1127,6 +1116,7 @@
         return;
       }
       const r = d.reservation;
+      const reservationNumber = r.humanNumberLabel || r.humanNumber || r.id || "—";
       closeHotelExtraModal();
       const roomChecks = roomsData
         .map((room) => {
@@ -1146,7 +1136,7 @@
             <form id="hotel-res-edit-form" class="stack">
               <div class="admin-modal-head menu-editor-modal-head">
                 <div>
-                  <p class="pill">Rezerwacja ${escapeHtml(r.humanNumberLabel || r.humanNumber)}</p>
+                  <p class="pill">Rezerwacja ${escapeHtml(reservationNumber)}</p>
                   <h3>Edycja rezerwacji</h3>
                   <p class="helper">Status: ${escapeHtml(r.statusLabel || r.status)}</p>
                 </div>

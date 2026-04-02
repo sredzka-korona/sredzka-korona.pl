@@ -130,8 +130,6 @@
   const REST_TEMPLATE_LABELS = {
     restaurant_confirm_email: "Link potwierdzający adres e-mail po wysłaniu formularza rezerwacji stolika.",
     rest_confirm_email: "To samo co powyżej (alternatywny klucz szablonu).",
-    restaurant_pending_client: "Klient — rezerwacja czeka na decyzję restauracji.",
-    rest_pending_client: "To samo — wariant skrócony.",
     restaurant_pending_admin: "Powiadomienie dla obsługi — nowa rezerwacja stolika.",
     rest_pending_admin: "To samo — wariant skrócony.",
     restaurant_confirmed_client: "Klient — stolik potwierdzony.",
@@ -855,6 +853,7 @@
         return;
       }
       const r = d.reservation;
+      const reservationNumber = r.humanNumberLabel || r.humanNumber || r.id || "—";
       const tableLimit = currentRestaurantTableLimit();
       if (!tableLimit) {
         alert("Brak aktywnych stolików. Najpierw dodaj stolik w zakładce Stoliki.");
@@ -869,7 +868,7 @@
             <form id="rest-edit-form" class="stack">
               <div class="admin-modal-head menu-editor-modal-head">
                 <div>
-                  <p class="pill">${escapeHtml(r.humanNumberLabel || r.humanNumber)}</p>
+                  <p class="pill">${escapeHtml(reservationNumber)}</p>
                   <h3>Edycja rezerwacji</h3>
                   <p class="helper">${escapeHtml(r.statusLabel || r.status)} · Stoliki: ${escapeHtml(r.assignedTablesLabel || "—")}</p>
                 </div>

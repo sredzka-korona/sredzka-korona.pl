@@ -76,7 +76,6 @@
 
   const HALL_TEMPLATE_LABELS = {
     hall_confirm_email: "E-mail z linkiem po zgłoszeniu z formularza (potwierdzenie adresu).",
-    hall_pending_client: "Klient — zgłoszenie czeka na decyzję obiektu.",
     hall_pending_admin: "Powiadomienie dla obsługi — nowe zgłoszenie sali.",
     hall_confirmed_client: "Klient — rezerwacja sali zaakceptowana.",
     hall_cancelled_client: "Klient — rezerwacja anulowana.",
@@ -772,6 +771,7 @@
         return;
       }
       const r = d.reservation;
+      const reservationNumber = r.humanNumberLabel || r.humanNumber || r.id || "—";
       closeHallExtraModal();
       const hallOpts = hallsData
         .map((h) => `<option value="${escapeHtml(h.id)}" ${h.id === r.hallId ? "selected" : ""}>${escapeHtml(h.name || h.id)}</option>`)
@@ -784,7 +784,7 @@
             <form id="hall-edit-form" class="stack">
               <div class="admin-modal-head menu-editor-modal-head">
                 <div>
-                  <p class="pill">${escapeHtml(r.humanNumberLabel || r.humanNumber)}</p>
+                  <p class="pill">${escapeHtml(reservationNumber)}</p>
                   <h3>Edycja</h3>
                   <p class="helper">${escapeHtml(r.statusLabel || r.status)}</p>
                 </div>

@@ -234,20 +234,6 @@ ${infoCard("Podsumowanie pobytu", [
 ${noteCard("<strong>Ważne:</strong> potwierdzenie adresu e-mail nie jest jeszcze ostatecznym potwierdzeniem pobytu. Po weryfikacji dostępności recepcja prześle kolejną wiadomość ze statusem rezerwacji.")}
 <p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>`,
     },
-    pending_client: {
-      subject: "{{hotelName}} — zgłoszenie oczekuje na decyzję recepcji ({{reservationNumber}})",
-      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>adres e-mail został poprawnie potwierdzony, a zgłoszenie zostało przekazane do recepcji <strong>{{hotelName}}</strong>.</p>
-<p>Na tym etapie rezerwacja ma status <strong>oczekująca na akceptację</strong>. Do czasu wysłania finalnego potwierdzenia termin nie jest jeszcze gwarantowany.</p>
-${infoCard("Podsumowanie zgłoszenia", [
-  ["Numer rezerwacji", "{{reservationNumber}}"],
-  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
-  ["Liczba noclegów", "{{nights}}"],
-  ["Pokoje", "{{roomsList}}"],
-  ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
-])}
-${noteCard("Recepcja wróci do Ciebie z decyzją możliwie szybko. W razie potrzeby możesz odpowiedzieć na tę wiadomość i doprecyzować szczegóły pobytu.")}`,
-    },
     pending_admin: {
       subject: "[{{hotelName}}] Nowa rezerwacja do decyzji: {{reservationNumber}}",
       bodyHtml: `<p>Do panelu wpłynęła nowa rezerwacja wymagająca decyzji recepcji.</p>
@@ -366,19 +352,6 @@ ${infoCard("Podsumowanie rezerwacji stolika", [
 ${noteCard("Rezerwacja stolika nie wymaga przedpłaty. <strong>Płatność odbywa się na miejscu</strong>, zgodnie z aktualnym menu i zamówieniem złożonym podczas wizyty.")}
 <p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>`,
     },
-    restaurant_pending_client: {
-      subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>adres e-mail został potwierdzony, a rezerwacja oczekuje teraz na akceptację restauracji.</p>
-${infoCard("Twoja rezerwacja", [
-  ["Numer rezerwacji", "{{reservationNumber}}"],
-  ["Data", "{{date}}"],
-  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
-  ["Liczba gości", "{{guestsCount}}"],
-  ["Przydział stolików", "{{tablesList}}"],
-])}
-${noteCard("Po zatwierdzeniu otrzymasz osobne potwierdzenie. <strong>Płatność za zamówienie realizowana jest na miejscu</strong>, zgodnie z wybranymi daniami i napojami.")}`,
-    },
     restaurant_pending_admin: {
       subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
       bodyHtml: `<p>Do obsługi wpłynęła nowa rezerwacja stolika wymagająca decyzji.</p>
@@ -470,7 +443,6 @@ ${infoCard("Szczegóły zgłoszenia", [
 ${noteCard("Stolik nie został zablokowany. Jeśli nadal chcesz dokonać rezerwacji, prześlij formularz ponownie.")}`,
     },
     rest_confirm_email: null,
-    rest_pending_client: null,
     rest_pending_admin: null,
     rest_confirmed_client: null,
     rest_cancelled_client: null,
@@ -495,21 +467,6 @@ ${infoCard("Podsumowanie zgłoszenia", [
   ["Wyłączność", "{{exclusive}}"],
 ])}
 ${noteCard("<strong>Wycena przygotowywana jest indywidualnie</strong> po kontakcie z obsługą obiektu. Szczegóły płatności i harmonogram ustalane są na etapie oferty.")}`,
-    },
-    hall_pending_client: {
-      subject: "{{venueName}} — zgłoszenie oczekuje na decyzję obiektu ({{reservationNumber}})",
-      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>adres e-mail został potwierdzony, a zgłoszenie trafiło do opiekuna rezerwacji.</p>
-${infoCard("Twoje zgłoszenie", [
-  ["Numer zgłoszenia", "{{reservationNumber}}"],
-  ["Sala", "{{hallName}}"],
-  ["Data", "{{date}}"],
-  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
-  ["Liczba gości", "{{guestsCount}}"],
-  ["Rodzaj wydarzenia", "{{eventType}}"],
-  ["Wyłączność", "{{exclusive}}"],
-])}
-${noteCard("Obiekt ma do <strong>7 dni</strong> na decyzję. <strong>Wycena ustalana jest indywidualnie</strong> po kontakcie z obsługą i nie jest prezentowana automatycznie w wiadomości.")}`,
     },
     hall_pending_admin: {
       subject: "[{{venueName}}] Nowe zgłoszenie sali {{reservationNumber}}",
@@ -637,17 +594,6 @@ Szacunkowa wartość pobytu: {{totalPrice}} PLN</p>
 <p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>
 <p>Pozdrawiamy,<br/>Recepcja {{hotelName}}</p>`,
   },
-  pending_client: {
-    subject: "{{hotelName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>Adres e-mail został potwierdzony, a zgłoszenie <strong>{{reservationNumber}}</strong> trafiło do recepcji.</p>
-<p>Status rezerwacji: <strong>oczekuje na akceptację hotelu</strong>.</p>
-<p>Termin pobytu: {{dateFrom}} — {{dateTo}} ({{nights}} nocy)<br/>
-Szacunkowa kwota: {{totalPrice}} PLN</p>
-<p>{{roomsList}}</p>
-<p>Po decyzji recepcji wyślemy kolejną wiadomość. Do czasu ostatecznego potwierdzenia rezerwacja nie jest jeszcze gwarantowana.</p>
-<p>Pozdrawiamy,<br/>Recepcja {{hotelName}}</p>`,
-  },
   pending_admin: {
     subject: "[{{hotelName}}] Nowa rezerwacja oczekująca {{reservationNumber}}",
     bodyHtml: `<p>Nowa rezerwacja oczekuje na decyzję recepcji.</p>
@@ -720,10 +666,6 @@ const ULTRA_LEGACY_HOTEL_DEFAULT_TEMPLATES = {
     bodyHtml:
       '<p>Witaj {{fullName}},</p><p>Kliknij link, aby potwierdzić rezerwację:</p><p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p><p>Numer: {{reservationNumber}}<br>Termin: {{dateFrom}} — {{dateTo}}</p>',
   },
-  pending_client: {
-    subject: "{{hotelName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-    bodyHtml: "<p>Witaj {{fullName}},</p><p>Twoja rezerwacja ma status oczekujący.</p><p>Numer: {{reservationNumber}}</p>",
-  },
   pending_admin: {
     subject: "[{{hotelName}}] Nowa rezerwacja oczekująca {{reservationNumber}}",
     bodyHtml:
@@ -750,11 +692,6 @@ const ULTRA_LEGACY_RESTAURANT_DEFAULT_TEMPLATES = {
     bodyHtml:
       '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie rezerwacji stolika do {{restaurantName}}.</p><p>Aby przekazac zgloszenie do obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz rezerwacje</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>',
   },
-  restaurant_pending_client: {
-    subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-    bodyHtml:
-      "<p>Dzien dobry {{fullName}},</p><p>Adres e-mail zostal potwierdzony, a zgloszenie <strong>{{reservationNumber}}</strong> oczekuje teraz na akceptacje restauracji.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
-  },
   restaurant_pending_admin: {
     subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
     bodyHtml:
@@ -779,11 +716,6 @@ const ULTRA_LEGACY_RESTAURANT_DEFAULT_TEMPLATES = {
     subject: "{{restaurantName}} — potwierdź rezerwację stolika ({{reservationNumber}})",
     bodyHtml:
       '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie rezerwacji stolika do {{restaurantName}}.</p><p>Aby przekazac zgloszenie do obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz rezerwacje</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>',
-  },
-  rest_pending_client: {
-    subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-    bodyHtml:
-      "<p>Dzien dobry {{fullName}},</p><p>Adres e-mail zostal potwierdzony, a zgloszenie <strong>{{reservationNumber}}</strong> oczekuje teraz na akceptacje restauracji.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
   },
   rest_pending_admin: {
     subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
@@ -812,11 +744,6 @@ const ULTRA_LEGACY_HALL_DEFAULT_TEMPLATES = {
     subject: "{{venueName}} — potwierdź zgłoszenie rezerwacji sali ({{reservationNumber}})",
     bodyHtml:
       '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za przeslanie zgloszenia rezerwacji sali do {{venueName}}.</p><p>To jest zgloszenie rezerwacyjne, a wycena zostanie ustalona indywidualnie po kontakcie z obiektem.</p><p>Aby potwierdzic zgloszenie, kliknij w link:</p><p><a href="{{confirmationLink}}">Potwierdz zgloszenie</a></p><p>Numer: <strong>{{reservationNumber}}</strong><br>Sala: {{hallName}}<br>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Gosci: {{guestsCount}} · {{eventType}}<br>Wylacznosc: {{exclusive}}</p><p>Pozdrawiamy,<br>{{venueName}}</p>',
-  },
-  hall_pending_client: {
-    subject: "{{venueName}} — zgłoszenie oczekuje na decyzję obiektu ({{reservationNumber}})",
-    bodyHtml:
-      "<p>Dzien dobry {{fullName}},</p><p>Zgloszenie zostalo potwierdzone linkiem e-mail i oczekuje teraz na decyzje obiektu.</p><p>Wycena zostanie podana telefonicznie lub mailowo po kontakcie z obsluga.</p><p>Numer: {{reservationNumber}} · {{hallName}}<br>{{date}} · {{timeFrom}}–{{timeTo}}</p><p>Pozdrawiamy,<br>{{venueName}}</p>",
   },
   hall_pending_admin: {
     subject: "[{{venueName}}] Nowe zgłoszenie sali {{reservationNumber}}",
@@ -852,16 +779,6 @@ const LEGACY_RESTAURANT_DEFAULT_TEMPLATES = {
 Liczba gości: {{guestsCount}}</p>
 <p>{{tablesList}}</p>
 <p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>
-<p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
-  },
-  restaurant_pending_client: {
-    subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>Adres e-mail został potwierdzony, a zgłoszenie <strong>{{reservationNumber}}</strong> oczekuje teraz na akceptację restauracji.</p>
-<p>Numer: {{reservationNumber}}<br/>
-{{date}} · {{timeFrom}}–{{timeTo}}</p>
-<p>Stoliki: {{tablesList}} · Goście: {{guestsCount}}</p>
-<p>Po zatwierdzeniu otrzymasz osobne potwierdzenie. Do tego czasu rezerwacja nie jest jeszcze gwarantowana.</p>
 <p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
   },
   restaurant_pending_admin: {
@@ -934,15 +851,6 @@ Liczba gości: {{guestsCount}}</p>
 <p>{{tablesList}}</p>
 <p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
   },
-  rest_pending_client: {
-    subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>Adres e-mail został potwierdzony, a zgłoszenie <strong>{{reservationNumber}}</strong> oczekuje teraz na akceptację restauracji.</p>
-<p>{{date}} · {{timeFrom}}–{{timeTo}}<br/>
-Goście: {{guestsCount}}</p>
-<p>{{tablesList}}</p>
-<p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
-  },
   rest_pending_admin: {
     subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
     bodyHtml: `<p>Nowa rezerwacja stolika oczekuje na decyzję obsługi.</p>
@@ -991,16 +899,6 @@ Sala: {{hallName}}<br/>
 {{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}})<br/>
 Goście: {{guestsCount}} · {{eventType}}<br/>
 Wyłączność: {{exclusive}}</p>
-<p>Pozdrawiamy,<br/>{{venueName}}</p>`,
-  },
-  hall_pending_client: {
-    subject: "{{venueName}} — zgłoszenie oczekuje na decyzję obiektu ({{reservationNumber}})",
-    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>Zgłoszenie zostało <strong>potwierdzone linkiem e-mail</strong>. Status: <strong>oczekujące na akceptację przez obiekt</strong>.</p>
-<p><strong>Wycena zostanie podana telefonicznie</strong> — obsługa skontaktuje się z Tobą w sprawie kosztów i dalszego potwierdzenia.</p>
-<p>Obiekt ma <strong>7 dni</strong> na decyzję (możliwe jest przedłużenie terminu przez obsługę).</p>
-<p>Numer: {{reservationNumber}} · {{hallName}}<br/>
-{{date}} · {{timeFrom}}–{{timeTo}}</p>
 <p>Pozdrawiamy,<br/>{{venueName}}</p>`,
   },
   hall_pending_admin: {
@@ -1073,7 +971,6 @@ const RESTAURANT_DEFAULT_TEMPLATES_BASE = buildRestaurantDefaultTemplates();
 const RESTAURANT_DEFAULT_TEMPLATES = {
   ...RESTAURANT_DEFAULT_TEMPLATES_BASE,
   rest_confirm_email: structuredClone(RESTAURANT_DEFAULT_TEMPLATES_BASE.restaurant_confirm_email),
-  rest_pending_client: structuredClone(RESTAURANT_DEFAULT_TEMPLATES_BASE.restaurant_pending_client),
   rest_pending_admin: structuredClone(RESTAURANT_DEFAULT_TEMPLATES_BASE.restaurant_pending_admin),
   rest_confirmed_client: structuredClone(RESTAURANT_DEFAULT_TEMPLATES_BASE.restaurant_confirmed_client),
   rest_cancelled_client: structuredClone(RESTAURANT_DEFAULT_TEMPLATES_BASE.restaurant_cancelled_client),

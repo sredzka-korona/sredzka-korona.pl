@@ -205,6 +205,48 @@
     return String(value || "").replace(/[^\d]/g, "");
   }
 
+  function normalizePhoneFields(prefixValue, nationalValue) {
+    const prefixRaw = String(prefixValue || "").trim();
+    const nationalRaw = String(nationalValue || "").trim();
+
+    if (nationalRaw) {
+      return {
+        phonePrefix: normalizePhonePrefix(prefixRaw || "+48"),
+        phoneNational: nationalRaw,
+      };
+    }
+
+    const compactPrefix = prefixRaw.replace(/[\s()-]/g, "");
+    const digitsOnly = compactPrefix.replace(/[^\d]/g, "");
+    const looksLikeWholePhone = digitsOnly.length >= 6;
+
+    if (!looksLikeWholePhone) {
+      return {
+        phonePrefix: normalizePhonePrefix(prefixRaw || "+48"),
+        phoneNational: nationalRaw,
+      };
+    }
+
+    if (compactPrefix.startsWith("+48") && digitsOnly.length > 2) {
+      return {
+        phonePrefix: "+48",
+        phoneNational: digitsOnly.slice(2),
+      };
+    }
+
+    if (compactPrefix.startsWith("48") && digitsOnly.length > 9) {
+      return {
+        phonePrefix: "+48",
+        phoneNational: digitsOnly.slice(2),
+      };
+    }
+
+    return {
+      phonePrefix: normalizePhonePrefix("+48"),
+      phoneNational: digitsOnly,
+    };
+  }
+
   function antiBotVerified() {
     return config.turnstileSiteKey && !state.turnstileFailed ? Boolean(state.turnstileToken) : Boolean(state.humanCheck);
   }
@@ -1054,7 +1096,7 @@
             </select>
           </label>
         </div>
-        <p class="gb-inline-note">Maksymalna liczba gości dla aktualnych ustawień: <strong id="gb-rest-max">${escapeHtml(String(maxGuests))}</strong>.</p>
+        <p class="gb-inline-note">Maksymalna ilość gości przy jednym stole: <strong id="gb-rest-max">${escapeHtml(String(maxGuestsPerTable))}</strong>.</p>
         <label class="gb-check">
           <input type="checkbox" id="gb-rest-join" ${state.restaurant.joinTables ? "checked" : ""} />
           <span>Prośba o połączenie stołów</span>
@@ -1208,27 +1250,27 @@
           <div class="gb-grid-2">
             <label class="gb-field">
               <span>Imię</span>
-              <input type="text" name="firstName" maxlength="60" value="${escapeHtml(state.personal.firstName)}" required />
+              <input type="text" name="firstName" maxlength="60" value="${escapeHtml(state.personal.firstName)}" autocomplete="given-name" required />
             </label>
             <label class="gb-field">
               <span>Nazwisko</span>
-              <input type="text" name="lastName" maxlength="60" value="${escapeHtml(state.personal.lastName)}" required />
+              <input type="text" name="lastName" maxlength="60" value="${escapeHtml(state.personal.lastName)}" autocomplete="family-name" required />
             </label>
           </div>
 
           <div class="gb-grid-2" style="margin-top:0.75rem;">
             <label class="gb-field">
               <span>Adres e-mail</span>
-              <input type="email" name="email" maxlength="180" value="${escapeHtml(state.personal.email)}" required />
+              <input type="email" name="email" maxlength="180" value="${escapeHtml(state.personal.email)}" autocomplete="email" required />
             </label>
             <div class="gb-phone-row">
               <label class="gb-field">
                 <span>Prefiks</span>
-                <input type="text" class="gb-phone-prefix" name="phonePrefix" maxlength="5" value="${escapeHtml(normalizePhonePrefix(state.personal.phonePrefix || "+48"))}" pattern="\\+[0-9]{1,4}" inputmode="tel" required />
+                <input type="tel" class="gb-phone-prefix" name="phonePrefix" maxlength="5" value="${escapeHtml(normalizePhonePrefix(state.personal.phonePrefix || "+48"))}" pattern="\\+[0-9]{1,4}" inputmode="tel" autocomplete="tel-country-code" autocapitalize="off" spellcheck="false" required />
               </label>
               <label class="gb-field">
                 <span>Numer telefonu</span>
-                <input type="text" name="phoneNational" maxlength="24" value="${escapeHtml(state.personal.phoneNational)}" pattern="[0-9][0-9\\s-]{5,23}" inputmode="tel" required />
+                <input type="tel" name="phoneNational" maxlength="24" value="${escapeHtml(state.personal.phoneNational)}" pattern="[0-9][0-9\\s-]{5,23}" inputmode="tel" autocomplete="tel-national" autocapitalize="off" spellcheck="false" required />
               </label>
             </div>
           </div>
@@ -1335,7 +1377,6 @@
       return `
         <div class="gb-antibot-wrap gb-antibot-wrap--turnstile">
           <div id="gb-turnstile-slot"></div>
-          ${state.turnstileReady ? "" : '<p class="gb-antibot-note">Ladowanie weryfikacji antybotowej...</p>'}
         </div>
       `;
     }
@@ -1541,8 +1582,12 @@
       state.personal.firstName = String(document.querySelector('[name="firstName"]')?.value || state.personal.firstName || "").trim();
       state.personal.lastName = String(document.querySelector('[name="lastName"]')?.value || state.personal.lastName || "").trim();
       state.personal.email = String(document.querySelector('[name="email"]')?.value || state.personal.email || "").trim();
-      state.personal.phonePrefix = normalizePhonePrefix(document.querySelector('[name="phonePrefix"]')?.value || state.personal.phonePrefix || "+48");
-      state.personal.phoneNational = String(document.querySelector('[name="phoneNational"]')?.value || state.personal.phoneNational || "").trim();
+      const normalizedPhone = normalizePhoneFields(
+        document.querySelector('[name="phonePrefix"]')?.value || state.personal.phonePrefix || "+48",
+        document.querySelector('[name="phoneNational"]')?.value || state.personal.phoneNational || ""
+      );
+      state.personal.phonePrefix = normalizedPhone.phonePrefix;
+      state.personal.phoneNational = String(normalizedPhone.phoneNational || "").trim();
       state.personal.hpCompanyWebsite = String(document.querySelector('[name="hpCompanyWebsite"]')?.value || state.personal.hpCompanyWebsite || "").trim();
       return;
     }
@@ -1785,7 +1830,7 @@
           guestsInput.value = String(maxGuests);
         }
         const marker = document.getElementById("gb-rest-max");
-        if (marker) marker.textContent = String(maxGuests);
+        if (marker) marker.textContent = String(maxGuestsPerTable);
       };
 
       tablesInput?.addEventListener("input", syncGuestsMax);
@@ -1958,19 +2003,33 @@
     }
 
     if (state.step === "personal") {
+      const prefixInput = document.querySelector('[name="phonePrefix"]');
+      const nationalInput = document.querySelector('[name="phoneNational"]');
+      const normalizePhoneInputsInForm = () => {
+        if (!(prefixInput instanceof HTMLInputElement) || !(nationalInput instanceof HTMLInputElement)) return;
+        const normalized = normalizePhoneFields(prefixInput.value, nationalInput.value);
+        prefixInput.value = normalized.phonePrefix;
+        nationalInput.value = normalized.phoneNational;
+      };
+
+      prefixInput?.addEventListener("change", normalizePhoneInputsInForm);
+      prefixInput?.addEventListener("blur", normalizePhoneInputsInForm);
+
       document.getElementById("gb-personal-form")?.addEventListener("submit", (event) => {
         event.preventDefault();
         renewSession({ persist: false });
         const form = event.currentTarget;
         if (!(form instanceof HTMLFormElement)) return;
+        normalizePhoneInputsInForm();
         if (!form.reportValidity()) return;
 
         const formData = new FormData(form);
         state.personal.firstName = String(formData.get("firstName") || "").trim();
         state.personal.lastName = String(formData.get("lastName") || "").trim();
         state.personal.email = String(formData.get("email") || "").trim();
-        state.personal.phonePrefix = normalizePhonePrefix(formData.get("phonePrefix") || "+48");
-        state.personal.phoneNational = String(formData.get("phoneNational") || "").trim();
+        const normalizedPhone = normalizePhoneFields(formData.get("phonePrefix") || "+48", formData.get("phoneNational") || "");
+        state.personal.phonePrefix = normalizedPhone.phonePrefix;
+        state.personal.phoneNational = String(normalizedPhone.phoneNational || "").trim();
         state.personal.hpCompanyWebsite = String(formData.get("hpCompanyWebsite") || "").trim();
         const phoneDigits = phoneNationalDigits(state.personal.phoneNational);
 

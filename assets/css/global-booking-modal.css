@@ -156,7 +156,7 @@ body.gb-modal-open {
 }
 
 #gb-modal .gb-body {
-  padding: 0 1.35rem 1.35rem;
+  padding: 0 1.35rem 0.6rem;
   max-height: calc(min(94dvh, 980px) - 115px);
   overflow-x: hidden;
   overflow-y: auto;
@@ -192,6 +192,11 @@ body.gb-modal-open {
   color: var(--gb-danger);
   font-size: 0.9rem;
   min-height: 1.2rem;
+}
+
+#gb-modal .gb-error:empty {
+  margin-top: 0;
+  min-height: 0;
 }
 
 #gb-modal .gb-grid-2 {
@@ -305,6 +310,22 @@ body.gb-modal-open {
   padding: 0;
   background: transparent;
   min-height: 0;
+}
+
+/* Checkbox/radio: globalne style #gb-modal input (width 100%, line-height, min-height…) psują układ */
+#gb-modal input[type="checkbox"],
+#gb-modal input[type="radio"] {
+  width: auto;
+  inline-size: auto;
+  max-inline-size: none;
+  min-height: 0;
+  min-inline-size: 0;
+  padding: 0;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  line-height: 1;
+  overflow: visible;
+  border-radius: 4px;
 }
 
 #gb-modal .gb-service-tiles {
@@ -849,6 +870,7 @@ body.gb-modal-open {
 
 #gb-modal .gb-check {
   display: flex;
+  flex-direction: row;
   align-items: flex-start;
   gap: 0.55rem;
   margin-top: 0.75rem;
@@ -859,8 +881,11 @@ body.gb-modal-open {
 }
 
 #gb-modal .gb-check input {
-  margin-top: 0.2rem;
+  margin-top: 0;
   width: auto;
+  inline-size: auto;
+  /* Pierwsza linia tekstu obok kontrolki — bez sztucznego obniżenia */
+  align-self: start;
 }
 
 #gb-modal .gb-actions {
@@ -1073,7 +1098,7 @@ body.gb-modal-open {
   }
 
   #gb-modal .gb-body {
-    padding: 0 0.95rem 1rem;
+    padding: 0 0.95rem 0.55rem;
     max-height: calc(100dvh - 180px);
   }
 
@@ -1193,7 +1218,7 @@ body.gb-modal-open {
   }
 
   #gb-modal .gb-body {
-    padding: 0 0.8rem 0.9rem;
+    padding: 0 0.8rem 0.45rem;
   }
 
   #gb-modal .gb-header,
