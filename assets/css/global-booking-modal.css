@@ -881,10 +881,10 @@ body.gb-modal-open {
 }
 
 #gb-modal .gb-check input {
-  margin-top: 0;
+  margin-top: 0.15em;
   width: auto;
   inline-size: auto;
-  /* Pierwsza linia tekstu obok kontrolki — bez sztucznego obniżenia */
+  /* Optycznie wyrównuje checkbox do pierwszej linii etykiety. */
   align-self: start;
 }
 
@@ -894,11 +894,11 @@ body.gb-modal-open {
   align-items: center;
   gap: 0.6rem;
   margin-top: auto;
-  padding-top: 1rem;
+  padding-top: 1.2rem;
 }
 
 #gb-modal .gb-body.gb-body--summary .gb-actions {
-  padding-top: 0.75rem;
+  padding-top: 0.9rem;
 }
 
 #gb-modal .gb-body.gb-body--summary .gb-error {

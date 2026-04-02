@@ -1984,12 +1984,21 @@ body.admin-modal-open {
   align-items: center;
 }
 
-.schedule-modal-summary {
-  margin: 0;
+.schedule-modal-footer:has(.schedule-details-footer-actions) {
+  margin-top: 1.5rem;
+  justify-content: flex-end;
 }
 
-.schedule-modal-danger {
-  margin-left: auto;
+.schedule-details-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.schedule-modal-summary {
+  margin: 0;
 }
 
 .schedule-modal-list {

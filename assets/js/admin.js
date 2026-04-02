@@ -2363,17 +2363,15 @@
         </div>
         ${scheduleReservationDetailsMarkup(item)}
         <div class="admin-modal-footer schedule-modal-footer">
-          ${
-            item.status === "pending"
-              ? `<div class="inline-actions">
-                   <button type="button" class="button secondary" data-schedule-details-action="confirm">Potwierdź</button>
-                 </div>`
-              : ""
-          }
-          <div class="inline-actions schedule-modal-danger">
+          <div class="schedule-details-footer-actions">
             <button type="button" class="button ${isBlock ? "danger icon-button" : "danger"}" data-schedule-details-action="delete" aria-label="${escapeAttribute(
               isBlock ? "Usuń blokadę" : "Odwołaj rezerwację"
             )}">${isBlock ? scheduleIconMarkup("trash") : "Odwołaj rezerwację"}</button>
+            ${
+              item.status === "pending"
+                ? `<button type="button" class="button secondary" data-schedule-details-action="confirm">Potwierdź</button>`
+                : ""
+            }
           </div>
         </div>
       `,
