@@ -1,8 +1,11 @@
 (function () {
   const config = window.SREDZKA_CONFIG || {};
   const SESSION_MS = 30 * 60 * 1000;
+  const SESSION_REFRESH_LEEWAY_MS = 30 * 1000;
   const EMAIL_CONFIRM_MS = 2 * 60 * 60 * 1000;
   const DRAFT_STORAGE_KEY = "sredzka-korona:global-booking-draft:v1";
+  const PAGE_VISIT_ID =
+    window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const SERVICE_KEYS = ["hotel", "restaurant", "events"];
 
   const SERVICE_META = {
@@ -50,6 +53,7 @@
     humanCheck: false,
     countdownUntil: 0,
     countdownTimer: null,
+    sessionRefreshTimer: null,
     pendingEmailSent: false,
     termsAccepted: false,
     requiresEmailConfirmation: true,
@@ -302,6 +306,12 @@
     `;
     document.body.appendChild(root);
     root.querySelector("#gb-close")?.addEventListener("click", closeModal);
+    root.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target.closest("#gb-restart") : null;
+      if (!target) return;
+      event.preventDefault();
+      void restartBookingFlow();
+    });
   }
 
   function clearCountdown() {
@@ -311,8 +321,47 @@
     }
   }
 
+  function clearSessionRefreshTimer() {
+    if (state.sessionRefreshTimer) {
+      clearTimeout(state.sessionRefreshTimer);
+      state.sessionRefreshTimer = null;
+    }
+  }
+
+  function scheduleSessionRefresh() {
+    clearSessionRefreshTimer();
+    if (!state.isOpen || state.step === "success") return;
+    const refreshIn = Math.max(1000, state.sessionStartedAt + SESSION_MS - Date.now() - SESSION_REFRESH_LEEWAY_MS);
+    state.sessionRefreshTimer = window.setTimeout(() => {
+      if (!state.isOpen || state.step === "success") {
+        clearSessionRefreshTimer();
+        return;
+      }
+      state.sessionStartedAt = Date.now();
+      persistDraftState();
+      scheduleSessionRefresh();
+    }, refreshIn);
+  }
+
+  function renewSession(options = {}) {
+    if (state.step === "success") return;
+    state.sessionStartedAt = Date.now();
+    if (options.persist !== false) {
+      persistDraftState();
+    }
+    scheduleSessionRefresh();
+  }
+
+  async function restartBookingFlow() {
+    clearDraftState();
+    resetStateForOpen();
+    await loadBookingFlags();
+    render();
+  }
+
   function resetStateForOpen() {
     clearCountdown();
+    clearSessionRefreshTimer();
     state.step = "service";
     state.selectedService = "";
     state.sessionStartedAt = Date.now();
@@ -374,6 +423,7 @@
     if (!storage) return;
     const snapshot = {
       version: 1,
+      pageVisitId: PAGE_VISIT_ID,
       savedAt: Date.now(),
       step: state.step,
       selectedService: state.selectedService,
@@ -413,6 +463,10 @@
       if (!raw) return false;
       const draft = JSON.parse(raw);
       if (!draft || Number(draft.version) !== 1) return false;
+      if (String(draft.pageVisitId || "") !== PAGE_VISIT_ID) {
+        clearDraftState();
+        return false;
+      }
 
       state.step = cleanStep(draft.step);
       state.selectedService = SERVICE_KEYS.includes(draft.selectedService) ? draft.selectedService : "";
@@ -1320,11 +1374,7 @@
     title.textContent = currentStepTitle();
 
     if (state.step !== "service" && state.step !== "success" && isSessionExpired()) {
-      body.innerHTML = renderSessionExpired();
-      renderProgress();
-      bindCommonHandlers();
-      persistDraftState();
-      return;
+      renewSession();
     }
 
     if (state.step === "service") {
@@ -1364,6 +1414,7 @@
       startCountdownTicker();
     }
 
+    scheduleSessionRefresh();
     persistDraftState();
   }
 
@@ -1440,10 +1491,12 @@
     if (!body) return;
     body.querySelectorAll("input, select, textarea").forEach((field) => {
       field.addEventListener("input", () => {
+        renewSession({ persist: false });
         syncCurrentStepFromDom();
         persistDraftState();
       });
       field.addEventListener("change", () => {
+        renewSession({ persist: false });
         syncCurrentStepFromDom();
         persistDraftState();
       });
@@ -1451,6 +1504,7 @@
   }
 
   function goBack() {
+    renewSession({ persist: false });
     syncCurrentStepFromDom();
     setError("");
     const flow = getFlow();
@@ -1476,18 +1530,13 @@
 
   function bindCommonHandlers() {
     if (state.step !== "service" && state.step !== "success" && isSessionExpired()) {
-      document.getElementById("gb-restart")?.addEventListener("click", async () => {
-        clearDraftState();
-        resetStateForOpen();
-        await loadBookingFlags();
-        render();
-      });
       return;
     }
 
     if (state.step === "service") {
       document.querySelectorAll("[data-service-select]").forEach((button) => {
         button.addEventListener("click", async () => {
+          renewSession({ persist: false });
           const service = button.getAttribute("data-service-select");
           if (!service || state.bookingFlags[service] === false) return;
           setError("");
@@ -1513,6 +1562,7 @@
       const fromInput = document.getElementById("gb-hotel-date-from");
       const toInput = document.getElementById("gb-hotel-date-to");
       document.getElementById("gb-next")?.addEventListener("click", async () => {
+        renewSession({ persist: false });
         const from = String(fromInput?.value || "");
         const to = String(toInput?.value || "");
         const today = todayYmdLocal();
@@ -1571,6 +1621,7 @@
       });
 
       document.getElementById("gb-next")?.addEventListener("click", () => {
+        renewSession({ persist: false });
         if (!state.hotel.selectedRoomIds.length) {
           setError("Wybierz przynajmniej jeden pokoj.");
           return;
@@ -1605,6 +1656,7 @@
       });
 
       document.getElementById("gb-next")?.addEventListener("click", () => {
+        renewSession({ persist: false });
         const dateValue = String(dateInput?.value || "");
         const slots = restaurantSlotsForDuration();
         const selectedTime = String(timeInput?.value || "");
@@ -1659,6 +1711,7 @@
       syncGuestsMax();
 
       document.getElementById("gb-next")?.addEventListener("click", async () => {
+        renewSession({ persist: false });
         const tablesCount = clamp(toInt(tablesInput?.value || 1, 1), 1, 30);
         const maxGuestsPerTable = Number(state.restaurant.publicSettings?.maxGuestsPerTable || 4);
         const maxGuests = Math.max(1, maxGuestsPerTable * tablesCount);
@@ -1719,6 +1772,7 @@
       guestsNumber?.addEventListener("input", () => syncGuests(guestsNumber.value));
 
       document.getElementById("gb-next")?.addEventListener("click", async () => {
+        renewSession({ persist: false });
         const dateValue = String(dateInput?.value || "");
         const timeValue = String(timeInput?.value || "");
         const today = todayYmdLocal();
@@ -1767,6 +1821,7 @@
       });
 
       document.getElementById("gb-next")?.addEventListener("click", () => {
+        renewSession({ persist: false });
         if (!state.events.selectedHallId) {
           setError("Wybierz dostepna sale.");
           return;
@@ -1784,6 +1839,7 @@
       const exclusiveInput = document.getElementById("gb-events-exclusive");
 
       document.getElementById("gb-next")?.addEventListener("click", async () => {
+        renewSession({ persist: false });
         state.events.eventType = String(typeInput?.value || "").trim();
         state.events.customerNote = String(noteInput?.value || "").trim();
 
@@ -1815,6 +1871,7 @@
     if (state.step === "personal") {
       document.getElementById("gb-personal-form")?.addEventListener("submit", (event) => {
         event.preventDefault();
+        renewSession({ persist: false });
         const form = event.currentTarget;
         if (!(form instanceof HTMLFormElement)) return;
         if (!form.reportValidity()) return;
@@ -1856,14 +1913,6 @@
       document.getElementById("gb-close-final")?.addEventListener("click", closeModal);
       return;
     }
-
-    document.getElementById("gb-restart")?.addEventListener("click", async () => {
-      clearDraftState();
-      resetStateForOpen();
-      await loadBookingFlags();
-      render();
-    });
-
   }
 
   function summaryButtonEnabled() {
@@ -2054,6 +2103,7 @@
       return;
     }
 
+    renewSession({ persist: false });
     state.submitting = true;
     updateSummarySubmitState();
     setError("");
@@ -2122,6 +2172,9 @@
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("gb-modal-open");
 
+    if (state.step !== "success") {
+      renewSession();
+    }
     await loadBookingFlags();
     if (!state.selectedService && state.step !== "service") {
       state.step = "service";
@@ -2132,6 +2185,7 @@
   function closeModal() {
     syncCurrentStepFromDom();
     clearCountdown();
+    clearSessionRefreshTimer();
     state.isOpen = false;
     state.turnstileToken = "";
     state.turnstileWidgetId = null;
