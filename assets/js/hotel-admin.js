@@ -109,6 +109,124 @@
     changed_client: "Klient — po edycji rezerwacji przez administratora (wysyłane tylko gdy zaznaczysz wysyłkę).",
   };
 
+  const HOTEL_TEMPLATE_DEFAULTS = {
+    confirm_email: {
+      subject: "{{hotelName}} | potwierdzenie adresu e-mail dla rezerwacji {{reservationNumber}}",
+      bodyHtml:
+        '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie formularza rezerwacji w obiekcie <strong>{{hotelName}}</strong>.</p><p>Aby przekazac zgloszenie do dalszej obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz adres e-mail</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}</p><p>Jesli to nie Ty wysylales zgloszenie, zignoruj te wiadomosc.</p>',
+    },
+    pending_client: {
+      subject: "{{hotelName}} | rezerwacja {{reservationNumber}} oczekuje na akceptacje",
+      bodyHtml:
+        "<p>Dzien dobry {{fullName}},</p><p>Twoja rezerwacja o numerze <strong>{{reservationNumber}}</strong> zostala zapisana i oczekuje teraz na akceptacje recepcji.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}<br>Orientacyjna kwota: {{totalPrice}} PLN</p><p>Po decyzji recepcji wyslemy osobna wiadomosc.</p>",
+    },
+    pending_admin: {
+      subject: "[{{hotelName}}] Rezerwacja do decyzji: {{reservationNumber}}",
+      bodyHtml:
+        "<p>W panelu pojawila sie nowa rezerwacja oczekujaca na akceptacje.</p><p>Numer: <strong>{{reservationNumber}}</strong><br>Klient: {{fullName}}<br>E-mail: {{email}}<br>Telefon: {{phone}}<br>Termin: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>Uwagi klienta: {{customerNote}}</p>",
+    },
+    confirmed_client: {
+      subject: "{{hotelName}} | rezerwacja {{reservationNumber}} potwierdzona",
+      bodyHtml:
+        "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje o numerze <strong>{{reservationNumber}}</strong>.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Liczba noclegow: {{nights}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>W razie pytan mozesz odpowiedziec na te wiadomosc lub skontaktowac sie bezposrednio z recepcja.</p>",
+    },
+    cancelled_client: {
+      subject: "{{hotelName}} | anulowanie rezerwacji {{reservationNumber}}",
+      bodyHtml:
+        "<p>Dzien dobry {{fullName}},</p><p>Informujemy, ze rezerwacja o numerze <strong>{{reservationNumber}}</strong> zostala anulowana.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}</p><p>Jesli potrzebujesz pomocy przy nowej rezerwacji, skontaktuj sie z recepcja.</p>",
+    },
+    changed_client: {
+      subject: "{{hotelName}} | zmiana rezerwacji {{reservationNumber}}",
+      bodyHtml:
+        "<p>Dzien dobry {{fullName}},</p><p>Wprowadzilismy zmiany w rezerwacji o numerze <strong>{{reservationNumber}}</strong>.</p><p>Aktualny termin pobytu: {{dateFrom}} - {{dateTo}}<br>Liczba noclegow: {{nights}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>Uwagi do rezerwacji: {{customerNote}}</p><p>Jesli chcesz cos doprecyzowac, odpowiedz na te wiadomosc lub skontaktuj sie z recepcja.</p>",
+    },
+  };
+
+  const LEGACY_HOTEL_TEMPLATE_DEFAULTS = {
+    confirm_email: {
+      subject: "{{hotelName}} — potwierdź rezerwację ({{reservationNumber}})",
+      bodyHtml:
+        '<p>Witaj {{fullName}},</p><p>Kliknij link, aby potwierdzić rezerwację:</p><p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p><p>Numer: {{reservationNumber}}<br>Termin: {{dateFrom}} — {{dateTo}}</p>',
+    },
+    pending_client: {
+      subject: "{{hotelName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
+      bodyHtml:
+        "<p>Witaj {{fullName}},</p><p>Twoja rezerwacja ma status oczekujący.</p><p>Numer: {{reservationNumber}}</p>",
+    },
+    pending_admin: {
+      subject: "[{{hotelName}}] Nowa rezerwacja oczekująca {{reservationNumber}}",
+      bodyHtml:
+        "<p>Nowa rezerwacja oczekuje na decyzję.</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{dateFrom}} — {{dateTo}}</p>",
+    },
+    confirmed_client: {
+      subject: "{{hotelName}} — rezerwacja potwierdzona ({{reservationNumber}})",
+      bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została potwierdzona.</p>",
+    },
+    cancelled_client: {
+      subject: "{{hotelName}} — rezerwacja anulowana ({{reservationNumber}})",
+      bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została anulowana.</p>",
+    },
+    changed_client: {
+      subject: "{{hotelName}} — zmiana w rezerwacji {{reservationNumber}}",
+      bodyHtml:
+        "<p>Witaj {{fullName}},</p><p>Wprowadziliśmy zmiany w rezerwacji <strong>{{reservationNumber}}</strong>.</p><p>Termin pobytu: {{dateFrom}} — {{dateTo}} ({{nights}} nocy).<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>{{customerNote}}</p><p>W razie pytań odpowiedz na tę wiadomość lub skontaktuj się z recepcją.</p>",
+    },
+  };
+
+  function slugifyRoomId(value) {
+    const map = { ą: "a", ć: "c", ę: "e", ł: "l", ń: "n", ó: "o", ś: "s", ż: "z", ź: "z" };
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .split("")
+      .map((char) => map[char] || char)
+      .join("")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80);
+  }
+
+  function roomPayload(room, overrides = {}) {
+    return {
+      id: room.id,
+      name: room.name || room.id,
+      pricePerNight: Number(room.pricePerNight || 0),
+      maxGuests: Math.max(1, toInt(room.maxGuests)),
+      bedsSingle: toInt(room.bedsSingle),
+      bedsDouble: toInt(room.bedsDouble),
+      bedsChild: toInt(room.bedsChild),
+      description: String(room.description || ""),
+      imageUrls: Array.isArray(room.imageUrls) ? room.imageUrls : [],
+      active: room.active !== false,
+      sortOrder: Number.isFinite(Number(room.sortOrder)) ? Number(room.sortOrder) : 0,
+      ...overrides,
+    };
+  }
+
+  function isLegacyHotelTemplate(key, template) {
+    if (!template) return true;
+    const subject = String(template.subject || "").trim();
+    const bodyHtml = String(template.bodyHtml || "").trim();
+    if (!subject || !bodyHtml) return true;
+    const legacy = LEGACY_HOTEL_TEMPLATE_DEFAULTS[key];
+    return Boolean(legacy && subject === legacy.subject && bodyHtml === legacy.bodyHtml);
+  }
+
+  function mergeHotelTemplates(rawTemplates) {
+    const merged = { ...(rawTemplates || {}) };
+    Object.entries(HOTEL_TEMPLATE_DEFAULTS).forEach(([key, defaults]) => {
+      if (isLegacyHotelTemplate(key, rawTemplates?.[key])) {
+        merged[key] = structuredClone(defaults);
+        return;
+      }
+      merged[key] = {
+        subject: String(rawTemplates?.[key]?.subject || defaults.subject),
+        bodyHtml: String(rawTemplates?.[key]?.bodyHtml || defaults.bodyHtml),
+      };
+    });
+    return merged;
+  }
+
   async function loadRooms() {
     const d = await hotelApi("admin-rooms-list", { method: "GET" });
     roomsData = d.rooms || [];
@@ -129,7 +247,23 @@
 
   async function loadTemplates() {
     const d = await hotelApi("admin-mail-templates", { method: "GET" });
-    templatesData = d.templates || {};
+    const rawTemplates = d.templates || {};
+    templatesData = mergeHotelTemplates(rawTemplates);
+    const legacyKeys = Object.keys(HOTEL_TEMPLATE_DEFAULTS).filter((key) => isLegacyHotelTemplate(key, rawTemplates[key]));
+    if (legacyKeys.length) {
+      await Promise.all(
+        legacyKeys.map((key) =>
+          hotelApi("admin-mail-template-save", {
+            method: "PUT",
+            body: {
+              key,
+              subject: templatesData[key].subject,
+              bodyHtml: templatesData[key].bodyHtml,
+            },
+          }).catch(() => null)
+        )
+      );
+    }
   }
 
   async function loadBlockList() {
@@ -148,18 +282,35 @@
     return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
   }
 
+  async function moveRoom(index, direction) {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= roomsData.length) return;
+    const reordered = [...roomsData];
+    [reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]];
+    await Promise.all(
+      reordered.map((room, order) =>
+        hotelApi("admin-room-upsert", {
+          method: "PUT",
+          body: roomPayload(room, { sortOrder: order }),
+        })
+      )
+    );
+    await loadRooms();
+  }
+
   function renderRooms(root) {
     const body = roomsData
       .map(
-        (r) => `
+        (r, index) => `
       <tr data-id="${escapeHtml(r.id)}">
         <td>${escapeHtml(r.name || r.id)}</td>
         <td>${escapeHtml(String(r.pricePerNight ?? ""))}</td>
         <td>${escapeHtml(String(r.maxGuests ?? "—"))}</td>
         <td>${escapeHtml([toInt(r.bedsSingle) && `${toInt(r.bedsSingle)}×1os.`, toInt(r.bedsDouble) && `${toInt(r.bedsDouble)}×2os.`, toInt(r.bedsChild) && `${toInt(r.bedsChild)}×dz.`].filter(Boolean).join(", ") || "—")}</td>
         <td>${r.active !== false ? "tak" : "nie"}</td>
-        <td>${escapeHtml(String(r.sortOrder ?? 0))}</td>
         <td class="admin-row-actions">
+          <button type="button" class="button secondary hotel-move-room" data-direction="-1" data-index="${index}" aria-label="Przesun pokoj w lewo" ${index === 0 ? "disabled" : ""}>←</button>
+          <button type="button" class="button secondary hotel-move-room" data-direction="1" data-index="${index}" aria-label="Przesun pokoj w prawo" ${index === roomsData.length - 1 ? "disabled" : ""}>→</button>
           <button type="button" class="button secondary hotel-edit-room" data-id="${escapeHtml(r.id)}">Edytuj</button>
           <button type="button" class="button secondary danger-muted hotel-delete-room" data-id="${escapeHtml(r.id)}" data-name="${escapeHtml(r.name || r.id)}">Usuń</button>
         </td>
@@ -179,8 +330,8 @@
         </div>
         <div class="table-scroll">
           <table class="hotel-table">
-            <thead><tr><th>Nazwa</th><th>Cena / noc</th><th>Max os.</th><th>Łóżka</th><th>Aktywny</th><th>Kol.</th><th></th></tr></thead>
-            <tbody>${body || "<tr><td colspan='7'>Brak danych — dodaj pokój lub uruchom seed.</td></tr>"}</tbody>
+            <thead><tr><th>Nazwa</th><th>Cena / noc</th><th>Max os.</th><th>Łóżka</th><th>Aktywny</th><th></th></tr></thead>
+            <tbody>${body || "<tr><td colspan='6'>Brak danych — dodaj pokój lub uruchom seed.</td></tr>"}</tbody>
           </table>
         </div>
       </div>`;
@@ -236,7 +387,7 @@
   }
 
   function renderTemplatesEditor() {
-    const keys = Object.keys(templatesData);
+    const keys = Object.keys(HOTEL_TEMPLATE_DEFAULTS);
     return `
       <div class="hotel-subpanel">
         <h3>Szablony mailingowe</h3>
@@ -347,18 +498,23 @@
       if (!availableTabs.some((tab) => tab.key === hotelSubTab)) {
         hotelSubTab = availableTabs[0].key;
       }
+      const activeSubTab = availableTabs.find((tab) => tab.key === hotelSubTab) || availableTabs[0];
       container.innerHTML = `
         <section class="panel col-12">
           <p class="pill">Hotel</p>
-          <h2>Rezerwacje pokoi i pokoje</h2>
-          <div class="hotel-nav${availableTabs.length === 1 ? " is-single" : ""}">
-            ${availableTabs
-              .map(
-                (tab) =>
-                  `<button type="button" class="button ${hotelSubTab === tab.key ? "" : "secondary"}" data-hsub="${escapeHtml(tab.key)}">${escapeHtml(tab.label)}</button>`
-              )
-              .join("")}
-          </div>
+          <h2>${escapeHtml(availableTabs.length === 1 ? activeSubTab.label : "Rezerwacje pokoi i pokoje")}</h2>
+          ${
+            availableTabs.length > 1
+              ? `<div class="hotel-nav">
+                  ${availableTabs
+                    .map(
+                      (tab) =>
+                        `<button type="button" class="button ${hotelSubTab === tab.key ? "" : "secondary"}" data-hsub="${escapeHtml(tab.key)}">${escapeHtml(tab.label)}</button>`
+                    )
+                    .join("")}
+                </div>`
+              : ""
+          }
           <div id="hotel-sub-content">${sub[hotelSubTab]}</div>
         </section>
       `;
@@ -397,21 +553,28 @@
           if (found) openRoomEditorModal(found);
         });
       });
+      document.querySelectorAll(".hotel-move-room").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          try {
+            await moveRoom(Number(btn.getAttribute("data-index")), Number(btn.getAttribute("data-direction")));
+            hotelSubTab = "rooms";
+            paint();
+          } catch (error) {
+            alert(error.message || "Nie udalo sie zmienic kolejnosci pokojow.");
+          }
+        });
+      });
       document.querySelector("#hotel-add-room")?.addEventListener("click", () => openRoomEditorModal(null));
       document.querySelectorAll(".hotel-delete-room").forEach((btn) => {
         btn.addEventListener("click", async () => {
           const id = btn.getAttribute("data-id");
           const name = btn.getAttribute("data-name") || id;
           if (!confirm(`Usunąć pokój „${name}” (${id})? Nie można tego cofnąć.`)) return;
-          const base = hotelApiBase();
           try {
-            const token = await firebase.auth().currentUser.getIdToken();
-            const res = await fetch(`${base}?op=admin-room-delete&id=${encodeURIComponent(id)}`, {
+            await hotelApi("admin-room-delete", {
               method: "DELETE",
-              headers: { Authorization: `Bearer ${token}` },
+              body: { id },
             });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.error || "Błąd usuwania.");
             await loadRooms();
             hotelSubTab = "rooms";
             paint();
@@ -526,8 +689,8 @@
                   <h3 id="hotel-room-editor-title">${isNew ? "Nowy pokój" : "Edycja pokoju"}</h3>
                   <p class="helper">${
                     isNew
-                      ? "Unikalny identyfikator dokumentu (np. room-03). Ten sam ID jest używany w rezerwacjach i blokadach."
-                      : `ID dokumentu: ${escapeHtml(r.id)} — nie zmienia się po utworzeniu.`
+                      ? "ID pokoju tworzy sie automatycznie z nazwy i jest uzywane w rezerwacjach oraz blokadach."
+                      : `ID pokoju: ${escapeHtml(r.id)}`
                   }</p>
                 </div>
                 <button type="button" class="button secondary" data-hotel-room-modal-close>Zamknij</button>
@@ -535,11 +698,11 @@
               <p class="status hotel-room-editor-msg" id="hotel-room-editor-msg" hidden></p>
               <div class="field-grid">
                 <label class="field-full">
-                  <span>ID pokoju (unikalny w systemie)</span>
-                  <input name="id" value="${escapeHtml(r.id)}" ${isNew ? "" : "readonly"} required pattern="[a-zA-Z0-9_-]+" placeholder="np. room-01" title="Litery, cyfry, myślnik, podkreślenie" autocomplete="off" />
+                  <span>ID pokoju</span>
+                  <input name="id" value="${escapeHtml(r.id)}" readonly required />
                 </label>
                 <label class="field-full">
-                  <span>Nazwa wyświetlana</span>
+                  <span>Nazwa pokoju</span>
                   <input name="name" value="${escapeHtml(r.name || "")}" required placeholder="np. Pokój dwuosobowy" />
                 </label>
                 <label class="field">
@@ -550,29 +713,23 @@
                   <span>Maks. gości</span>
                   <input name="maxGuests" type="number" min="1" step="1" value="${escapeHtml(String(r.maxGuests ?? 2))}" required />
                 </label>
-                <label class="field">
-                  <span>Łóżka 1-os.</span>
-                  <input name="bedsSingle" type="number" min="0" step="1" value="${escapeHtml(String(r.bedsSingle ?? 0))}" />
-                </label>
-                <label class="field">
-                  <span>Łóżka 2-os.</span>
-                  <input name="bedsDouble" type="number" min="0" step="1" value="${escapeHtml(String(r.bedsDouble ?? 0))}" />
-                </label>
-                <label class="field">
-                  <span>Łóżka dziecięce</span>
-                  <input name="bedsChild" type="number" min="0" step="1" value="${escapeHtml(String(r.bedsChild ?? 0))}" />
-                </label>
-                <label class="field">
-                  <span>Kolejność (sortowanie)</span>
-                  <input name="sortOrder" type="number" step="1" value="${escapeHtml(String(r.sortOrder ?? 0))}" />
-                </label>
+                <div class="field-full hotel-room-editor-compact-grid">
+                  <label class="field">
+                    <span>Łóżka 1-os.</span>
+                    <input name="bedsSingle" type="number" min="0" step="1" value="${escapeHtml(String(r.bedsSingle ?? 0))}" />
+                  </label>
+                  <label class="field">
+                    <span>Łóżka 2-os.</span>
+                    <input name="bedsDouble" type="number" min="0" step="1" value="${escapeHtml(String(r.bedsDouble ?? 0))}" />
+                  </label>
+                  <label class="field">
+                    <span>Łóżka dziecięce</span>
+                    <input name="bedsChild" type="number" min="0" step="1" value="${escapeHtml(String(r.bedsChild ?? 0))}" />
+                  </label>
+                </div>
                 <label class="field-full">
                   <span>Opis (strona / rezerwacja)</span>
                   <textarea name="description" rows="4" placeholder="Krótki opis pokoju">${escapeHtml(r.description || "")}</textarea>
-                </label>
-                <label class="field-full">
-                  <span>Adresy zdjęć (w osobnych liniach lub po przecinku)</span>
-                  <textarea name="imageUrls" rows="3" placeholder="https://...">${escapeHtml(formatImageUrlsForInput(r.imageUrls))}</textarea>
                 </label>
                 <label class="field-full hotel-room-editor-check">
                   <input name="active" type="checkbox" ${r.active !== false ? "checked" : ""} />
@@ -592,6 +749,8 @@
       document.body.classList.add("admin-modal-open");
 
       const overlay = host.querySelector("[data-hotel-room-modal-overlay]");
+      const idInput = host.querySelector('input[name="id"]');
+      const nameInput = host.querySelector('input[name="name"]');
       const showMsg = (text, isError) => {
         const el = host.querySelector("#hotel-room-editor-msg");
         if (!el) return;
@@ -615,13 +774,20 @@
       };
       document.addEventListener("keydown", hotelRoomModalKeydownHandler);
 
+      const syncIdFromName = () => {
+        if (!isNew || !idInput || !nameInput) return;
+        idInput.value = slugifyRoomId(nameInput.value);
+      };
+      syncIdFromName();
+      nameInput?.addEventListener("input", syncIdFromName);
+
       host.querySelector("#hotel-room-editor-form")?.addEventListener("submit", async (ev) => {
         ev.preventDefault();
         showMsg("", false);
         const fd = new FormData(ev.target);
         const id = String(fd.get("id") || "").trim();
         if (!id) {
-          showMsg("Podaj ID pokoju.", true);
+          showMsg("Podaj nazwe pokoju, aby utworzyc ID.", true);
           return;
         }
         if (isNew && roomsData.some((x) => x.id === id)) {
@@ -633,8 +799,6 @@
           showMsg("Niepoprawna cena.", true);
           return;
         }
-        const sortOrderRaw = Number(fd.get("sortOrder"));
-        const sortOrder = Number.isFinite(sortOrderRaw) ? sortOrderRaw : 0;
         try {
           await hotelApi("admin-room-upsert", {
             method: "PUT",
@@ -647,9 +811,9 @@
               bedsDouble: toInt(fd.get("bedsDouble")),
               bedsChild: toInt(fd.get("bedsChild")),
               description: String(fd.get("description") || "").trim(),
-              imageUrls: parseImageUrlsInput(fd.get("imageUrls")),
+              imageUrls: Array.isArray(r.imageUrls) ? r.imageUrls : [],
               active: fd.get("active") === "on",
-              sortOrder,
+              sortOrder: Number.isFinite(Number(r.sortOrder)) ? Number(r.sortOrder) : roomsData.length,
             },
           });
           closeHotelRoomModal();

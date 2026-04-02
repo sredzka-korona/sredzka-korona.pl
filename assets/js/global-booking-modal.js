@@ -2,6 +2,7 @@
   const config = window.SREDZKA_CONFIG || {};
   const SESSION_MS = 30 * 60 * 1000;
   const EMAIL_CONFIRM_MS = 2 * 60 * 60 * 1000;
+  const DRAFT_STORAGE_KEY = "sredzka-korona:global-booking-draft:v1";
   const SERVICE_KEYS = ["hotel", "restaurant", "events"];
 
   const SERVICE_META = {
@@ -49,6 +50,8 @@
     countdownUntil: 0,
     countdownTimer: null,
     pendingEmailSent: false,
+    termsAccepted: false,
+    requiresEmailConfirmation: true,
     personal: {
       firstName: "",
       lastName: "",
@@ -158,8 +161,34 @@
     return Math.round(total * 100) / 100;
   }
 
+  function hotelBedSummary(room) {
+    const single = Math.max(0, toInt(room?.bedsSingle, 0));
+    const dbl = Math.max(0, toInt(room?.bedsDouble, 0));
+    const child = Math.max(0, toInt(room?.bedsChild, 0));
+    const parts = [];
+    if (single > 0) parts.push(`${single}x jednoosobowe`);
+    if (dbl > 0) parts.push(`${dbl}x dwuosobowe`);
+    if (child > 0) parts.push(`${child}x dziecięce`);
+    return parts.length ? parts.join(" ") : "Układ łóżek ustalany indywidualnie";
+  }
+
   function fullName() {
     return [state.personal.firstName, state.personal.lastName].map((x) => String(x || "").trim()).filter(Boolean).join(" ");
+  }
+
+  function normalizePhonePrefix(value) {
+    const cleaned = String(value || "").replace(/[^\d+]/g, "");
+    if (!cleaned) return "+48";
+    if (cleaned.startsWith("+")) return `+${cleaned.slice(1).replace(/[^\d]/g, "").slice(0, 4)}`;
+    return `+${cleaned.replace(/[^\d]/g, "").slice(0, 4)}`;
+  }
+
+  function phoneNationalDigits(value) {
+    return String(value || "").replace(/[^\d]/g, "");
+  }
+
+  function antiBotVerified() {
+    return config.turnstileSiteKey ? Boolean(state.turnstileToken) : Boolean(state.humanCheck);
   }
 
   function getFlow() {
@@ -261,7 +290,6 @@
       <div class="gb-shell" role="dialog" aria-modal="true" aria-labelledby="gb-title">
         <div class="gb-header">
           <div>
-            <p class="gb-kicker">System Rezerwacji</p>
             <h2 class="gb-title" id="gb-title">System Rezerwacji</h2>
           </div>
           <button type="button" class="gb-close" id="gb-close" aria-label="Zamknij">×</button>
@@ -271,11 +299,6 @@
       </div>
     `;
     document.body.appendChild(root);
-    root.addEventListener("click", (event) => {
-      if (event.target === root) {
-        closeModal();
-      }
-    });
     root.querySelector("#gb-close")?.addEventListener("click", closeModal);
   }
 
@@ -298,6 +321,8 @@
     state.humanCheck = false;
     state.countdownUntil = 0;
     state.pendingEmailSent = false;
+    state.termsAccepted = false;
+    state.requiresEmailConfirmation = true;
 
     state.hotel = {
       dateFrom: "",
@@ -331,6 +356,150 @@
       customerNote: "",
       exclusive: false,
     };
+  }
+
+  function draftStorage() {
+    try {
+      return window.localStorage;
+    } catch {
+      return null;
+    }
+  }
+
+  function persistDraftState() {
+    const storage = draftStorage();
+    if (!storage) return;
+    const snapshot = {
+      version: 1,
+      savedAt: Date.now(),
+      step: state.step,
+      selectedService: state.selectedService,
+      sessionStartedAt: Number(state.sessionStartedAt || 0),
+      countdownUntil: Number(state.countdownUntil || 0),
+      pendingEmailSent: Boolean(state.pendingEmailSent),
+      termsAccepted: Boolean(state.termsAccepted),
+      requiresEmailConfirmation: state.requiresEmailConfirmation !== false,
+      personal: state.personal,
+      hotel: state.hotel,
+      restaurant: state.restaurant,
+      events: state.events,
+      humanCheck: Boolean(state.humanCheck),
+    };
+    try {
+      storage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
+    } catch {
+      /* ignore quota/storage errors */
+    }
+  }
+
+  function clearDraftState() {
+    const storage = draftStorage();
+    if (!storage) return;
+    try {
+      storage.removeItem(DRAFT_STORAGE_KEY);
+    } catch {
+      /* ignore quota/storage errors */
+    }
+  }
+
+  function restoreDraftState() {
+    const storage = draftStorage();
+    if (!storage) return false;
+    try {
+      const raw = storage.getItem(DRAFT_STORAGE_KEY);
+      if (!raw) return false;
+      const draft = JSON.parse(raw);
+      if (!draft || Number(draft.version) !== 1) return false;
+
+      state.step = cleanStep(draft.step);
+      state.selectedService = SERVICE_KEYS.includes(draft.selectedService) ? draft.selectedService : "";
+      state.sessionStartedAt = Number(draft.sessionStartedAt || 0);
+      state.countdownUntil = Number(draft.countdownUntil || 0);
+      state.pendingEmailSent = Boolean(draft.pendingEmailSent);
+      state.termsAccepted = Boolean(draft.termsAccepted);
+      state.requiresEmailConfirmation = draft.requiresEmailConfirmation !== false;
+      state.humanCheck = Boolean(draft.humanCheck);
+      state.turnstileToken = "";
+      state.turnstileWidgetId = null;
+
+      state.personal = {
+        firstName: cleanString(draft.personal?.firstName, 60),
+        lastName: cleanString(draft.personal?.lastName, 60),
+        email: cleanString(draft.personal?.email, 180),
+        phonePrefix: normalizePhonePrefix(draft.personal?.phonePrefix || "+48"),
+        phoneNational: cleanString(draft.personal?.phoneNational, 24),
+        hpCompanyWebsite: cleanString(draft.personal?.hpCompanyWebsite, 200),
+      };
+
+      state.hotel = {
+        dateFrom: cleanString(draft.hotel?.dateFrom, 10),
+        dateTo: cleanString(draft.hotel?.dateTo, 10),
+        availability: draft.hotel?.availability && typeof draft.hotel.availability === "object" ? draft.hotel.availability : null,
+        selectedRoomIds: Array.isArray(draft.hotel?.selectedRoomIds)
+          ? draft.hotel.selectedRoomIds.map((id) => cleanString(id, 80)).filter(Boolean)
+          : [],
+      };
+
+      state.restaurant = {
+        loading: false,
+        publicSettings: draft.restaurant?.publicSettings && typeof draft.restaurant.publicSettings === "object" ? draft.restaurant.publicSettings : null,
+        reservationDate: cleanString(draft.restaurant?.reservationDate, 10) || todayYmdLocal(),
+        startTime: cleanString(draft.restaurant?.startTime, 5),
+        durationHours: Number(draft.restaurant?.durationHours || 2),
+        tablesCount: clamp(toInt(draft.restaurant?.tablesCount, 1), 1, 30),
+        guestsCount: clamp(toInt(draft.restaurant?.guestsCount, 2), 1, 300),
+        joinTables: Boolean(draft.restaurant?.joinTables),
+        customerNote: cleanString(draft.restaurant?.customerNote, 2000),
+      };
+
+      state.events = {
+        loading: false,
+        halls: Array.isArray(draft.events?.halls) ? draft.events.halls : [],
+        reservationDate: cleanString(draft.events?.reservationDate, 10) || todayYmdLocal(),
+        startTime: cleanString(draft.events?.startTime, 5) || "12:00",
+        durationHours: Number(draft.events?.durationHours || 4),
+        guestsCount: clamp(toInt(draft.events?.guestsCount, 60), 1, 120),
+        hallAvailability: draft.events?.hallAvailability && typeof draft.events.hallAvailability === "object" ? draft.events.hallAvailability : {},
+        selectedHallId: cleanString(draft.events?.selectedHallId, 80),
+        eventType: cleanString(draft.events?.eventType, 500),
+        customerNote: cleanString(draft.events?.customerNote, 2000),
+        exclusive: Boolean(draft.events?.exclusive),
+      };
+
+      if (state.step !== "service" && !state.selectedService) {
+        state.step = "service";
+      }
+      if (state.selectedService) {
+        const flow = getFlow();
+        if (!flow.includes(state.step)) {
+          state.step = flow[0];
+        }
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function cleanStep(step) {
+    const allowed = new Set([
+      "service",
+      "hotelDates",
+      "hotelRooms",
+      "restaurantDateTime",
+      "restaurantDetails",
+      "eventsDateTime",
+      "eventsHall",
+      "eventsDetails",
+      "personal",
+      "summary",
+      "success",
+    ]);
+    return allowed.has(String(step || "")) ? String(step) : "service";
+  }
+
+  function cleanString(value, max = 2000) {
+    return String(value || "").trim().slice(0, max);
   }
 
   async function loadBookingFlags() {
@@ -367,7 +536,7 @@
       .map((_, index) => {
         const active = current === index;
         const done = current > index;
-        return `<span class="gb-step-dot ${active ? "is-active" : ""} ${done ? "is-done" : ""}">${index + 2}</span>`;
+        return `<span class="gb-step-dot ${active ? "is-active" : ""} ${done ? "is-done" : ""}">${index + 1}</span>`;
       })
       .join("");
   }
@@ -565,7 +734,7 @@
 
   function currentStepTitle() {
     const map = {
-      service: "Wybierz rodzaj rezerwacji",
+      service: "System Rezerwacji",
       hotelDates: "Hotel - termin pobytu",
       hotelRooms: "Hotel - pokoje",
       restaurantDateTime: "Restauracja - termin",
@@ -583,8 +752,6 @@
   function renderServiceStep() {
     return `
       <section>
-        <h3>Pierwszy krok</h3>
-        <p class="gb-hint">Wybierz modul rezerwacji. Wylaczenie w panelu admina automatycznie wyszarza kafelek.</p>
         <div class="gb-service-tiles">
           ${SERVICE_KEYS.map((serviceKey) => {
             const enabled = state.bookingFlags[serviceKey] !== false;
@@ -611,8 +778,6 @@
   function renderHotelDatesStep() {
     return `
       <section>
-        <h3>Hotel - zakres dat</h3>
-        <p class="gb-hint">Podaj date przyjazdu i wyjazdu. Wyjazd musi byc po przyjezdzie (minimum 1 noc).</p>
         <div class="gb-grid-2">
           <label class="gb-field">
             <span>Rezerwacja od</span>
@@ -623,7 +788,8 @@
             <input type="date" id="gb-hotel-date-to" min="${escapeHtml(todayYmdLocal())}" value="${escapeHtml(state.hotel.dateTo)}" required />
           </label>
         </div>
-        <div class="gb-actions gb-actions--end">
+        <div class="gb-actions">
+          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wroc</button>
           <button type="button" class="gb-btn gb-btn-primary" id="gb-next">Dalej</button>
         </div>
         <p class="gb-error" id="gb-error">${escapeHtml(state.error)}</p>
@@ -638,8 +804,6 @@
 
     return `
       <section>
-        <h3>Hotel - pokoje (koszyk)</h3>
-        <p class="gb-hint">Pokazujemy tylko pokoje, ktore sa wolne w calym wskazanym terminie (takze bez kolizji z rezerwacjami oczekujacymi i blokadami).</p>
         <div class="gb-room-list">
           ${
             rooms.length
@@ -648,17 +812,30 @@
                     const isSelected = selectedSet.has(room.id);
                     const unit = Number(room.pricePerNight || 0);
                     const subtotal = (unit * nights).toFixed(2);
+                    const guests = Math.max(1, toInt(room.maxGuests, 1));
                     return `
                       <article class="gb-room-card">
-                        <div class="gb-room-head">
-                          <strong>${escapeHtml(room.name)}</strong>
-                          <span class="gb-room-price">${escapeHtml(unit.toFixed(2))} PLN / noc</span>
+                        <strong class="gb-room-name">${escapeHtml(room.name)}</strong>
+                        <p class="gb-room-line">
+                          <span class="gb-room-line-left">
+                            <span class="gb-room-icon" aria-hidden="true">👤</span>
+                            ${escapeHtml(String(guests))} osobowy
+                          </span>
+                        </p>
+                        <div class="gb-room-line gb-room-line--beds">
+                          <span class="gb-room-line-left">
+                            <span class="gb-room-icon" aria-hidden="true">🛏️</span>
+                            ${escapeHtml(hotelBedSummary(room))}
+                          </span>
+                          <button type="button" class="gb-pill-btn ${isSelected ? "is-active" : ""}" data-toggle-room="${escapeHtml(room.id)}">
+                            ${isSelected ? "W koszyku" : "Dodaj do koszyka"}
+                          </button>
                         </div>
-                        <p class="gb-room-meta">Do ${escapeHtml(String(room.maxGuests || 0))} os. ${room.description ? `· ${escapeHtml(room.description)}` : ""}</p>
-                        <p class="gb-room-meta">Koszt dla terminu: ${escapeHtml(subtotal)} PLN</p>
-                        <button type="button" class="gb-pill-btn ${isSelected ? "is-active" : ""}" data-toggle-room="${escapeHtml(room.id)}">
-                          ${isSelected ? "W koszyku" : "Dodaj do koszyka"}
-                        </button>
+                        <div class="gb-room-price-wrap">
+                          <span class="gb-room-price">${escapeHtml(unit.toFixed(2))} PLN / noc</span>
+                          <small class="gb-room-price-note">${escapeHtml(subtotal)} PLN / za ${escapeHtml(String(nights))} nocy</small>
+                        </div>
+                        ${room.description ? `<p class="gb-room-meta">${escapeHtml(room.description)}</p>` : ""}
                       </article>
                     `;
                   })
@@ -678,8 +855,10 @@
                   .join("")}</ul>`
               : " <span>brak</span>"
           }
-          <p><strong>Liczba nocy:</strong> ${escapeHtml(String(nights))}</p>
-          <p><strong>Lacznie:</strong> ${escapeHtml(hotelTotalPrice().toFixed(2))} PLN</p>
+          <div class="gb-cart-total-row">
+            <span><strong>Liczba nocy:</strong> ${escapeHtml(String(nights))}</span>
+            <strong class="gb-cart-total">Razem ${escapeHtml(hotelTotalPrice().toFixed(2))} PLN</strong>
+          </div>
         </div>
         <div class="gb-actions">
           <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wroc</button>
@@ -919,7 +1098,7 @@
 
           <div class="gb-grid-2">
             <label class="gb-field">
-              <span>Imie</span>
+              <span>Imię</span>
               <input type="text" name="firstName" maxlength="60" value="${escapeHtml(state.personal.firstName)}" required />
             </label>
             <label class="gb-field">
@@ -933,14 +1112,14 @@
               <span>Adres e-mail</span>
               <input type="email" name="email" maxlength="180" value="${escapeHtml(state.personal.email)}" required />
             </label>
-            <div class="gb-grid-2" style="gap:0.5rem;">
+            <div class="gb-phone-row">
               <label class="gb-field">
                 <span>Prefiks</span>
-                <input type="text" name="phonePrefix" maxlength="5" value="${escapeHtml(state.personal.phonePrefix || "+48")}" pattern="\\+[0-9]{1,4}" required />
+                <input type="text" class="gb-phone-prefix" name="phonePrefix" maxlength="5" value="${escapeHtml(normalizePhonePrefix(state.personal.phonePrefix || "+48"))}" pattern="\\+[0-9]{1,4}" inputmode="tel" required />
               </label>
               <label class="gb-field">
                 <span>Numer telefonu</span>
-                <input type="text" name="phoneNational" maxlength="15" value="${escapeHtml(state.personal.phoneNational)}" pattern="[0-9]{6,15}" required />
+                <input type="text" name="phoneNational" maxlength="24" value="${escapeHtml(state.personal.phoneNational)}" pattern="[0-9][0-9\\s-]{5,23}" inputmode="tel" required />
               </label>
             </div>
           </div>
@@ -962,20 +1141,20 @@
       const nights = nightsCount();
       const roomsById = hotelRoomMap();
       return `
-        <div class="gb-summary-box">
-          <h3 style="margin-bottom:0.3rem;">Podsumowanie - Hotel</h3>
-          <ul>
+        <div class="gb-summary-box gb-summary-box--hotel">
+          <h3 style="margin-bottom:0.3rem;">Podsumowanie</h3>
+          <ul class="gb-summary-list">
             <li><strong>Termin:</strong> ${escapeHtml(state.hotel.dateFrom)} - ${escapeHtml(state.hotel.dateTo)} (${escapeHtml(String(nights))} nocy)</li>
             ${state.hotel.selectedRoomIds
               .map((id) => {
                 const room = roomsById.get(id);
                 const unit = Number(room?.pricePerNight || 0);
                 const lineTotal = (unit * nights).toFixed(2);
-                return `<li><strong>${escapeHtml(room?.name || id)}</strong> · ${escapeHtml(unit.toFixed(2))} PLN / noc · ${escapeHtml(lineTotal)} PLN</li>`;
+                return `<li><strong>${escapeHtml(room?.name || id)}</strong> — ${escapeHtml(unit.toFixed(2))} PLN / noc — ${escapeHtml(lineTotal)} PLN</li>`;
               })
               .join("")}
-            <li><strong>Koszt calosciowy:</strong> ${escapeHtml(hotelTotalPrice().toFixed(2))} PLN</li>
           </ul>
+          <p class="gb-summary-total">Razem ${escapeHtml(hotelTotalPrice().toFixed(2))} PLN</p>
         </div>
       `;
     }
@@ -984,7 +1163,7 @@
       return `
         <div class="gb-summary-box">
           <h3 style="margin-bottom:0.3rem;">Podsumowanie - Restauracja</h3>
-          <ul>
+          <ul class="gb-summary-list">
             <li><strong>Data:</strong> ${escapeHtml(state.restaurant.reservationDate)}</li>
             <li><strong>Godzina:</strong> ${escapeHtml(state.restaurant.startTime)}</li>
             <li><strong>Czas rezerwacji:</strong> ${escapeHtml(String(state.restaurant.durationHours))} h</li>
@@ -1001,7 +1180,7 @@
     return `
       <div class="gb-summary-box">
         <h3 style="margin-bottom:0.3rem;">Podsumowanie - Przyjecia</h3>
-        <ul>
+        <ul class="gb-summary-list">
           <li><strong>Data:</strong> ${escapeHtml(state.events.reservationDate)}</li>
           <li><strong>Godzina:</strong> ${escapeHtml(state.events.startTime)}</li>
           <li><strong>Czas rezerwacji:</strong> ${escapeHtml(String(state.events.durationHours))} h</li>
@@ -1018,10 +1197,10 @@
 
   function renderAntiBotSection() {
     if (config.turnstileSiteKey) {
-      return `<div id="gb-turnstile-slot"></div>`;
+      return `<div class="gb-antibot-wrap"><div id="gb-turnstile-slot"></div></div>`;
     }
     return `
-      <label class="gb-check">
+      <label class="gb-check gb-antibot-wrap">
         <input type="checkbox" id="gb-human-check" ${state.humanCheck ? "checked" : ""} />
         <span>Potwierdzam, ze nie jestem botem.</span>
       </label>
@@ -1029,34 +1208,39 @@
   }
 
   function renderSummaryStep() {
-    const submitLabel = state.selectedService === "events" ? "Popros o oferte" : "Zaloz zamowienie";
+    const submitLabel = state.selectedService === "events" ? "Poproś o ofertę" : "Rezerwuj";
+    const showSubmitButton = antiBotVerified();
 
     return `
       <section>
-        <h3>Podsumowanie i finalizacja</h3>
-        <p class="gb-hint">Sprawdz dane, zaakceptuj regulamin i przejdz weryfikacje anty-bot, aby odblokowac przycisk koncowy.</p>
+        <h3>Podsumowanie</h3>
 
-        <div class="gb-summary-box">
-          <h3 style="margin-bottom:0.3rem;">Dane zamawiajacego</h3>
-          <ul>
-            <li><strong>Imie i nazwisko:</strong> ${escapeHtml(fullName())}</li>
-            <li><strong>E-mail:</strong> ${escapeHtml(state.personal.email)}</li>
-            <li><strong>Telefon:</strong> ${escapeHtml(`${state.personal.phonePrefix} ${state.personal.phoneNational}`.trim())}</li>
-          </ul>
+        <div class="gb-summary-grid">
+          <div class="gb-summary-box">
+            <h3 style="margin-bottom:0.3rem;">Dane zamawiającego</h3>
+            <ul class="gb-summary-list">
+              <li><strong>Imię i nazwisko:</strong> ${escapeHtml(fullName())}</li>
+              <li><strong>E-mail:</strong> ${escapeHtml(state.personal.email)}</li>
+              <li><strong>Telefon:</strong> ${escapeHtml(`${state.personal.phonePrefix} ${state.personal.phoneNational}`.trim())}</li>
+            </ul>
+          </div>
+          ${renderSummaryBox()}
         </div>
 
-        ${renderSummaryBox()}
-
         <label class="gb-check">
-          <input type="checkbox" id="gb-terms" />
-          <span>Akceptuje <a class="gb-link" href="${escapeHtml(SERVICE_META[state.selectedService]?.confirmPath || "#")}" target="_blank" rel="noopener">regulamin rezerwacji</a>.</span>
+          <input type="checkbox" id="gb-terms" ${state.termsAccepted ? "checked" : ""} />
+          <span>Akceptuję <a class="gb-link" href="${escapeHtml(SERVICE_META[state.selectedService]?.confirmPath || "#")}" target="_blank" rel="noopener">regulamin rezerwacji</a>, oraz fakt, że moja rezerwacja zostanie rozpatrzona w ciągu 3 dni.</span>
         </label>
-
-        ${renderAntiBotSection()}
 
         <div class="gb-actions">
           <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wroc</button>
-          <button type="button" class="gb-btn gb-btn-primary" id="gb-submit" disabled>${escapeHtml(submitLabel)}</button>
+          <div class="gb-submit-slot">
+            ${
+              showSubmitButton
+                ? `<button type="button" class="gb-btn gb-btn-primary" id="gb-submit" ${state.termsAccepted && !state.submitting ? "" : "disabled"}>${escapeHtml(submitLabel)}</button>`
+                : renderAntiBotSection()
+            }
+          </div>
         </div>
         <p class="gb-error" id="gb-error">${escapeHtml(state.error)}</p>
       </section>
@@ -1067,15 +1251,20 @@
     const left = state.countdownUntil ? Math.max(0, state.countdownUntil - Date.now()) : EMAIL_CONFIRM_MS;
     return `
       <section>
-        <h3>Zgloszenie zapisane</h3>
-        <p class="gb-hint">Na podany adres e-mail wyslalismy link potwierdzajacy. Potwierdz go, aby finalnie zapisac rezerwacje.</p>
-        <p class="gb-countdown"><strong>Czas na klikniecie linku:</strong> <span id="gb-countdown-value">${escapeHtml(formatCountdown(left))}</span></p>
-        <p class="gb-hint" style="margin-top:0.75rem;">
-          Po potwierdzeniu linku rezerwacja przejdzie na status <strong>oczekujace</strong>.
-          Decyzje o przyjeciu lub odrzuceniu otrzymasz mailowo w ciagu <strong>3 dni</strong>.
-          Rezerwacja moze nie zostac przyjeta.
-        </p>
-        <p class="gb-inline-note">System wysyla tez e-mail do obslugi obiektu, gdy status zmieni sie na oczekujace po Twoim potwierdzeniu linku.</p>
+        <h3>Rezerwacja została zapisana</h3>
+        ${
+          state.requiresEmailConfirmation
+            ? `<div class="gb-success-card">
+                <p class="gb-hint">Wysłaliśmy link potwierdzający na Twój adres e-mail. Kliknij go, aby aktywować zgłoszenie.</p>
+                <p class="gb-countdown"><strong>Czas na potwierdzenie:</strong> <span id="gb-countdown-value">${escapeHtml(formatCountdown(left))}</span></p>
+                <p class="gb-hint" style="margin-top:0.75rem;">Po potwierdzeniu maila rezerwacja przejdzie na status <strong>oczekująca</strong>. Decyzję o przyjęciu lub odrzuceniu wyślemy e-mailowo w ciągu <strong>3 dni</strong>. Rezerwacja może nie zostać przyjęta.</p>
+                <p class="gb-inline-note">Obsługa otrzymuje osobne powiadomienie e-mail, gdy potwierdzisz rezerwację linkiem.</p>
+              </div>`
+            : `<div class="gb-success-card">
+                <p class="gb-hint">Zgłoszenie trafiło już do kolejki oczekującej. Mail potwierdzający nie był wymagany dla tego zgłoszenia.</p>
+                <p class="gb-hint" style="margin-top:0.5rem;">Decyzję o przyjęciu lub odrzuceniu otrzymasz e-mailowo w ciągu <strong>3 dni</strong>. Rezerwacja może nie zostać przyjęta.</p>
+              </div>`
+        }
 
         <div class="gb-actions gb-actions--end">
           <button type="button" class="gb-btn gb-btn-primary" id="gb-close-final">Zamknij</button>
@@ -1110,6 +1299,7 @@
       body.innerHTML = renderSessionExpired();
       renderProgress();
       bindCommonHandlers();
+      persistDraftState();
       return;
     }
 
@@ -1139,6 +1329,7 @@
 
     renderProgress();
     bindCommonHandlers();
+    bindLiveDraftHandlers();
 
     if (state.step === "summary") {
       mountAntiBotHandlers();
@@ -1147,6 +1338,8 @@
     if (state.step === "success") {
       startCountdownTicker();
     }
+
+    persistDraftState();
   }
 
   function setError(message) {
@@ -1157,7 +1350,81 @@
     }
   }
 
+  function syncCurrentStepFromDom() {
+    if (!state.isOpen) return;
+    if (state.step === "hotelDates") {
+      const fromInput = document.getElementById("gb-hotel-date-from");
+      const toInput = document.getElementById("gb-hotel-date-to");
+      state.hotel.dateFrom = String(fromInput?.value || state.hotel.dateFrom || "");
+      state.hotel.dateTo = String(toInput?.value || state.hotel.dateTo || "");
+      return;
+    }
+    if (state.step === "restaurantDateTime") {
+      state.restaurant.reservationDate = String(document.getElementById("gb-rest-date")?.value || state.restaurant.reservationDate || "");
+      state.restaurant.startTime = String(document.getElementById("gb-rest-time")?.value || state.restaurant.startTime || "");
+      state.restaurant.durationHours = Number(document.getElementById("gb-rest-duration")?.value || state.restaurant.durationHours || 2);
+      return;
+    }
+    if (state.step === "restaurantDetails") {
+      state.restaurant.tablesCount = clamp(toInt(document.getElementById("gb-rest-tables")?.value || state.restaurant.tablesCount || 1, 1), 1, 30);
+      state.restaurant.guestsCount = clamp(toInt(document.getElementById("gb-rest-guests")?.value || state.restaurant.guestsCount || 1, 1), 1, 300);
+      state.restaurant.joinTables = Boolean(document.getElementById("gb-rest-join")?.checked);
+      state.restaurant.customerNote = String(document.getElementById("gb-rest-note")?.value || state.restaurant.customerNote || "").trim();
+      return;
+    }
+    if (state.step === "eventsDateTime") {
+      state.events.reservationDate = String(document.getElementById("gb-events-date")?.value || state.events.reservationDate || "");
+      state.events.startTime = String(document.getElementById("gb-events-time")?.value || state.events.startTime || "");
+      state.events.durationHours = Number(document.getElementById("gb-events-duration")?.value || state.events.durationHours || 4);
+      state.events.guestsCount = clamp(toInt(document.getElementById("gb-events-guests-number")?.value || state.events.guestsCount || 60, 60), 1, 120);
+      return;
+    }
+    if (state.step === "eventsDetails") {
+      state.events.eventType = String(document.getElementById("gb-events-type")?.value || state.events.eventType || "").trim();
+      state.events.customerNote = String(document.getElementById("gb-events-note")?.value || state.events.customerNote || "").trim();
+      state.events.exclusive = Boolean(document.getElementById("gb-events-exclusive")?.checked);
+      return;
+    }
+    if (state.step === "personal") {
+      state.personal.firstName = String(document.querySelector('[name="firstName"]')?.value || state.personal.firstName || "").trim();
+      state.personal.lastName = String(document.querySelector('[name="lastName"]')?.value || state.personal.lastName || "").trim();
+      state.personal.email = String(document.querySelector('[name="email"]')?.value || state.personal.email || "").trim();
+      state.personal.phonePrefix = normalizePhonePrefix(document.querySelector('[name="phonePrefix"]')?.value || state.personal.phonePrefix || "+48");
+      state.personal.phoneNational = String(document.querySelector('[name="phoneNational"]')?.value || state.personal.phoneNational || "").trim();
+      state.personal.hpCompanyWebsite = String(document.querySelector('[name="hpCompanyWebsite"]')?.value || state.personal.hpCompanyWebsite || "").trim();
+      return;
+    }
+    if (state.step === "summary") {
+      const terms = document.getElementById("gb-terms");
+      if (terms) {
+        state.termsAccepted = Boolean(terms.checked);
+      }
+      if (!config.turnstileSiteKey) {
+        const human = document.getElementById("gb-human-check");
+        if (human) {
+          state.humanCheck = Boolean(human.checked);
+        }
+      }
+    }
+  }
+
+  function bindLiveDraftHandlers() {
+    const body = document.getElementById("gb-body");
+    if (!body) return;
+    body.querySelectorAll("input, select, textarea").forEach((field) => {
+      field.addEventListener("input", () => {
+        syncCurrentStepFromDom();
+        persistDraftState();
+      });
+      field.addEventListener("change", () => {
+        syncCurrentStepFromDom();
+        persistDraftState();
+      });
+    });
+  }
+
   function goBack() {
+    syncCurrentStepFromDom();
     setError("");
     const flow = getFlow();
     const index = flow.indexOf(state.step);
@@ -1166,6 +1433,7 @@
       if (state.step !== "summary") {
         state.turnstileToken = "";
         state.humanCheck = false;
+        state.termsAccepted = false;
       }
       render();
     }
@@ -1234,7 +1502,8 @@
           state.hotel.dateFrom = from;
           state.hotel.dateTo = to;
           state.hotel.availability = availability;
-          state.hotel.selectedRoomIds = [];
+          const availableRoomIds = new Set((availability?.rooms || []).map((room) => room.id));
+          state.hotel.selectedRoomIds = state.hotel.selectedRoomIds.filter((roomId) => availableRoomIds.has(roomId));
 
           if (!availability?.rooms?.length) {
             setError("Brak wolnych pokoi w podanym terminie.");
@@ -1514,17 +1783,23 @@
         state.personal.firstName = String(formData.get("firstName") || "").trim();
         state.personal.lastName = String(formData.get("lastName") || "").trim();
         state.personal.email = String(formData.get("email") || "").trim();
-        state.personal.phonePrefix = String(formData.get("phonePrefix") || "+48").trim();
+        state.personal.phonePrefix = normalizePhonePrefix(formData.get("phonePrefix") || "+48");
         state.personal.phoneNational = String(formData.get("phoneNational") || "").trim();
         state.personal.hpCompanyWebsite = String(formData.get("hpCompanyWebsite") || "").trim();
+        const phoneDigits = phoneNationalDigits(state.personal.phoneNational);
 
         if (!state.personal.firstName || !state.personal.lastName || !state.personal.email || !state.personal.phoneNational) {
           setError("Wypelnij wszystkie wymagane pola danych osobowych.");
           return;
         }
+        if (phoneDigits.length < 6 || phoneDigits.length > 15) {
+          setError("Podaj poprawny numer telefonu (6-15 cyfr, spacje i myslniki sa dozwolone).");
+          return;
+        }
 
         state.turnstileToken = "";
         state.humanCheck = false;
+        state.termsAccepted = false;
         setError("");
         state.step = "summary";
         render();
@@ -1547,17 +1822,12 @@
       await loadBookingFlags();
       render();
     });
+
   }
 
   function summaryButtonEnabled() {
-    const terms = document.getElementById("gb-terms");
-    const termsChecked = Boolean(terms?.checked);
-    if (!termsChecked) return false;
-
-    if (config.turnstileSiteKey) {
-      return Boolean(state.turnstileToken);
-    }
-    return Boolean(state.humanCheck);
+    if (!state.termsAccepted) return false;
+    return antiBotVerified();
   }
 
   function updateSummarySubmitState() {
@@ -1600,14 +1870,24 @@
     setError(state.error);
 
     const terms = document.getElementById("gb-terms");
-    terms?.addEventListener("change", updateSummarySubmitState);
+    terms?.addEventListener("change", () => {
+      state.termsAccepted = Boolean(terms.checked);
+      persistDraftState();
+      updateSummarySubmitState();
+    });
 
     if (!config.turnstileSiteKey) {
       const human = document.getElementById("gb-human-check");
       human?.addEventListener("change", () => {
         state.humanCheck = Boolean(human.checked);
-        updateSummarySubmitState();
+        persistDraftState();
+        render();
       });
+      updateSummarySubmitState();
+      return;
+    }
+
+    if (state.turnstileToken) {
       updateSummarySubmitState();
       return;
     }
@@ -1633,15 +1913,18 @@
         sitekey: config.turnstileSiteKey,
         callback: (token) => {
           state.turnstileToken = String(token || "");
-          updateSummarySubmitState();
+          persistDraftState();
+          render();
         },
         "expired-callback": () => {
           state.turnstileToken = "";
+          persistDraftState();
           updateSummarySubmitState();
         },
         "error-callback": () => {
           state.turnstileToken = "";
           setError("Weryfikacja anty-bot nie powiodla sie. Sprobuj ponownie.");
+          persistDraftState();
           updateSummarySubmitState();
         },
       });
@@ -1714,18 +1997,17 @@
   async function submitCurrentReservation() {
     if (state.submitting) return;
 
-    const terms = document.getElementById("gb-terms");
-    if (!terms?.checked) {
+    if (!state.termsAccepted) {
       setError("Zaakceptuj regulamin, aby kontynuowac.");
       return;
     }
 
-    if (config.turnstileSiteKey && !state.turnstileToken) {
+    if (config.turnstileSiteKey && !antiBotVerified()) {
       setError("Potwierdz weryfikacje anty-bot.");
       return;
     }
 
-    if (!config.turnstileSiteKey && !state.humanCheck) {
+    if (!config.turnstileSiteKey && !antiBotVerified()) {
       setError("Potwierdz, ze nie jestes botem.");
       return;
     }
@@ -1736,13 +2018,14 @@
 
     try {
       const { service, payload } = buildPayload();
-      await api(service, "public-reservation-draft", {
+      const response = await api(service, "public-reservation-draft", {
         method: "POST",
         body: payload,
       });
 
       state.pendingEmailSent = true;
-      state.countdownUntil = Date.now() + EMAIL_CONFIRM_MS;
+      state.requiresEmailConfirmation = response?.requiresEmailConfirmation !== false;
+      state.countdownUntil = state.requiresEmailConfirmation ? Date.now() + EMAIL_CONFIRM_MS : 0;
       state.step = "success";
       state.submitting = false;
       render();
@@ -1767,7 +2050,7 @@
 
   function startCountdownTicker() {
     clearCountdown();
-    if (!state.countdownUntil) return;
+    if (!state.requiresEmailConfirmation || !state.countdownUntil) return;
 
     const target = document.getElementById("gb-countdown-value");
     if (!target) return;
@@ -1784,8 +2067,10 @@
   async function openModal() {
     ensureCss();
     ensureModalMarkup();
-
-    resetStateForOpen();
+    const restored = restoreDraftState();
+    if (!restored) {
+      resetStateForOpen();
+    }
     state.isOpen = true;
 
     const modal = document.getElementById("gb-modal");
@@ -1796,10 +2081,14 @@
     document.body.classList.add("gb-modal-open");
 
     await loadBookingFlags();
+    if (!state.selectedService && state.step !== "service") {
+      state.step = "service";
+    }
     render();
   }
 
   function closeModal() {
+    syncCurrentStepFromDom();
     clearCountdown();
     state.isOpen = false;
     state.turnstileToken = "";
@@ -1812,6 +2101,13 @@
     modal.classList.remove("gb-open");
     modal.setAttribute("aria-hidden", "true");
     document.body.classList.remove("gb-modal-open");
+
+    if (state.step === "success") {
+      clearDraftState();
+      resetStateForOpen();
+      return;
+    }
+    persistDraftState();
   }
 
   function bindOpeners() {

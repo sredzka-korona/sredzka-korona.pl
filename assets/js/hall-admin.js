@@ -329,18 +329,23 @@
       if (!availableTabs.some((tab) => tab.key === hallSubTab)) {
         hallSubTab = availableTabs[0].key;
       }
+      const activeSubTab = availableTabs.find((tab) => tab.key === hallSubTab) || availableTabs[0];
       container.innerHTML = `
         <section class="panel col-12">
           <p class="pill">Sale</p>
-          <h2>Rezerwacje sal</h2>
-          <div class="hotel-nav${availableTabs.length === 1 ? " is-single" : ""}">
-            ${availableTabs
-              .map(
-                (tab) =>
-                  `<button type="button" class="button ${hallSubTab === tab.key ? "" : "secondary"}" data-hsub="${escapeHtml(tab.key)}">${escapeHtml(tab.label)}</button>`
-              )
-              .join("")}
-          </div>
+          <h2>${escapeHtml(availableTabs.length === 1 ? activeSubTab.label : "Rezerwacje sal")}</h2>
+          ${
+            availableTabs.length > 1
+              ? `<div class="hotel-nav">
+                  ${availableTabs
+                    .map(
+                      (tab) =>
+                        `<button type="button" class="button ${hallSubTab === tab.key ? "" : "secondary"}" data-hsub="${escapeHtml(tab.key)}">${escapeHtml(tab.label)}</button>`
+                    )
+                    .join("")}
+                </div>`
+              : ""
+          }
           <div id="hall-sub-content">${sub[hallSubTab]}</div>
         </section>
       `;

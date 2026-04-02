@@ -1588,32 +1588,34 @@ function defaultTemplateMap(service) {
   if (service === "hotel") {
     return {
       confirm_email: {
-        subject: "{{hotelName}} — potwierdź rezerwację ({{reservationNumber}})",
+        subject: "{{hotelName}} | potwierdzenie adresu e-mail dla rezerwacji {{reservationNumber}}",
         bodyHtml:
-          '<p>Witaj {{fullName}},</p><p>Kliknij link, aby potwierdzić rezerwację:</p><p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p><p>Numer: {{reservationNumber}}<br>Termin: {{dateFrom}} — {{dateTo}}</p>',
+          '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie formularza rezerwacji w obiekcie <strong>{{hotelName}}</strong>.</p><p>Aby przekazac zgloszenie do dalszej obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz adres e-mail</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}</p><p>Jesli to nie Ty wysylales zgloszenie, zignoruj te wiadomosc.</p>',
       },
       pending_client: {
-        subject: "{{hotelName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
+        subject: "{{hotelName}} | rezerwacja {{reservationNumber}} oczekuje na akceptacje",
         bodyHtml:
-          "<p>Witaj {{fullName}},</p><p>Twoja rezerwacja ma status oczekujący.</p><p>Numer: {{reservationNumber}}</p>",
+          "<p>Dzien dobry {{fullName}},</p><p>Twoja rezerwacja o numerze <strong>{{reservationNumber}}</strong> zostala zapisana i oczekuje teraz na akceptacje recepcji.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}<br>Orientacyjna kwota: {{totalPrice}} PLN</p><p>Po decyzji recepcji wyslemy osobna wiadomosc.</p>",
       },
       pending_admin: {
-        subject: "[{{hotelName}}] Nowa rezerwacja oczekująca {{reservationNumber}}",
+        subject: "[{{hotelName}}] Rezerwacja do decyzji: {{reservationNumber}}",
         bodyHtml:
-          "<p>Nowa rezerwacja oczekuje na decyzję.</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{dateFrom}} — {{dateTo}}</p>",
+          "<p>W panelu pojawila sie nowa rezerwacja oczekujaca na akceptacje.</p><p>Numer: <strong>{{reservationNumber}}</strong><br>Klient: {{fullName}}<br>E-mail: {{email}}<br>Telefon: {{phone}}<br>Termin: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>Uwagi klienta: {{customerNote}}</p>",
       },
       confirmed_client: {
-        subject: "{{hotelName}} — rezerwacja potwierdzona ({{reservationNumber}})",
-        bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została potwierdzona.</p>",
+        subject: "{{hotelName}} | rezerwacja {{reservationNumber}} potwierdzona",
+        bodyHtml:
+          "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje o numerze <strong>{{reservationNumber}}</strong>.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Liczba noclegow: {{nights}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>W razie pytan mozesz odpowiedziec na te wiadomosc lub skontaktowac sie bezposrednio z recepcja.</p>",
       },
       cancelled_client: {
-        subject: "{{hotelName}} — rezerwacja anulowana ({{reservationNumber}})",
-        bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została anulowana.</p>",
+        subject: "{{hotelName}} | anulowanie rezerwacji {{reservationNumber}}",
+        bodyHtml:
+          "<p>Dzien dobry {{fullName}},</p><p>Informujemy, ze rezerwacja o numerze <strong>{{reservationNumber}}</strong> zostala anulowana.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}</p><p>Jesli potrzebujesz pomocy przy nowej rezerwacji, skontaktuj sie z recepcja.</p>",
       },
       changed_client: {
-        subject: "{{hotelName}} — zmiana w rezerwacji {{reservationNumber}}",
+        subject: "{{hotelName}} | zmiana rezerwacji {{reservationNumber}}",
         bodyHtml:
-          "<p>Witaj {{fullName}},</p><p>Wprowadziliśmy zmiany w rezerwacji <strong>{{reservationNumber}}</strong>.</p><p>Termin pobytu: {{dateFrom}} — {{dateTo}} ({{nights}} nocy).<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>{{customerNote}}</p><p>W razie pytań odpowiedz na tę wiadomość lub skontaktuj się z recepcją.</p>",
+          "<p>Dzien dobry {{fullName}},</p><p>Wprowadzilismy zmiany w rezerwacji o numerze <strong>{{reservationNumber}}</strong>.</p><p>Aktualny termin pobytu: {{dateFrom}} - {{dateTo}}<br>Liczba noclegow: {{nights}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>Uwagi do rezerwacji: {{customerNote}}</p><p>Jesli chcesz cos doprecyzowac, odpowiedz na te wiadomosc lub skontaktuj sie z recepcja.</p>",
       },
     };
   }
@@ -1790,7 +1792,7 @@ async function resolveTemplateForEvent(env, service, eventKey) {
 function listStatusWhere(status) {
   const s = cleanString(status, 40) || "active";
   if (s === "all") return { sql: "", binds: [] };
-  if (s === "active") return { sql: "WHERE status IN ('pending','confirmed')", binds: [] };
+  if (s === "active") return { sql: "WHERE status IN ('email_verification_pending','pending','confirmed')", binds: [] };
   return { sql: "WHERE status = ?", binds: [s] };
 }
 
@@ -1999,29 +2001,37 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
     if (verifyTurnstileToken && !(await verifyTurnstileToken(body.turnstileToken || ""))) {
       return { status: 400, data: { error: "Weryfikacja anty-spam nie powiodła się." } };
     }
-    if (!hasSmtpConfig(env)) {
-      return { status: 503, data: { error: "System mailowy jest chwilowo niedostępny. Spróbuj ponownie później." } };
-    }
     try {
+      const smtpAvailable = hasSmtpConfig(env);
       assertSession(body.sessionStartedAt);
       assertTerms(body.termsAccepted);
       if (!cleanString(body.fullName, 120) || !cleanString(body.email, 180).includes("@")) {
         return { status: 400, data: { error: "Wypełnij imię i nazwisko oraz poprawny e-mail." } };
       }
-      const out = await createHotelReservation(env, body, { withConfirmationToken: true, status: "email_verification_pending" });
+      const out = await createHotelReservation(env, body, {
+        withConfirmationToken: smtpAvailable,
+        status: smtpAvailable ? "email_verification_pending" : "pending",
+      });
       const row = await getHotelReservation(env, out.id);
-      try {
-        await sendTemplatedBookingMail(env, request, {
-          service: "hotel",
-          eventKey: "confirm_email",
-          row,
-          token: out.token,
-          to: row?.email,
-        });
-      } catch (error) {
-        await env.DB.prepare("DELETE FROM hotel_reservations WHERE id = ?").bind(out.id).run();
-        console.error("Hotel draft mail error:", error);
-        return { status: 502, data: { error: "Nie udało się wysłać wiadomości e-mail z potwierdzeniem." } };
+      let requiresEmailConfirmation = smtpAvailable;
+      if (smtpAvailable) {
+        try {
+          await sendTemplatedBookingMail(env, request, {
+            service: "hotel",
+            eventKey: "confirm_email",
+            row,
+            token: out.token,
+            to: row?.email,
+          });
+        } catch (error) {
+          requiresEmailConfirmation = false;
+          console.error("Hotel draft mail error:", error);
+          await env.DB.prepare(
+            "UPDATE hotel_reservations SET status='pending', confirmation_token_hash=NULL, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
+          )
+            .bind(nowMs() + HOTEL_PENDING_MS, nowMs(), out.id)
+            .run();
+        }
       }
       return {
         status: 200,
@@ -2029,7 +2039,10 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
           ok: true,
           reservationId: out.id,
           humanNumber: out.humanNumber,
-          message: "Wysłano wiadomość z linkiem potwierdzającym.",
+          requiresEmailConfirmation,
+          message: requiresEmailConfirmation
+            ? "Wysłano wiadomość z linkiem potwierdzającym."
+            : "Rezerwacja została zapisana jako oczekująca. Jeśli nie widzisz e-maila, sprawdź także folder SPAM.",
         },
       };
     } catch (error) {
@@ -2138,29 +2151,37 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
     if (verifyTurnstileToken && !(await verifyTurnstileToken(body.turnstileToken || ""))) {
       return { status: 400, data: { error: "Weryfikacja anty-spam nie powiodła się." } };
     }
-    if (!hasSmtpConfig(env)) {
-      return { status: 503, data: { error: "System mailowy jest chwilowo niedostępny. Spróbuj ponownie później." } };
-    }
     try {
+      const smtpAvailable = hasSmtpConfig(env);
       assertSession(body.sessionStartedAt);
       assertTerms(body.termsAccepted);
       if (!cleanString(body.fullName, 120) || !cleanString(body.email, 180).includes("@")) {
         return { status: 400, data: { error: "Wypełnij imię i nazwisko oraz poprawny e-mail." } };
       }
-      const out = await createRestaurantReservation(env, body, { withConfirmationToken: true, status: "email_verification_pending" });
+      const out = await createRestaurantReservation(env, body, {
+        withConfirmationToken: smtpAvailable,
+        status: smtpAvailable ? "email_verification_pending" : "pending",
+      });
       const row = await getRestaurantReservationRow(env, out.id);
-      try {
-        await sendTemplatedBookingMail(env, request, {
-          service: "restaurant",
-          eventKey: "confirm_email",
-          row,
-          token: out.token,
-          to: row?.email,
-        });
-      } catch (error) {
-        await env.DB.prepare("DELETE FROM restaurant_reservations WHERE id = ?").bind(out.id).run();
-        console.error("Restaurant draft mail error:", error);
-        return { status: 502, data: { error: "Nie udało się wysłać wiadomości e-mail z potwierdzeniem." } };
+      let requiresEmailConfirmation = smtpAvailable;
+      if (smtpAvailable) {
+        try {
+          await sendTemplatedBookingMail(env, request, {
+            service: "restaurant",
+            eventKey: "confirm_email",
+            row,
+            token: out.token,
+            to: row?.email,
+          });
+        } catch (error) {
+          requiresEmailConfirmation = false;
+          console.error("Restaurant draft mail error:", error);
+          await env.DB.prepare(
+            "UPDATE restaurant_reservations SET status='pending', confirmation_token_hash=NULL, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
+          )
+            .bind(nowMs() + RESTAURANT_PENDING_MS, nowMs(), out.id)
+            .run();
+        }
       }
       return {
         status: 200,
@@ -2168,7 +2189,10 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
           ok: true,
           reservationId: out.id,
           humanNumber: out.humanNumber,
-          message: "Wysłano wiadomość z linkiem potwierdzającym.",
+          requiresEmailConfirmation,
+          message: requiresEmailConfirmation
+            ? "Wysłano wiadomość z linkiem potwierdzającym."
+            : "Rezerwacja została zapisana jako oczekująca. Jeśli nie widzisz e-maila, sprawdź także folder SPAM.",
         },
       };
     } catch (error) {
@@ -2274,10 +2298,8 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
     if (verifyTurnstileToken && !(await verifyTurnstileToken(body.turnstileToken || ""))) {
       return { status: 400, data: { error: "Weryfikacja anty-spam nie powiodła się." } };
     }
-    if (!hasSmtpConfig(env)) {
-      return { status: 503, data: { error: "System mailowy jest chwilowo niedostępny. Spróbuj ponownie później." } };
-    }
     try {
+      const smtpAvailable = hasSmtpConfig(env);
       assertSession(body.sessionStartedAt);
       assertTerms(body.termsAccepted);
       if (!cleanString(body.fullName, 120) || !cleanString(body.email, 180).includes("@")) {
@@ -2286,20 +2308,30 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
       if (!cleanString(body.eventType, 500)) {
         return { status: 400, data: { error: "Podaj rodzaj imprezy." } };
       }
-      const out = await createHallReservation(env, body, { withConfirmationToken: true, status: "email_verification_pending" });
+      const out = await createHallReservation(env, body, {
+        withConfirmationToken: smtpAvailable,
+        status: smtpAvailable ? "email_verification_pending" : "pending",
+      });
       const row = await getHallReservationRow(env, out.id);
-      try {
-        await sendTemplatedBookingMail(env, request, {
-          service: "hall",
-          eventKey: "confirm_email",
-          row,
-          token: out.token,
-          to: row?.email,
-        });
-      } catch (error) {
-        await env.DB.prepare("DELETE FROM venue_reservations WHERE id = ?").bind(out.id).run();
-        console.error("Hall draft mail error:", error);
-        return { status: 502, data: { error: "Nie udało się wysłać wiadomości e-mail z potwierdzeniem." } };
+      let requiresEmailConfirmation = smtpAvailable;
+      if (smtpAvailable) {
+        try {
+          await sendTemplatedBookingMail(env, request, {
+            service: "hall",
+            eventKey: "confirm_email",
+            row,
+            token: out.token,
+            to: row?.email,
+          });
+        } catch (error) {
+          requiresEmailConfirmation = false;
+          console.error("Hall draft mail error:", error);
+          await env.DB.prepare(
+            "UPDATE venue_reservations SET status='pending', confirmation_token_hash=NULL, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
+          )
+            .bind(nowMs() + HALL_PENDING_MS, nowMs(), out.id)
+            .run();
+        }
       }
       return {
         status: 200,
@@ -2307,7 +2339,10 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
           ok: true,
           reservationId: out.id,
           humanNumber: out.humanNumber,
-          message: "Wysłano wiadomość z linkiem potwierdzającym.",
+          requiresEmailConfirmation,
+          message: requiresEmailConfirmation
+            ? "Wysłano wiadomość z linkiem potwierdzającym."
+            : "Rezerwacja została zapisana jako oczekująca. Jeśli nie widzisz e-maila, sprawdź także folder SPAM.",
         },
       };
     } catch (error) {
@@ -2416,7 +2451,8 @@ async function handleHotelAdmin(env, op, request) {
   }
   if (op === "admin-room-delete" && request.method === "DELETE") {
     const url = new URL(request.url);
-    const id = cleanString(url.searchParams.get("id"), 80);
+    const body = await readBody(request).catch(() => ({}));
+    const id = cleanString(url.searchParams.get("id") || body?.id, 80);
     if (!id) return { status: 400, data: { error: "Brak ID pokoju." } };
     try {
       await assertHotelRoomDeletable(env, id);

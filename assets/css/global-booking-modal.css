@@ -1,13 +1,13 @@
 :root {
   --gb-text: #f8f2e6;
   --gb-text-muted: rgba(248, 242, 230, 0.78);
-  --gb-accent: #d8b27a;
-  --gb-accent-strong: #b98f53;
+  --gb-accent: #d8c082;
+  --gb-accent-strong: #b99c5a;
   --gb-danger: #ef9f9f;
-  --gb-shell-bg: rgba(15, 11, 8, 0.56);
-  --gb-shell-border: rgba(255, 232, 194, 0.28);
-  --gb-card-bg: rgba(255, 248, 235, 0.09);
-  --gb-card-bg-hover: rgba(255, 248, 235, 0.17);
+  --gb-shell-bg: rgba(9, 17, 24, 0.78);
+  --gb-shell-border: rgba(198, 221, 236, 0.34);
+  --gb-card-bg: rgba(245, 252, 255, 0.12);
+  --gb-card-bg-hover: rgba(245, 252, 255, 0.2);
 }
 
 body.gb-modal-open {
@@ -21,11 +21,12 @@ body.gb-modal-open {
   display: none;
   padding: max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px))
     max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
-  background: radial-gradient(circle at 8% 10%, rgba(217, 175, 117, 0.15), transparent 38%),
-    radial-gradient(circle at 92% 86%, rgba(255, 215, 163, 0.12), transparent 45%),
-    rgba(9, 7, 6, 0.72);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background:
+    radial-gradient(circle at 16% 12%, rgba(95, 134, 170, 0.22), transparent 38%),
+    radial-gradient(circle at 85% 80%, rgba(183, 145, 79, 0.2), transparent 40%),
+    linear-gradient(155deg, rgba(6, 11, 17, 0.82), rgba(10, 18, 26, 0.88));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   box-sizing: border-box;
 }
 
@@ -35,14 +36,15 @@ body.gb-modal-open {
 }
 
 #gb-modal .gb-shell {
-  width: min(980px, calc(100vw - 2rem));
+  width: min(784px, calc(100vw - 2rem));
   max-height: min(94dvh, 980px);
   overflow: hidden;
   border-radius: 28px;
   border: 1px solid var(--gb-shell-border);
   background:
-    linear-gradient(160deg, rgba(255, 241, 219, 0.08), rgba(255, 241, 219, 0.02)),
-    url("../img/booking-lux-bg.svg") center / cover no-repeat,
+    radial-gradient(circle at 12% 4%, rgba(225, 241, 255, 0.26), transparent 34%),
+    radial-gradient(circle at 88% 94%, rgba(226, 188, 115, 0.24), transparent 38%),
+    linear-gradient(165deg, rgba(19, 34, 48, 0.92), rgba(9, 19, 28, 0.96)),
     var(--gb-shell-bg);
   box-shadow:
     0 44px 90px rgba(0, 0, 0, 0.52),
@@ -62,33 +64,35 @@ body.gb-modal-open {
 
 #gb-modal .gb-header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: center;
   gap: 1rem;
-  padding: 1.2rem 1.35rem 0.8rem;
+  padding: 1.4rem 1.35rem 0.95rem;
   position: relative;
   z-index: 1;
+  text-align: center;
 }
 
 #gb-modal .gb-kicker {
-  margin: 0;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  font-size: 0.7rem;
-  color: rgba(255, 232, 194, 0.76);
+  display: none;
 }
 
 #gb-modal .gb-title {
-  margin: 0.3rem 0 0;
-  font-size: clamp(1.25rem, 2vw, 1.72rem);
-  font-weight: 600;
-  color: #fff6e7;
+  margin: 0;
+  font-size: clamp(1.8rem, 3.2vw, 2.6rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #f4f8fd;
 }
 
 #gb-modal .gb-close {
+  position: absolute;
+  top: 0.95rem;
+  right: 0.95rem;
   border: 1px solid rgba(255, 231, 190, 0.34);
-  background: rgba(255, 245, 226, 0.14);
-  color: #fff8ee;
+  background: rgba(244, 250, 255, 0.14);
+  color: #fff;
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 999px;
@@ -230,7 +234,8 @@ body.gb-modal-open {
   border-radius: 16px;
   background: var(--gb-card-bg);
   color: #fff9ef;
-  padding: 1rem 0.85rem;
+  min-height: 136px;
+  padding: 1.25rem 1rem;
   text-align: center;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
@@ -246,14 +251,14 @@ body.gb-modal-open {
 #gb-modal .gb-service-tile strong,
 #gb-modal .gb-hall-tile strong {
   display: block;
-  margin-bottom: 0.4rem;
-  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.18rem;
 }
 
 #gb-modal .gb-service-tile small,
 #gb-modal .gb-hall-tile small {
   color: rgba(255, 245, 228, 0.78);
-  font-size: 0.8rem;
+  font-size: 0.95rem;
 }
 
 #gb-modal .gb-service-tile.is-disabled,
@@ -280,28 +285,63 @@ body.gb-modal-open {
   border: 1px solid rgba(255, 227, 183, 0.32);
   border-radius: 15px;
   background: rgba(255, 245, 226, 0.1);
-  padding: 0.85rem;
+  padding: 0.95rem;
   display: grid;
-  gap: 0.5rem;
+  gap: 0.35rem;
 }
 
-#gb-modal .gb-room-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.65rem;
+#gb-modal .gb-room-name {
+  font-size: 1.08rem;
+  color: #fff7ea;
+  margin-bottom: 0.1rem;
+}
+
+#gb-modal .gb-room-line {
+  margin: 0;
+  color: rgba(255, 236, 205, 0.9);
+  font-size: 0.92rem;
+}
+
+#gb-modal .gb-room-line-left {
+  display: inline-flex;
   align-items: center;
+  gap: 0.45rem;
+}
+
+#gb-modal .gb-room-line--beds {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+#gb-modal .gb-room-icon {
+  display: inline-flex;
+  width: 1.1rem;
+  justify-content: center;
+}
+
+#gb-modal .gb-room-price-wrap {
+  display: grid;
+  gap: 0.06rem;
 }
 
 #gb-modal .gb-room-price {
   color: #ffe7bf;
   font-weight: 700;
   white-space: nowrap;
+  font-size: 1.02rem;
+}
+
+#gb-modal .gb-room-price-note {
+  color: rgba(255, 236, 205, 0.8);
+  font-size: 0.78rem;
 }
 
 #gb-modal .gb-room-meta {
   margin: 0;
   color: rgba(255, 236, 205, 0.84);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
 }
 
 #gb-modal .gb-pill-btn {
@@ -311,7 +351,7 @@ body.gb-modal-open {
   padding: 0.44rem 0.9rem;
   border-radius: 999px;
   cursor: pointer;
-  justify-self: flex-start;
+  justify-self: flex-end;
 }
 
 #gb-modal .gb-pill-btn.is-active {
@@ -332,6 +372,82 @@ body.gb-modal-open {
 #gb-modal .gb-summary-box ul {
   margin: 0.4rem 0 0;
   padding-left: 1rem;
+}
+
+#gb-modal .gb-cart-total-row {
+  margin-top: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.96rem;
+}
+
+#gb-modal .gb-cart-total {
+  color: #ffe7bf;
+  font-size: 1.02rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+#gb-modal .gb-phone-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+#gb-modal .gb-phone-prefix {
+  text-align: center;
+}
+
+#gb-modal .gb-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+#gb-modal .gb-summary-list {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+}
+
+#gb-modal .gb-summary-total {
+  margin: 0.8rem 0 0;
+  color: #ffe7bf;
+  font-size: 1.12rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+#gb-modal .gb-summary-box--hotel {
+  display: flex;
+  flex-direction: column;
+}
+
+#gb-modal .gb-summary-box--hotel .gb-summary-total {
+  margin-top: auto;
+  padding-top: 0.75rem;
+}
+
+#gb-modal .gb-submit-slot {
+  margin-left: auto;
+  min-width: 280px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+#gb-modal .gb-antibot-wrap {
+  margin-top: 0;
+  justify-self: flex-end;
+}
+
+#gb-modal .gb-success-card {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 225, 179, 0.28);
+  background: rgba(255, 245, 225, 0.1);
+  padding: 0.9rem;
+  margin-top: 0.3rem;
 }
 
 #gb-modal .gb-summary-box li {
@@ -445,7 +561,7 @@ body.gb-modal-open {
 
 @media (max-width: 860px) {
   #gb-modal .gb-shell {
-    width: min(720px, calc(100vw - 1rem));
+    width: min(576px, calc(100vw - 1rem));
     border-radius: 22px;
   }
 
@@ -453,6 +569,15 @@ body.gb-modal-open {
   #gb-modal .gb-hall-tiles,
   #gb-modal .gb-grid-3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #gb-modal .gb-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #gb-modal .gb-submit-slot {
+    min-width: 0;
+    width: 100%;
   }
 }
 
@@ -484,6 +609,16 @@ body.gb-modal-open {
   #gb-modal .gb-grid-3,
   #gb-modal .gb-range-pair {
     grid-template-columns: 1fr;
+  }
+
+  #gb-modal .gb-phone-row {
+    grid-template-columns: 80px minmax(0, 1fr);
+  }
+
+  #gb-modal .gb-room-line--beds,
+  #gb-modal .gb-cart-total-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   #gb-modal .gb-actions {

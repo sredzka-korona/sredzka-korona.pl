@@ -305,6 +305,36 @@ a {
   font-size: 1.3rem;
 }
 
+.icon-inline {
+  display: inline-flex;
+  width: 1.1rem;
+  height: 1.1rem;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.icon-inline svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.admin-entry-icon .icon-inline {
+  width: 1.8rem;
+  height: 1.8rem;
+}
+
+.button.icon-button .icon-inline,
+.schedule-refresh-button .icon-inline {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
 .login-wrap {
   min-height: 100vh;
   display: grid;
@@ -481,10 +511,16 @@ a {
   display: flex;
   align-items: flex-end;
   gap: 0.65rem;
+  flex-wrap: wrap;
 }
 
 .upload-room-gallery-form .field-full {
   flex: 1 1 auto;
+  margin: 0;
+}
+
+.upload-room-gallery-form .field {
+  flex: 1 1 220px;
   margin: 0;
 }
 
@@ -1141,7 +1177,8 @@ body.admin-modal-open {
 
 .admin-section-tile-grid {
   grid-template-columns: repeat(var(--tile-count, 4), minmax(0, 1fr));
-  width: min(100%, 1120px);
+  gap: 0.75rem;
+  width: min(100%, 1060px);
 }
 
 .admin-tile {
@@ -1218,6 +1255,21 @@ body.admin-modal-open {
   max-width: 24ch;
 }
 
+.admin-section-tile-grid .admin-tile {
+  min-height: 92px;
+  padding: 0.85rem 0.95rem;
+  border-radius: 22px;
+  align-content: center;
+}
+
+.admin-section-tile-grid .admin-tile-title {
+  font-size: 1.5rem;
+}
+
+.admin-section-tile-grid .admin-tile-copy {
+  display: none;
+}
+
 .admin-stage {
   margin-top: 0.25rem;
   width: 100%;
@@ -1252,28 +1304,28 @@ body.admin-modal-open {
 
 .admin-entry-tile--schedule {
   width: min(100%, 1120px);
-  min-height: 220px;
+  min-height: 132px;
   margin-top: 1.4rem;
-  padding: 1.35rem 1.4rem 1.45rem;
-  border-radius: 32px;
+  padding: 1rem 1.2rem;
+  border-radius: 26px;
   background:
-    linear-gradient(145deg, rgba(28, 43, 74, 0.9), rgba(39, 61, 103, 0.82)),
-    radial-gradient(circle at 100% 0%, rgba(197, 160, 102, 0.3), transparent 46%);
-  border: 1px solid rgba(203, 175, 126, 0.42);
+    linear-gradient(145deg, rgba(23, 39, 68, 0.94), rgba(41, 61, 101, 0.88)),
+    radial-gradient(circle at 100% 0%, rgba(197, 160, 102, 0.24), transparent 42%);
+  border: 1px solid rgba(203, 175, 126, 0.28);
   box-shadow:
-    0 28px 44px rgba(14, 26, 46, 0.25),
+    0 20px 34px rgba(14, 26, 46, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.22);
   color: #f3f6fc;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.95rem;
 }
 
 .admin-entry-tile--schedule .admin-tile-title {
   color: #f7fbff;
-  font-size: clamp(2.4rem, 4vw, 3.2rem);
-}
-
-.admin-entry-tile--schedule .admin-tile-copy {
-  color: rgba(240, 247, 255, 0.86);
-  max-width: 72ch;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  margin: 0;
 }
 
 .admin-entry-icon {
@@ -1285,11 +1337,12 @@ body.admin-modal-open {
   background: rgba(255, 255, 255, 0.14);
   border: 1px solid rgba(255, 255, 255, 0.22);
   font-size: 1.9rem;
+  color: #fff7e8;
 }
 
 .schedule-shell {
   display: grid;
-  gap: 1rem;
+  gap: 1.15rem;
 }
 
 .schedule-summary-grid {
@@ -1302,10 +1355,10 @@ body.admin-modal-open {
 .schedule-calendar-card,
 .schedule-day-card {
   border: 1px solid rgba(93, 110, 143, 0.24);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.78);
-  padding: 0.95rem 1rem;
-  box-shadow: 0 16px 28px rgba(25, 36, 61, 0.08);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 1rem 1.05rem;
+  box-shadow: 0 18px 30px rgba(25, 36, 61, 0.08);
 }
 
 .schedule-summary-head,
@@ -1334,13 +1387,21 @@ body.admin-modal-open {
 .schedule-quick-item,
 .schedule-day-item {
   border: 1px solid rgba(131, 107, 69, 0.22);
-  border-radius: 14px;
-  padding: 0.72rem 0.8rem;
-  background: rgba(255, 255, 255, 0.82);
+  border-radius: 18px;
+  padding: 0.82rem 0.88rem;
+  background: rgba(255, 255, 255, 0.88);
 }
 
 .schedule-quick-head,
 .schedule-day-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.schedule-day-item-meta {
   display: flex;
   align-items: center;
   gap: 0.45rem;
@@ -1357,49 +1418,66 @@ body.admin-modal-open {
   margin-top: 0.55rem;
 }
 
+.schedule-details-chip {
+  align-self: flex-start;
+  min-width: auto;
+  padding-inline: 0.9rem;
+}
+
 .schedule-weekdays {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.45rem;
-  margin: 0.7rem 0 0.45rem;
+  gap: 0.5rem;
+  margin: 0.9rem 0 0.55rem;
 }
 
 .schedule-weekdays span {
   text-align: center;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.schedule-weekdays .is-saturday {
+  color: #2e63bb;
+}
+
+.schedule-weekdays .is-sunday {
+  color: #c04848;
 }
 
 .schedule-calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.45rem;
+  gap: 0.5rem;
 }
 
 .schedule-day-cell {
-  min-height: 88px;
-  border: 1px solid rgba(112, 132, 170, 0.22);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.9);
+  min-height: 102px;
+  border: 1px solid rgba(112, 132, 170, 0.18);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(252, 252, 252, 0.98), rgba(246, 248, 252, 0.96));
   text-align: left;
-  padding: 0.55rem 0.58rem;
+  padding: 0.7rem 0.72rem;
   display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto 1fr;
   align-content: space-between;
-  gap: 0.45rem;
+  gap: 0.45rem 0.35rem;
   cursor: pointer;
   transition:
     border-color 0.18s ease,
     box-shadow 0.18s ease,
-    transform 0.18s ease;
+    transform 0.18s ease,
+    background 0.18s ease;
 }
 
 .schedule-day-cell:hover {
   transform: translateY(-1px);
-  border-color: rgba(112, 82, 45, 0.42);
-  box-shadow: 0 10px 18px rgba(34, 48, 79, 0.12);
+  border-color: rgba(112, 82, 45, 0.38);
+  box-shadow: 0 12px 20px rgba(34, 48, 79, 0.1);
 }
 
 .schedule-day-cell:focus-visible {
@@ -1409,25 +1487,59 @@ body.admin-modal-open {
 }
 
 .schedule-day-cell.is-empty {
-  opacity: 0.56;
+  background: linear-gradient(180deg, rgba(236, 240, 246, 0.96), rgba(226, 232, 240, 0.96));
+  border-color: rgba(142, 155, 176, 0.2);
 }
 
 .schedule-day-cell.is-selected {
-  border-color: rgba(112, 82, 45, 0.7);
+  border-color: rgba(112, 82, 45, 0.68);
+  background: linear-gradient(180deg, rgba(255, 250, 240, 0.98), rgba(250, 240, 222, 0.96));
   box-shadow: 0 0 0 2px rgba(193, 160, 103, 0.22);
 }
 
 .schedule-day-cell.is-outside {
-  opacity: 0.45;
+  opacity: 0.42;
 }
 
 .schedule-day-number {
   font-weight: 700;
+  font-size: 1rem;
+}
+
+.schedule-day-dot {
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 999px;
+  justify-self: end;
+  align-self: start;
+  background: linear-gradient(180deg, #d6b36c, #a97c2f);
+  box-shadow: 0 0 0 4px rgba(214, 179, 108, 0.14);
 }
 
 .schedule-day-count {
   color: var(--muted);
   font-size: 0.78rem;
+  grid-column: 1 / -1;
+  align-self: end;
+}
+
+.schedule-day-cell.has-entries {
+  border-color: rgba(189, 151, 86, 0.42);
+  background: linear-gradient(180deg, rgba(255, 254, 251, 0.98), rgba(252, 247, 237, 0.97));
+}
+
+.schedule-day-cell.has-entries .schedule-day-count {
+  color: #5e4820;
+  font-weight: 700;
+}
+
+.schedule-day-cell.is-saturday .schedule-day-number {
+  color: #2e63bb;
+}
+
+.schedule-day-cell.is-sunday .schedule-day-number,
+.schedule-day-cell.is-holiday .schedule-day-number {
+  color: #c04848;
 }
 
 .schedule-pill-hotel {
@@ -1462,14 +1574,86 @@ body.admin-modal-open {
 }
 
 .schedule-modal {
-  width: min(900px, calc(100vw - 1.5rem));
+  width: min(920px, calc(100vw - 1.5rem));
 }
 
-.schedule-details-list {
-  margin: 0;
-  padding-left: 1.1rem;
+.schedule-modal-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.schedule-modal-footer {
+  align-items: center;
+}
+
+.schedule-modal-danger {
+  margin-left: auto;
+}
+
+.schedule-details-view {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.9rem;
+}
+
+.schedule-details-banner {
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(98, 120, 184, 0.18);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(243, 246, 255, 0.96), rgba(235, 240, 252, 0.92));
+}
+
+.schedule-details-banner strong,
+.schedule-note-card p {
+  margin: 0;
+}
+
+.schedule-details-banner p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.schedule-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.schedule-detail-card {
+  display: grid;
+  gap: 0.32rem;
+  padding: 0.88rem 0.95rem;
+  border-radius: 16px;
+  border: 1px solid rgba(131, 107, 69, 0.18);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.schedule-detail-card.is-wide {
+  grid-column: 1 / -1;
+}
+
+.schedule-detail-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.schedule-detail-value {
+  font-size: 1.02rem;
+  line-height: 1.35;
+}
+
+.schedule-note-card {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.92rem 0.98rem;
+  border-radius: 18px;
+  border: 1px solid rgba(131, 107, 69, 0.18);
+  background: rgba(255, 252, 247, 0.88);
 }
 
 .schedule-create-services {
@@ -1523,6 +1707,47 @@ body.admin-modal-open {
 
 .schedule-block-helper {
   margin: 0.1rem 0 0;
+}
+
+.schedule-calendar-head {
+  position: relative;
+  display: grid;
+  align-items: center;
+}
+
+.schedule-calendar-nav {
+  width: min(100%, 420px);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.schedule-calendar-title {
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.schedule-refresh-button {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #7b6341;
+  cursor: pointer;
+}
+
+.schedule-refresh-button:hover {
+  color: #3c4c71;
 }
 
 .admin-hotel-wrap {
@@ -1582,12 +1807,19 @@ body.admin-modal-open {
 .hotel-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0.75rem 0;
+  gap: 0.45rem;
+  margin: 0.45rem 0 0.2rem;
 }
 
 .hotel-nav.is-single .button {
   min-width: 220px;
+}
+
+.hotel-nav .button {
+  min-height: auto;
+  padding: 0.62rem 1rem;
+  border-radius: 18px;
+  font-size: 0.95rem;
 }
 
 .hotel-subpanel {
@@ -1606,6 +1838,42 @@ body.admin-modal-open {
 .hotel-subpanel h3,
 .hotel-subpanel p {
   margin: 0;
+}
+
+.booking-toggle-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(200, 170, 120, 0.22);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.booking-toggle-card.is-enabled {
+  border-color: rgba(65, 133, 80, 0.22);
+}
+
+.booking-toggle-card.is-disabled {
+  border-color: rgba(164, 71, 71, 0.22);
+}
+
+.booking-toggle-copy {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.booking-toggle-status {
+  font-weight: 700;
+}
+
+.booking-toggle-status.is-enabled {
+  color: #2f7b42;
+}
+
+.booking-toggle-status.is-disabled {
+  color: #a13c3c;
 }
 
 .hotel-filters {
@@ -1837,6 +2105,11 @@ button.icon-btn {
   gap: 1rem;
 }
 
+.home-media-draft-actions {
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
 .home-media-controls {
   gap: 0.85rem;
 }
@@ -1885,6 +2158,17 @@ button.icon-btn {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.hotel-room-editor-compact-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.admin-row-actions .hotel-move-room {
+  min-width: 2.7rem;
+  padding-inline: 0.7rem;
 }
 
 @media (max-width: 980px) {
@@ -1955,9 +2239,9 @@ button.icon-btn {
   }
 
   .admin-entry-tile--schedule {
-    min-height: 190px;
+    min-height: 112px;
     margin-top: 0.5rem;
-    padding: 1rem 1.05rem 1.1rem;
+    padding: 0.9rem 1rem;
   }
 
   .admin-entry-icon {
@@ -1971,7 +2255,7 @@ button.icon-btn {
   }
 
   .schedule-calendar-head {
-    align-items: flex-start;
+    padding-top: 2.6rem;
   }
 
   .schedule-calendar-grid {
@@ -1979,8 +2263,22 @@ button.icon-btn {
   }
 
   .schedule-day-cell {
-    min-height: 74px;
+    min-height: 86px;
     padding: 0.48rem 0.5rem;
+  }
+
+  .schedule-calendar-nav {
+    width: 100%;
+  }
+
+  .schedule-refresh-button {
+    right: 0;
+    top: 0;
+    transform: none;
+  }
+
+  .schedule-details-grid {
+    grid-template-columns: 1fr;
   }
 
   .schedule-create-services {
@@ -2008,6 +2306,15 @@ button.icon-btn {
   .upload-room-gallery-form .button {
     width: auto;
     justify-self: auto;
+  }
+
+  .booking-toggle-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hotel-room-editor-compact-grid {
+    grid-template-columns: 1fr;
   }
 
   .home-media-control-pair {

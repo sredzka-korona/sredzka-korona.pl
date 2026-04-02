@@ -532,9 +532,9 @@
       label: "Hotel",
       description: "Zarządzanie pokojami, galerią i ustawieniami modułów hotelu.",
       tiles: [
-        { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Hotel na stronie głównej (pozycja i zoom)." },
-        { key: "gallery", label: "Galeria", description: "Wspólna galeria pokoi z podziałem na albumy 1/2/3/4-osobowe." },
         { key: "rooms", label: "Pokoje", description: "Konfiguracja pokoi, cen i parametrów rezerwacyjnych." },
+        { key: "gallery", label: "Galeria", description: "Wspólna galeria pokoi z podziałem na albumy 1/2/3/4-osobowe." },
+        { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Hotel na stronie głównej (pozycja i zoom)." },
         { key: "templates", label: "Szablony maili", description: "Wiadomości wysyłane dla rezerwacji hotelowych." },
         { key: "settings", label: "Ustawienia rezerwacji", description: "Włączenie i przerwy w przyjmowaniu rezerwacji." },
       ],
@@ -1086,13 +1086,15 @@
     return response.json().catch(() => null);
   }
 
-  const SCHEDULE_ACTIVE_STATUSES = new Set(["pending", "confirmed", "manual_block"]);
+  const SCHEDULE_ACTIVE_STATUSES = new Set(["email_verification_pending", "pending", "confirmed", "manual_block"]);
+  const SCHEDULE_POLISH_HOLIDAY_CACHE = new Map();
   const SCHEDULE_SERVICE_LABELS = {
     hotel: "Hotel",
     restaurant: "Restauracja",
     hall: "Przyjęcia",
   };
   const SCHEDULE_STATUS_LABELS = {
+    email_verification_pending: "Do potwierdzenia e-mail",
     pending: "Do potwierdzenia",
     confirmed: "Potwierdzona",
     manual_block: "Blokada",
@@ -1127,10 +1129,25 @@
     const normalized = String(statusValue || "")
       .trim()
       .toLowerCase();
+    if (normalized === "email_verification_pending") return "schedule-status-pending";
     if (normalized === "pending") return "schedule-status-pending";
     if (normalized === "confirmed") return "schedule-status-confirmed";
     if (normalized === "manual_block") return "schedule-status-block";
     return "";
+  }
+
+  function scheduleIconMarkup(name) {
+    const icons = {
+      calendar:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5" width="17" height="15.5" rx="3"></rect><path d="M7.5 3.5v4"></path><path d="M16.5 3.5v4"></path><path d="M3.5 9.5h17"></path></svg>',
+      refresh:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 11a8 8 0 1 0 2 5.2"></path><path d="M20 4v7h-7"></path></svg>',
+      close:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>',
+      trash:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 7.5h15"></path><path d="M9.5 3.5h5"></path><path d="M8 7.5v11"></path><path d="M16 7.5v11"></path><path d="M6.5 7.5l.8 12a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-12"></path></svg>',
+    };
+    return `<span class="icon-inline icon-${escapeAttribute(name)}">${icons[name] || ""}</span>`;
   }
 
   function scheduleEntriesCountLabel(count) {
@@ -1158,6 +1175,64 @@
       .join("\n");
     const more = entries.length > 3 ? `\n• ... i ${entries.length - 3} kolejne` : "";
     return `W wybranym terminie istnieją już ${scheduleEntriesCountLabel(entries.length)}.\nBlokada nie anuluje tych rezerwacji, tylko ograniczy kolejne.\n\n${preview}${more}\n\nCzy mimo to utworzyć blokadę?`;
+  }
+
+  function scheduleCalculateEasterSunday(year) {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month - 1, day);
+  }
+
+  function scheduleGetPolishHolidayMap(year) {
+    if (SCHEDULE_POLISH_HOLIDAY_CACHE.has(year)) {
+      return SCHEDULE_POLISH_HOLIDAY_CACHE.get(year);
+    }
+    const map = new Map();
+    const addHoliday = (date, label) => {
+      map.set(scheduleDateToYmd(date), label);
+    };
+    const easterSunday = scheduleCalculateEasterSunday(year);
+    const easterMonday = new Date(easterSunday);
+    easterMonday.setDate(easterMonday.getDate() + 1);
+    const pentecost = new Date(easterSunday);
+    pentecost.setDate(pentecost.getDate() + 49);
+    const corpusChristi = new Date(easterSunday);
+    corpusChristi.setDate(corpusChristi.getDate() + 60);
+    [
+      [new Date(year, 0, 1), "Nowy Rok"],
+      [new Date(year, 0, 6), "Trzech Króli"],
+      [new Date(year, 4, 1), "Święto Pracy"],
+      [new Date(year, 4, 3), "Święto Konstytucji 3 Maja"],
+      [new Date(year, 7, 15), "Wniebowzięcie NMP"],
+      [new Date(year, 10, 1), "Wszystkich Świętych"],
+      [new Date(year, 10, 11), "Narodowe Święto Niepodległości"],
+      [new Date(year, 11, 25), "Boże Narodzenie"],
+      [new Date(year, 11, 26), "Drugi dzień Bożego Narodzenia"],
+    ].forEach(([date, label]) => addHoliday(date, label));
+    addHoliday(easterSunday, "Wielkanoc");
+    addHoliday(easterMonday, "Poniedziałek Wielkanocny");
+    addHoliday(pentecost, "Zesłanie Ducha Świętego");
+    addHoliday(corpusChristi, "Boże Ciało");
+    SCHEDULE_POLISH_HOLIDAY_CACHE.set(year, map);
+    return map;
+  }
+
+  function scheduleHolidayLabel(ymd) {
+    const year = Number(String(ymd || "").slice(0, 4));
+    if (!year) return "";
+    return scheduleGetPolishHolidayMap(year).get(String(ymd || "").slice(0, 10)) || "";
   }
 
   function scheduleYmdToDate(ymd) {
@@ -1201,6 +1276,15 @@
   function scheduleFormatTime(ms) {
     if (!Number.isFinite(ms) || ms <= 0) return "—";
     return new Date(ms).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function scheduleFormatCompactDate(ymd) {
+    if (!ymd) return "—";
+    return scheduleYmdToDate(ymd).toLocaleDateString("pl-PL", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
   }
 
   function scheduleMonthLabel(monthCursor) {
@@ -1253,7 +1337,7 @@
         status: row.status,
         statusLabel: scheduleStatusLabel(row.status, row.statusLabel || row.status),
         humanNumberLabel: row.humanNumberLabel || row.id,
-        title: row.customerName || "Rezerwacja hotelowa",
+        title: row.status === "manual_block" ? "Blokada terminu" : row.customerName || "Rezerwacja hotelowa",
         subtitle: `${dateFrom} - ${dateTo}`,
         dateFrom,
         dateTo,
@@ -1274,7 +1358,7 @@
         status: row.status,
         statusLabel: scheduleStatusLabel(row.status, row.statusLabel || row.status),
         humanNumberLabel: row.humanNumberLabel || row.id,
-        title: row.fullName || "Rezerwacja restauracji",
+        title: row.status === "manual_block" ? "Blokada terminu" : row.fullName || "Rezerwacja restauracji",
         subtitle: `${row.reservationDate || ""} ${scheduleFormatTime(startMs)} - ${scheduleFormatTime(endMs)}`.trim(),
         dateFrom: String(row.reservationDate || "").slice(0, 10),
         dateTo: String(row.reservationDate || "").slice(0, 10),
@@ -1378,7 +1462,7 @@
 
       const tomorrow = scheduleAddDays(getTodayIsoDate(), 1);
       state.schedule.items = items;
-      state.schedule.pendingItems = items.filter((item) => item.status === "pending");
+      state.schedule.pendingItems = items.filter((item) => item.status === "pending" || item.status === "email_verification_pending");
       state.schedule.tomorrowItems = items.filter((item) => scheduleItemOnDate(item, tomorrow));
       state.schedule.roomOptions = Array.isArray(hotelRooms?.rooms) ? hotelRooms.rooms : [];
       state.schedule.tableOptions = Array.isArray(restaurantTables?.tables) ? restaurantTables.tables : [];
@@ -1400,22 +1484,84 @@
   function scheduleBuildMonthCells(monthCursor) {
     const [year, month] = String(monthCursor || "").split("-").map((value) => Number(value));
     const monthStart = new Date((year || new Date().getFullYear()), (month || 1) - 1, 1);
+    const monthEnd = new Date((year || new Date().getFullYear()), month || 1, 0);
     const firstDayIndex = (monthStart.getDay() + 6) % 7;
+    const daysInMonth = monthEnd.getDate();
     const startDate = new Date(monthStart);
     startDate.setDate(monthStart.getDate() - firstDayIndex);
+    const totalCells = Math.ceil((firstDayIndex + daysInMonth) / 7) * 7;
     const cells = [];
-    for (let index = 0; index < 42; index += 1) {
+    for (let index = 0; index < totalCells; index += 1) {
       const date = new Date(startDate);
       date.setDate(startDate.getDate() + index);
       const ymd = scheduleDateToYmd(date);
+      const holidayLabel = scheduleHolidayLabel(ymd);
+      const weekday = date.getDay();
       cells.push({
         ymd,
         day: date.getDate(),
         inCurrentMonth: date.getMonth() === monthStart.getMonth(),
         count: scheduleItemsForDate(ymd).length,
+        isSaturday: weekday === 6,
+        isSunday: weekday === 0,
+        isHoliday: Boolean(holidayLabel),
+        holidayLabel,
       });
     }
     return cells;
+  }
+
+  function scheduleRoomLabels(roomIds) {
+    const roomMap = new Map((state.schedule.roomOptions || []).map((room) => [String(room.id), room.name || room.id]));
+    return (Array.isArray(roomIds) ? roomIds : [])
+      .map((roomId) => roomMap.get(String(roomId)) || String(roomId))
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  function scheduleTableLabels(tableIds) {
+    const tableMap = new Map(
+      (state.schedule.tableOptions || []).map((table) => [
+        String(table.id),
+        `Stół ${table.number || table.id}${table.zone ? ` (${table.zone})` : ""}`,
+      ])
+    );
+    return (Array.isArray(tableIds) ? tableIds : [])
+      .map((tableId) => tableMap.get(String(tableId)) || String(tableId))
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  function scheduleNoteMarkup(note) {
+    return escapeHtml(String(note || "")).replace(/\n/g, "<br>");
+  }
+
+  function scheduleDetailCardMarkup(label, value, wide = false) {
+    return `
+      <article class="schedule-detail-card${wide ? " is-wide" : ""}">
+        <span class="schedule-detail-label">${escapeHtml(label)}</span>
+        <strong class="schedule-detail-value">${escapeHtml(value || "—")}</strong>
+      </article>
+    `;
+  }
+
+  function scheduleNoteCardMarkup(label, value) {
+    if (!String(value || "").trim()) return "";
+    return `
+      <article class="schedule-note-card">
+        <span class="schedule-detail-label">${escapeHtml(label)}</span>
+        <p>${scheduleNoteMarkup(value)}</p>
+      </article>
+    `;
+  }
+
+  function scheduleCardHeading(item) {
+    if (item?.status === "manual_block") return "Blokada";
+    const candidate = String(item?.humanNumberLabel || "").trim();
+    if (candidate && candidate.length <= 18 && !/^[0-9a-f-]{24,}$/i.test(candidate)) {
+      return candidate;
+    }
+    return "Rezerwacja";
   }
 
   function scheduleQuickListMarkup(items, emptyText) {
@@ -1429,7 +1575,7 @@
             (item) => `
               <article class="schedule-quick-item">
                 <div class="schedule-quick-head">
-                  <strong>${escapeHtml(item.humanNumberLabel || item.id)}</strong>
+                  <strong>${escapeHtml(scheduleCardHeading(item))}</strong>
                   <span class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</span>
                   <span class="pill schedule-status-pill ${scheduleStatusPillClass(item.status)}">${escapeHtml(item.statusLabel || scheduleStatusLabel(item.status))}</span>
                 </div>
@@ -1437,7 +1583,7 @@
                 <p class="helper">${escapeHtml(item.subtitle || "")}</p>
                 <div class="inline-actions">
                   ${
-                    item.status === "pending"
+                    item.status === "pending" || item.status === "email_verification_pending"
                       ? `<button type="button" class="button secondary" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>
                          <button type="button" class="button secondary danger-muted" data-schedule-action="reject" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odrzuć</button>`
                       : ""
@@ -1457,9 +1603,7 @@
     if (!panel) return;
     if (!onlineBookingsEnabled) {
       panel.innerHTML = `
-        <p class="pill">Grafik</p>
-        <h2>Grafik rezerwacji</h2>
-        <p class="section-intro">Ten widok wymaga włączenia backendu rezerwacji online.</p>
+        <p class="status">Ten widok wymaga włączenia backendu rezerwacji online.</p>
       `;
       return;
     }
@@ -1479,9 +1623,6 @@
     const tomorrowLabel = scheduleAddDays(getTodayIsoDate(), 1);
 
     panel.innerHTML = `
-      <p class="pill">Grafik</p>
-      <h2>Centrum rezerwacji</h2>
-      <p class="section-intro">Akceptuj rezerwacje, sprawdzaj jutrzejszy dzień i zarządzaj kalendarzem w jednym miejscu.</p>
       <div class="schedule-shell">
         <div class="schedule-summary-grid">
           <section class="schedule-summary-card">
@@ -1502,15 +1643,25 @@
         </div>
         <section class="schedule-calendar-card">
           <div class="schedule-calendar-head">
-            <div class="inline-actions">
+            <div class="schedule-calendar-nav">
               <button type="button" class="button secondary icon-button" data-schedule-month="-1" aria-label="Poprzedni miesiąc">←</button>
-              <h3>${escapeHtml(scheduleMonthLabel(monthCursor))}</h3>
+              <h3 class="schedule-calendar-title">${escapeHtml(scheduleMonthLabel(monthCursor))}</h3>
               <button type="button" class="button secondary icon-button" data-schedule-month="1" aria-label="Następny miesiąc">→</button>
             </div>
-            <button type="button" class="button secondary" data-schedule-refresh>Odśwież</button>
+            <button type="button" class="schedule-refresh-button" data-schedule-refresh aria-label="Odśwież">${scheduleIconMarkup("refresh")}</button>
           </div>
           <div class="schedule-weekdays">
-            ${["Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Nd"].map((day) => `<span>${day}</span>`).join("")}
+            ${[
+              { label: "Pon", className: "" },
+              { label: "Wt", className: "" },
+              { label: "Śr", className: "" },
+              { label: "Czw", className: "" },
+              { label: "Pt", className: "" },
+              { label: "Sob", className: "is-saturday" },
+              { label: "Nd", className: "is-sunday" },
+            ]
+              .map((day) => `<span class="${day.className}">${day.label}</span>`)
+              .join("")}
           </div>
           <div class="schedule-calendar-grid">
             ${monthCells
@@ -1518,11 +1669,17 @@
                 (cell) => `
                   <button
                     type="button"
-                    class="schedule-day-cell${cell.inCurrentMonth ? "" : " is-outside"}${cell.count === 0 ? " is-empty" : ""}${cell.ymd === selectedDate ? " is-selected" : ""}"
+                    class="schedule-day-cell${cell.inCurrentMonth ? "" : " is-outside"}${cell.count === 0 ? " is-empty" : " has-entries"}${cell.ymd === selectedDate ? " is-selected" : ""}${cell.isSaturday ? " is-saturday" : ""}${cell.isSunday ? " is-sunday" : ""}${cell.isHoliday ? " is-holiday" : ""}"
                     data-schedule-day="${escapeAttribute(cell.ymd)}"
+                    title="${escapeAttribute(
+                      [scheduleFormatDateLabel(cell.ymd), cell.holidayLabel || "", cell.count > 0 ? scheduleEntriesCountLabel(cell.count) : "Brak wpisów"]
+                        .filter(Boolean)
+                        .join(" • ")
+                    )}"
                   >
                     <span class="schedule-day-number">${escapeHtml(String(cell.day))}</span>
-                    <span class="schedule-day-count">${cell.count > 0 ? scheduleEntriesCountLabel(cell.count) : "Brak wpisów"}</span>
+                    ${cell.count > 0 ? '<span class="schedule-day-dot" aria-hidden="true"></span>' : ""}
+                    <span class="schedule-day-count">${cell.count > 0 ? scheduleEntriesCountLabel(cell.count) : ""}</span>
                   </button>
                 `
               )
@@ -1531,10 +1688,7 @@
         </section>
         <section class="schedule-day-card">
           <div class="schedule-day-head">
-            <div>
-              <h3>${escapeHtml(scheduleFormatDateLabel(selectedDate))}</h3>
-              <p class="helper">Wszystkie rezerwacje i blokady z wybranego dnia.</p>
-            </div>
+            <h3>${escapeHtml(scheduleFormatDateLabel(selectedDate))}</h3>
             <button type="button" class="button" data-schedule-add>+ Dodaj</button>
           </div>
           <div class="schedule-day-list">
@@ -1545,20 +1699,22 @@
                       (item) => `
                         <article class="schedule-day-item">
                           <div class="schedule-day-item-head">
-                            <strong>${escapeHtml(item.humanNumberLabel || item.id)}</strong>
-                            <span class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</span>
-                            <span class="pill schedule-status-pill ${scheduleStatusPillClass(item.status)}">${escapeHtml(item.statusLabel || scheduleStatusLabel(item.status))}</span>
+                            <div class="schedule-day-item-meta">
+                              <strong>${escapeHtml(scheduleCardHeading(item))}</strong>
+                              <span class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</span>
+                              <span class="pill schedule-status-pill ${scheduleStatusPillClass(item.status)}">${escapeHtml(item.statusLabel || scheduleStatusLabel(item.status))}</span>
+                            </div>
+                            <button type="button" class="button secondary schedule-details-chip" data-schedule-action="details" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Szczegóły</button>
                           </div>
                           <p>${escapeHtml(item.title || "Rezerwacja")}</p>
                           <p class="helper">${escapeHtml(item.subtitle || "")}</p>
                           <div class="inline-actions">
                             ${
-                              item.status === "pending"
+                              item.status === "pending" || item.status === "email_verification_pending"
                                 ? `<button type="button" class="button secondary" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>
                                    <button type="button" class="button secondary danger-muted" data-schedule-action="reject" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odrzuć</button>`
                                 : ""
                             }
-                            <button type="button" class="button secondary" data-schedule-action="details" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Szczegóły</button>
                           </div>
                         </article>
                       `
@@ -1670,35 +1826,84 @@
   }
 
   function scheduleReservationDetailsMarkup(item) {
-    const details = [];
-    details.push(`<li><strong>Numer:</strong> ${escapeHtml(item.humanNumberLabel || item.id)}</li>`);
-    details.push(`<li><strong>Moduł:</strong> ${escapeHtml(scheduleServiceLabel(item.service))}</li>`);
-    details.push(`<li><strong>Status:</strong> ${escapeHtml(item.statusLabel || item.status)}</li>`);
-    if (item.service === "hotel") {
-      details.push(`<li><strong>Termin:</strong> ${escapeHtml(item.raw.dateFrom)} - ${escapeHtml(item.raw.dateTo)}</li>`);
-      details.push(`<li><strong>Pokoje:</strong> ${escapeHtml((item.raw.roomIds || []).join(", ") || "—")}</li>`);
-      details.push(`<li><strong>Klient:</strong> ${escapeHtml(item.raw.customerName || "—")}</li>`);
-      details.push(`<li><strong>E-mail:</strong> ${escapeHtml(item.raw.email || "—")}</li>`);
-      details.push(`<li><strong>Telefon:</strong> ${escapeHtml(item.raw.phone || "—")}</li>`);
-    } else if (item.service === "restaurant") {
-      details.push(`<li><strong>Termin:</strong> ${escapeHtml(scheduleFormatDateTime(item.startMs))} - ${escapeHtml(scheduleFormatDateTime(item.endMs))}</li>`);
-      details.push(`<li><strong>Stoliki:</strong> ${escapeHtml(item.raw.assignedTablesLabel || "—")}</li>`);
-      details.push(`<li><strong>Goście:</strong> ${escapeHtml(String(item.raw.guestsCount || "—"))}</li>`);
-      details.push(`<li><strong>Klient:</strong> ${escapeHtml(item.raw.fullName || "—")}</li>`);
-      details.push(`<li><strong>E-mail:</strong> ${escapeHtml(item.raw.email || "—")}</li>`);
-      details.push(`<li><strong>Telefon:</strong> ${escapeHtml(item.raw.phone || "—")}</li>`);
-    } else {
-      details.push(`<li><strong>Sala:</strong> ${escapeHtml(item.raw.hallName || "—")}</li>`);
-      details.push(`<li><strong>Termin:</strong> ${escapeHtml(scheduleFormatDateTime(item.startMs))} - ${escapeHtml(scheduleFormatDateTime(item.endMs))}</li>`);
-      details.push(`<li><strong>Goście:</strong> ${escapeHtml(String(item.raw.guestsCount || "—"))}</li>`);
-      details.push(`<li><strong>Impreza:</strong> ${escapeHtml(item.raw.eventType || "—")}</li>`);
-      details.push(`<li><strong>Klient:</strong> ${escapeHtml(item.raw.fullName || "—")}</li>`);
-      details.push(`<li><strong>E-mail:</strong> ${escapeHtml(item.raw.email || "—")}</li>`);
-      details.push(`<li><strong>Telefon:</strong> ${escapeHtml(item.raw.phone || "—")}</li>`);
+    const isBlock = item.status === "manual_block";
+    const cards = [];
+    const notes = [];
+
+    if (isBlock) {
+      cards.push(scheduleDetailCardMarkup("Obszar", scheduleServiceLabel(item.service)));
+      if (item.service === "hotel") {
+        cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatCompactDate(item.raw.dateFrom)} - ${scheduleFormatCompactDate(item.raw.dateTo)}`));
+        cards.push(scheduleDetailCardMarkup("Pokoje", scheduleRoomLabels(item.raw.roomIds || item.resourceIds || []) || "Wskazane pokoje", true));
+      } else if (item.service === "restaurant") {
+        cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
+        cards.push(
+          scheduleDetailCardMarkup(
+            "Stoliki",
+            item.raw.assignedTablesLabel || scheduleTableLabels(item.raw.assignedTableIds || item.resourceIds || []) || "Wskazane stoliki",
+            true
+          )
+        );
+      } else {
+        cards.push(scheduleDetailCardMarkup("Sala", item.raw.hallName || "Wybrana sala"));
+        cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
+      }
+      notes.push(
+        scheduleNoteCardMarkup(
+          "Notatka dla recepcji",
+          item.raw.adminNote || "Ta blokada ogranicza nowe rezerwacje w tym terminie."
+        )
+      );
+      return `
+        <div class="schedule-details-view is-block">
+          <div class="schedule-details-banner">
+            <strong>Blokada terminu</strong>
+            <p>Ta pozycja nie odwołuje istniejących rezerwacji. Ogranicza tylko kolejne rezerwacje w wybranym zakresie.</p>
+          </div>
+          <div class="schedule-details-grid">${cards.join("")}</div>
+          ${notes.join("")}
+        </div>
+      `;
     }
-    details.push(`<li><strong>Uwagi klienta:</strong> ${escapeHtml(item.raw.customerNote || "—")}</li>`);
-    details.push(`<li><strong>Notatka administratora:</strong> ${escapeHtml(item.raw.adminNote || "—")}</li>`);
-    return `<ul class="schedule-details-list">${details.join("")}</ul>`;
+
+    cards.push(scheduleDetailCardMarkup("Status", item.statusLabel || scheduleStatusLabel(item.status)));
+    if (item.service === "hotel") {
+      cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatCompactDate(item.raw.dateFrom)} - ${scheduleFormatCompactDate(item.raw.dateTo)}`));
+      cards.push(scheduleDetailCardMarkup("Pokoje", scheduleRoomLabels(item.raw.roomIds || item.resourceIds || []) || "—", true));
+      cards.push(scheduleDetailCardMarkup("Klient", item.raw.customerName || "—"));
+      cards.push(scheduleDetailCardMarkup("Telefon", item.raw.phone || "—"));
+      cards.push(scheduleDetailCardMarkup("E-mail", item.raw.email || "—", true));
+    } else if (item.service === "restaurant") {
+      cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
+      cards.push(
+        scheduleDetailCardMarkup(
+          "Stoliki",
+          item.raw.assignedTablesLabel || scheduleTableLabels(item.raw.assignedTableIds || item.resourceIds || []) || "—",
+          true
+        )
+      );
+      cards.push(scheduleDetailCardMarkup("Goście", String(item.raw.guestsCount || "—")));
+      cards.push(scheduleDetailCardMarkup("Klient", item.raw.fullName || "—"));
+      cards.push(scheduleDetailCardMarkup("Telefon", item.raw.phone || "—"));
+      cards.push(scheduleDetailCardMarkup("E-mail", item.raw.email || "—", true));
+    } else {
+      cards.push(scheduleDetailCardMarkup("Sala", item.raw.hallName || "—"));
+      cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
+      cards.push(scheduleDetailCardMarkup("Goście", String(item.raw.guestsCount || "—")));
+      cards.push(scheduleDetailCardMarkup("Rodzaj wydarzenia", item.raw.eventType || "—", true));
+      cards.push(scheduleDetailCardMarkup("Klient", item.raw.fullName || "—"));
+      cards.push(scheduleDetailCardMarkup("Telefon", item.raw.phone || "—"));
+      cards.push(scheduleDetailCardMarkup("E-mail", item.raw.email || "—", true));
+    }
+
+    notes.push(scheduleNoteCardMarkup("Uwagi klienta", item.raw.customerNote || ""));
+    notes.push(scheduleNoteCardMarkup("Notatka administratora", item.raw.adminNote || ""));
+    return `
+      <div class="schedule-details-view">
+        <div class="schedule-details-grid">${cards.join("")}</div>
+        ${notes.join("")}
+      </div>
+    `;
   }
 
   function openScheduleDetailsModal(service, id) {
@@ -1710,20 +1915,28 @@
         <div class="admin-modal-head">
           <div>
             <p class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</p>
-            <h3>Szczegóły wpisu</h3>
+            <h3>${isBlock ? "Szczegóły blokady" : "Szczegóły rezerwacji"}</h3>
           </div>
-          <button type="button" class="button secondary" data-schedule-modal-close>Zamknij</button>
+          <div class="schedule-modal-head-actions">
+            <button type="button" class="button secondary" data-schedule-details-action="edit">Edytuj</button>
+            <button type="button" class="button secondary icon-button" data-schedule-modal-close aria-label="Zamknij">${scheduleIconMarkup("close")}</button>
+          </div>
         </div>
         ${scheduleReservationDetailsMarkup(item)}
-        <div class="admin-modal-footer">
+        <div class="admin-modal-footer schedule-modal-footer">
           ${
-            item.status === "pending"
-              ? `<button type="button" class="button secondary" data-schedule-details-action="confirm">Potwierdź</button>
-                 <button type="button" class="button secondary danger-muted" data-schedule-details-action="reject">Odrzuć</button>`
+            item.status === "pending" || item.status === "email_verification_pending"
+              ? `<div class="inline-actions">
+                   <button type="button" class="button secondary" data-schedule-details-action="confirm">Potwierdź</button>
+                   <button type="button" class="button secondary danger-muted" data-schedule-details-action="reject">Odrzuć</button>
+                 </div>`
               : ""
           }
-          <button type="button" class="button secondary" data-schedule-details-action="edit">Edytuj</button>
-          <button type="button" class="button danger" data-schedule-details-action="delete">${isBlock ? "Usuń blokadę" : "Anuluj rezerwację"}</button>
+          <div class="inline-actions schedule-modal-danger">
+            <button type="button" class="button ${isBlock ? "danger icon-button" : "danger"}" data-schedule-details-action="delete" aria-label="${escapeAttribute(
+              isBlock ? "Usuń blokadę" : "Anuluj rezerwację"
+            )}">${isBlock ? scheduleIconMarkup("trash") : "Anuluj rezerwację"}</button>
+          </div>
         </div>
       `,
       (mount) => {
@@ -2429,9 +2642,10 @@
   function setAdminTab(tabKey) {
     dismissMenuEditorModal({ skipRender: true, closeEntirely: true });
     captureDraftIfPossible();
+    const tab = getAdminTabConfig(tabKey);
     state.ui.view = "section";
     state.ui.topTab = tabKey;
-    state.ui.tileByTab[tabKey] = getActiveAdminTile(tabKey);
+    state.ui.tileByTab[tab.key] = tab.tiles[0]?.key || "";
     renderDashboard();
   }
 
@@ -2744,7 +2958,14 @@
         <section class="admin-workspace${inSectionView ? "" : " admin-workspace-home"}">
           ${
             inSectionView
-              ? `
+              ? activeTab.key === "grafik"
+                ? `
+              <div class="grid admin-stage admin-stage--single">
+                ${renderAdminStageMarkup(activeTab.key, activeTile)}
+                <div id="admin-modal-root" class="admin-modal-root col-12"></div>
+              </div>
+            `
+                : `
               <div class="admin-workspace-head">
                 <div>
                   <p class="pill">${escapeHtml(activeTab.label)}</p>
@@ -2763,7 +2984,6 @@
                         data-admin-tile="${escapeAttribute(tile.key)}"
                       >
                         <span class="admin-tile-title">${escapeHtml(tile.label)}</span>
-                        <span class="admin-tile-copy">${escapeHtml(tile.description)}</span>
                       </button>
                     `
                   )
@@ -2785,9 +3005,8 @@
                       class="admin-tile admin-entry-tile admin-entry-tile--schedule"
                       data-admin-entry="${escapeAttribute(scheduleTab.key)}"
                     >
-                      <span class="admin-entry-icon" aria-hidden="true">GR</span>
+                      <span class="admin-entry-icon" aria-hidden="true">${scheduleIconMarkup("calendar")}</span>
                       <span class="admin-tile-title">${escapeHtml(scheduleTab.label)}</span>
-                      <span class="admin-tile-copy">${escapeHtml(scheduleTab.description)}</span>
                     </button>
                   `;
                 })()}
@@ -3562,10 +3781,8 @@
 
     const {
       title,
-      intro,
       enabledId,
-      enabledLabel,
-      enabledHelp,
+      toggleLabel,
       pauseRangesKey,
       pauseLabel,
       statusMessage = "",
@@ -3575,28 +3792,68 @@
     const booking = state.content.booking || {};
     const domainKey = String(enabledId || "").replace(/^booking-enable-/, "");
     const isEnabled = booking[domainKey] !== false;
+    const bookingLabel = toggleLabel || title;
 
     panel.innerHTML = `
       <p class="pill">Ustawienia rezerwacji</p>
       <h2>${escapeHtml(title)}</h2>
-      <p class="section-intro">${escapeHtml(intro)}</p>
       <div class="stack">
         ${disabled ? '<p class="panel-note">W tej konfiguracji rezerwacje online sa globalnie wylaczone. Po wlaczeniu backendu rezerwacji te ustawienia zaczna dzialac.</p>' : ""}
-        <label class="checkbox-field">
-          <input type="checkbox" id="${escapeAttribute(enabledId)}" ${isEnabled ? "checked" : ""} ${disabled ? "disabled" : ""} />
-          <span class="checkbox-copy">
-            <strong>${escapeHtml(enabledLabel)}</strong>
-            <span>${escapeHtml(enabledHelp)}</span>
-          </span>
-        </label>
-        <p class="helper" style="margin: 0;">Mozesz dodac wiele okresow przerwy. Dni graniczne sa liczone wlacznie.</p>
-        ${renderPauseRangesEditorMarkup(domainKey, booking[pauseRangesKey], {
-          disabled,
-          label: pauseLabel || "Przerwa",
-        })}
+        <div class="booking-toggle-card ${isEnabled ? "is-enabled" : "is-disabled"}">
+          <div class="booking-toggle-copy">
+            <strong>Rezerwacja ${escapeHtml(bookingLabel)}</strong>
+            <span class="booking-toggle-status ${isEnabled ? "is-enabled" : "is-disabled"}" data-booking-toggle-status="${escapeAttribute(enabledId)}">
+              Rezerwacja ${escapeHtml(bookingLabel)} ${isEnabled ? "wlaczona" : "wylaczona"}
+            </span>
+          </div>
+          <input type="checkbox" id="${escapeAttribute(enabledId)}" ${isEnabled ? "checked" : ""} ${disabled ? "disabled" : ""} hidden />
+          <button class="button ${isEnabled ? "secondary" : ""}" type="button" data-booking-toggle-button="${escapeAttribute(enabledId)}" ${disabled ? "disabled" : ""}>
+            ${isEnabled ? "Wylacz" : "Wlacz"}
+          </button>
+        </div>
+        <div class="stack">
+          <strong>Blokada rezerwacji:</strong>
+          ${renderPauseRangesEditorMarkup(domainKey, booking[pauseRangesKey], {
+            disabled,
+            label: pauseLabel || "Przerwa",
+          })}
+        </div>
         <p class="status">${escapeHtml(statusMessage)}</p>
       </div>
     `;
+
+    const toggleInput = panel.querySelector(`#${enabledId}`);
+    const toggleButton = panel.querySelector(`[data-booking-toggle-button="${enabledId}"]`);
+    const toggleStatus = panel.querySelector(`[data-booking-toggle-status="${enabledId}"]`);
+    const toggleCard = panel.querySelector(".booking-toggle-card");
+
+    const paintToggleState = () => {
+      const enabled = Boolean(toggleInput?.checked);
+      if (toggleButton) {
+        toggleButton.textContent = enabled ? "Wylacz" : "Wlacz";
+        toggleButton.classList.toggle("secondary", enabled);
+      }
+      if (toggleStatus) {
+        toggleStatus.textContent = `Rezerwacja ${bookingLabel} ${enabled ? "wlaczona" : "wylaczona"}`;
+        toggleStatus.classList.toggle("is-enabled", enabled);
+        toggleStatus.classList.toggle("is-disabled", !enabled);
+      }
+      if (toggleCard) {
+        toggleCard.classList.toggle("is-enabled", enabled);
+        toggleCard.classList.toggle("is-disabled", !enabled);
+      }
+    };
+
+    toggleButton?.addEventListener("click", () => {
+      if (!toggleInput || toggleInput.disabled) return;
+      toggleInput.checked = !toggleInput.checked;
+      paintToggleState();
+      refreshSaveDockVisibility();
+    });
+    toggleInput?.addEventListener("change", () => {
+      paintToggleState();
+      refreshSaveDockVisibility();
+    });
 
     bindRepeaterButtons();
   }
@@ -3604,10 +3861,8 @@
   function renderHotelBookingSettingsPanel(statusMessage = "") {
     renderDomainBookingSettingsPanel("#hotel-booking-settings-panel", {
       title: "Hotel",
-      intro: "Steruj formularzem rezerwacji pokoi i okresami przerwy.",
       enabledId: "booking-enable-hotel",
-      enabledLabel: "Hotel - rezerwacja pokoi wlaczona",
-      enabledHelp: "Wylacza lub wlacza formularz rezerwacji na stronie hotelu.",
+      toggleLabel: "Hotel",
       pauseRangesKey: "hotelPauseRanges",
       pauseLabel: "Hotel",
       statusMessage,
@@ -3618,10 +3873,8 @@
   function renderRestaurantBookingSettingsPanel(statusMessage = "") {
     renderDomainBookingSettingsPanel("#restaurant-booking-settings-panel", {
       title: "Restauracja",
-      intro: "Steruj formularzem rezerwacji stolikow i okresami przerwy.",
       enabledId: "booking-enable-restaurant",
-      enabledLabel: "Restauracja - rezerwacja stolika wlaczona",
-      enabledHelp: "Wylacza lub wlacza formularz rezerwacji na stronie restauracji.",
+      toggleLabel: "Restauracja",
       pauseRangesKey: "restaurantPauseRanges",
       pauseLabel: "Restauracja",
       statusMessage,
@@ -3632,10 +3885,8 @@
   function renderEventsBookingSettingsPanel(statusMessage = "") {
     renderDomainBookingSettingsPanel("#events-booking-settings-panel", {
       title: "Przyjecia",
-      intro: "Steruj formularzem zapytan o sale oraz okresami przerwy.",
       enabledId: "booking-enable-events",
-      enabledLabel: "Przyjecia / sale - rezerwacja wlaczona",
-      enabledHelp: "Wylacza lub wlacza formularz zapytania o sale.",
+      toggleLabel: "Przyjecia",
       pauseRangesKey: "eventsPauseRanges",
       pauseLabel: "Przyjecia / sale",
       statusMessage,
@@ -3653,49 +3904,42 @@
     state.content.home.sectionMedia = normalizeHomeSectionMedia(state.content.home.sectionMedia);
     const media = state.content.home.sectionMedia[sectionKey];
     const defaults = HOME_SECTION_MEDIA_DEFAULTS[sectionKey] || HOME_SECTION_MEDIA_DEFAULTS.hotel;
+    const draft = structuredClone(media);
     const messageId = `home-media-status-${sectionKey}`;
 
     panel.innerHTML = `
       <p class="pill">${escapeHtml(panelLabel)}</p>
       <h2>Strona glowna</h2>
-      <p class="section-intro">Zmiana obrazu kafelka "${escapeHtml(panelLabel)}" na stronie glownej. Ustaw kadrowanie: przesuniecie X/Y oraz zoom.</p>
       <div class="stack home-media-editor">
-        <form class="stack" data-home-media-upload-form="${escapeAttribute(sectionKey)}">
+        <form class="repeater-item upload-room-gallery-form home-media-upload-form" data-home-media-upload-form="${escapeAttribute(sectionKey)}">
           <label class="field-full">
-            <span>Nowe zdjecie sekcji</span>
+            <span>Nowe zdjecie</span>
             <input type="file" name="image" accept="image/*" required />
           </label>
-          <div class="inline-actions">
-            <button class="button" type="submit">Wgraj zdjecie</button>
-            <button class="button secondary" type="button" data-home-media-reset="${escapeAttribute(sectionKey)}">Przywroc domyslne</button>
-          </div>
+          <button class="button" type="submit">Wgraj zdjecie</button>
+          <button class="button secondary" type="button" data-home-media-reset="${escapeAttribute(sectionKey)}">Przywroc domyslne</button>
         </form>
-
-        <label class="field-full">
-          <span>Alt obrazu</span>
-          <input type="text" data-home-media-field="imageAlt" maxlength="200" value="${escapeAttribute(media.imageAlt || "")}" />
-        </label>
 
         <div class="field-grid home-media-controls">
           <label class="field-full">
             <span>Pozycja pozioma (X)</span>
             <div class="home-media-control-pair">
-              <input type="range" min="0" max="100" step="1" data-home-media-field="focusX" value="${escapeAttribute(String(media.focusX))}" />
-              <input type="number" min="0" max="100" step="1" data-home-media-field="focusX" value="${escapeAttribute(String(media.focusX))}" />
+              <input type="range" min="0" max="100" step="1" data-home-media-field="focusX" value="${escapeAttribute(String(draft.focusX))}" />
+              <input type="number" min="0" max="100" step="1" data-home-media-field="focusX" value="${escapeAttribute(String(draft.focusX))}" />
             </div>
           </label>
           <label class="field-full">
             <span>Pozycja pionowa (Y)</span>
             <div class="home-media-control-pair">
-              <input type="range" min="0" max="100" step="1" data-home-media-field="focusY" value="${escapeAttribute(String(media.focusY))}" />
-              <input type="number" min="0" max="100" step="1" data-home-media-field="focusY" value="${escapeAttribute(String(media.focusY))}" />
+              <input type="range" min="0" max="100" step="1" data-home-media-field="focusY" value="${escapeAttribute(String(draft.focusY))}" />
+              <input type="number" min="0" max="100" step="1" data-home-media-field="focusY" value="${escapeAttribute(String(draft.focusY))}" />
             </div>
           </label>
           <label class="field-full">
             <span>Zoom</span>
             <div class="home-media-control-pair">
-              <input type="range" min="1" max="2.5" step="0.01" data-home-media-field="zoom" value="${escapeAttribute(String(media.zoom))}" />
-              <input type="number" min="1" max="2.5" step="0.01" data-home-media-field="zoom" value="${escapeAttribute(String(media.zoom))}" />
+              <input type="range" min="1" max="2.5" step="0.01" data-home-media-field="zoom" value="${escapeAttribute(String(draft.zoom))}" />
+              <input type="number" min="1" max="2.5" step="0.01" data-home-media-field="zoom" value="${escapeAttribute(String(draft.zoom))}" />
             </div>
           </label>
         </div>
@@ -3703,9 +3947,13 @@
         <div class="home-media-preview-shell">
           <strong>Podglad kafelka</strong>
           <div class="home-media-preview" id="home-media-preview-${escapeAttribute(sectionKey)}">
-            <img src="${escapeAttribute(media.imageUrl || "")}" alt="${escapeAttribute(media.imageAlt || panelLabel)}" />
+            <img src="${escapeAttribute(draft.imageUrl || "")}" alt="${escapeAttribute(draft.imageAlt || panelLabel)}" />
             <div class="home-media-preview-overlay">${escapeHtml(panelLabel)}</div>
           </div>
+        </div>
+        <div class="admin-toolbar-actions home-media-draft-actions">
+          <button class="button secondary" type="button" data-home-media-cancel="${escapeAttribute(sectionKey)}">Anuluj</button>
+          <button class="button" type="button" data-home-media-apply="${escapeAttribute(sectionKey)}">Zapisz</button>
         </div>
         <p class="status" id="${escapeAttribute(messageId)}">${escapeHtml(statusMessage)}</p>
       </div>
@@ -3714,7 +3962,8 @@
     const statusNode = panel.querySelector(`#${messageId}`);
     const preview = panel.querySelector(`#home-media-preview-${sectionKey}`);
     const previewImg = preview?.querySelector("img");
-    const altInput = panel.querySelector('[data-home-media-field="imageAlt"]');
+    const applyButton = panel.querySelector(`[data-home-media-apply="${sectionKey}"]`);
+    const cancelButton = panel.querySelector(`[data-home-media-cancel="${sectionKey}"]`);
 
     const setStatus = (text) => {
       if (statusNode) {
@@ -3722,15 +3971,46 @@
       }
     };
 
+    const sameMediaState = (left, right) =>
+      JSON.stringify({
+        imageUrl: left.imageUrl || "",
+        imageAlt: left.imageAlt || "",
+        focusX: Number(left.focusX ?? defaults.focusX),
+        focusY: Number(left.focusY ?? defaults.focusY),
+        zoom: Number(left.zoom ?? defaults.zoom),
+      }) ===
+      JSON.stringify({
+        imageUrl: right.imageUrl || "",
+        imageAlt: right.imageAlt || "",
+        focusX: Number(right.focusX ?? defaults.focusX),
+        focusY: Number(right.focusY ?? defaults.focusY),
+        zoom: Number(right.zoom ?? defaults.zoom),
+      });
+
+    const syncDraftFrom = (source) => {
+      draft.imageUrl = source.imageUrl || defaults.imageUrl;
+      draft.imageAlt = source.imageAlt || defaults.imageAlt || panelLabel;
+      draft.focusX = clampNumber(source.focusX, 0, 100, defaults.focusX);
+      draft.focusY = clampNumber(source.focusY, 0, 100, defaults.focusY);
+      draft.zoom = clampNumber(source.zoom, 1, 2.5, defaults.zoom);
+    };
+
+    const refreshDraftActions = () => {
+      const isDirty = !sameMediaState(draft, media);
+      if (applyButton) applyButton.disabled = !isDirty;
+      if (cancelButton) cancelButton.disabled = !isDirty;
+    };
+
     const applyPreview = () => {
       if (!preview) return;
-      preview.style.setProperty("--home-media-focus-x", `${media.focusX}%`);
-      preview.style.setProperty("--home-media-focus-y", `${media.focusY}%`);
-      preview.style.setProperty("--home-media-zoom", String(media.zoom));
+      preview.style.setProperty("--home-media-focus-x", `${draft.focusX}%`);
+      preview.style.setProperty("--home-media-focus-y", `${draft.focusY}%`);
+      preview.style.setProperty("--home-media-zoom", String(draft.zoom));
       if (previewImg) {
-        previewImg.src = media.imageUrl || defaults.imageUrl;
-        previewImg.alt = media.imageAlt || panelLabel;
+        previewImg.src = draft.imageUrl || defaults.imageUrl;
+        previewImg.alt = draft.imageAlt || panelLabel;
       }
+      refreshDraftActions();
     };
 
     const syncFieldInputs = (field, value) => {
@@ -3742,24 +4022,17 @@
     };
 
     const updateMediaField = (field, rawValue) => {
-      if (field === "imageAlt") {
-        media.imageAlt = String(rawValue || "").trim();
-        applyPreview();
-        refreshSaveDockVisibility();
-        return;
-      }
       if (field === "zoom") {
-        media.zoom = clampNumber(rawValue, 1, 2.5, defaults.zoom);
-        syncFieldInputs(field, media.zoom);
+        draft.zoom = clampNumber(rawValue, 1, 2.5, defaults.zoom);
+        syncFieldInputs(field, draft.zoom);
       } else if (field === "focusX") {
-        media.focusX = clampNumber(rawValue, 0, 100, defaults.focusX);
-        syncFieldInputs(field, media.focusX);
+        draft.focusX = clampNumber(rawValue, 0, 100, defaults.focusX);
+        syncFieldInputs(field, draft.focusX);
       } else if (field === "focusY") {
-        media.focusY = clampNumber(rawValue, 0, 100, defaults.focusY);
-        syncFieldInputs(field, media.focusY);
+        draft.focusY = clampNumber(rawValue, 0, 100, defaults.focusY);
+        syncFieldInputs(field, draft.focusY);
       }
       applyPreview();
-      refreshSaveDockVisibility();
     };
 
     panel.querySelectorAll('[data-home-media-field="focusX"], [data-home-media-field="focusY"], [data-home-media-field="zoom"]').forEach((input) => {
@@ -3771,27 +4044,13 @@
       });
     });
 
-    if (altInput) {
-      altInput.addEventListener("input", () => {
-        updateMediaField("imageAlt", altInput.value);
-      });
-    }
-
     panel.querySelector(`[data-home-media-reset="${sectionKey}"]`)?.addEventListener("click", () => {
-      media.imageUrl = defaults.imageUrl;
-      media.imageAlt = defaults.imageAlt;
-      media.focusX = defaults.focusX;
-      media.focusY = defaults.focusY;
-      media.zoom = defaults.zoom;
-      if (altInput) {
-        altInput.value = media.imageAlt;
-      }
-      syncFieldInputs("focusX", media.focusX);
-      syncFieldInputs("focusY", media.focusY);
-      syncFieldInputs("zoom", media.zoom);
+      syncDraftFrom(defaults);
+      syncFieldInputs("focusX", draft.focusX);
+      syncFieldInputs("focusY", draft.focusY);
+      syncFieldInputs("zoom", draft.zoom);
       applyPreview();
-      refreshSaveDockVisibility();
-      setStatus("Przywrocono domyslne zdjecie i ustawienia kadrowania.");
+      setStatus("Przywrocono domyslny obraz i domyslne kadrowanie.");
     });
 
     panel.querySelector(`[data-home-media-upload-form="${sectionKey}"]`)?.addEventListener("submit", async (event) => {
@@ -3807,20 +4066,36 @@
       try {
         setStatus("Kompresowanie i przygotowanie zdjecia...");
         const compressed = await compressImageFile(file, { maxBytes: INLINE_IMAGE_MAX_BYTES });
-        media.imageUrl = await blobToDataUrl(compressed);
-        if (!media.imageAlt) {
-          media.imageAlt = compressed.name.replace(/\.[^/.]+$/, "") || defaults.imageAlt;
-          if (altInput) {
-            altInput.value = media.imageAlt;
-          }
+        draft.imageUrl = await blobToDataUrl(compressed);
+        if (!draft.imageAlt) {
+          draft.imageAlt = defaults.imageAlt || panelLabel;
         }
         applyPreview();
-        refreshSaveDockVisibility();
-        setStatus("Zdjecie zostalo wgrane do szkicu. Kliknij Zapisz, aby opublikowac.");
+        setStatus("Zdjecie zostalo wgrane do szkicu. Kliknij Zapisz, aby zatwierdzic ustawienia.");
         form.reset();
       } catch (error) {
         setStatus(error.message || "Nie udalo sie przygotowac zdjecia.");
       }
+    });
+
+    applyButton?.addEventListener("click", () => {
+      media.imageUrl = draft.imageUrl;
+      media.imageAlt = draft.imageAlt;
+      media.focusX = draft.focusX;
+      media.focusY = draft.focusY;
+      media.zoom = draft.zoom;
+      refreshSaveDockVisibility();
+      refreshDraftActions();
+      setStatus("Ustawienia kafelka zapisano w panelu. Kliknij glowne Zapisz, aby opublikowac je na stronie.");
+    });
+
+    cancelButton?.addEventListener("click", () => {
+      syncDraftFrom(media);
+      syncFieldInputs("focusX", draft.focusX);
+      syncFieldInputs("focusY", draft.focusY);
+      syncFieldInputs("zoom", draft.zoom);
+      applyPreview();
+      setStatus("Przywrocono ostatnio zapisane ustawienia tego kafelka.");
     });
 
     applyPreview();
@@ -5506,8 +5781,8 @@
                       <article class="thumb-card">
                         <img src="${escapeAttribute(image.url || image)}" alt="${escapeAttribute(image.alt || "Restauracja")}" />
                         <div class="inline-actions">
-                          <button class="button secondary" type="button" data-move-restaurant-image-up="${index}" ${index === 0 ? 'disabled' : ''}>↑</button>
-                          <button class="button secondary" type="button" data-move-restaurant-image-down="${index}" ${index === gallery.length - 1 ? 'disabled' : ''}>↓</button>
+                          <button class="button secondary" type="button" data-move-restaurant-image-up="${index}" aria-label="Przesun w lewo" ${index === 0 ? 'disabled' : ''}>←</button>
+                          <button class="button secondary" type="button" data-move-restaurant-image-down="${index}" aria-label="Przesun w prawo" ${index === gallery.length - 1 ? 'disabled' : ''}>→</button>
                           <button class="button danger" type="button" data-remove-restaurant-image="${index}">Usun</button>
                         </div>
                       </article>`
@@ -5604,24 +5879,20 @@
       <p class="pill">Hotel</p>
       <h2>Galeria Pokoi</h2>
       <p class="section-intro">Wspolna galeria pokoi. Przy dodawaniu zdjec wskazujesz album (1/2/3/4-osobowe), a nizej zarzadzasz kolejnoscia i usuwaniem.</p>
-      <form class="repeater-item stack" id="hotel-room-gallery-upload-form">
-        <div class="field-grid">
-          <label class="field">
-            <span>Album</span>
-            <select name="roomType" required>
-              ${roomTypes
-                .map((roomType) => `<option value="${escapeAttribute(roomType.key)}">${escapeHtml(roomType.label)}</option>`)
-                .join("")}
-            </select>
-          </label>
-          <label class="field">
-            <span>Dodaj zdjecia</span>
-            <input type="file" name="images" accept="image/*" multiple required />
-          </label>
-        </div>
-        <div class="inline-actions">
-          <button class="button secondary" type="submit">Wgraj do wybranego albumu</button>
-        </div>
+      <form class="repeater-item upload-room-gallery-form upload-room-gallery-form--album" id="hotel-room-gallery-upload-form">
+        <label class="field">
+          <span>Wgraj zdjecie</span>
+          <input type="file" name="images" accept="image/*" multiple required />
+        </label>
+        <label class="field">
+          <span>Wybierz album</span>
+          <select name="roomType" required>
+            ${roomTypes
+              .map((roomType) => `<option value="${escapeAttribute(roomType.key)}">${escapeHtml(roomType.label)}</option>`)
+              .join("")}
+          </select>
+        </label>
+        <button class="button secondary" type="submit">Wgraj</button>
       </form>
       <p class="status">${escapeHtml(statusMessage)}</p>
       <div class="grid">
@@ -5640,8 +5911,8 @@
                                 <article class="thumb-card">
                                   <img src="${escapeAttribute(image.url || image)}" alt="${escapeAttribute(image.alt || roomType.label)}" />
                                   <div class="inline-actions">
-                                    <button class="button secondary" type="button" data-move-up="${roomType.key}" data-index="${index}" ${index === 0 ? 'disabled' : ''}>↑</button>
-                                    <button class="button secondary" type="button" data-move-down="${roomType.key}" data-index="${index}" ${index === roomGalleries[roomType.key].length - 1 ? 'disabled' : ''}>↓</button>
+                                    <button class="button secondary" type="button" data-move-up="${roomType.key}" data-index="${index}" aria-label="Przesun w lewo" ${index === 0 ? 'disabled' : ''}>←</button>
+                                    <button class="button secondary" type="button" data-move-down="${roomType.key}" data-index="${index}" aria-label="Przesun w prawo" ${index === roomGalleries[roomType.key].length - 1 ? 'disabled' : ''}>→</button>
                                     <button class="button danger" type="button" data-remove-room-image="${roomType.key}" data-index="${index}">Usun</button>
                                   </div>
                                 </article>`
@@ -5825,8 +6096,8 @@
                                 <article class="thumb-card">
                                   <img src="${escapeAttribute(image.url || image)}" alt="${escapeAttribute(image.alt || hallType.label)}" />
                                   <div class="inline-actions">
-                                    <button class="button secondary" type="button" data-move-up-hall="${hallType.key}" data-index="${index}" ${index === 0 ? 'disabled' : ''}>↑</button>
-                                    <button class="button secondary" type="button" data-move-down-hall="${hallType.key}" data-index="${index}" ${index === hallGalleries[hallType.key].length - 1 ? 'disabled' : ''}>↓</button>
+                                    <button class="button secondary" type="button" data-move-up-hall="${hallType.key}" data-index="${index}" aria-label="Przesun w lewo" ${index === 0 ? 'disabled' : ''}>←</button>
+                                    <button class="button secondary" type="button" data-move-down-hall="${hallType.key}" data-index="${index}" aria-label="Przesun w prawo" ${index === hallGalleries[hallType.key].length - 1 ? 'disabled' : ''}>→</button>
                                     <button class="button danger" type="button" data-remove-hall-image="${hallType.key}" data-index="${index}">Usun</button>
                                   </div>
                                 </article>`
