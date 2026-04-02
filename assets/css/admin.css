@@ -2671,6 +2671,7 @@ button.icon-btn {
   line-height: 1.18;
   font-weight: 700;
   color: #1f1712;
+  text-align: center;
 }
 
 .mail-preview-button {
@@ -2693,6 +2694,29 @@ button.icon-btn {
   font-size: 1rem;
   line-height: 1.75;
   color: #3e3125;
+}
+
+.mail-preview-body h1,
+.mail-preview-body h2,
+.mail-preview-body h3 {
+  margin: 0 0 1rem;
+  font-family: "Cormorant Garamond", serif;
+  line-height: 1.2;
+  color: #1f1712;
+  font-weight: 700;
+  text-align: center;
+}
+
+.mail-preview-body h1 {
+  font-size: 2rem;
+}
+
+.mail-preview-body h2 {
+  font-size: 1.65rem;
+}
+
+.mail-preview-body h3 {
+  font-size: 1.35rem;
 }
 
 .mail-preview-body > :first-child {

@@ -88,15 +88,18 @@
       html {
         scroll-behavior: smooth;
         scrollbar-width: none;
-        overflow: hidden;
-        height: 100%;
+        min-height: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
       }
 
       body {
         margin: 0;
         min-height: 100vh;
-        height: 100vh;
-        overflow: hidden;
+        min-height: 100svh;
+        min-height: 100dvh;
+        overflow-x: hidden;
+        overflow-y: auto;
         font-family: "Manrope", sans-serif;
         color: var(--text);
         background: #fefcf9;
@@ -142,8 +145,9 @@
       .shell {
         position: relative;
         min-height: 100vh;
-        height: 100vh;
-        overflow: hidden;
+        min-height: 100svh;
+        min-height: 100dvh;
+        overflow: visible;
         display: flex;
         flex-direction: column;
       }

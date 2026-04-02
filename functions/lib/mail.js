@@ -32,10 +32,16 @@ function decodeHtmlEntities(value) {
 }
 
 function enhanceFragmentHtml(html) {
-  return String(html || "").replace(/<a\b([^>]*)>/gi, (match, attrs) => {
-    if (/\bstyle\s*=/i.test(attrs)) return `<a${attrs}>`;
-    return `<a${attrs} style="color:#7b5a24;font-weight:700;text-decoration:none;border-bottom:1px solid #c8aa78;">`;
-  });
+  return String(html || "")
+    .replace(/<a\b([^>]*)>/gi, (match, attrs) => {
+      if (/\bstyle\s*=/i.test(attrs)) return `<a${attrs}>`;
+      return `<a${attrs} style="color:#7b5a24;font-weight:700;text-decoration:none;border-bottom:1px solid #c8aa78;">`;
+    })
+    .replace(/<h([1-3])\b([^>]*)>/gi, (match, level, attrs) => {
+      if (/\bstyle\s*=/i.test(attrs)) return `<h${level}${attrs}>`;
+      const sizes = { 1: "30px", 2: "24px", 3: "20px" };
+      return `<h${level}${attrs} style="margin:0 0 18px 0;font-family:Georgia,'Times New Roman',serif;font-size:${sizes[level] || "24px"};line-height:1.2;color:#1f1712;font-weight:700;text-align:center;">`;
+    });
 }
 
 function htmlToText(html) {
@@ -121,12 +127,12 @@ function buildBrandedEmail({
             </tr>
             <tr>
               <td style="background:#ffffff;border:1px solid #e8dcc8;border-radius:22px;padding:34px 32px;box-shadow:0 10px 30px rgba(52,33,14,0.08);">
-                <div style="font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.2;color:#1f1712;font-weight:700;margin:0 0 22px 0;">
+                <div style="font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.2;color:#1f1712;font-weight:700;margin:0 0 22px 0;text-align:center;">
                   ${safeSubject}
                 </div>
                 ${
                   actionHref
-                    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 26px 0;">
+                    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 26px auto;">
                         <tr>
                           <td style="border-radius:999px;background:#7b5a24;">
                             <a href="${actionHref}" style="display:inline-block;padding:14px 24px;font-size:15px;line-height:1.2;font-weight:700;color:#ffffff;text-decoration:none;">${actionTitle}</a>
@@ -186,7 +192,7 @@ function infoCard(title, rows, footerHtml = "") {
     .join("");
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;margin:24px 0 22px 0;border:1px solid #eadfce;border-radius:18px;background:#fbf7f1;">
     <tr>
-      <td style="padding:18px 20px 8px 20px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.2;color:#241914;font-weight:700;">${title}</td>
+      <td style="padding:18px 20px 8px 20px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.2;color:#241914;font-weight:700;text-align:center;">${title}</td>
     </tr>
     <tr>
       <td style="padding:0 20px 6px 20px;">
@@ -196,7 +202,7 @@ function infoCard(title, rows, footerHtml = "") {
     ${
       footerHtml
         ? `<tr>
-            <td style="padding:0 20px 20px 20px;color:#5e4b39;font-size:14px;line-height:1.7;">${footerHtml}</td>
+            <td style="padding:0 20px 20px 20px;color:#5e4b39;font-size:14px;line-height:1.7;text-align:center;">${footerHtml}</td>
           </tr>`
         : ""
     }

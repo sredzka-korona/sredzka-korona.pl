@@ -151,6 +151,15 @@
     return enumerateNights(state.hotel.dateFrom, state.hotel.dateTo).length;
   }
 
+  function formatNightCount(count) {
+    const safe = Math.max(0, toInt(count, 0));
+    const mod10 = safe % 10;
+    const mod100 = safe % 100;
+    if (safe === 1) return "1 noc";
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${safe} noce`;
+    return `${safe} nocy`;
+  }
+
   function hotelRoomMap() {
     const map = new Map();
     (state.hotel.availability?.rooms || []).forEach((room) => map.set(room.id, room));
@@ -654,8 +663,12 @@
       state.restaurant.publicSettings = data;
       state.restaurant.reservationDate = data?.selectedDate || dateValue;
       syncRestaurantStartTime();
+      setError("");
+    } catch (error) {
+      setError(error?.message || "Nie udało się załadować danych restauracji.");
     } finally {
       state.restaurant.loading = false;
+      render();
     }
   }
 
@@ -882,7 +895,7 @@
                           <strong class="gb-room-name">${escapeHtml(room.name)}</strong>
                           <div class="gb-room-price-wrap">
                             <span class="gb-room-price">${escapeHtml(unit.toFixed(2))} PLN / noc</span>
-                            <small class="gb-room-price-note">${escapeHtml(subtotal)} PLN / za ${escapeHtml(String(nights))} ${nights === 1 ? "noc" : "nocy"}</small>
+                            <small class="gb-room-price-note">${escapeHtml(subtotal)} PLN / za ${escapeHtml(formatNightCount(nights))}</small>
                           </div>
                         </div>
                         <p class="gb-room-line">
@@ -911,20 +924,32 @@
           }
         </div>
         <div class="gb-cart">
-          <strong>Wybrane pokoje:</strong>
-          ${
-            state.hotel.selectedRoomIds.length
-              ? `<ul>${state.hotel.selectedRoomIds
-                  .map((id) => {
-                    const room = rooms.find((entry) => entry.id === id);
-                    return `<li>${escapeHtml(room?.name || id)}</li>`;
-                  })
-                  .join("")}</ul>`
-              : " <span>brak</span>"
-          }
-          <div class="gb-cart-total-row">
-            <span><strong>Liczba noclegów:</strong> ${escapeHtml(String(nights))}</span>
+          <div class="gb-cart-head">
+            <strong>Podsumowanie pobytu</strong>
             <strong class="gb-cart-total">Razem ${escapeHtml(hotelTotalPrice().toFixed(2))} PLN</strong>
+          </div>
+          <div class="gb-cart-stats">
+            <div class="gb-cart-stat">
+              <span class="gb-cart-stat-k">Termin pobytu</span>
+              <strong class="gb-cart-stat-v">${escapeHtml(state.hotel.dateFrom)} — ${escapeHtml(state.hotel.dateTo)}</strong>
+            </div>
+            <div class="gb-cart-stat">
+              <span class="gb-cart-stat-k">Liczba nocy</span>
+              <strong class="gb-cart-stat-v">${escapeHtml(formatNightCount(nights))}</strong>
+            </div>
+          </div>
+          <div class="gb-cart-selection">
+            <span class="gb-cart-selection-label">Wybrane pokoje</span>
+            ${
+              state.hotel.selectedRoomIds.length
+                ? `<ul class="gb-cart-room-list">${state.hotel.selectedRoomIds
+                    .map((id) => {
+                      const room = rooms.find((entry) => entry.id === id);
+                      return `<li class="gb-cart-room-item">${escapeHtml(room?.name || id)}</li>`;
+                    })
+                    .join("")}</ul>`
+                : '<p class="gb-cart-empty">Brak wybranych pokoi.</p>'
+            }
           </div>
         </div>
         <div class="gb-actions">
@@ -938,7 +963,12 @@
 
   function renderRestaurantDateTimeStep() {
     if (state.restaurant.loading) {
-      return `<p class="gb-hint">Ładowanie godzin otwarcia i dostępnych slotów…</p>`;
+      return `
+        <div class="gb-loading-state" role="status" aria-live="polite">
+          <span class="gb-loading-spinner" aria-hidden="true"></span>
+          <p class="gb-loading-text">Ładowanie...</p>
+        </div>
+      `;
     }
 
     const slots = restaurantSlotsForDuration();
@@ -951,7 +981,7 @@
 
     return `
       <section>
-        <h3>Data, godzina i czas</h3>
+        <h3>Termin</h3>
         ${dayHint ? `<p class="gb-inline-note gb-opening-hours-note">${escapeHtml(dayHint)}</p>` : ""}
         <div class="gb-grid-3">
           <label class="gb-field">
@@ -1106,7 +1136,7 @@
             data-select-hall="${escapeHtml(smallHall?.id || "")}"
             ${smallInfo.available && smallHall ? "" : "disabled"}
           >
-            <strong>${escapeHtml(smallHall?.name || "Sala mala")}</strong>
+            <strong>${escapeHtml(smallHall?.name || "Sala mała")}</strong>
             <small>${smallInfo.available ? "Dostępna" : escapeHtml(smallInfo.reason || "Niedostępna")}</small>
           </button>
 
@@ -1116,7 +1146,7 @@
             data-select-hall="${escapeHtml(largeHall?.id || "")}"
             ${largeInfo.available && largeHall ? "" : "disabled"}
           >
-            <strong>${escapeHtml(largeHall?.name || "Sala duza")}</strong>
+            <strong>${escapeHtml(largeHall?.name || "Sala duża")}</strong>
             <small>${largeInfo.available ? `Dostępna (wolne miejsca: ${escapeHtml(String(largeInfo.maxGuests || 0))})` : escapeHtml(largeInfo.reason || "Niedostępna")}</small>
           </button>
         </div>
@@ -1213,17 +1243,22 @@
     if (service === "hotel") {
       const nights = nightsCount();
       const roomsById = hotelRoomMap();
-      const nightsLabel = nights === 1 ? "1 nocleg" : `${nights} noclegów`;
+      const nightsLabel = formatNightCount(nights);
       return `
         <div class="gb-summary-box gb-summary-box--hotel">
-          <h3 class="gb-summary-box-title">Podsumowanie</h3>
-          <div class="gb-summary-hotel-term">
-            <div class="gb-summary-row">
-              <span class="gb-summary-k">Termin pobytu</span>
-              <span class="gb-summary-v">${escapeHtml(state.hotel.dateFrom)} — ${escapeHtml(state.hotel.dateTo)}</span>
+          <h3 class="gb-summary-box-title">Podsumowanie pobytu</h3>
+          <div class="gb-summary-stat-grid">
+            <div class="gb-summary-stat">
+              <span class="gb-summary-stat-k">Termin pobytu</span>
+              <strong class="gb-summary-stat-v">${escapeHtml(state.hotel.dateFrom)} — ${escapeHtml(state.hotel.dateTo)}</strong>
             </div>
-            <p class="gb-summary-sub">${escapeHtml(nightsLabel)}</p>
+            <div class="gb-summary-stat">
+              <span class="gb-summary-stat-k">Liczba nocy</span>
+              <strong class="gb-summary-stat-v">${escapeHtml(nightsLabel)}</strong>
+            </div>
           </div>
+          <div class="gb-summary-section">
+            <span class="gb-summary-section-label">Pokoje</span>
           <ul class="gb-summary-room-list">
             ${state.hotel.selectedRoomIds
               .map((id) => {
@@ -1240,6 +1275,7 @@
               })
               .join("")}
           </ul>
+          </div>
           <p class="gb-summary-total">Razem ${escapeHtml(hotelTotalPrice().toFixed(2))} PLN</p>
         </div>
       `;
@@ -1248,7 +1284,7 @@
     if (service === "restaurant") {
       return `
         <div class="gb-summary-box">
-          <h3 class="gb-summary-box-title">Podsumowanie — Restauracja</h3>
+          <h3 class="gb-summary-box-title">Podsumowanie rezerwacji</h3>
           <ul class="gb-summary-list gb-summary-list--stacked">
             <li class="gb-summary-li"><span class="gb-summary-k">Data</span><span class="gb-summary-v">${escapeHtml(state.restaurant.reservationDate)}</span></li>
             <li class="gb-summary-li"><span class="gb-summary-k">Godzina</span><span class="gb-summary-v">${escapeHtml(state.restaurant.startTime)}</span></li>
@@ -1272,7 +1308,7 @@
     const selectedHall = state.events.halls.find((hall) => hall.id === state.events.selectedHallId);
     return `
       <div class="gb-summary-box">
-        <h3 class="gb-summary-box-title">Podsumowanie — Przyjęcia</h3>
+        <h3 class="gb-summary-box-title">Podsumowanie zapytania</h3>
         <ul class="gb-summary-list gb-summary-list--stacked">
           <li class="gb-summary-li"><span class="gb-summary-k">Data</span><span class="gb-summary-v">${escapeHtml(state.events.reservationDate)}</span></li>
           <li class="gb-summary-li"><span class="gb-summary-k">Godzina</span><span class="gb-summary-v">${escapeHtml(state.events.startTime)}</span></li>
@@ -1310,11 +1346,11 @@
 
         <div class="gb-summary-grid">
           <div class="gb-summary-box">
-            <h3 class="gb-summary-box-title">Dane zamawiającego</h3>
-            <ul class="gb-summary-list">
-              <li><strong>Imię i nazwisko:</strong> ${escapeHtml(fullName())}</li>
-              <li><strong>E-mail:</strong> ${escapeHtml(state.personal.email)}</li>
-              <li><strong>Telefon:</strong> ${escapeHtml(`${state.personal.phonePrefix} ${state.personal.phoneNational}`.trim())}</li>
+            <h3 class="gb-summary-box-title">Dane kontaktowe</h3>
+            <ul class="gb-summary-list gb-summary-list--stacked">
+              <li class="gb-summary-li"><span class="gb-summary-k">Imię i nazwisko</span><span class="gb-summary-v">${escapeHtml(fullName())}</span></li>
+              <li class="gb-summary-li"><span class="gb-summary-k">E-mail</span><span class="gb-summary-v">${escapeHtml(state.personal.email)}</span></li>
+              <li class="gb-summary-li"><span class="gb-summary-k">Telefon</span><span class="gb-summary-v">${escapeHtml(`${state.personal.phonePrefix} ${state.personal.phoneNational}`.trim())}</span></li>
             </ul>
           </div>
           ${renderSummaryBox()}
@@ -1562,7 +1598,7 @@
 
     if (state.step === "service") {
       document.querySelectorAll("[data-service-select]").forEach((button) => {
-        button.addEventListener("click", async () => {
+        button.addEventListener("click", () => {
           renewSession({ persist: false });
           const service = button.getAttribute("data-service-select");
           if (!service || state.bookingFlags[service] === false) return;
@@ -1570,14 +1606,21 @@
           state.selectedService = service;
           const flow = getFlow();
           state.step = flow[1] || "summary";
+          render();
 
           if (service === "restaurant") {
-            await loadRestaurantSettingsForDate(state.restaurant.reservationDate || todayYmdLocal());
+            loadRestaurantSettingsForDate(state.restaurant.reservationDate || todayYmdLocal());
+            return;
           }
           if (service === "events") {
-            await ensureEventHallsLoaded();
+            ensureEventHallsLoaded()
+              .then(() => render())
+              .catch((error) => {
+                setError(error?.message || "Nie udało się załadować sal.");
+                render();
+              });
+            return;
           }
-          render();
         });
       });
       return;
@@ -1669,7 +1712,6 @@
         state.restaurant.reservationDate = String(dateInput.value || "");
         setError("");
         await loadRestaurantSettingsForDate(state.restaurant.reservationDate || todayYmdLocal());
-        render();
       });
 
       durationInput?.addEventListener("change", () => {

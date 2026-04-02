@@ -558,7 +558,7 @@ exports.hotelApi = onRequest(
         return;
       }
 
-      if (req.method === "DELETE" && op === "admin-room-delete") {
+      if ((req.method === "DELETE" || req.method === "POST") && op === "admin-room-delete") {
         const body =
           typeof req.body === "object" && req.body ? req.body : JSON.parse(req.body || "{}");
         const id = String(url.searchParams.get("id") || body.id || "").trim();

@@ -721,8 +721,8 @@
           if (!confirm(`Usunąć pokój „${name}”? Nie można tego cofnąć.`)) return;
           try {
             await hotelApi("admin-room-delete", {
-              method: "DELETE",
-              query: { id },
+              method: "POST",
+              body: { id },
             });
             await loadRooms();
             hotelSubTab = "rooms";

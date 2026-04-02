@@ -887,7 +887,7 @@ const restaurantApi = onRequest(
         return;
       }
 
-      if (req.method === "DELETE" && op === "admin-table-delete") {
+      if ((req.method === "DELETE" || req.method === "POST") && op === "admin-table-delete") {
         const body = typeof req.body === "object" && req.body ? req.body : JSON.parse(req.body || "{}");
         const tableId = String(body.id || "").trim();
         if (!tableId) {

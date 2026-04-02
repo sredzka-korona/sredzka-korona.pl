@@ -17,16 +17,26 @@
     return "";
   }
 
-  async function restaurantApi(op, options = {}) {
-    const base = restaurantApiBase();
-    if (!base) {
-      throw new Error("Brak restaurantApiBase / firebaseProjectId.");
+  function restaurantDirectApiBase() {
+    if (config.restaurantApiBase) {
+      return String(config.restaurantApiBase).replace(/\/$/, "");
     }
-    if (typeof firebase === "undefined" || !firebase.auth()?.currentUser) {
-      throw new Error("Brak sesji Firebase.");
+    if (config.firebaseProjectId) {
+      return `https://europe-west1-${config.firebaseProjectId}.cloudfunctions.net/restaurantApi`;
     }
-    const token = await firebase.auth().currentUser.getIdToken();
-    const res = await fetch(`${base}?op=${encodeURIComponent(op)}`, {
+    return "";
+  }
+
+  async function performRestaurantApiRequest(base, token, op, options = {}) {
+    const url = new URL(base);
+    url.searchParams.set("op", op);
+    if (options.query && typeof options.query === "object") {
+      Object.entries(options.query).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === "") return;
+        url.searchParams.set(key, String(value));
+      });
+    }
+    const res = await fetch(url.toString(), {
       method: options.method || "GET",
       headers: {
         "Content-Type": "application/json",
@@ -43,6 +53,31 @@
       } catch {
         data = { _nonJson: raw.slice(0, 400) };
       }
+    }
+    return { res, data };
+  }
+
+  function shouldRetryRestaurantViaDirectApi(base, directBase, res, data) {
+    if (!base || !directBase || base === directBase) return false;
+    if (res.ok) return false;
+    if (res.status !== 404) return false;
+    const nonJson = String(data?._nonJson || "");
+    return /404|page not found|requested url was not found/i.test(nonJson);
+  }
+
+  async function restaurantApi(op, options = {}) {
+    const base = restaurantApiBase();
+    if (!base) {
+      throw new Error("Brak restaurantApiBase / firebaseProjectId.");
+    }
+    if (typeof firebase === "undefined" || !firebase.auth()?.currentUser) {
+      throw new Error("Brak sesji Firebase.");
+    }
+    const token = await firebase.auth().currentUser.getIdToken();
+    let { res, data } = await performRestaurantApiRequest(base, token, op, options);
+    const directBase = restaurantDirectApiBase();
+    if (shouldRetryRestaurantViaDirectApi(base, directBase, res, data)) {
+      ({ res, data } = await performRestaurantApiRequest(directBase, token, op, options));
     }
     if (!res.ok) {
       const hint =
@@ -596,7 +631,7 @@
           }
           try {
             await restaurantApi("admin-table-delete", {
-              method: "DELETE",
+              method: "POST",
               body: { id },
             });
             await loadSettings();

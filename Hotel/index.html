@@ -108,15 +108,18 @@
       html {
         scroll-behavior: smooth;
         scrollbar-width: none;
-        overflow: hidden;
-        height: 100%;
+        min-height: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
       }
 
       body {
         margin: 0;
         min-height: 100vh;
-        height: 100vh;
-        overflow: hidden;
+        min-height: 100svh;
+        min-height: 100dvh;
+        overflow-x: hidden;
+        overflow-y: auto;
         font-family: "Manrope", sans-serif;
         color: var(--text);
         background: #fefcf9;
@@ -161,8 +164,9 @@
       .shell {
         position: relative;
         min-height: 100vh;
-        height: 100vh;
-        overflow: hidden;
+        min-height: 100svh;
+        min-height: 100dvh;
+        overflow: visible;
         display: flex;
         flex-direction: column;
       }
@@ -640,7 +644,7 @@
 
       }
 
-        @media (max-width: 780px) {
+      @media (max-width: 780px) {
         .floating-nav-brand {
           gap: 0.75rem !important;
           flex-direction: row !important;
@@ -665,7 +669,16 @@
         }
 
         .hotel-content {
-          padding: calc(var(--nav-height) + 1rem) 1rem calc(6rem + env(safe-area-inset-bottom, 0px));
+          min-height: 100svh;
+          min-height: 100dvh;
+          justify-content: flex-start;
+          gap: 1.5rem;
+          padding: calc(var(--nav-height) + 1rem) 1rem calc(8.5rem + env(safe-area-inset-bottom, 0px));
+        }
+
+        .hotel-info {
+          flex: 0 0 auto;
+          justify-content: flex-start;
         }
 
         .hotel-title {
@@ -679,6 +692,7 @@
         .rooms-info {
           grid-template-columns: repeat(2, 1fr);
           gap: 1rem;
+          margin: 1.25rem auto 0;
         }
 
         .gallery-grid {
@@ -691,6 +705,7 @@
         }
 
         .reservation-info {
+          margin-top: 0;
           margin-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
           padding: 1.2rem;
         }
@@ -817,9 +832,7 @@
 
       @media (max-width: 780px) {
         .watermark {
-          font-size: 0.65rem;
-          bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px));
-          left: 50%;
+          display: none;
         }
       }
 

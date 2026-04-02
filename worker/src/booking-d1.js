@@ -2,6 +2,7 @@ import { connect } from "cloudflare:sockets";
 
 const SESSION_MS = 30 * 60 * 1000;
 const EMAIL_LINK_MS = 2 * 60 * 60 * 1000;
+const ADMIN_ACTION_LINK_MS = 3 * 24 * 60 * 60 * 1000;
 const HOTEL_PENDING_MS = 3 * 24 * 60 * 60 * 1000;
 const RESTAURANT_PENDING_MS = 3 * 24 * 60 * 60 * 1000;
 const HALL_PENDING_MS = 7 * 24 * 60 * 60 * 1000;
@@ -54,10 +55,16 @@ function decodeHtmlEntities(value) {
 }
 
 function enhanceFragmentHtml(html) {
-  return String(html || "").replace(/<a\b([^>]*)>/gi, (match, attrs) => {
-    if (/\bstyle\s*=/i.test(attrs)) return `<a${attrs}>`;
-    return `<a${attrs} style="color:#7b5a24;font-weight:700;text-decoration:none;border-bottom:1px solid #c8aa78;">`;
-  });
+  return String(html || "")
+    .replace(/<a\b([^>]*)>/gi, (match, attrs) => {
+      if (/\bstyle\s*=/i.test(attrs)) return `<a${attrs}>`;
+      return `<a${attrs} style="color:#7b5a24;font-weight:700;text-decoration:none;border-bottom:1px solid #c8aa78;">`;
+    })
+    .replace(/<h([1-3])\b([^>]*)>/gi, (match, level, attrs) => {
+      if (/\bstyle\s*=/i.test(attrs)) return `<h${level}${attrs}>`;
+      const sizes = { 1: "30px", 2: "24px", 3: "20px" };
+      return `<h${level}${attrs} style="margin:0 0 18px 0;font-family:Georgia,'Times New Roman',serif;font-size:${sizes[level] || "24px"};line-height:1.2;color:#1f1712;font-weight:700;text-align:center;">`;
+    });
 }
 
 function htmlToText(html) {
@@ -143,12 +150,12 @@ function buildBrandedEmail({
             </tr>
             <tr>
               <td style="background:#ffffff;border:1px solid #e8dcc8;border-radius:22px;padding:34px 32px;box-shadow:0 10px 30px rgba(52,33,14,0.08);">
-                <div style="font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.2;color:#1f1712;font-weight:700;margin:0 0 22px 0;">
+                <div style="font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.2;color:#1f1712;font-weight:700;margin:0 0 22px 0;text-align:center;">
                   ${safeSubject}
                 </div>
                 ${
                   actionHref
-                    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 26px 0;">
+                    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 26px auto;">
                         <tr>
                           <td style="border-radius:999px;background:#7b5a24;">
                             <a href="${actionHref}" style="display:inline-block;padding:14px 24px;font-size:15px;line-height:1.2;font-weight:700;color:#ffffff;text-decoration:none;">${actionTitle}</a>
@@ -208,7 +215,7 @@ function infoCard(title, rows, footerHtml = "") {
     .join("");
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;margin:24px 0 22px 0;border:1px solid #eadfce;border-radius:18px;background:#fbf7f1;">
     <tr>
-      <td style="padding:18px 20px 8px 20px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.2;color:#241914;font-weight:700;">${title}</td>
+      <td style="padding:18px 20px 8px 20px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.2;color:#241914;font-weight:700;text-align:center;">${title}</td>
     </tr>
     <tr>
       <td style="padding:0 20px 6px 20px;">
@@ -218,7 +225,7 @@ function infoCard(title, rows, footerHtml = "") {
     ${
       footerHtml
         ? `<tr>
-            <td style="padding:0 20px 20px 20px;color:#5e4b39;font-size:14px;line-height:1.7;">${footerHtml}</td>
+            <td style="padding:0 20px 20px 20px;color:#5e4b39;font-size:14px;line-height:1.7;text-align:center;">${footerHtml}</td>
           </tr>`
         : ""
     }
@@ -796,6 +803,7 @@ async function ensureSchema(env) {
         room_ids_json TEXT NOT NULL DEFAULT '[]',
         confirmation_token_hash TEXT,
         admin_action_token_hash TEXT,
+        admin_action_expires_at INTEGER,
         email_verification_expires_at INTEGER,
         pending_expires_at INTEGER,
         created_at INTEGER NOT NULL,
@@ -845,6 +853,7 @@ async function ensureSchema(env) {
         cleanup_buffer_minutes INTEGER NOT NULL DEFAULT 30,
         confirmation_token_hash TEXT,
         admin_action_token_hash TEXT,
+        admin_action_expires_at INTEGER,
         email_verification_expires_at INTEGER,
         pending_expires_at INTEGER,
         created_at INTEGER NOT NULL,
@@ -899,6 +908,7 @@ async function ensureSchema(env) {
         admin_note TEXT NOT NULL DEFAULT '',
         confirmation_token_hash TEXT,
         admin_action_token_hash TEXT,
+        admin_action_expires_at INTEGER,
         email_verification_expires_at INTEGER,
         pending_expires_at INTEGER,
         created_at INTEGER NOT NULL,
@@ -928,6 +938,11 @@ async function migrateHumanYearAndTemplates(env) {
     } catch {
       /* kolumna już istnieje */
     }
+    try {
+      await env.DB.prepare(`ALTER TABLE ${tbl} ADD COLUMN admin_action_expires_at INTEGER`).run();
+    } catch {
+      /* kolumna już istnieje */
+    }
   }
   await env.DB.prepare(
     `UPDATE hotel_reservations SET human_year = CAST(strftime('%Y', created_at/1000, 'unixepoch') AS INTEGER)
@@ -942,8 +957,23 @@ async function migrateHumanYearAndTemplates(env) {
      WHERE human_year IS NULL`
   ).run();
 
-  const services = ["hotel", "restaurant", "hall"];
   const now = nowMs();
+  const adminLinkCeiling = now + ADMIN_ACTION_LINK_MS;
+  for (const tbl of ["hotel_reservations", "restaurant_reservations", "venue_reservations"]) {
+    await env.DB.prepare(
+      `UPDATE ${tbl}
+       SET admin_action_expires_at = CASE
+         WHEN pending_expires_at IS NOT NULL THEN MIN(pending_expires_at, ?)
+         ELSE ?
+       END
+       WHERE admin_action_token_hash IS NOT NULL
+         AND admin_action_expires_at IS NULL`
+    )
+      .bind(adminLinkCeiling, adminLinkCeiling)
+      .run();
+  }
+
+  const services = ["hotel", "restaurant", "hall"];
   for (const service of services) {
     const defaults = defaultTemplateMap(service);
     const existing = await env.DB.prepare("SELECT key FROM booking_mail_templates WHERE service = ?")
@@ -1029,32 +1059,32 @@ async function seedDefaults(env) {
 async function expireReservations(env) {
   const now = nowMs();
   await env.DB.prepare(
-    "UPDATE hotel_reservations SET status='expired', updated_at=? WHERE status='email_verification_pending' AND email_verification_expires_at IS NOT NULL AND email_verification_expires_at < ?"
+    "UPDATE hotel_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='email_verification_pending' AND email_verification_expires_at IS NOT NULL AND email_verification_expires_at < ?"
   )
     .bind(now, now)
     .run();
   await env.DB.prepare(
-    "UPDATE hotel_reservations SET status='expired', updated_at=? WHERE status='pending' AND pending_expires_at IS NOT NULL AND pending_expires_at < ?"
+    "UPDATE hotel_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='pending' AND pending_expires_at IS NOT NULL AND pending_expires_at < ?"
   )
     .bind(now, now)
     .run();
   await env.DB.prepare(
-    "UPDATE restaurant_reservations SET status='expired', updated_at=? WHERE status='email_verification_pending' AND email_verification_expires_at IS NOT NULL AND email_verification_expires_at < ?"
+    "UPDATE restaurant_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='email_verification_pending' AND email_verification_expires_at IS NOT NULL AND email_verification_expires_at < ?"
   )
     .bind(now, now)
     .run();
   await env.DB.prepare(
-    "UPDATE restaurant_reservations SET status='expired', updated_at=? WHERE status='pending' AND pending_expires_at IS NOT NULL AND pending_expires_at < ?"
+    "UPDATE restaurant_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='pending' AND pending_expires_at IS NOT NULL AND pending_expires_at < ?"
   )
     .bind(now, now)
     .run();
   await env.DB.prepare(
-    "UPDATE venue_reservations SET status='expired', updated_at=? WHERE status='email_verification_pending' AND email_verification_expires_at IS NOT NULL AND email_verification_expires_at < ?"
+    "UPDATE venue_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='email_verification_pending' AND email_verification_expires_at IS NOT NULL AND email_verification_expires_at < ?"
   )
     .bind(now, now)
     .run();
   await env.DB.prepare(
-    "UPDATE venue_reservations SET status='expired', updated_at=? WHERE status='pending' AND pending_expires_at IS NOT NULL AND pending_expires_at < ?"
+    "UPDATE venue_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='pending' AND pending_expires_at IS NOT NULL AND pending_expires_at < ?"
   )
     .bind(now, now)
     .run();
@@ -2671,12 +2701,20 @@ function parseAdminNotifyEmails(env) {
 }
 
 async function issueAdminActionToken(env, service, reservationId) {
+  const now = nowMs();
+  const table = reservationTableName(service);
+  const row = await env.DB.prepare(`SELECT pending_expires_at FROM ${table} WHERE id = ? LIMIT 1`)
+    .bind(reservationId)
+    .first();
   const token = randomToken();
   const tokenHash = await sha256Hex(token);
+  const pendingExpiresAt = Number(row?.pending_expires_at || 0);
+  const adminActionExpiresAt =
+    pendingExpiresAt > now ? Math.min(now + ADMIN_ACTION_LINK_MS, pendingExpiresAt) : now + ADMIN_ACTION_LINK_MS;
   await env.DB.prepare(
-    `UPDATE ${reservationTableName(service)} SET admin_action_token_hash = ?, updated_at = ? WHERE id = ?`
+    `UPDATE ${table} SET admin_action_token_hash = ?, admin_action_expires_at = ?, updated_at = ? WHERE id = ?`
   )
-    .bind(tokenHash, nowMs(), reservationId)
+    .bind(tokenHash, adminActionExpiresAt, now, reservationId)
     .run();
   return token;
 }
@@ -2685,10 +2723,18 @@ async function getReservationByAdminActionToken(env, service, token) {
   const cleanToken = cleanString(token, 500);
   if (!cleanToken) return null;
   const tokenHash = await sha256Hex(cleanToken);
+  const now = nowMs();
   return env.DB.prepare(
-    `SELECT * FROM ${reservationTableName(service)} WHERE admin_action_token_hash = ? LIMIT 1`
+    `SELECT * FROM ${reservationTableName(service)}
+     WHERE admin_action_token_hash = ?
+       AND admin_action_expires_at IS NOT NULL
+       AND admin_action_expires_at >= ?
+       AND status = 'pending'
+       AND pending_expires_at IS NOT NULL
+       AND pending_expires_at >= ?
+     LIMIT 1`
   )
-    .bind(tokenHash)
+    .bind(tokenHash, now, now)
     .first();
 }
 
@@ -2770,7 +2816,9 @@ async function confirmReservationById(env, request, service, id) {
       },
     };
   }
-  await env.DB.prepare(`UPDATE ${table} SET status='confirmed', pending_expires_at=NULL, updated_at=? WHERE id=?`)
+  await env.DB.prepare(
+    `UPDATE ${table} SET status='confirmed', pending_expires_at=NULL, admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE id=?`
+  )
     .bind(nowMs(), id)
     .run();
   const updated = await env.DB.prepare(`SELECT * FROM ${table} WHERE id = ? LIMIT 1`)
@@ -2962,7 +3010,7 @@ async function handlePublicAdminAction(env, op, request, service) {
     const url = new URL(request.url);
     const row = await getReservationByAdminActionToken(env, service, url.searchParams.get("token"));
     if (!row) {
-      return { status: 404, data: { error: "Link administracyjny jest nieprawidłowy lub wygasł." } };
+      return { status: 404, data: { error: "Link administracyjny wygasł albo rezerwacja została już obsłużona." } };
     }
     return { status: 200, data: await buildAdminActionPayload(env, request, service, row) };
   }
@@ -2970,7 +3018,7 @@ async function handlePublicAdminAction(env, op, request, service) {
     const body = await readBody(request);
     const row = await getReservationByAdminActionToken(env, service, body.token);
     if (!row) {
-      return { status: 404, data: { error: "Link administracyjny jest nieprawidłowy lub wygasł." } };
+      return { status: 404, data: { error: "Link administracyjny wygasł albo rezerwacja została już obsłużona." } };
     }
     return confirmReservationById(env, request, service, row.id);
   }
@@ -3020,7 +3068,7 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
           requiresEmailConfirmation = false;
           console.error("Hotel draft mail error:", error);
           await env.DB.prepare(
-            "UPDATE hotel_reservations SET status='pending', confirmation_token_hash=NULL, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
+            "UPDATE hotel_reservations SET status='pending', confirmation_token_hash=NULL, admin_action_token_hash=NULL, admin_action_expires_at=NULL, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
           )
             .bind(nowMs() + HOTEL_PENDING_MS, nowMs(), out.id)
             .run();
@@ -3066,7 +3114,9 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
       return { status: 400, data: { error: row.status === "expired" ? "Link potwierdzający wygasł." : "Ta rezerwacja została już przetworzona." } };
     }
     if (row.email_verification_expires_at && Number(row.email_verification_expires_at) < nowMs()) {
-      await env.DB.prepare("UPDATE hotel_reservations SET status='expired', email_verification_expires_at=NULL, updated_at=? WHERE id=?")
+      await env.DB.prepare(
+        "UPDATE hotel_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, email_verification_expires_at=NULL, updated_at=? WHERE id=?"
+      )
         .bind(nowMs(), row.id)
         .run();
       return { status: 400, data: { error: "Link potwierdzający wygasł." } };
@@ -3075,7 +3125,7 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
       const roomIds = parseJson(row.room_ids_json, []);
       await assertHotelRoomIdsAvailable(env, roomIds, row.date_from, row.date_to, row.id);
       await env.DB.prepare(
-        "UPDATE hotel_reservations SET status='pending', email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
+        "UPDATE hotel_reservations SET status='pending', admin_action_token_hash=NULL, admin_action_expires_at=NULL, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
       )
         .bind(nowMs() + HOTEL_PENDING_MS, nowMs(), row.id)
         .run();
@@ -3176,7 +3226,7 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
           requiresEmailConfirmation = false;
           console.error("Restaurant draft mail error:", error);
           await env.DB.prepare(
-            "UPDATE restaurant_reservations SET status='pending', confirmation_token_hash=NULL, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
+            "UPDATE restaurant_reservations SET status='pending', confirmation_token_hash=NULL, admin_action_token_hash=NULL, admin_action_expires_at=NULL, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
           )
             .bind(nowMs() + RESTAURANT_PENDING_MS, nowMs(), out.id)
             .run();
@@ -3222,7 +3272,9 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
       return { status: 400, data: { error: row.status === "expired" ? "Link potwierdzający wygasł." : "Ta rezerwacja została już przetworzona." } };
     }
     if (row.email_verification_expires_at && Number(row.email_verification_expires_at) < nowMs()) {
-      await env.DB.prepare("UPDATE restaurant_reservations SET status='expired', email_verification_expires_at=NULL, updated_at=? WHERE id=?")
+      await env.DB.prepare(
+        "UPDATE restaurant_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, email_verification_expires_at=NULL, updated_at=? WHERE id=?"
+      )
         .bind(nowMs(), row.id)
         .run();
       return { status: 400, data: { error: "Link potwierdzający wygasł." } };
@@ -3239,7 +3291,7 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
         return { status: 409, data: { error: "Brak wolnych stolików w tym terminie." } };
       }
       await env.DB.prepare(
-        "UPDATE restaurant_reservations SET status='pending', assigned_table_ids_json=?, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
+        "UPDATE restaurant_reservations SET status='pending', assigned_table_ids_json=?, admin_action_token_hash=NULL, admin_action_expires_at=NULL, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
       )
         .bind(toJson(assigned), nowMs() + RESTAURANT_PENDING_MS, nowMs(), row.id)
         .run();
@@ -3331,7 +3383,7 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
           requiresEmailConfirmation = false;
           console.error("Hall draft mail error:", error);
           await env.DB.prepare(
-            "UPDATE venue_reservations SET status='pending', confirmation_token_hash=NULL, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
+            "UPDATE venue_reservations SET status='pending', confirmation_token_hash=NULL, admin_action_token_hash=NULL, admin_action_expires_at=NULL, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
           )
             .bind(nowMs() + HALL_PENDING_MS, nowMs(), out.id)
             .run();
@@ -3377,7 +3429,9 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
       return { status: 400, data: { error: row.status === "expired" ? "Link potwierdzający wygasł." : "Ta rezerwacja została już przetworzona." } };
     }
     if (row.email_verification_expires_at && Number(row.email_verification_expires_at) < nowMs()) {
-      await env.DB.prepare("UPDATE venue_reservations SET status='expired', email_verification_expires_at=NULL, updated_at=? WHERE id=?")
+      await env.DB.prepare(
+        "UPDATE venue_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, email_verification_expires_at=NULL, updated_at=? WHERE id=?"
+      )
         .bind(nowMs(), row.id)
         .run();
       return { status: 400, data: { error: "Link potwierdzający wygasł." } };
@@ -3397,7 +3451,7 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
       );
       if (!chk.ok) return { status: 409, data: { error: "Termin niedostępny." } };
       await env.DB.prepare(
-        "UPDATE venue_reservations SET status='pending', email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
+        "UPDATE venue_reservations SET status='pending', admin_action_token_hash=NULL, admin_action_expires_at=NULL, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
       )
         .bind(nowMs() + HALL_PENDING_MS, nowMs(), row.id)
         .run();
@@ -3456,7 +3510,7 @@ async function handleHotelAdmin(env, op, request) {
       .run();
     return { status: 200, data: { ok: true } };
   }
-  if (op === "admin-room-delete" && request.method === "DELETE") {
+  if (op === "admin-room-delete" && ["DELETE", "POST"].includes(request.method)) {
     const url = new URL(request.url);
     const body = await readBody(request).catch(() => ({}));
     const id = cleanString(url.searchParams.get("id") || body?.id, 80);
@@ -3609,7 +3663,9 @@ async function handleHotelAdmin(env, op, request) {
   if (op === "admin-reservation-confirm" && request.method === "POST") {
     const body = await readBody(request);
     const id = cleanString(body.id, 80);
-    await env.DB.prepare("UPDATE hotel_reservations SET status='confirmed', pending_expires_at=NULL, updated_at=? WHERE id=?")
+    await env.DB.prepare(
+      "UPDATE hotel_reservations SET status='confirmed', pending_expires_at=NULL, admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE id=?"
+    )
       .bind(nowMs(), id)
       .run();
     try {
@@ -3634,7 +3690,9 @@ async function handleHotelAdmin(env, op, request) {
     if (existing.status !== "manual_block" && !cancelReason) {
       return { status: 400, data: { error: "Podaj powód anulowania rezerwacji." } };
     }
-    await env.DB.prepare("UPDATE hotel_reservations SET status='cancelled', pending_expires_at=NULL, updated_at=? WHERE id=?")
+    await env.DB.prepare(
+      "UPDATE hotel_reservations SET status='cancelled', pending_expires_at=NULL, admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE id=?"
+    )
       .bind(nowMs(), id)
       .run();
     try {
@@ -3767,9 +3825,10 @@ async function handleRestaurantAdmin(env, op, request) {
       .run();
     return { status: 200, data: { ok: true, table: { id, number: nextNumber } } };
   }
-  if (op === "admin-table-delete" && request.method === "DELETE") {
-    const body = await readBody(request);
-    const id = cleanString(body.id, 80);
+  if (op === "admin-table-delete" && ["DELETE", "POST"].includes(request.method)) {
+    const url = new URL(request.url);
+    const body = await readBody(request).catch(() => ({}));
+    const id = cleanString(body.id || url.searchParams.get("id"), 80);
     if (!id) return { status: 400, data: { error: "Brak id stolika." } };
     const target = await env.DB.prepare("SELECT id FROM restaurant_tables WHERE id=?").bind(id).first();
     if (!target) return { status: 404, data: { error: "Stolik nie istnieje." } };
@@ -3971,7 +4030,9 @@ async function handleRestaurantAdmin(env, op, request) {
   if (op === "admin-reservation-confirm" && request.method === "POST") {
     const body = await readBody(request);
     const id = cleanString(body.id, 80);
-    await env.DB.prepare("UPDATE restaurant_reservations SET status='confirmed', pending_expires_at=NULL, updated_at=? WHERE id=?")
+    await env.DB.prepare(
+      "UPDATE restaurant_reservations SET status='confirmed', pending_expires_at=NULL, admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE id=?"
+    )
       .bind(nowMs(), id)
       .run();
     try {
@@ -3996,7 +4057,9 @@ async function handleRestaurantAdmin(env, op, request) {
     if (existing.status !== "manual_block" && !cancelReason) {
       return { status: 400, data: { error: "Podaj powód anulowania rezerwacji." } };
     }
-    await env.DB.prepare("UPDATE restaurant_reservations SET status='cancelled', pending_expires_at=NULL, updated_at=? WHERE id=?")
+    await env.DB.prepare(
+      "UPDATE restaurant_reservations SET status='cancelled', pending_expires_at=NULL, admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE id=?"
+    )
       .bind(nowMs(), id)
       .run();
     try {
@@ -4196,7 +4259,9 @@ async function handleHallAdmin(env, op, request) {
   if (op === "admin-reservation-confirm" && request.method === "POST") {
     const body = await readBody(request);
     const id = cleanString(body.id, 80);
-    await env.DB.prepare("UPDATE venue_reservations SET status='confirmed', pending_expires_at=NULL, updated_at=? WHERE id=?")
+    await env.DB.prepare(
+      "UPDATE venue_reservations SET status='confirmed', pending_expires_at=NULL, admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE id=?"
+    )
       .bind(nowMs(), id)
       .run();
     try {
@@ -4221,7 +4286,9 @@ async function handleHallAdmin(env, op, request) {
     if (existing.status !== "manual_block" && !cancelReason) {
       return { status: 400, data: { error: "Podaj powód anulowania rezerwacji." } };
     }
-    await env.DB.prepare("UPDATE venue_reservations SET status='cancelled', pending_expires_at=NULL, updated_at=? WHERE id=?")
+    await env.DB.prepare(
+      "UPDATE venue_reservations SET status='cancelled', pending_expires_at=NULL, admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE id=?"
+    )
       .bind(nowMs(), id)
       .run();
     try {

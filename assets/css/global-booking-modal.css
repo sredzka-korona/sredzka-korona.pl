@@ -28,6 +28,7 @@ body.gb-modal-open {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 #gb-modal.gb-open {
@@ -37,6 +38,7 @@ body.gb-modal-open {
 
 #gb-modal .gb-shell {
   width: min(784px, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
   max-height: min(94dvh, 980px);
   overflow: hidden;
   border-radius: 28px;
@@ -84,6 +86,8 @@ body.gb-modal-open {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #f4f8fd;
+  line-height: 1.08;
+  max-width: calc(100% - 4.5rem);
 }
 
 #gb-modal .gb-close {
@@ -143,7 +147,8 @@ body.gb-modal-open {
 #gb-modal .gb-body {
   padding: 0 1.35rem 1.35rem;
   max-height: calc(min(94dvh, 980px) - 115px);
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   position: relative;
   z-index: 1;
 }
@@ -187,6 +192,7 @@ body.gb-modal-open {
 #gb-modal .gb-field {
   display: grid;
   gap: 0.33rem;
+  min-width: 0;
 }
 
 #gb-modal .gb-field > span {
@@ -199,6 +205,8 @@ body.gb-modal-open {
 #gb-modal textarea,
 #gb-modal button {
   font-family: inherit;
+  min-width: 0;
+  max-width: 100%;
 }
 
 #gb-modal input,
@@ -214,6 +222,15 @@ body.gb-modal-open {
   box-sizing: border-box;
   min-height: 2.75rem;
   line-height: 1.35;
+}
+
+#gb-modal input[type="date"],
+#gb-modal input[type="time"],
+#gb-modal input[type="number"],
+#gb-modal input[type="text"],
+#gb-modal input[type="email"],
+#gb-modal select {
+  height: 2.95rem;
 }
 
 #gb-modal select {
@@ -232,10 +249,17 @@ body.gb-modal-open {
   min-height: 0;
 }
 
-#gb-modal .gb-service-tiles,
+#gb-modal .gb-service-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 0.85rem;
+  padding: 0.2rem;
+}
+
 #gb-modal .gb-hall-tiles {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 320px));
   justify-content: center;
   gap: 0.85rem;
   padding: 0.2rem;
@@ -248,8 +272,7 @@ body.gb-modal-open {
   background: var(--gb-card-bg);
   color: #fff9ef;
   min-height: 136px;
-  flex: 1 1 280px;
-  max-width: 400px;
+  width: 100%;
   padding: 1.25rem 1rem;
   text-align: center;
   cursor: pointer;
@@ -259,6 +282,7 @@ body.gb-modal-open {
   transform-origin: center;
   will-change: transform;
   transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  overflow-wrap: anywhere;
 }
 
 #gb-modal .gb-service-tile:hover,
@@ -310,6 +334,7 @@ body.gb-modal-open {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  min-height: 212px;
 }
 
 #gb-modal .gb-room-card-header {
@@ -317,6 +342,7 @@ body.gb-modal-open {
   justify-content: space-between;
   align-items: flex-start;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 #gb-modal .gb-room-card-bottom {
@@ -324,7 +350,9 @@ body.gb-modal-open {
   justify-content: flex-end;
   align-items: flex-end;
   gap: 0.75rem;
-  margin-top: 0.15rem;
+  margin-top: auto;
+  padding-top: 0.8rem;
+  border-top: 1px solid rgba(255, 225, 179, 0.14);
 }
 
 #gb-modal .gb-room-card-bottom .gb-room-meta {
@@ -368,18 +396,23 @@ body.gb-modal-open {
   text-align: right;
   justify-items: end;
   flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 #gb-modal .gb-room-price {
   color: #ffe7bf;
   font-weight: 700;
-  white-space: nowrap;
   font-size: 1.02rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 #gb-modal .gb-room-price-note {
   color: rgba(255, 236, 205, 0.8);
   font-size: 0.78rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 #gb-modal .gb-room-meta {
@@ -410,12 +443,92 @@ body.gb-modal-open {
   background: rgba(255, 245, 225, 0.1);
   padding: 0.8rem;
   margin-top: 0.85rem;
+  min-width: 0;
 }
 
 #gb-modal .gb-cart ul,
 #gb-modal .gb-summary-box ul {
   margin: 0.4rem 0 0;
   padding-left: 1rem;
+}
+
+#gb-modal .gb-cart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+#gb-modal .gb-cart-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.9rem;
+}
+
+#gb-modal .gb-cart-stat {
+  display: grid;
+  gap: 0.16rem;
+  padding: 0.72rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 225, 179, 0.16);
+  background: rgba(255, 251, 241, 0.06);
+}
+
+#gb-modal .gb-cart-stat-k {
+  font-size: 0.76rem;
+  color: rgba(255, 236, 205, 0.74);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#gb-modal .gb-cart-stat-v {
+  color: #fff8ef;
+  font-size: 0.96rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+#gb-modal .gb-cart-selection {
+  margin-top: 0.85rem;
+}
+
+#gb-modal .gb-cart-selection-label,
+#gb-modal .gb-summary-section-label {
+  display: inline-block;
+  font-size: 0.8rem;
+  color: rgba(255, 236, 205, 0.78);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+#gb-modal .gb-cart-room-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.55rem 0 0;
+  padding: 0;
+}
+
+#gb-modal .gb-cart-room-item {
+  margin: 0;
+  padding: 0.38rem 0.72rem;
+  border-radius: 999px;
+  background: rgba(255, 251, 241, 0.1);
+  border: 1px solid rgba(255, 225, 179, 0.16);
+  color: #fff8ef;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+#gb-modal .gb-cart-empty {
+  margin: 0.55rem 0 0;
+  color: var(--gb-text-muted);
+  font-size: 0.92rem;
 }
 
 #gb-modal .gb-cart-total-row {
@@ -476,14 +589,21 @@ body.gb-modal-open {
 
 #gb-modal .gb-submit-slot {
   margin-left: auto;
-  min-width: 280px;
+  min-width: min(280px, 100%);
+  max-width: 100%;
   display: flex;
   justify-content: flex-end;
+}
+
+#gb-modal .gb-submit-slot > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 #gb-modal .gb-antibot-wrap {
   margin-top: 0;
   justify-self: flex-end;
+  max-width: 100%;
 }
 
 #gb-modal .gb-success-card {
@@ -500,17 +620,39 @@ body.gb-modal-open {
   font-weight: 600;
 }
 
-#gb-modal .gb-summary-hotel-term {
-  margin: 0.35rem 0 0.85rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid rgba(255, 225, 179, 0.22);
+#gb-modal .gb-summary-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0.35rem 0 0.95rem;
 }
 
-#gb-modal .gb-summary-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem 0.65rem;
+#gb-modal .gb-summary-stat {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.72rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 225, 179, 0.16);
+  background: rgba(255, 251, 241, 0.06);
+}
+
+#gb-modal .gb-summary-stat-k {
+  font-size: 0.76rem;
+  color: rgba(255, 236, 205, 0.74);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#gb-modal .gb-summary-stat-v {
+  color: #fff8ef;
+  font-size: 0.96rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+#gb-modal .gb-summary-section {
+  margin-top: 0.15rem;
 }
 
 #gb-modal .gb-summary-k {
@@ -518,23 +660,21 @@ body.gb-modal-open {
   color: rgba(255, 236, 205, 0.88);
   font-weight: 600;
   min-width: 6.5rem;
+  max-width: 100%;
 }
 
 #gb-modal .gb-summary-v {
   font-size: 0.98rem;
   color: var(--gb-text);
   font-weight: 600;
-}
-
-#gb-modal .gb-summary-sub {
-  margin: 0.35rem 0 0;
-  font-size: 0.88rem;
-  color: var(--gb-text-muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 #gb-modal .gb-summary-room-list {
   list-style: none;
-  margin: 0;
+  margin: 0.55rem 0 0;
   padding: 0;
   display: grid;
   gap: 0.65rem;
@@ -548,6 +688,7 @@ body.gb-modal-open {
   gap: 0.5rem 0.75rem;
   padding: 0.55rem 0;
   border-bottom: 1px solid rgba(255, 225, 179, 0.15);
+  min-width: 0;
 }
 
 #gb-modal .gb-summary-room-item:last-child {
@@ -566,15 +707,21 @@ body.gb-modal-open {
   gap: 0.2rem;
   text-align: right;
   font-size: 0.9rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 #gb-modal .gb-summary-room-unit {
   color: rgba(255, 231, 200, 0.92);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 #gb-modal .gb-summary-room-total {
   color: var(--gb-text-muted);
   font-size: 0.86rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 #gb-modal .gb-summary-list--stacked .gb-summary-li {
@@ -585,6 +732,7 @@ body.gb-modal-open {
   padding: 0.28rem 0;
   border-bottom: 1px solid rgba(255, 225, 179, 0.12);
   align-items: baseline;
+  min-width: 0;
 }
 
 #gb-modal .gb-summary-list--stacked .gb-summary-li:last-child {
@@ -606,6 +754,7 @@ body.gb-modal-open {
   flex: 1 1 55%;
   font-weight: 500;
   font-size: 0.92rem;
+  min-width: 0;
 }
 
 #gb-modal .gb-summary-box li {
@@ -620,6 +769,7 @@ body.gb-modal-open {
   color: rgba(255, 241, 216, 0.92);
   font-size: 0.9rem;
   line-height: 1.45;
+  min-width: 0;
 }
 
 #gb-modal .gb-check input {
@@ -655,6 +805,9 @@ body.gb-modal-open {
   cursor: pointer;
   font-weight: 600;
   font-size: 0.95rem;
+  line-height: 1.35;
+  text-align: center;
+  white-space: normal;
   transition: transform 0.2s ease, opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
@@ -731,14 +884,47 @@ body.gb-modal-open {
   margin: 0.45rem 0 0;
   color: rgba(255, 239, 211, 0.8);
   font-size: 0.83rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 #gb-modal .gb-opening-hours-note {
-  margin-bottom: 1.15rem;
+  margin-bottom: 1.6rem;
+}
+
+#gb-modal .gb-loading-state {
+  min-height: 13rem;
+  display: grid;
+  place-items: center;
+  gap: 0.9rem;
+  text-align: center;
+}
+
+#gb-modal .gb-loading-spinner {
+  width: 2.7rem;
+  height: 2.7rem;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 231, 188, 0.22);
+  border-top-color: #e4c188;
+  box-shadow: 0 0 0 1px rgba(255, 231, 188, 0.06);
+  animation: gb-spin 0.85s linear infinite;
+}
+
+#gb-modal .gb-loading-text {
+  margin: 0;
+  color: rgba(255, 244, 224, 0.92);
+  font-size: 1rem;
+  letter-spacing: 0.02em;
 }
 
 #gb-modal .gb-link {
   color: #ffe0ad;
+}
+
+@keyframes gb-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 860px) {
@@ -752,6 +938,10 @@ body.gb-modal-open {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  #gb-modal .gb-hall-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   #gb-modal .gb-summary-grid {
     grid-template-columns: 1fr;
   }
@@ -759,6 +949,25 @@ body.gb-modal-open {
   #gb-modal .gb-submit-slot {
     min-width: 0;
     width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  #gb-modal .gb-summary-list--stacked .gb-summary-li,
+  #gb-modal .gb-summary-room-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #gb-modal .gb-summary-k,
+  #gb-modal .gb-summary-list--stacked .gb-summary-li .gb-summary-k {
+    min-width: 0;
+    flex: 1 1 auto;
+    max-width: none;
+  }
+
+  #gb-modal .gb-summary-room-prices {
+    text-align: left;
   }
 }
 
@@ -784,15 +993,36 @@ body.gb-modal-open {
     padding-right: 0.95rem;
   }
 
+  #gb-modal .gb-header {
+    padding-top: 1rem;
+    padding-bottom: 0.8rem;
+  }
+
+  #gb-modal .gb-title {
+    max-width: calc(100% - 3.5rem);
+    font-size: clamp(1.45rem, 7vw, 2rem);
+    letter-spacing: 0.04em;
+  }
+
+  #gb-modal .gb-close {
+    top: 0.7rem;
+    right: 0.7rem;
+    width: 2rem;
+    height: 2rem;
+    font-size: 1.05rem;
+  }
+
   #gb-modal .gb-service-tiles,
+  #gb-modal .gb-hall-tiles,
   #gb-modal .gb-grid-2,
   #gb-modal .gb-grid-3,
   #gb-modal .gb-range-pair {
     grid-template-columns: 1fr;
   }
 
-  #gb-modal .gb-hall-tile {
-    max-width: none;
+  #gb-modal .gb-cart-stats,
+  #gb-modal .gb-summary-stat-grid {
+    grid-template-columns: 1fr;
   }
 
   #gb-modal .gb-phone-row {
@@ -800,6 +1030,11 @@ body.gb-modal-open {
   }
 
   #gb-modal .gb-cart-total-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  #gb-modal .gb-cart-head {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -830,5 +1065,37 @@ body.gb-modal-open {
 
   #gb-modal .gb-actions--end {
     flex-direction: column;
+  }
+
+  #gb-modal .gb-submit-slot,
+  #gb-modal .gb-antibot-wrap,
+  #gb-modal .gb-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  #gb-modal .gb-shell {
+    width: calc(100vw - 0.5rem);
+    max-width: calc(100vw - 0.5rem);
+    border-radius: 16px;
+  }
+
+  #gb-modal {
+    padding: 0.25rem;
+  }
+
+  #gb-modal .gb-body {
+    padding: 0 0.8rem 0.9rem;
+  }
+
+  #gb-modal .gb-header,
+  #gb-modal .gb-progress {
+    padding-left: 0.8rem;
+    padding-right: 0.8rem;
+  }
+
+  #gb-modal .gb-phone-row {
+    grid-template-columns: 74px minmax(0, 1fr);
   }
 }
