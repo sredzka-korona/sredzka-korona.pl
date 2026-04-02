@@ -81,7 +81,108 @@
     hall_confirmed_client: "Klient — rezerwacja sali zaakceptowana.",
     hall_cancelled_client: "Klient — rezerwacja anulowana.",
     hall_changed_client: "Po edycji zgłoszenia przez admina (opcjonalna wysyłka).",
+    hall_expired_pending_client: "Klient — wygasło oczekiwanie na decyzję obiektu.",
+    hall_expired_pending_admin: "Obsługa — informacja o automatycznym wygaśnięciu zgłoszenia.",
+    hall_expired_email_client: "Klient — nie potwierdzono adresu e-mail w terminie 2 godzin.",
+    hall_extended_pending_client: "Klient — przedłużono termin oczekiwania na decyzję.",
   };
+
+  const HALL_TEMPLATE_PREVIEW_VARS = Object.freeze({
+    reservationNumber: "7/2026/PRZYJĘCIA",
+    reservationSubject: "Przyjęcie jubileuszowe",
+    decisionDeadline: "14 kwietnia 2026, godz. 12:00",
+    fullName: "Karolina Zielińska",
+    email: "karolina.zielinska@example.com",
+    phone: "+48 602 333 444",
+    hallName: "Sala Bankietowa",
+    date: "30 maja 2026",
+    timeFrom: "16:00",
+    timeTo: "02:00",
+    durationHours: "10",
+    guestsCount: "120",
+    eventType: "Przyjęcie jubileuszowe",
+    exclusive: "Tak",
+    customerNote: "Zależy nam na parkiecie tanecznym, spokojnej strefie dla seniorów i oprawie premium.",
+    adminNote: "Zapytanie o indywidualne menu i opiekę koordynatora wydarzenia.",
+    confirmationLink: "https://www.sredzkakorona.pl/przyjecia/potwierdzenie?token=podglad",
+    venueName: "Średzka Korona",
+  });
+
+  function renderTemplatePreviewString(template, vars) {
+    return String(template || "").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
+      const value = vars?.[key];
+      if (value === undefined || value === null) return "";
+      return escapeHtml(String(value));
+    });
+  }
+
+  function sanitizeTemplatePreviewHtml(html) {
+    return String(html || "")
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, "")
+      .replace(/\s(href|src)\s*=\s*(['"])\s*javascript:[\s\S]*?\2/gi, ' $1="#"');
+  }
+
+  function buildMailPreviewMarkup({ subject, bodyHtml, serviceLabel, footerLabel, actionLabel = "" }) {
+    return `
+      <div class="mail-preview-shell">
+        <div class="mail-preview-note">Podgląd na przykładowych danych. Branding i układ odpowiadają faktycznie wysyłanej wiadomości.</div>
+        <div class="mail-preview-frame">
+          <div class="mail-preview-canvas">
+            <div class="mail-preview-brand" aria-label="Średzka Korona">
+              <span>ŚREDZKA</span>
+              <img src="/ikony/logo-korona.png" alt="Korona" width="42" height="42" />
+              <span>KORONA</span>
+            </div>
+            <div class="mail-preview-service">${escapeHtml(serviceLabel)}</div>
+            <div class="mail-preview-card">
+              <div class="mail-preview-subject">${escapeHtml(subject || "Temat wiadomości")}</div>
+              ${actionLabel ? `<a class="mail-preview-button" href="#" onclick="return false;">${escapeHtml(actionLabel)}</a>` : ""}
+              <div class="mail-preview-body">${bodyHtml || "<p>Brak treści wiadomości.</p>"}</div>
+            </div>
+            <div class="mail-preview-footer">
+              <div>Wiadomość transakcyjna dotycząca rezerwacji w obiekcie Średzka Korona.</div>
+              <div class="mail-preview-footer-link">${escapeHtml(footerLabel)}</div>
+              <div>Jeśli masz pytania, odpowiedz na tę wiadomość.</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function hallPreviewActionLabel(key) {
+    return key === "hall_confirm_email" ? "Potwierdź zgłoszenie" : "";
+  }
+
+  function updateHallTemplatePreview(key) {
+    if (!key) return;
+    const subjectField = document.querySelector(`[data-hall-tpl-key="${key}"][data-field="subject"]`);
+    const bodyField = document.querySelector(`[data-hall-tpl-key="${key}"][data-field="bodyHtml"]`);
+    const previewHost = document.querySelector(`[data-hall-preview-key="${key}"]`);
+    if (!subjectField || !bodyField || !previewHost) return;
+    const renderedSubject = renderTemplatePreviewString(subjectField.value, HALL_TEMPLATE_PREVIEW_VARS);
+    const renderedBody = sanitizeTemplatePreviewHtml(
+      renderTemplatePreviewString(bodyField.value, HALL_TEMPLATE_PREVIEW_VARS)
+    );
+    previewHost.innerHTML = buildMailPreviewMarkup({
+      subject: renderedSubject,
+      bodyHtml: renderedBody,
+      serviceLabel: "Przyjęcia",
+      footerLabel: "Przyjęcia Średzka Korona",
+      actionLabel: hallPreviewActionLabel(key),
+    });
+  }
+
+  function bindHallTemplatePreviews() {
+    const keys = new Set();
+    document.querySelectorAll("[data-hall-tpl-key][data-field]").forEach((field) => {
+      const key = field.getAttribute("data-hall-tpl-key");
+      if (!key) return;
+      keys.add(key);
+      field.addEventListener("input", () => updateHallTemplatePreview(key));
+    });
+    keys.forEach((key) => updateHallTemplatePreview(key));
+  }
 
   async function loadHalls() {
     const d = await hallApi("admin-halls-list", { method: "GET" });
@@ -198,7 +299,7 @@
         <td>${escapeHtml(r.reservationDate || "")}</td>
         <td>${formatMs(r.startDateTime)}</td>
         <td>${formatMs(r.endDateTime)}</td>
-        <td>${escapeHtml(String(r.durationHours ?? ""))}</td>
+        <td>${r.durationUnspecified ? "nie określono" : escapeHtml(String(r.durationHours ?? ""))}</td>
         <td>${escapeHtml(String(r.guestsCount ?? ""))}</td>
         <td>${escapeHtml(r.eventType || "")}</td>
         <td>${r.exclusive ? "tak" : "nie"}</td>
@@ -256,7 +357,9 @@
     return `
       <div class="hotel-subpanel">
         <h3>Szablony mailingowe — sale</h3>
-        <p class="helper">Zmienne: <code>{{reservationNumber}}</code>, <code>{{fullName}}</code>, <code>{{hallName}}</code>, <code>{{date}}</code>, <code>{{timeFrom}}</code>, <code>{{timeTo}}</code>, <code>{{durationHours}}</code>, <code>{{guestsCount}}</code>, <code>{{eventType}}</code>, <code>{{exclusive}}</code>, <code>{{customerNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{venueName}}</code>.</p>
+        <p class="helper">Zmienne: <code>{{reservationNumber}}</code> (np. 7/2026/PRZYJĘCIA), <code>{{reservationSubject}}</code>, <code>{{decisionDeadline}}</code>, <code>{{adminActionLink}}</code>, <code>{{fullName}}</code>, <code>{{hallName}}</code>, <code>{{date}}</code>, <code>{{timeFrom}}</code>, <code>{{timeTo}}</code>, <code>{{durationHours}}</code>, <code>{{guestsCount}}</code>, <code>{{eventType}}</code>, <code>{{exclusive}}</code>, <code>{{customerNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{venueName}}</code>.</p>
+        <p class="helper">Logo, przycisk akcji i premium-layout wiadomości są dodawane automatycznie przy wysyłce. W tym miejscu edytujesz główną treść maila.</p>
+        <p class="helper">Podgląd pokazuje ekskluzywną wersję maila dla przyjęć z przykładowym zapytaniem i pełnym brandingiem.</p>
         <div id="hall-template-forms">
           ${keys
             .map(
@@ -264,7 +367,14 @@
             <details class="hotel-template-card">
               <summary><span class="tpl-key">${escapeHtml(k)}</span>${HALL_TEMPLATE_LABELS[k] ? `<span class="tpl-desc"> — ${escapeHtml(HALL_TEMPLATE_LABELS[k])}</span>` : ""}</summary>
               <label>Temat<input type="text" data-hall-tpl-key="${escapeHtml(k)}" data-field="subject" value="${escapeHtml(templatesData[k]?.subject || "")}" /></label>
-              <label>Treść HTML<textarea data-hall-tpl-key="${escapeHtml(k)}" data-field="bodyHtml" rows="10">${escapeHtml(templatesData[k]?.bodyHtml || "")}</textarea></label>
+              <label>Treść HTML<textarea data-hall-tpl-key="${escapeHtml(k)}" data-field="bodyHtml" rows="18">${escapeHtml(templatesData[k]?.bodyHtml || "")}</textarea></label>
+              <div class="mail-preview-panel">
+                <div class="mail-preview-panel-head">
+                  <strong>Podgląd wiadomości</strong>
+                  <span class="helper">Wersja z przykładowym zgłoszeniem sali i finalnym layoutem wysyłki.</span>
+                </div>
+                <div class="mail-preview-render" data-hall-preview-key="${escapeHtml(k)}"></div>
+              </div>
               <button type="button" class="button hall-save-tpl" data-key="${escapeHtml(k)}">Zapisz szablon</button>
             </details>`
             )
@@ -527,6 +637,7 @@
             .catch((err) => alert(err.message));
         });
       });
+      bindHallTemplatePreviews();
 
       countdownTimer = setInterval(() => {
         document.querySelectorAll(".hall-countdown").forEach((el) => {

@@ -3,6 +3,7 @@ const { initializeApp, getApps } = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 
 const { renderTemplate, getHallMailTemplate, sendMail, buildBrandedEmail } = require("./lib/mail");
+const { formatHumanReservationNumber } = require("./lib/humanNumber");
 
 if (!getApps().length) {
   initializeApp();
@@ -27,7 +28,7 @@ function buildHallMailVars(data) {
   const end = data.endDateTime?.toDate?.() || new Date(data.endMs || 0);
   return {
     reservationId: data.id,
-    reservationNumber: String(data.humanNumber || data.id),
+    reservationNumber: formatHumanReservationNumber(data, "hall") || String(data.id),
     fullName: data.fullName || "",
     email: data.email || "",
     phone: `${data.phonePrefix || ""} ${data.phoneNational || ""}`.trim(),
@@ -35,7 +36,9 @@ function buildHallMailVars(data) {
     date: data.reservationDate || "",
     timeFrom: data.startTimeLabel || start.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }),
     timeTo: data.endTimeLabel || end.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }),
-    durationHours: String(data.durationHours ?? ""),
+    durationHours: data.durationUnspecified
+      ? "nie określono"
+      : `${Number(data.durationHours ?? 0)} h`,
     guestsCount: String(data.guestsCount ?? ""),
     eventType: data.eventType || "",
     exclusive: data.exclusive ? "tak" : "nie",

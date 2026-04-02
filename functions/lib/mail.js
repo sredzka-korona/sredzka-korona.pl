@@ -166,7 +166,458 @@ function buildBrandedEmail({
   };
 }
 
-const DEFAULT_TEMPLATES = {
+function isSameTemplateShape(left, right) {
+  return (
+    String(left?.subject || "").trim() === String(right?.subject || "").trim() &&
+    String(left?.bodyHtml || "").trim() === String(right?.bodyHtml || "").trim()
+  );
+}
+
+function infoCard(title, rows, footerHtml = "") {
+  const body = rows
+    .filter(([, value]) => String(value ?? "").trim())
+    .map(
+      ([label, value]) => `
+        <tr>
+          <td style="padding:10px 0;border-bottom:1px solid #eadfce;color:#7a6754;font-size:13px;line-height:1.4;width:38%;vertical-align:top;">${label}</td>
+          <td style="padding:10px 0;border-bottom:1px solid #eadfce;color:#241914;font-size:15px;line-height:1.5;font-weight:600;vertical-align:top;">${value}</td>
+        </tr>`
+    )
+    .join("");
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;margin:24px 0 22px 0;border:1px solid #eadfce;border-radius:18px;background:#fbf7f1;">
+    <tr>
+      <td style="padding:18px 20px 8px 20px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.2;color:#241914;font-weight:700;">${title}</td>
+    </tr>
+    <tr>
+      <td style="padding:0 20px 6px 20px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">${body}</table>
+      </td>
+    </tr>
+    ${
+      footerHtml
+        ? `<tr>
+            <td style="padding:0 20px 20px 20px;color:#5e4b39;font-size:14px;line-height:1.7;">${footerHtml}</td>
+          </tr>`
+        : ""
+    }
+  </table>`;
+}
+
+function noteCard(html) {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;margin:18px 0 0 0;border-left:4px solid #c8aa78;background:#f8f1e5;">
+    <tr>
+      <td style="padding:16px 18px;color:#4c3b2d;font-size:14px;line-height:1.75;">${html}</td>
+    </tr>
+  </table>`;
+}
+
+function buildHotelDefaultTemplates() {
+  return {
+    confirm_email: {
+      subject: "{{hotelName}} — potwierdzenie adresu e-mail ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>dziękujemy za wybór <strong>{{hotelName}}</strong>. Otrzymaliśmy zgłoszenie rezerwacji i przygotowaliśmy jego kompletne podsumowanie.</p>
+<p>Aby przekazać rezerwację do dalszej obsługi recepcji, potwierdź adres e-mail. Link pozostaje aktywny przez <strong>2 godziny</strong>.</p>
+${infoCard("Podsumowanie pobytu", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Liczba noclegów", "{{nights}}"],
+  ["Wybrane pokoje", "{{roomsList}}"],
+  ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
+])}
+${noteCard("<strong>Ważne:</strong> potwierdzenie adresu e-mail nie jest jeszcze ostatecznym potwierdzeniem pobytu. Po weryfikacji dostępności recepcja prześle kolejną wiadomość ze statusem rezerwacji.")}
+<p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>`,
+    },
+    pending_client: {
+      subject: "{{hotelName}} — zgłoszenie oczekuje na decyzję recepcji ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>adres e-mail został poprawnie potwierdzony, a zgłoszenie zostało przekazane do recepcji <strong>{{hotelName}}</strong>.</p>
+<p>Na tym etapie rezerwacja ma status <strong>oczekująca na akceptację</strong>. Do czasu wysłania finalnego potwierdzenia termin nie jest jeszcze gwarantowany.</p>
+${infoCard("Podsumowanie zgłoszenia", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Liczba noclegów", "{{nights}}"],
+  ["Pokoje", "{{roomsList}}"],
+  ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
+])}
+${noteCard("Recepcja wróci do Ciebie z decyzją możliwie szybko. W razie potrzeby możesz odpowiedzieć na tę wiadomość i doprecyzować szczegóły pobytu.")}`,
+    },
+    pending_admin: {
+      subject: "[{{hotelName}}] Nowa rezerwacja do decyzji: {{reservationNumber}}",
+      bodyHtml: `<p>Do panelu wpłynęła nowa rezerwacja wymagająca decyzji recepcji.</p>
+${infoCard("Dane rezerwacji", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Klient", "{{fullName}}"],
+  ["E-mail", "{{email}}"],
+  ["Telefon", "{{phone}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Liczba noclegów", "{{nights}}"],
+  ["Pokoje", "{{roomsList}}"],
+  ["Orientacyjna kwota", "{{totalPrice}} PLN"],
+  ["Uwagi klienta", "{{customerNote}}"],
+])}
+${noteCard("Po zatwierdzeniu klient otrzyma wiadomość z potwierdzeniem rezerwacji. Po anulowaniu system może wysłać informację o odrzuceniu zgłoszenia.")}`,
+    },
+    confirmed_client: {
+      subject: "{{hotelName}} — rezerwacja potwierdzona ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>z przyjemnością potwierdzamy rezerwację pobytu w <strong>{{hotelName}}</strong>.</p>
+${infoCard("Potwierdzony pobyt", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Liczba noclegów", "{{nights}}"],
+  ["Pokoje", "{{roomsList}}"],
+  ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
+])}
+${noteCard("Jeżeli chcesz doprecyzować godzinę przyjazdu, potrzeby dotyczące pobytu lub inne szczegóły organizacyjne, odpowiedz na tę wiadomość.")}
+<p>Dziękujemy za zaufanie i do zobaczenia w {{hotelName}}.</p>`,
+    },
+    cancelled_client: {
+      subject: "{{hotelName}} — anulowanie rezerwacji ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>informujemy, że rezerwacja została anulowana.</p>
+${infoCard("Anulowane zgłoszenie", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Pierwotny termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Pokoje", "{{roomsList}}"],
+])}
+${noteCard("Jeżeli chcesz zarezerwować nowy termin lub potrzebujesz pomocy w ponownym przygotowaniu pobytu, skontaktuj się z recepcją odpowiadając na tę wiadomość.")}`,
+    },
+    changed_client: {
+      subject: "{{hotelName}} — zaktualizowano rezerwację ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>wprowadziliśmy zmiany w Twojej rezerwacji. Aktualne dane pobytu znajdują się poniżej.</p>
+${infoCard("Aktualne podsumowanie rezerwacji", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Liczba noclegów", "{{nights}}"],
+  ["Pokoje", "{{roomsList}}"],
+  ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
+  ["Uwagi do rezerwacji", "{{customerNote}}"],
+])}
+${noteCard("Jeżeli któraś z powyższych informacji wymaga doprecyzowania, odpowiedz na tę wiadomość. Zespół recepcji wróci do Ciebie możliwie szybko.")}`,
+    },
+    expired_pending_client: {
+      subject: "{{hotelName}} — zgłoszenie wygasło ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>rezerwacja nie została potwierdzona w wymaganym czasie i wygasła automatycznie.</p>
+${infoCard("Wygasłe zgłoszenie", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Pokoje", "{{roomsList}}"],
+])}
+${noteCard("Termin wrócił do puli dostępności. Jeżeli nadal planujesz pobyt, prześlij nowe zgłoszenie lub skontaktuj się bezpośrednio z recepcją.")}`,
+    },
+    expired_pending_admin: {
+      subject: "[{{hotelName}}] Wygasła rezerwacja oczekująca {{reservationNumber}}",
+      bodyHtml: `<p>Rezerwacja oczekująca wygasła automatycznie z powodu braku decyzji w wymaganym terminie.</p>
+${infoCard("Dane wygasłego zgłoszenia", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Klient", "{{fullName}}"],
+  ["E-mail", "{{email}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Pokoje", "{{roomsList}}"],
+])}`,
+    },
+    expired_email_client: {
+      subject: "{{hotelName}} — link potwierdzający wygasł",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>nie otrzymaliśmy potwierdzenia adresu e-mail w ciągu 2 godzin, dlatego zgłoszenie zostało anulowane automatycznie.</p>
+${infoCard("Szczegóły zgłoszenia", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Pokoje", "{{roomsList}}"],
+])}
+${noteCard("Termin nie został zablokowany i może być już dostępny dla innych gości. Jeśli nadal chcesz zarezerwować pobyt, prześlij formularz ponownie.")}`,
+    },
+    cancelled_admin: {
+      subject: "[{{hotelName}}] Anulowano rezerwację {{reservationNumber}}",
+      bodyHtml: `<p>Rezerwacja została anulowana.</p>
+${infoCard("Podsumowanie anulowania", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Klient", "{{fullName}}"],
+  ["E-mail", "{{email}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+])}`,
+    },
+  };
+}
+
+function buildRestaurantDefaultTemplates() {
+  return {
+    restaurant_confirm_email: {
+      subject: "{{restaurantName}} — potwierdzenie rezerwacji stolika ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>dziękujemy za wybór <strong>{{restaurantName}}</strong>. Otrzymaliśmy zgłoszenie rezerwacji stolika i przygotowaliśmy jego podsumowanie.</p>
+<p>Aby przekazać rezerwację do obsługi sali, potwierdź adres e-mail. Link pozostaje ważny przez <strong>2 godziny</strong>.</p>
+${infoCard("Podsumowanie rezerwacji stolika", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Przydział stolików", "{{tablesList}}"],
+])}
+${noteCard("Rezerwacja stolika nie wymaga przedpłaty. <strong>Płatność odbywa się na miejscu</strong>, zgodnie z aktualnym menu i zamówieniem złożonym podczas wizyty.")}
+<p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>`,
+    },
+    restaurant_pending_client: {
+      subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>adres e-mail został potwierdzony, a rezerwacja oczekuje teraz na akceptację restauracji.</p>
+${infoCard("Twoja rezerwacja", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Przydział stolików", "{{tablesList}}"],
+])}
+${noteCard("Po zatwierdzeniu otrzymasz osobne potwierdzenie. <strong>Płatność za zamówienie realizowana jest na miejscu</strong>, zgodnie z wybranymi daniami i napojami.")}`,
+    },
+    restaurant_pending_admin: {
+      subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
+      bodyHtml: `<p>Do obsługi wpłynęła nowa rezerwacja stolika wymagająca decyzji.</p>
+${infoCard("Szczegóły rezerwacji", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Klient", "{{fullName}}"],
+  ["E-mail", "{{email}}"],
+  ["Telefon", "{{phone}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Przydział stolików", "{{tablesList}}"],
+  ["Łączenie stolików", "{{joinTables}}"],
+  ["Uwagi klienta", "{{customerNote}}"],
+])}`,
+    },
+    restaurant_confirmed_client: {
+      subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>z przyjemnością potwierdzamy Twoją rezerwację stolika.</p>
+${infoCard("Potwierdzone spotkanie", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Przydział stolików", "{{tablesList}}"],
+])}
+${noteCard("Rezerwacja nie wymaga przedpłaty. <strong>Płatność następuje na miejscu</strong> według zamówienia i aktualnej karty menu. W przypadku spóźnienia lub zmiany liczby gości prosimy o wcześniejszy kontakt.")}`,
+    },
+    restaurant_cancelled_client: {
+      subject: "{{restaurantName}} — rezerwacja anulowana ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>informujemy, że rezerwacja stolika została anulowana.</p>
+${infoCard("Anulowana rezerwacja", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+])}
+${noteCard("Jeśli chcesz zarezerwować inny termin, będzie nam bardzo miło ponownie Cię ugościć. Wystarczy odpowiedzieć na tę wiadomość lub wysłać nowe zgłoszenie.")}`,
+    },
+    restaurant_changed_client: {
+      subject: "{{restaurantName}} — zaktualizowano rezerwację stolika ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>wprowadziliśmy zmiany w Twojej rezerwacji. Aktualne szczegóły wizyty znajdują się poniżej.</p>
+${infoCard("Aktualne podsumowanie", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Przydział stolików", "{{tablesList}}"],
+  ["Uwagi do rezerwacji", "{{customerNote}}"],
+])}
+${noteCard("<strong>Płatność odbywa się na miejscu</strong>, zgodnie z zamówieniem złożonym podczas wizyty. Jeżeli potrzebujesz doprecyzować szczegóły rezerwacji, odpowiedz na tę wiadomość.")}`,
+    },
+    restaurant_expired_pending_client: {
+      subject: "{{restaurantName}} — rezerwacja wygasła ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>rezerwacja wygasła, ponieważ nie została potwierdzona w wymaganym czasie.</p>
+${infoCard("Wygasłe zgłoszenie", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+])}
+${noteCard("Stolik wrócił do puli dostępności. Jeżeli chcesz zarezerwować wizytę ponownie, prześlij nowe zgłoszenie.")}`,
+    },
+    restaurant_expired_pending_admin: {
+      subject: "[{{restaurantName}}] Wygasła rezerwacja {{reservationNumber}}",
+      bodyHtml: `<p>Rezerwacja stolika wygasła automatycznie.</p>
+${infoCard("Dane wygasłego zgłoszenia", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Klient", "{{fullName}}"],
+  ["E-mail", "{{email}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+])}`,
+    },
+    restaurant_expired_email_client: {
+      subject: "{{restaurantName}} — link potwierdzający wygasł",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>nie otrzymaliśmy potwierdzenia adresu e-mail w ciągu 2 godzin, dlatego zgłoszenie zostało anulowane.</p>
+${infoCard("Szczegóły zgłoszenia", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+])}
+${noteCard("Stolik nie został zablokowany. Jeśli nadal chcesz dokonać rezerwacji, prześlij formularz ponownie.")}`,
+    },
+    rest_confirm_email: null,
+    rest_pending_client: null,
+    rest_pending_admin: null,
+    rest_confirmed_client: null,
+    rest_cancelled_client: null,
+    rest_changed_client: null,
+  };
+}
+
+function buildHallDefaultTemplates() {
+  return {
+    hall_confirm_email: {
+      subject: "{{venueName}} — potwierdzenie zgłoszenia rezerwacji sali ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>dziękujemy za zainteresowanie organizacją wydarzenia w <strong>{{venueName}}</strong>. Otrzymaliśmy zgłoszenie i przygotowaliśmy jego podsumowanie.</p>
+<p>Aby przekazać zgłoszenie do opiekuna rezerwacji, potwierdź adres e-mail. Link pozostaje aktywny przez <strong>2 godziny</strong>.</p>
+${infoCard("Podsumowanie zgłoszenia", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Rodzaj wydarzenia", "{{eventType}}"],
+  ["Wyłączność", "{{exclusive}}"],
+])}
+${noteCard("<strong>Wycena przygotowywana jest indywidualnie</strong> po kontakcie z obsługą obiektu. Szczegóły płatności i harmonogram ustalane są na etapie oferty.")}`,
+    },
+    hall_pending_client: {
+      subject: "{{venueName}} — zgłoszenie oczekuje na decyzję obiektu ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>adres e-mail został potwierdzony, a zgłoszenie trafiło do opiekuna rezerwacji.</p>
+${infoCard("Twoje zgłoszenie", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Rodzaj wydarzenia", "{{eventType}}"],
+  ["Wyłączność", "{{exclusive}}"],
+])}
+${noteCard("Obiekt ma do <strong>7 dni</strong> na decyzję. <strong>Wycena ustalana jest indywidualnie</strong> po kontakcie z obsługą i nie jest prezentowana automatycznie w wiadomości.")}`,
+    },
+    hall_pending_admin: {
+      subject: "[{{venueName}}] Nowe zgłoszenie sali {{reservationNumber}}",
+      bodyHtml: `<p>Do obsługi wpłynęło nowe zgłoszenie rezerwacji sali.</p>
+${infoCard("Szczegóły zgłoszenia", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Klient", "{{fullName}}"],
+  ["E-mail", "{{email}}"],
+  ["Telefon", "{{phone}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Rodzaj wydarzenia", "{{eventType}}"],
+  ["Wyłączność", "{{exclusive}}"],
+  ["Pełna blokada", "{{fullBlockLabel}}"],
+  ["Uwagi klienta", "{{customerNote}}"],
+])}`,
+    },
+    hall_confirmed_client: {
+      subject: "{{venueName}} — rezerwacja sali potwierdzona ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>z przyjemnością potwierdzamy przyjęcie rezerwacji sali.</p>
+${infoCard("Potwierdzone wydarzenie", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Rodzaj wydarzenia", "{{eventType}}"],
+])}
+${noteCard("Szczegóły organizacyjne, oferta cenowa oraz harmonogram płatności obowiązują zgodnie z indywidualnymi ustaleniami z obsługą obiektu.")}`,
+    },
+    hall_cancelled_client: {
+      subject: "{{venueName}} — rezerwacja sali anulowana ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>informujemy, że zgłoszenie rezerwacji sali zostało anulowane.</p>
+${infoCard("Anulowane zgłoszenie", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+  ["Rodzaj wydarzenia", "{{eventType}}"],
+])}
+${noteCard("Jeżeli chcesz omówić nowy termin lub przygotować świeżą ofertę dla wydarzenia, odpowiedz na tę wiadomość.")}`,
+    },
+    hall_changed_client: {
+      subject: "{{venueName}} — zaktualizowano rezerwację sali ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>wprowadziliśmy zmiany w Twoim zgłoszeniu. Aktualne dane wydarzenia znajdują się poniżej.</p>
+${infoCard("Aktualne podsumowanie", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Rodzaj wydarzenia", "{{eventType}}"],
+  ["Uwagi do rezerwacji", "{{customerNote}}"],
+])}
+${noteCard("Wycena i warunki płatności obowiązują zgodnie z indywidualnymi ustaleniami z obsługą obiektu. W razie pytań odpowiedz na tę wiadomość.")}`,
+    },
+    hall_expired_pending_client: {
+      subject: "{{venueName}} — zgłoszenie wygasło ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>zgłoszenie wygasło, ponieważ obiekt nie potwierdził rezerwacji w wymaganym czasie.</p>
+${infoCard("Wygasłe zgłoszenie", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+])}
+${noteCard("Jeżeli nadal planujesz wydarzenie w tym terminie lub chcesz zaproponować inny termin, skontaktuj się z obiektem.")}`,
+    },
+    hall_expired_pending_admin: {
+      subject: "[{{venueName}}] Wygasła rezerwacja sali {{reservationNumber}}",
+      bodyHtml: `<p>Zgłoszenie rezerwacji sali wygasło automatycznie.</p>
+${infoCard("Dane wygasłego zgłoszenia", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Klient", "{{fullName}}"],
+  ["E-mail", "{{email}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+])}`,
+    },
+    hall_expired_email_client: {
+      subject: "{{venueName}} — link potwierdzający wygasł",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>nie otrzymaliśmy potwierdzenia adresu e-mail w ciągu 2 godzin, dlatego zgłoszenie zostało anulowane automatycznie.</p>
+${infoCard("Szczegóły zgłoszenia", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+])}
+${noteCard("Termin nie został zablokowany. Jeśli nadal chcesz zorganizować wydarzenie w obiekcie, wyślij formularz ponownie.")}`,
+    },
+    hall_extended_pending_client: {
+      subject: "{{venueName}} — przedłużono termin oczekiwania ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>termin oczekiwania na decyzję dotyczącą zgłoszenia został przedłużony.</p>
+${infoCard("Status zgłoszenia", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+  ["Nowy termin ważności", "{{expiresAt}}"],
+])}
+${noteCard("Obsługa obiektu nadal pracuje nad decyzją i wróci z odpowiedzią możliwie szybko.")}`,
+    },
+  };
+}
+
+const LEGACY_DEFAULT_TEMPLATES = {
   confirm_email: {
     subject: "{{hotelName}} — potwierdź rezerwację ({{reservationNumber}})",
     bodyHtml: `<p>Dzień dobry {{fullName}},</p>
@@ -257,7 +708,7 @@ Szacunkowa kwota: {{totalPrice}} PLN</p>
   },
 };
 
-const RESTAURANT_DEFAULT_TEMPLATES = {
+const LEGACY_RESTAURANT_DEFAULT_TEMPLATES = {
   restaurant_confirm_email: {
     subject: "{{restaurantName}} — potwierdź rezerwację stolika ({{reservationNumber}})",
     bodyHtml: `<p>Dzień dobry {{fullName}},</p>
@@ -395,7 +846,7 @@ Goście: {{guestsCount}}</p>
   },
 };
 
-const HALL_DEFAULT_TEMPLATES = {
+const LEGACY_HALL_DEFAULT_TEMPLATES = {
   hall_confirm_email: {
     subject: "{{venueName}} — potwierdź zgłoszenie rezerwacji sali ({{reservationNumber}})",
     bodyHtml: `<p>Dzień dobry {{fullName}},</p>
@@ -405,7 +856,7 @@ const HALL_DEFAULT_TEMPLATES = {
 <p><a href="{{confirmationLink}}">Potwierdź zgłoszenie</a></p>
 <p>Numer: {{reservationNumber}}<br/>
 Sala: {{hallName}}<br/>
-{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br/>
+{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}})<br/>
 Goście: {{guestsCount}} · {{eventType}}<br/>
 Wyłączność: {{exclusive}}</p>
 <p>Pozdrawiamy,<br/>{{venueName}}</p>`,
@@ -425,7 +876,7 @@ Wyłączność: {{exclusive}}</p>
     bodyHtml: `<p>Nowe zgłoszenie rezerwacji sali wymaga decyzji obsługi.</p>
 <p><strong>{{fullName}}</strong><br/>{{email}}<br/>{{phone}}</p>
 <p>Numer: {{reservationNumber}}<br/>
-Sala: {{hallName}} · {{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br/>
+Sala: {{hallName}} · {{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}})<br/>
 Goście: {{guestsCount}} · Wyłączność: {{exclusive}} · 100+: {{fullBlockLabel}}</p>
 <p>Rodzaj imprezy: {{eventType}}</p>
 <p>Uwagi klienta: {{customerNote}}</p>`,
@@ -451,7 +902,7 @@ Goście: {{guestsCount}} · Wyłączność: {{exclusive}} · 100+: {{fullBlockLa
     bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>Wprowadziliśmy zmiany w zgłoszeniu <strong>{{reservationNumber}}</strong>.</p>
 <p>Sala: {{hallName}}<br/>
-Termin: {{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br/>
+Termin: {{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}})<br/>
 Liczba gości: {{guestsCount}}<br/>
 Rodzaj wydarzenia: {{eventType}}</p>
 <p>Uwagi do rezerwacji: {{customerNote}}</p>
@@ -485,15 +936,35 @@ Rodzaj wydarzenia: {{eventType}}</p>
   },
 };
 
+const DEFAULT_TEMPLATES = buildHotelDefaultTemplates();
+const RESTAURANT_DEFAULT_TEMPLATES_BASE = buildRestaurantDefaultTemplates();
+const RESTAURANT_DEFAULT_TEMPLATES = {
+  ...RESTAURANT_DEFAULT_TEMPLATES_BASE,
+  rest_confirm_email: structuredClone(RESTAURANT_DEFAULT_TEMPLATES_BASE.restaurant_confirm_email),
+  rest_pending_client: structuredClone(RESTAURANT_DEFAULT_TEMPLATES_BASE.restaurant_pending_client),
+  rest_pending_admin: structuredClone(RESTAURANT_DEFAULT_TEMPLATES_BASE.restaurant_pending_admin),
+  rest_confirmed_client: structuredClone(RESTAURANT_DEFAULT_TEMPLATES_BASE.restaurant_confirmed_client),
+  rest_cancelled_client: structuredClone(RESTAURANT_DEFAULT_TEMPLATES_BASE.restaurant_cancelled_client),
+  rest_changed_client: structuredClone(RESTAURANT_DEFAULT_TEMPLATES_BASE.restaurant_changed_client),
+};
+const HALL_DEFAULT_TEMPLATES = buildHallDefaultTemplates();
+
 async function getMailTemplate(db, key) {
   const snap = await db.collection("hotelMailTemplates").doc(key).get();
   if (!snap.exists) {
     return DEFAULT_TEMPLATES[key] || { subject: "", bodyHtml: "" };
   }
   const d = snap.data();
+  const current = {
+    subject: d.subject || "",
+    bodyHtml: d.bodyHtml || "",
+  };
+  if (isSameTemplateShape(current, LEGACY_DEFAULT_TEMPLATES[key])) {
+    return DEFAULT_TEMPLATES[key] || current;
+  }
   return {
-    subject: d.subject || DEFAULT_TEMPLATES[key]?.subject || "",
-    bodyHtml: d.bodyHtml || DEFAULT_TEMPLATES[key]?.bodyHtml || "",
+    subject: current.subject || DEFAULT_TEMPLATES[key]?.subject || "",
+    bodyHtml: current.bodyHtml || DEFAULT_TEMPLATES[key]?.bodyHtml || "",
   };
 }
 
@@ -503,9 +974,16 @@ async function getRestaurantMailTemplate(db, key) {
     return RESTAURANT_DEFAULT_TEMPLATES[key] || { subject: "", bodyHtml: "" };
   }
   const d = snap.data();
+  const current = {
+    subject: d.subject || "",
+    bodyHtml: d.bodyHtml || "",
+  };
+  if (isSameTemplateShape(current, LEGACY_RESTAURANT_DEFAULT_TEMPLATES[key])) {
+    return RESTAURANT_DEFAULT_TEMPLATES[key] || current;
+  }
   return {
-    subject: d.subject || RESTAURANT_DEFAULT_TEMPLATES[key]?.subject || "",
-    bodyHtml: d.bodyHtml || RESTAURANT_DEFAULT_TEMPLATES[key]?.bodyHtml || "",
+    subject: current.subject || RESTAURANT_DEFAULT_TEMPLATES[key]?.subject || "",
+    bodyHtml: current.bodyHtml || RESTAURANT_DEFAULT_TEMPLATES[key]?.bodyHtml || "",
   };
 }
 
@@ -515,9 +993,16 @@ async function getHallMailTemplate(db, key) {
     return HALL_DEFAULT_TEMPLATES[key] || { subject: "", bodyHtml: "" };
   }
   const d = snap.data();
+  const current = {
+    subject: d.subject || "",
+    bodyHtml: d.bodyHtml || "",
+  };
+  if (isSameTemplateShape(current, LEGACY_HALL_DEFAULT_TEMPLATES[key])) {
+    return HALL_DEFAULT_TEMPLATES[key] || current;
+  }
   return {
-    subject: d.subject || HALL_DEFAULT_TEMPLATES[key]?.subject || "",
-    bodyHtml: d.bodyHtml || HALL_DEFAULT_TEMPLATES[key]?.bodyHtml || "",
+    subject: current.subject || HALL_DEFAULT_TEMPLATES[key]?.subject || "",
+    bodyHtml: current.bodyHtml || HALL_DEFAULT_TEMPLATES[key]?.bodyHtml || "",
   };
 }
 

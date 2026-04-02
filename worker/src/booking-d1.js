@@ -188,6 +188,51 @@ function buildBrandedEmail({
   };
 }
 
+function isSameTemplateShape(left, right) {
+  return (
+    String(left?.subject || "").trim() === String(right?.subject || "").trim() &&
+    String(left?.bodyHtml || "").trim() === String(right?.bodyHtml || "").trim()
+  );
+}
+
+function infoCard(title, rows, footerHtml = "") {
+  const body = rows
+    .filter(([, value]) => String(value ?? "").trim())
+    .map(
+      ([label, value]) => `
+        <tr>
+          <td style="padding:10px 0;border-bottom:1px solid #eadfce;color:#7a6754;font-size:13px;line-height:1.4;width:38%;vertical-align:top;">${label}</td>
+          <td style="padding:10px 0;border-bottom:1px solid #eadfce;color:#241914;font-size:15px;line-height:1.5;font-weight:600;vertical-align:top;">${value}</td>
+        </tr>`
+    )
+    .join("");
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;margin:24px 0 22px 0;border:1px solid #eadfce;border-radius:18px;background:#fbf7f1;">
+    <tr>
+      <td style="padding:18px 20px 8px 20px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.2;color:#241914;font-weight:700;">${title}</td>
+    </tr>
+    <tr>
+      <td style="padding:0 20px 6px 20px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">${body}</table>
+      </td>
+    </tr>
+    ${
+      footerHtml
+        ? `<tr>
+            <td style="padding:0 20px 20px 20px;color:#5e4b39;font-size:14px;line-height:1.7;">${footerHtml}</td>
+          </tr>`
+        : ""
+    }
+  </table>`;
+}
+
+function noteCard(html) {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;margin:18px 0 0 0;border-left:4px solid #c8aa78;background:#f8f1e5;">
+    <tr>
+      <td style="padding:16px 18px;color:#4c3b2d;font-size:14px;line-height:1.75;">${html}</td>
+    </tr>
+  </table>`;
+}
+
 function base64Utf8(value) {
   const bytes = new TextEncoder().encode(String(value ?? ""));
   let binary = "";
@@ -243,9 +288,20 @@ function serviceConfirmPath(service) {
   return "/Przyjec/potwierdzenie.html";
 }
 
+function serviceAdminActionPath(service) {
+  if (service === "hotel") return "/Hotel/akceptacja.html";
+  if (service === "restaurant") return "/Restauracja/akceptacja.html";
+  return "/Przyjec/akceptacja.html";
+}
+
 function buildConfirmationLink(env, request, service, token) {
   const base = publicSiteUrl(env, request);
   return `${base}${serviceConfirmPath(service)}?token=${encodeURIComponent(token)}`;
+}
+
+function buildAdminActionLink(env, request, service, token) {
+  const base = publicSiteUrl(env, request);
+  return `${base}${serviceAdminActionPath(service)}?token=${encodeURIComponent(token)}`;
 }
 
 function serviceLandingPath(service) {
@@ -258,6 +314,12 @@ function serviceLabel(service) {
   if (service === "hotel") return "Hotel";
   if (service === "restaurant") return "Restauracja";
   return "Przyjęcia i sale";
+}
+
+function reservationTableName(service) {
+  if (service === "hotel") return "hotel_reservations";
+  if (service === "restaurant") return "restaurant_reservations";
+  return "venue_reservations";
 }
 
 function splitLines(raw) {
@@ -480,6 +542,19 @@ function formatHm(ms) {
   });
 }
 
+function formatDateTimeWarsaw(ms) {
+  if (!Number.isFinite(Number(ms))) return "";
+  return new Intl.DateTimeFormat("pl-PL", {
+    timeZone: "Europe/Warsaw",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(Number(ms)));
+}
+
 function randomToken() {
   const arr = new Uint8Array(24);
   crypto.getRandomValues(arr);
@@ -511,10 +586,21 @@ function normalizePhone(prefix, national) {
   };
 }
 
-function humanNumberKey(service) {
-  if (service === "hotel") return "hotel_human_seq";
-  if (service === "restaurant") return "restaurant_human_seq";
-  return "hall_human_seq";
+function reservationTypeLabel(service) {
+  if (service === "hotel") return "HOTEL";
+  if (service === "restaurant") return "RESTAURACJA";
+  return "PRZYJĘCIA";
+}
+
+function reservationSubjectLabel(service, row) {
+  if (service === "hotel") return "Pobyt hotelowy";
+  if (service === "restaurant") return "Rezerwacja stolika";
+  const hallName = cleanString(row?.hall_name_snapshot || row?.hallName || row?.hall_id || row?.hallId, 200);
+  const eventType = cleanString(row?.event_type || row?.eventType, 200);
+  if (hallName && eventType) return `Rezerwacja sali ${hallName} (${eventType})`;
+  if (hallName) return `Rezerwacja sali ${hallName}`;
+  if (eventType) return `Rezerwacja sali (${eventType})`;
+  return "Rezerwacja sali";
 }
 
 function yearFromMsWarsaw(ms) {
@@ -534,23 +620,80 @@ function addOneDayYmd(ymd) {
   return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
 }
 
-async function nextHumanSequenceForYear(env, service, year) {
+async function legacyHumanSequenceTotalForYear(env, year) {
   const y = Number(year);
   if (!Number.isFinite(y) || y < 2000 || y > 2100) {
     throw new Error("Nieprawidłowy rok numeracji.");
   }
-  const key = `${humanNumberKey(service)}_${y}`;
+  const keys = [`hotel_human_seq_${y}`, `restaurant_human_seq_${y}`, `hall_human_seq_${y}`];
+  const placeholders = keys.map(() => "?").join(", ");
+  const rows = await env.DB.prepare(
+    `SELECT value FROM booking_counters WHERE key IN (${placeholders})`
+  )
+    .bind(...keys)
+    .all();
+  return (rows.results || []).reduce((sum, row) => sum + Number(row?.value || 0), 0);
+}
+
+async function existingReservationCountForYear(env, year) {
+  const y = Number(year);
   const row = await env.DB.prepare(
-    `INSERT INTO booking_counters (key, value) VALUES (?, 1)
+    `SELECT
+        (SELECT COUNT(*) FROM hotel_reservations WHERE human_year = ?) +
+        (SELECT COUNT(*) FROM restaurant_reservations WHERE human_year = ?) +
+        (SELECT COUNT(*) FROM venue_reservations WHERE human_year = ?) AS total`
+  )
+    .bind(y, y, y)
+    .first();
+  return Number(row?.total || 0);
+}
+
+async function maxHumanSequenceForYear(env, year) {
+  const y = Number(year);
+  const row = await env.DB.prepare(
+    `SELECT MAX(value) AS max_value
+     FROM (
+       SELECT MAX(human_number) AS value FROM hotel_reservations WHERE human_year = ?
+       UNION ALL
+       SELECT MAX(human_number) AS value FROM restaurant_reservations WHERE human_year = ?
+       UNION ALL
+       SELECT MAX(human_number) AS value FROM venue_reservations WHERE human_year = ?
+     )`
+  )
+    .bind(y, y, y)
+    .first();
+  return Number(row?.max_value || 0);
+}
+
+async function nextHumanSequenceForYear(env, year) {
+  const y = Number(year);
+  if (!Number.isFinite(y) || y < 2000 || y > 2100) {
+    throw new Error("Nieprawidłowy rok numeracji.");
+  }
+  const key = `reservation_human_seq_${y}`;
+  const existing = await env.DB.prepare("SELECT value FROM booking_counters WHERE key = ?")
+    .bind(key)
+    .first();
+  let startingValue = 1;
+  if (!existing) {
+    const [legacyTotal, existingCount, maxHuman] = await Promise.all([
+      legacyHumanSequenceTotalForYear(env, y),
+      existingReservationCountForYear(env, y),
+      maxHumanSequenceForYear(env, y),
+    ]);
+    startingValue = Math.max(legacyTotal, existingCount, maxHuman, 0) + 1;
+  }
+  const row = await env.DB.prepare(
+    `INSERT INTO booking_counters (key, value) VALUES (?, ?)
      ON CONFLICT(key) DO UPDATE SET value = booking_counters.value + 1
      RETURNING value`
   )
-    .bind(key)
+    .bind(key, startingValue)
     .first();
-  return Number(row?.value || 1);
+  return Number(row?.value || startingValue);
 }
 
-function formatHumanReservationNumber(row) {
+function formatHumanReservationNumber(row, service) {
   if (!row) return "";
   const seq = Number(row.human_number ?? 0);
   const hy = row.human_year;
@@ -558,7 +701,7 @@ function formatHumanReservationNumber(row) {
     hy != null && hy !== ""
       ? Number(hy)
       : yearFromMsWarsaw(Number(row.created_at || 0));
-  return `${seq}/${y}`;
+  return `${seq}/${y}/${reservationTypeLabel(service)}`;
 }
 
 async function readBody(request) {
@@ -652,6 +795,7 @@ async function ensureSchema(env) {
         admin_note TEXT NOT NULL DEFAULT '',
         room_ids_json TEXT NOT NULL DEFAULT '[]',
         confirmation_token_hash TEXT,
+        admin_action_token_hash TEXT,
         email_verification_expires_at INTEGER,
         pending_expires_at INTEGER,
         created_at INTEGER NOT NULL,
@@ -700,6 +844,7 @@ async function ensureSchema(env) {
         admin_note TEXT NOT NULL DEFAULT '',
         cleanup_buffer_minutes INTEGER NOT NULL DEFAULT 30,
         confirmation_token_hash TEXT,
+        admin_action_token_hash TEXT,
         email_verification_expires_at INTEGER,
         pending_expires_at INTEGER,
         created_at INTEGER NOT NULL,
@@ -753,6 +898,7 @@ async function ensureSchema(env) {
         customer_note TEXT NOT NULL DEFAULT '',
         admin_note TEXT NOT NULL DEFAULT '',
         confirmation_token_hash TEXT,
+        admin_action_token_hash TEXT,
         email_verification_expires_at INTEGER,
         pending_expires_at INTEGER,
         created_at INTEGER NOT NULL,
@@ -774,6 +920,11 @@ async function migrateHumanYearAndTemplates(env) {
   for (const tbl of ["hotel_reservations", "restaurant_reservations", "venue_reservations"]) {
     try {
       await env.DB.prepare(`ALTER TABLE ${tbl} ADD COLUMN human_year INTEGER`).run();
+    } catch {
+      /* kolumna już istnieje */
+    }
+    try {
+      await env.DB.prepare(`ALTER TABLE ${tbl} ADD COLUMN admin_action_token_hash TEXT`).run();
     } catch {
       /* kolumna już istnieje */
     }
@@ -1000,7 +1151,7 @@ async function createHotelReservation(env, payload, options = {}) {
   const now = nowMs();
   const id = crypto.randomUUID();
   const humanYear = yearFromMsWarsaw(now);
-  const humanNumber = await nextHumanSequenceForYear(env, "hotel", humanYear);
+  const humanNumber = await nextHumanSequenceForYear(env, humanYear);
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const roomIds = Array.isArray(payload.roomIds) ? payload.roomIds.map((x) => cleanString(x, 80)).filter(Boolean) : [];
   const dateFrom = cleanString(payload.dateFrom, 10);
@@ -1083,7 +1234,7 @@ function mapHotelReservation(row) {
     id: row.id,
     humanNumber: row.human_number,
     humanYear: row.human_year != null ? Number(row.human_year) : null,
-    humanNumberLabel: formatHumanReservationNumber(row),
+    humanNumberLabel: formatHumanReservationNumber(row, "hotel"),
     customerName: row.customer_name,
     email: row.email,
     phonePrefix: row.phone_prefix || "",
@@ -1407,7 +1558,7 @@ function mapRestaurantReservation(row, tableMap) {
     id: row.id,
     humanNumber: row.human_number,
     humanYear: row.human_year != null ? Number(row.human_year) : null,
-    humanNumberLabel: formatHumanReservationNumber(row),
+    humanNumberLabel: formatHumanReservationNumber(row, "restaurant"),
     fullName: row.full_name,
     email: row.email,
     phonePrefix: row.phone_prefix || "",
@@ -1477,7 +1628,7 @@ async function createRestaurantReservation(env, payload, options = {}) {
   }
   const id = crypto.randomUUID();
   const humanYear = yearFromMsWarsaw(now);
-  const humanNumber = await nextHumanSequenceForYear(env, "restaurant", humanYear);
+  const humanNumber = await nextHumanSequenceForYear(env, humanYear);
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const token = options.withConfirmationToken ? randomToken() : "";
   const tokenHash = token ? await sha256Hex(token) : null;
@@ -1655,7 +1806,7 @@ async function createHallReservation(env, payload, options = {}) {
   }
   const id = crypto.randomUUID();
   const humanYear = yearFromMsWarsaw(now);
-  const humanNumber = await nextHumanSequenceForYear(env, "hall", humanYear);
+  const humanNumber = await nextHumanSequenceForYear(env, humanYear);
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const token = options.withConfirmationToken ? randomToken() : "";
   const tokenHash = token ? await sha256Hex(token) : null;
@@ -1723,7 +1874,7 @@ function mapHallReservation(row, hallMap) {
     id: row.id,
     humanNumber: row.human_number,
     humanYear: row.human_year != null ? Number(row.human_year) : null,
-    humanNumberLabel: formatHumanReservationNumber(row),
+    humanNumberLabel: formatHumanReservationNumber(row, "hall"),
     phonePrefix: row.phone_prefix || "",
     phoneNational: row.phone_national || "",
     hallId: row.hall_id,
@@ -1755,7 +1906,7 @@ function mapHallReservation(row, hallMap) {
   };
 }
 
-function defaultTemplateMap(service) {
+function legacyDefaultTemplateMap(service) {
   if (service === "hotel") {
     return {
       confirm_email: {
@@ -1771,7 +1922,7 @@ function defaultTemplateMap(service) {
       pending_admin: {
         subject: "[{{hotelName}}] Rezerwacja do decyzji: {{reservationNumber}}",
         bodyHtml:
-          "<p>W panelu pojawila sie nowa rezerwacja oczekujaca na akceptacje.</p><p>Numer: <strong>{{reservationNumber}}</strong><br>Klient: {{fullName}}<br>E-mail: {{email}}<br>Telefon: {{phone}}<br>Termin: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>Uwagi klienta: {{customerNote}}</p>",
+          "<p>W panelu pojawila sie nowa rezerwacja oczekujaca na akceptacje.</p><p>Numer: <strong>{{reservationNumber}}</strong><br>Dotyczy: {{reservationSubject}}<br>Decyzja do: {{decisionDeadline}}<br>Klient: {{fullName}}<br>E-mail: {{email}}<br>Telefon: {{phone}}<br>Termin: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>Uwagi klienta: {{customerNote}}</p>",
       },
       confirmed_client: {
         subject: "{{hotelName}} | rezerwacja {{reservationNumber}} potwierdzona",
@@ -1805,7 +1956,7 @@ function defaultTemplateMap(service) {
       restaurant_pending_admin: {
         subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
         bodyHtml:
-          "<p>Nowa rezerwacja stolika oczekuje na decyzje obslugi.</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>{{tablesList}} · Gosci: {{guestsCount}} · Laczenie: {{joinTables}}</p><p>Uwagi klienta: {{customerNote}}</p>",
+          "<p>Nowa rezerwacja stolika oczekuje na decyzje obslugi.</p><p>Dotyczy: {{reservationSubject}}<br>Decyzja do: {{decisionDeadline}}</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>{{tablesList}} · Gosci: {{guestsCount}} · Laczenie: {{joinTables}}</p><p>Uwagi klienta: {{customerNote}}</p>",
       },
       restaurant_confirmed_client: {
         subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
@@ -1830,7 +1981,7 @@ function defaultTemplateMap(service) {
       rest_pending_admin: {
         subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
         bodyHtml:
-          "<p>Nowa rezerwacja stolika oczekuje na decyzje obslugi.</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>{{tablesList}} · Gosci: {{guestsCount}} · Laczenie: {{joinTables}}</p><p>Uwagi klienta: {{customerNote}}</p>",
+          "<p>Nowa rezerwacja stolika oczekuje na decyzje obslugi.</p><p>Dotyczy: {{reservationSubject}}<br>Decyzja do: {{decisionDeadline}}</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>{{tablesList}} · Gosci: {{guestsCount}} · Laczenie: {{joinTables}}</p><p>Uwagi klienta: {{customerNote}}</p>",
       },
       rest_confirmed_client: {
         subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
@@ -1868,7 +2019,7 @@ function defaultTemplateMap(service) {
     hall_pending_admin: {
       subject: "[{{venueName}}] Nowe zgłoszenie sali {{reservationNumber}}",
       bodyHtml:
-        "<p>Nowe zgloszenie rezerwacji sali oczekuje na decyzje obslugi.</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>Numer: {{reservationNumber}}</p><p>Sala: {{hallName}} · {{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>Gosci: {{guestsCount}} · Wylacznosc: {{exclusive}} · 100+: {{fullBlockLabel}}</p><p>Rodzaj imprezy: {{eventType}}</p><p>Uwagi klienta: {{customerNote}}</p>",
+        "<p>Nowe zgloszenie rezerwacji sali oczekuje na decyzje obslugi.</p><p>Dotyczy: {{reservationSubject}}<br>Decyzja do: {{decisionDeadline}}</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>Numer: {{reservationNumber}}</p><p>Sala: {{hallName}} · {{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>Gosci: {{guestsCount}} · Wylacznosc: {{exclusive}} · 100+: {{fullBlockLabel}}</p><p>Rodzaj imprezy: {{eventType}}</p><p>Uwagi klienta: {{customerNote}}</p>",
     },
     hall_confirmed_client: {
       subject: "{{venueName}} — rezerwacja sali potwierdzona ({{reservationNumber}})",
@@ -1886,6 +2037,426 @@ function defaultTemplateMap(service) {
         "<p>Dzien dobry {{fullName}},</p><p>Wprowadzilismy zmiany w rezerwacji sali <strong>{{reservationNumber}}</strong>.</p><p>Sala: {{hallName}}<br>Data: {{date}}<br>Godziny: {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Gosci: {{guestsCount}}<br>Impreza: {{eventType}}</p><p>Uwagi do rezerwacji: {{customerNote}}</p><p>W razie pytan odpowiedz na te wiadomosc lub skontaktuj sie z obiektem.</p><p>Pozdrawiamy,<br>{{venueName}}</p>",
     },
   };
+}
+
+function buildHotelDefaultTemplates() {
+  return {
+    confirm_email: {
+      subject: "{{hotelName}} — potwierdzenie adresu e-mail ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>dziękujemy za wybór <strong>{{hotelName}}</strong>. Otrzymaliśmy zgłoszenie rezerwacji i przygotowaliśmy jego kompletne podsumowanie.</p>
+<p>Aby przekazać rezerwację do dalszej obsługi recepcji, potwierdź adres e-mail. Link pozostaje aktywny przez <strong>2 godziny</strong>.</p>
+${infoCard("Podsumowanie pobytu", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Liczba noclegów", "{{nights}}"],
+  ["Wybrane pokoje", "{{roomsList}}"],
+  ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
+])}
+${noteCard("<strong>Ważne:</strong> potwierdzenie adresu e-mail nie jest jeszcze ostatecznym potwierdzeniem pobytu. Po weryfikacji dostępności recepcja prześle kolejną wiadomość ze statusem rezerwacji.")}
+<p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>`,
+    },
+    pending_client: {
+      subject: "{{hotelName}} — zgłoszenie oczekuje na decyzję recepcji ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>adres e-mail został poprawnie potwierdzony, a zgłoszenie zostało przekazane do recepcji <strong>{{hotelName}}</strong>.</p>
+<p>Na tym etapie rezerwacja ma status <strong>oczekująca na akceptację</strong>. Do czasu wysłania finalnego potwierdzenia termin nie jest jeszcze gwarantowany.</p>
+${infoCard("Podsumowanie zgłoszenia", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Liczba noclegów", "{{nights}}"],
+  ["Pokoje", "{{roomsList}}"],
+  ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
+])}
+${noteCard("Recepcja wróci do Ciebie z decyzją możliwie szybko. W razie potrzeby możesz odpowiedzieć na tę wiadomość i doprecyzować szczegóły pobytu.")}`,
+    },
+    pending_admin: {
+      subject: "[{{hotelName}}] Nowa rezerwacja do decyzji: {{reservationNumber}}",
+      bodyHtml: `<p>Do panelu wpłynęła nowa rezerwacja wymagająca decyzji recepcji.</p>
+${infoCard("Dane rezerwacji", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Dotyczy", "{{reservationSubject}}"],
+  ["Decyzja do", "{{decisionDeadline}}"],
+  ["Klient", "{{fullName}}"],
+  ["E-mail", "{{email}}"],
+  ["Telefon", "{{phone}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Liczba noclegów", "{{nights}}"],
+  ["Pokoje", "{{roomsList}}"],
+  ["Orientacyjna kwota", "{{totalPrice}} PLN"],
+  ["Uwagi klienta", "{{customerNote}}"],
+])}`,
+    },
+    confirmed_client: {
+      subject: "{{hotelName}} — rezerwacja potwierdzona ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>z przyjemnością potwierdzamy rezerwację pobytu w <strong>{{hotelName}}</strong>.</p>
+${infoCard("Potwierdzony pobyt", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Liczba noclegów", "{{nights}}"],
+  ["Pokoje", "{{roomsList}}"],
+  ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
+])}
+${noteCard("Jeżeli chcesz doprecyzować godzinę przyjazdu, potrzeby dotyczące pobytu lub inne szczegóły organizacyjne, odpowiedz na tę wiadomość.")}
+<p>Dziękujemy za zaufanie i do zobaczenia w {{hotelName}}.</p>`,
+    },
+    cancelled_client: {
+      subject: "{{hotelName}} — anulowanie rezerwacji ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>informujemy, że rezerwacja została anulowana.</p>
+${infoCard("Anulowane zgłoszenie", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Pierwotny termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Pokoje", "{{roomsList}}"],
+])}
+${noteCard("Jeżeli chcesz zarezerwować nowy termin lub potrzebujesz pomocy w ponownym przygotowaniu pobytu, skontaktuj się z recepcją odpowiadając na tę wiadomość.")}`,
+    },
+    changed_client: {
+      subject: "{{hotelName}} — zaktualizowano rezerwację ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>wprowadziliśmy zmiany w Twojej rezerwacji. Aktualne dane pobytu znajdują się poniżej.</p>
+${infoCard("Aktualne podsumowanie rezerwacji", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Liczba noclegów", "{{nights}}"],
+  ["Pokoje", "{{roomsList}}"],
+  ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
+  ["Uwagi do rezerwacji", "{{customerNote}}"],
+])}
+${noteCard("Jeżeli któraś z powyższych informacji wymaga doprecyzowania, odpowiedz na tę wiadomość. Zespół recepcji wróci do Ciebie możliwie szybko.")}`,
+    },
+    expired_pending_client: {
+      subject: "{{hotelName}} — zgłoszenie wygasło ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>rezerwacja nie została potwierdzona w wymaganym czasie i wygasła automatycznie.</p>
+${infoCard("Wygasłe zgłoszenie", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Pokoje", "{{roomsList}}"],
+])}
+${noteCard("Termin wrócił do puli dostępności. Jeżeli nadal planujesz pobyt, prześlij nowe zgłoszenie lub skontaktuj się bezpośrednio z recepcją.")}`,
+    },
+    expired_pending_admin: {
+      subject: "[{{hotelName}}] Wygasła rezerwacja oczekująca {{reservationNumber}}",
+      bodyHtml: `<p>Rezerwacja oczekująca wygasła automatycznie z powodu braku decyzji w wymaganym terminie.</p>
+${infoCard("Dane wygasłego zgłoszenia", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Klient", "{{fullName}}"],
+  ["E-mail", "{{email}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Pokoje", "{{roomsList}}"],
+])}`,
+    },
+    expired_email_client: {
+      subject: "{{hotelName}} — link potwierdzający wygasł",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>nie otrzymaliśmy potwierdzenia adresu e-mail w ciągu 2 godzin, dlatego zgłoszenie zostało anulowane automatycznie.</p>
+${infoCard("Szczegóły zgłoszenia", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Pokoje", "{{roomsList}}"],
+])}
+${noteCard("Termin nie został zablokowany i może być już dostępny dla innych gości. Jeśli nadal chcesz zarezerwować pobyt, prześlij formularz ponownie.")}`,
+    },
+    cancelled_admin: {
+      subject: "[{{hotelName}}] Anulowano rezerwację {{reservationNumber}}",
+      bodyHtml: `<p>Rezerwacja została anulowana.</p>
+${infoCard("Podsumowanie anulowania", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Klient", "{{fullName}}"],
+  ["E-mail", "{{email}}"],
+  ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+])}`,
+    },
+  };
+}
+
+function buildRestaurantDefaultTemplates() {
+  const base = {
+    restaurant_confirm_email: {
+      subject: "{{restaurantName}} — potwierdzenie rezerwacji stolika ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>dziękujemy za wybór <strong>{{restaurantName}}</strong>. Otrzymaliśmy zgłoszenie rezerwacji stolika i przygotowaliśmy jego podsumowanie.</p>
+<p>Aby przekazać rezerwację do obsługi sali, potwierdź adres e-mail. Link pozostaje ważny przez <strong>2 godziny</strong>.</p>
+${infoCard("Podsumowanie rezerwacji stolika", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Przydział stolików", "{{tablesList}}"],
+])}
+${noteCard("Rezerwacja stolika nie wymaga przedpłaty. <strong>Płatność odbywa się na miejscu</strong>, zgodnie z aktualnym menu i zamówieniem złożonym podczas wizyty.")}
+<p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>`,
+    },
+    restaurant_pending_client: {
+      subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>adres e-mail został potwierdzony, a rezerwacja oczekuje teraz na akceptację restauracji.</p>
+${infoCard("Twoja rezerwacja", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Przydział stolików", "{{tablesList}}"],
+])}
+${noteCard("Po zatwierdzeniu otrzymasz osobne potwierdzenie. <strong>Płatność za zamówienie realizowana jest na miejscu</strong>, zgodnie z wybranymi daniami i napojami.")}`,
+    },
+    restaurant_pending_admin: {
+      subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
+      bodyHtml: `<p>Do obsługi wpłynęła nowa rezerwacja stolika wymagająca decyzji.</p>
+${infoCard("Szczegóły rezerwacji", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Dotyczy", "{{reservationSubject}}"],
+  ["Decyzja do", "{{decisionDeadline}}"],
+  ["Klient", "{{fullName}}"],
+  ["E-mail", "{{email}}"],
+  ["Telefon", "{{phone}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Przydział stolików", "{{tablesList}}"],
+  ["Łączenie stolików", "{{joinTables}}"],
+  ["Uwagi klienta", "{{customerNote}}"],
+])}`,
+    },
+    restaurant_confirmed_client: {
+      subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>z przyjemnością potwierdzamy Twoją rezerwację stolika.</p>
+${infoCard("Potwierdzone spotkanie", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Przydział stolików", "{{tablesList}}"],
+])}
+${noteCard("Rezerwacja nie wymaga przedpłaty. <strong>Płatność następuje na miejscu</strong> według zamówienia i aktualnej karty menu. W przypadku spóźnienia lub zmiany liczby gości prosimy o wcześniejszy kontakt.")}`,
+    },
+    restaurant_cancelled_client: {
+      subject: "{{restaurantName}} — rezerwacja anulowana ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>informujemy, że rezerwacja stolika została anulowana.</p>
+${infoCard("Anulowana rezerwacja", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+])}
+${noteCard("Jeśli chcesz zarezerwować inny termin, będzie nam bardzo miło ponownie Cię ugościć. Wystarczy odpowiedzieć na tę wiadomość lub wysłać nowe zgłoszenie.")}`,
+    },
+    restaurant_changed_client: {
+      subject: "{{restaurantName}} — zaktualizowano rezerwację stolika ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>wprowadziliśmy zmiany w Twojej rezerwacji. Aktualne szczegóły wizyty znajdują się poniżej.</p>
+${infoCard("Aktualne podsumowanie", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Przydział stolików", "{{tablesList}}"],
+  ["Uwagi do rezerwacji", "{{customerNote}}"],
+])}
+${noteCard("<strong>Płatność odbywa się na miejscu</strong>, zgodnie z zamówieniem złożonym podczas wizyty. Jeżeli potrzebujesz doprecyzować szczegóły rezerwacji, odpowiedz na tę wiadomość.")}`,
+    },
+    restaurant_expired_pending_client: {
+      subject: "{{restaurantName}} — rezerwacja wygasła ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>rezerwacja wygasła, ponieważ nie została potwierdzona w wymaganym czasie.</p>
+${infoCard("Wygasłe zgłoszenie", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+])}
+${noteCard("Stolik wrócił do puli dostępności. Jeżeli chcesz zarezerwować wizytę ponownie, prześlij nowe zgłoszenie.")}`,
+    },
+    restaurant_expired_pending_admin: {
+      subject: "[{{restaurantName}}] Wygasła rezerwacja {{reservationNumber}}",
+      bodyHtml: `<p>Rezerwacja stolika wygasła automatycznie.</p>
+${infoCard("Dane wygasłego zgłoszenia", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Klient", "{{fullName}}"],
+  ["E-mail", "{{email}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+])}`,
+    },
+    restaurant_expired_email_client: {
+      subject: "{{restaurantName}} — link potwierdzający wygasł",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>nie otrzymaliśmy potwierdzenia adresu e-mail w ciągu 2 godzin, dlatego zgłoszenie zostało anulowane.</p>
+${infoCard("Szczegóły zgłoszenia", [
+  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Data", "{{date}}"],
+  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+])}
+${noteCard("Stolik nie został zablokowany. Jeśli nadal chcesz dokonać rezerwacji, prześlij formularz ponownie.")}`,
+    },
+  };
+  return {
+    ...base,
+    rest_confirm_email: structuredClone(base.restaurant_confirm_email),
+    rest_pending_client: structuredClone(base.restaurant_pending_client),
+    rest_pending_admin: structuredClone(base.restaurant_pending_admin),
+    rest_confirmed_client: structuredClone(base.restaurant_confirmed_client),
+    rest_cancelled_client: structuredClone(base.restaurant_cancelled_client),
+    rest_changed_client: structuredClone(base.restaurant_changed_client),
+  };
+}
+
+function buildHallDefaultTemplates() {
+  return {
+    hall_confirm_email: {
+      subject: "{{venueName}} — potwierdzenie zgłoszenia rezerwacji sali ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>dziękujemy za zainteresowanie organizacją wydarzenia w <strong>{{venueName}}</strong>. Otrzymaliśmy zgłoszenie i przygotowaliśmy jego podsumowanie.</p>
+<p>Aby przekazać zgłoszenie do opiekuna rezerwacji, potwierdź adres e-mail. Link pozostaje aktywny przez <strong>2 godziny</strong>.</p>
+${infoCard("Podsumowanie zgłoszenia", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Rodzaj wydarzenia", "{{eventType}}"],
+  ["Wyłączność", "{{exclusive}}"],
+])}
+${noteCard("<strong>Wycena przygotowywana jest indywidualnie</strong> po kontakcie z obsługą obiektu. Szczegóły płatności i harmonogram ustalane są na etapie oferty.")}`,
+    },
+    hall_pending_client: {
+      subject: "{{venueName}} — zgłoszenie oczekuje na decyzję obiektu ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>adres e-mail został potwierdzony, a zgłoszenie trafiło do opiekuna rezerwacji.</p>
+${infoCard("Twoje zgłoszenie", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Rodzaj wydarzenia", "{{eventType}}"],
+  ["Wyłączność", "{{exclusive}}"],
+])}
+${noteCard("Obiekt ma do <strong>7 dni</strong> na decyzję. <strong>Wycena ustalana jest indywidualnie</strong> po kontakcie z obsługą i nie jest prezentowana automatycznie w wiadomości.")}`,
+    },
+    hall_pending_admin: {
+      subject: "[{{venueName}}] Nowe zgłoszenie sali {{reservationNumber}}",
+      bodyHtml: `<p>Do obsługi wpłynęło nowe zgłoszenie rezerwacji sali.</p>
+${infoCard("Szczegóły zgłoszenia", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Dotyczy", "{{reservationSubject}}"],
+  ["Decyzja do", "{{decisionDeadline}}"],
+  ["Klient", "{{fullName}}"],
+  ["E-mail", "{{email}}"],
+  ["Telefon", "{{phone}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Rodzaj wydarzenia", "{{eventType}}"],
+  ["Wyłączność", "{{exclusive}}"],
+  ["Pełna blokada", "{{fullBlockLabel}}"],
+  ["Uwagi klienta", "{{customerNote}}"],
+])}`,
+    },
+    hall_confirmed_client: {
+      subject: "{{venueName}} — rezerwacja sali potwierdzona ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>z przyjemnością potwierdzamy przyjęcie rezerwacji sali.</p>
+${infoCard("Potwierdzone wydarzenie", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Rodzaj wydarzenia", "{{eventType}}"],
+])}
+${noteCard("Szczegóły organizacyjne, oferta cenowa oraz harmonogram płatności obowiązują zgodnie z indywidualnymi ustaleniami z obsługą obiektu.")}`,
+    },
+    hall_cancelled_client: {
+      subject: "{{venueName}} — rezerwacja sali anulowana ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>informujemy, że zgłoszenie rezerwacji sali zostało anulowane.</p>
+${infoCard("Anulowane zgłoszenie", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+  ["Rodzaj wydarzenia", "{{eventType}}"],
+])}
+${noteCard("Jeżeli chcesz omówić nowy termin lub przygotować świeżą ofertę dla wydarzenia, odpowiedz na tę wiadomość.")}`,
+    },
+    hall_changed_client: {
+      subject: "{{venueName}} — zaktualizowano rezerwację sali ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>wprowadziliśmy zmiany w Twoim zgłoszeniu. Aktualne dane wydarzenia znajdują się poniżej.</p>
+${infoCard("Aktualne podsumowanie", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+  ["Liczba gości", "{{guestsCount}}"],
+  ["Rodzaj wydarzenia", "{{eventType}}"],
+  ["Uwagi do rezerwacji", "{{customerNote}}"],
+])}
+${noteCard("Wycena i warunki płatności obowiązują zgodnie z indywidualnymi ustaleniami z obsługą obiektu. W razie pytań odpowiedz na tę wiadomość.")}`,
+    },
+    hall_expired_pending_client: {
+      subject: "{{venueName}} — zgłoszenie wygasło ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>zgłoszenie wygasło, ponieważ obiekt nie potwierdził rezerwacji w wymaganym czasie.</p>
+${infoCard("Wygasłe zgłoszenie", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+])}
+${noteCard("Jeżeli nadal planujesz wydarzenie w tym terminie lub chcesz zaproponować inny termin, skontaktuj się z obiektem.")}`,
+    },
+    hall_expired_pending_admin: {
+      subject: "[{{venueName}}] Wygasła rezerwacja sali {{reservationNumber}}",
+      bodyHtml: `<p>Zgłoszenie rezerwacji sali wygasło automatycznie.</p>
+${infoCard("Dane wygasłego zgłoszenia", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Klient", "{{fullName}}"],
+  ["E-mail", "{{email}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+])}`,
+    },
+    hall_expired_email_client: {
+      subject: "{{venueName}} — link potwierdzający wygasł",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>nie otrzymaliśmy potwierdzenia adresu e-mail w ciągu 2 godzin, dlatego zgłoszenie zostało anulowane automatycznie.</p>
+${infoCard("Szczegóły zgłoszenia", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+])}
+${noteCard("Termin nie został zablokowany. Jeśli nadal chcesz zorganizować wydarzenie w obiekcie, wyślij formularz ponownie.")}`,
+    },
+    hall_extended_pending_client: {
+      subject: "{{venueName}} — przedłużono termin oczekiwania ({{reservationNumber}})",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>termin oczekiwania na decyzję dotyczącą zgłoszenia został przedłużony.</p>
+${infoCard("Status zgłoszenia", [
+  ["Numer zgłoszenia", "{{reservationNumber}}"],
+  ["Sala", "{{hallName}}"],
+  ["Data", "{{date}}"],
+  ["Godziny", "{{timeFrom}} — {{timeTo}}"],
+  ["Nowy termin ważności", "{{expiresAt}}"],
+])}
+${noteCard("Obsługa obiektu nadal pracuje nad decyzją i wróci z odpowiedzią możliwie szybko.")}`,
+    },
+  };
+}
+
+function defaultTemplateMap(service) {
+  if (service === "hotel") return buildHotelDefaultTemplates();
+  if (service === "restaurant") return buildRestaurantDefaultTemplates();
+  return buildHallDefaultTemplates();
 }
 
 const EVENT_TEMPLATE_KEYS = {
@@ -1916,13 +2487,14 @@ const EVENT_TEMPLATE_KEYS = {
 };
 
 async function loadTemplates(env, service) {
+  const defaults = defaultTemplateMap(service);
+  const legacyDefaults = legacyDefaultTemplateMap(service);
   const rows = await env.DB.prepare(
     "SELECT key, subject, body_html AS bodyHtml FROM booking_mail_templates WHERE service = ? ORDER BY key ASC"
   )
     .bind(service)
     .all();
   if ((rows.results || []).length === 0) {
-    const defaults = defaultTemplateMap(service);
     const now = nowMs();
     for (const [key, val] of Object.entries(defaults)) {
       await env.DB.prepare(
@@ -1933,9 +2505,33 @@ async function loadTemplates(env, service) {
     }
     return defaults;
   }
+  const rowMap = new Map((rows.results || []).map((r) => [r.key, { subject: r.subject || "", bodyHtml: r.bodyHtml || "" }]));
   const out = {};
-  (rows.results || []).forEach((r) => {
-    out[r.key] = { subject: r.subject || "", bodyHtml: r.bodyHtml || "" };
+  const now = nowMs();
+  for (const [key, template] of Object.entries(defaults)) {
+    const existing = rowMap.get(key);
+    if (!existing) {
+      out[key] = template;
+      await env.DB.prepare(
+        "INSERT INTO booking_mail_templates (service, key, subject, body_html, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(service, key) DO UPDATE SET subject = excluded.subject, body_html = excluded.body_html, updated_at = excluded.updated_at"
+      )
+        .bind(service, key, template.subject, template.bodyHtml, now)
+        .run();
+      continue;
+    }
+    if (isSameTemplateShape(existing, legacyDefaults[key])) {
+      out[key] = template;
+      await env.DB.prepare(
+        "INSERT INTO booking_mail_templates (service, key, subject, body_html, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(service, key) DO UPDATE SET subject = excluded.subject, body_html = excluded.body_html, updated_at = excluded.updated_at"
+      )
+        .bind(service, key, template.subject, template.bodyHtml, now)
+        .run();
+      continue;
+    }
+    out[key] = existing;
+  }
+  rowMap.forEach((value, key) => {
+    if (!out[key]) out[key] = value;
   });
   return out;
 }
@@ -2068,9 +2664,129 @@ function hallDisplayName(env) {
 }
 
 function parseAdminNotifyEmails(env) {
-  return splitLines(String(env.ADMIN_NOTIFY_EMAIL || "").replace(/,/g, "\n"))
+  return [...new Set([env.ADMIN_NOTIFY_EMAIL, env.FIREBASE_ADMIN_EMAILS]
+    .flatMap((raw) => splitLines(String(raw || "").replace(/,/g, "\n")))
     .map((x) => cleanString(x, 320).toLowerCase())
-    .filter((x) => x.includes("@"));
+    .filter((x) => x.includes("@")))];
+}
+
+async function issueAdminActionToken(env, service, reservationId) {
+  const token = randomToken();
+  const tokenHash = await sha256Hex(token);
+  await env.DB.prepare(
+    `UPDATE ${reservationTableName(service)} SET admin_action_token_hash = ?, updated_at = ? WHERE id = ?`
+  )
+    .bind(tokenHash, nowMs(), reservationId)
+    .run();
+  return token;
+}
+
+async function getReservationByAdminActionToken(env, service, token) {
+  const cleanToken = cleanString(token, 500);
+  if (!cleanToken) return null;
+  const tokenHash = await sha256Hex(cleanToken);
+  return env.DB.prepare(
+    `SELECT * FROM ${reservationTableName(service)} WHERE admin_action_token_hash = ? LIMIT 1`
+  )
+    .bind(tokenHash)
+    .first();
+}
+
+function buildAdminActionDetailRows(service, vars) {
+  const rows = [
+    ["Numer rezerwacji", vars.reservationNumber || ""],
+    ["Dotyczy", vars.reservationSubject || ""],
+    ["Decyzja do", vars.decisionDeadline || ""],
+    ["Klient", vars.fullName || ""],
+    ["E-mail", vars.email || ""],
+    ["Telefon", vars.phone || ""],
+  ];
+  if (service === "hotel") {
+    rows.push(
+      ["Termin pobytu", [vars.dateFrom, vars.dateTo].filter(Boolean).join(" — ")],
+      ["Liczba noclegów", vars.nights || ""],
+      ["Pokoje", vars.roomsList || ""],
+      ["Orientacyjna kwota", vars.totalPrice ? `${vars.totalPrice} PLN` : ""]
+    );
+  } else if (service === "restaurant") {
+    rows.push(
+      ["Data", vars.date || ""],
+      ["Godzina", [vars.timeFrom, vars.timeTo].filter(Boolean).join(" — ")],
+      ["Liczba gości", vars.guestsCount || ""],
+      ["Przydział stolików", vars.tablesList || ""],
+      ["Łączenie stolików", vars.joinTables || ""]
+    );
+  } else {
+    rows.push(
+      ["Sala", vars.hallName || ""],
+      ["Data", vars.date || ""],
+      ["Godziny", [vars.timeFrom, vars.timeTo].filter(Boolean).join(" — ")],
+      ["Liczba gości", vars.guestsCount || ""],
+      ["Rodzaj wydarzenia", vars.eventType || ""],
+      ["Wyłączność", vars.exclusive || ""]
+    );
+  }
+  rows.push(["Uwagi klienta", vars.customerNote || ""]);
+  return rows.filter(([, value]) => String(value || "").trim());
+}
+
+async function buildAdminActionPayload(env, request, service, row) {
+  const vars = await buildMailVarsForService(env, request, service, row, "");
+  return {
+    ok: true,
+    service,
+    serviceLabel: serviceLabel(service),
+    status: row.status || "",
+    statusLabel: statusLabel(row.status || ""),
+    canConfirm: row.status === "pending" && Number(row.pending_expires_at || 0) > nowMs(),
+    reservationNumber: vars.reservationNumber || "",
+    reservationSubject: vars.reservationSubject || reservationSubjectLabel(service, row),
+    decisionDeadline: vars.decisionDeadline || "",
+    details: buildAdminActionDetailRows(service, vars).map(([label, value]) => ({ label, value })),
+  };
+}
+
+async function confirmReservationById(env, request, service, id) {
+  const table = reservationTableName(service);
+  const row = await env.DB.prepare(`SELECT * FROM ${table} WHERE id = ? LIMIT 1`)
+    .bind(id)
+    .first();
+  if (!row) {
+    return { status: 404, data: { error: "Brak rezerwacji." } };
+  }
+  if (row.status === "confirmed") {
+    return { status: 200, data: await buildAdminActionPayload(env, request, service, row) };
+  }
+  if (row.status !== "pending") {
+    return {
+      status: 400,
+      data: {
+        error:
+          row.status === "expired"
+            ? "Ta rezerwacja wygasła i nie może już zostać potwierdzona."
+            : row.status === "cancelled"
+              ? "Ta rezerwacja została już anulowana."
+              : "Ta rezerwacja nie oczekuje już na decyzję.",
+      },
+    };
+  }
+  await env.DB.prepare(`UPDATE ${table} SET status='confirmed', pending_expires_at=NULL, updated_at=? WHERE id=?`)
+    .bind(nowMs(), id)
+    .run();
+  const updated = await env.DB.prepare(`SELECT * FROM ${table} WHERE id = ? LIMIT 1`)
+    .bind(id)
+    .first();
+  try {
+    await sendTemplatedBookingMail(env, request, {
+      service,
+      eventKey: "confirmed_client",
+      row: updated,
+      to: updated?.email,
+    });
+  } catch (error) {
+    console.error(`${service} confirm mail error:`, error);
+  }
+  return { status: 200, data: await buildAdminActionPayload(env, request, service, updated) };
 }
 
 async function buildHotelMailVars(env, request, row, token = "") {
@@ -2080,7 +2796,8 @@ async function buildHotelMailVars(env, request, row, token = "") {
   const roomLabels = roomIds.map((id) => roomMap.get(id)?.name || id).join(", ");
   return {
     reservationId: row.id,
-    reservationNumber: formatHumanReservationNumber(row),
+    reservationNumber: formatHumanReservationNumber(row, "hotel"),
+    reservationSubject: reservationSubjectLabel("hotel", row),
     fullName: row.customer_name || "",
     email: row.email || "",
     phone: `${row.phone_prefix || ""} ${row.phone_national || ""}`.trim(),
@@ -2091,6 +2808,7 @@ async function buildHotelMailVars(env, request, row, token = "") {
     totalPrice: String(Number(row.total_price || 0).toFixed(2)),
     customerNote: row.customer_note || "",
     adminNote: row.admin_note || "",
+    decisionDeadline: formatDateTimeWarsaw(Number(row.pending_expires_at || 0)),
     confirmationLink: token ? buildConfirmationLink(env, request, "hotel", token) : "",
     hotelName: hotelDisplayName(env),
   };
@@ -2108,7 +2826,8 @@ async function buildRestaurantMailVars(env, request, row, token = "") {
     .join(", ");
   return {
     reservationId: row.id,
-    reservationNumber: formatHumanReservationNumber(row),
+    reservationNumber: formatHumanReservationNumber(row, "restaurant"),
+    reservationSubject: reservationSubjectLabel("restaurant", row),
     fullName: row.full_name || "",
     email: row.email || "",
     phone: `${row.phone_prefix || ""} ${row.phone_national || ""}`.trim(),
@@ -2122,6 +2841,7 @@ async function buildRestaurantMailVars(env, request, row, token = "") {
     joinTables: Number(row.join_tables) ? "tak" : "nie",
     customerNote: row.customer_note || "",
     adminNote: row.admin_note || "",
+    decisionDeadline: formatDateTimeWarsaw(Number(row.pending_expires_at || 0)),
     confirmationLink: token ? buildConfirmationLink(env, request, "restaurant", token) : "",
     restaurantName: restaurantDisplayName(env),
   };
@@ -2131,7 +2851,8 @@ async function buildHallMailVars(env, request, row, token = "") {
   const hall = await env.DB.prepare("SELECT name FROM venue_halls WHERE id = ?").bind(row.hall_id).first();
   return {
     reservationId: row.id,
-    reservationNumber: formatHumanReservationNumber(row),
+    reservationNumber: formatHumanReservationNumber(row, "hall"),
+    reservationSubject: reservationSubjectLabel("hall", row),
     fullName: row.full_name || "",
     email: row.email || "",
     phone: `${row.phone_prefix || ""} ${row.phone_national || ""}`.trim(),
@@ -2145,6 +2866,7 @@ async function buildHallMailVars(env, request, row, token = "") {
     exclusive: Number(row.exclusive) ? "tak" : "nie",
     customerNote: row.customer_note || "",
     adminNote: row.admin_note || "",
+    decisionDeadline: formatDateTimeWarsaw(Number(row.pending_expires_at || 0)),
     confirmationLink: token ? buildConfirmationLink(env, request, "hall", token) : "",
     venueName: hallDisplayName(env),
   };
@@ -2171,6 +2893,21 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
   if (eventKey === "cancelled_client" && cancelReason) {
     html += `<p><strong>Powod anulowania:</strong><br>${escapeHtml(cancelReason).replace(/\n/g, "<br>")}</p>`;
   }
+  if (eventKey === "pending_admin") {
+    const summaryRows = buildAdminActionDetailRows(service, vars).map(([label, value]) => [
+      escapeHtml(label),
+      escapeHtml(value),
+    ]);
+    if (summaryRows.length) {
+      html += infoCard("Szczegóły rezerwacji", summaryRows);
+    }
+    if (vars.adminActionLink) {
+      const safeLink = escapeHtml(String(vars.adminActionLink));
+      html += noteCard(
+        `Aby szybko potwierdzić rezerwację, kliknij link: <a class="confirm-link-inline" href="${safeLink}">${safeLink}</a>`
+      );
+    }
+  }
   const siteUrl = publicSiteUrl(env, request);
   const brandName =
     service === "hotel"
@@ -2189,16 +2926,63 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
       service === "restaurant"
         ? `Rezerwacja stolika ${vars.reservationNumber || ""}`.trim()
         : `Rezerwacja ${vars.reservationNumber || ""}`.trim(),
-    actionUrl: eventKey === "confirm_email" ? vars.confirmationLink || "" : "",
-    actionLabel: service === "hall" ? "Potwierdź zgłoszenie" : "Potwierdź adres e-mail",
+    actionUrl:
+      eventKey === "confirm_email"
+        ? vars.confirmationLink || ""
+        : eventKey === "pending_admin"
+          ? vars.adminActionLink || ""
+          : "",
+    actionLabel:
+      eventKey === "pending_admin"
+        ? "Otwórz i potwierdź"
+        : service === "hall"
+          ? "Potwierdź zgłoszenie"
+          : "Potwierdź adres e-mail",
   });
   return sendMailViaSmtp(env, { to: destination, subject, html: email.html, text: email.text });
+}
+
+async function notifyPendingAdmins(env, request, service, row) {
+  const adminActionToken = await issueAdminActionToken(env, service, row.id);
+  const adminActionLink = buildAdminActionLink(env, request, service, adminActionToken);
+  const admins = parseAdminNotifyEmails(env);
+  for (const adminEmail of admins) {
+    await sendTemplatedBookingMail(env, request, {
+      service,
+      eventKey: "pending_admin",
+      row,
+      to: adminEmail,
+      extraVars: { adminActionLink },
+    });
+  }
+}
+
+async function handlePublicAdminAction(env, op, request, service) {
+  if (op === "public-admin-action-view" && request.method === "GET") {
+    const url = new URL(request.url);
+    const row = await getReservationByAdminActionToken(env, service, url.searchParams.get("token"));
+    if (!row) {
+      return { status: 404, data: { error: "Link administracyjny jest nieprawidłowy lub wygasł." } };
+    }
+    return { status: 200, data: await buildAdminActionPayload(env, request, service, row) };
+  }
+  if (op === "public-admin-action-confirm" && request.method === "POST") {
+    const body = await readBody(request);
+    const row = await getReservationByAdminActionToken(env, service, body.token);
+    if (!row) {
+      return { status: 404, data: { error: "Link administracyjny jest nieprawidłowy lub wygasł." } };
+    }
+    return confirmReservationById(env, request, service, row.id);
+  }
+  return null;
 }
 
 async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
   if (op === "health" && request.method === "GET") {
     return { status: 200, data: { ok: true, service: "hotelApi-d1" } };
   }
+  const adminAction = await handlePublicAdminAction(env, op, request, "hotel");
+  if (adminAction) return adminAction;
   if (op === "public-availability" && request.method === "POST") {
     const body = await readBody(request);
     const out = await hotelAvailability(env, cleanString(body.dateFrom, 10), cleanString(body.dateTo, 10));
@@ -2240,6 +3024,12 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
           )
             .bind(nowMs() + HOTEL_PENDING_MS, nowMs(), out.id)
             .run();
+          try {
+            const pendingRow = await getHotelReservation(env, out.id);
+            await notifyPendingAdmins(env, request, "hotel", pendingRow);
+          } catch (adminError) {
+            console.error("Hotel admin notify fallback error:", adminError);
+          }
         }
       }
       return {
@@ -2290,23 +3080,16 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
         .bind(nowMs() + HOTEL_PENDING_MS, nowMs(), row.id)
         .run();
       try {
+        const pendingRow = await getHotelReservation(env, row.id);
         await sendTemplatedBookingMail(env, request, {
           service: "hotel",
           eventKey: "pending_client",
-          row: { ...row, status: "pending" },
-          to: row.email,
+          row: pendingRow,
+          to: pendingRow?.email,
         });
-        const admins = parseAdminNotifyEmails(env);
-        for (const adminEmail of admins) {
-          await sendTemplatedBookingMail(env, request, {
-            service: "hotel",
-            eventKey: "pending_admin",
-            row: { ...row, status: "pending" },
-            to: adminEmail,
-          });
-        }
-      } catch (error) {
-        console.error("Hotel pending mail error:", error);
+        await notifyPendingAdmins(env, request, "hotel", pendingRow);
+      } catch (mailError) {
+        console.error("Hotel pending mail error:", mailError);
       }
       return { status: 200, data: { ok: true, reservationId: row.id, humanNumber: row.human_number } };
     } catch (error) {
@@ -2320,6 +3103,8 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
   if (op === "health" && request.method === "GET") {
     return { status: 200, data: { ok: true, service: "restaurantApi-d1" } };
   }
+  const adminAction = await handlePublicAdminAction(env, op, request, "restaurant");
+  if (adminAction) return adminAction;
   if (op === "public-settings" && request.method === "GET") {
     const url = new URL(request.url);
     const requestedDate = cleanString(url.searchParams.get("reservationDate"), 10);
@@ -2395,6 +3180,12 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
           )
             .bind(nowMs() + RESTAURANT_PENDING_MS, nowMs(), out.id)
             .run();
+          try {
+            const pendingRow = await getRestaurantReservationRow(env, out.id);
+            await notifyPendingAdmins(env, request, "restaurant", pendingRow);
+          } catch (adminError) {
+            console.error("Restaurant admin notify fallback error:", adminError);
+          }
         }
       }
       return {
@@ -2452,25 +3243,17 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
       )
         .bind(toJson(assigned), nowMs() + RESTAURANT_PENDING_MS, nowMs(), row.id)
         .run();
-      const rowAfter = await getRestaurantReservationRow(env, row.id);
       try {
+        const pendingRow = await getRestaurantReservationRow(env, row.id);
         await sendTemplatedBookingMail(env, request, {
           service: "restaurant",
           eventKey: "pending_client",
-          row: rowAfter,
-          to: rowAfter?.email,
+          row: pendingRow,
+          to: pendingRow?.email,
         });
-        const admins = parseAdminNotifyEmails(env);
-        for (const adminEmail of admins) {
-          await sendTemplatedBookingMail(env, request, {
-            service: "restaurant",
-            eventKey: "pending_admin",
-            row: rowAfter,
-            to: adminEmail,
-          });
-        }
-      } catch (error) {
-        console.error("Restaurant pending mail error:", error);
+        await notifyPendingAdmins(env, request, "restaurant", pendingRow);
+      } catch (mailError) {
+        console.error("Restaurant pending mail error:", mailError);
       }
       return { status: 200, data: { ok: true, reservationId: row.id, humanNumber: row.human_number } };
     } catch (error) {
@@ -2484,6 +3267,8 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
   if (op === "health" && request.method === "GET") {
     return { status: 200, data: { ok: true, service: "hallApi-d1" } };
   }
+  const adminAction = await handlePublicAdminAction(env, op, request, "hall");
+  if (adminAction) return adminAction;
   if (op === "public-halls" && request.method === "GET") {
     const halls = (await venueHalls(env))
       .filter((h) => h.active)
@@ -2550,6 +3335,12 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
           )
             .bind(nowMs() + HALL_PENDING_MS, nowMs(), out.id)
             .run();
+          try {
+            const pendingRow = await getHallReservationRow(env, out.id);
+            await notifyPendingAdmins(env, request, "hall", pendingRow);
+          } catch (adminError) {
+            console.error("Hall admin notify fallback error:", adminError);
+          }
         }
       }
       return {
@@ -2611,24 +3402,16 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
         .bind(nowMs() + HALL_PENDING_MS, nowMs(), row.id)
         .run();
       try {
-        const rowAfter = await getHallReservationRow(env, row.id);
+        const pendingRow = await getHallReservationRow(env, row.id);
         await sendTemplatedBookingMail(env, request, {
           service: "hall",
           eventKey: "pending_client",
-          row: rowAfter,
-          to: rowAfter?.email,
+          row: pendingRow,
+          to: pendingRow?.email,
         });
-        const admins = parseAdminNotifyEmails(env);
-        for (const adminEmail of admins) {
-          await sendTemplatedBookingMail(env, request, {
-            service: "hall",
-            eventKey: "pending_admin",
-            row: rowAfter,
-            to: adminEmail,
-          });
-        }
-      } catch (error) {
-        console.error("Hall pending mail error:", error);
+        await notifyPendingAdmins(env, request, "hall", pendingRow);
+      } catch (mailError) {
+        console.error("Hall pending mail error:", mailError);
       }
       return { status: 200, data: { ok: true, reservationId: row.id, humanNumber: row.human_number } };
     } catch (error) {
@@ -2953,15 +3736,30 @@ async function handleRestaurantAdmin(env, op, request) {
   }
   if (op === "admin-table-create" && request.method === "POST") {
     const now = nowMs();
-    const existing = await restaurantTables(env, true);
-    const nextNumber = existing.reduce((max, row) => Math.max(max, Number(row.number || 0)), 0) + 1;
-    const nextSortOrder = existing.reduce((max, row) => Math.max(max, Number(row.sortOrder || 0)), 0) + 1;
-    const id = `table-${nextNumber}-${now}`;
-    await env.DB.prepare(
-      "INSERT INTO restaurant_tables (id, number, zone, active, hidden, description, sort_order, updated_at) VALUES (?, ?, 'sala', 1, 0, '', ?, ?)"
-    )
-      .bind(id, nextNumber, nextSortOrder, now)
-      .run();
+    const maxNumRow = await env.DB.prepare("SELECT COALESCE(MAX(number), 0) AS m FROM restaurant_tables").first();
+    const maxSortRow = await env.DB.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM restaurant_tables").first();
+    const nextNumber = Number(maxNumRow?.m || 0) + 1;
+    const nextSortOrder = Number(maxSortRow?.m || 0) + 1;
+    const suffix =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${now}-${Math.random().toString(36).slice(2, 10)}`;
+    const id = `table-${nextNumber}-${suffix}`;
+    try {
+      await env.DB.prepare(
+        "INSERT INTO restaurant_tables (id, number, zone, active, hidden, description, sort_order, updated_at) VALUES (?, ?, 'sala', 1, 0, '', ?, ?)"
+      )
+        .bind(id, nextNumber, nextSortOrder, now)
+        .run();
+    } catch (error) {
+      const msg = String(error?.message || "nie udało się dodać stolika.");
+      return {
+        status: 409,
+        data: {
+          error: msg.includes("UNIQUE") || msg.includes("constraint") ? "Konflikt zapisu stolika — odśwież listę i spróbuj ponownie." : msg,
+        },
+      };
+    }
     const countRow = await env.DB.prepare("SELECT COUNT(*) AS c FROM restaurant_tables").first();
     const tableCount = Math.max(1, Number(countRow?.c || 0));
     await env.DB.prepare("UPDATE restaurant_settings SET table_count=?, updated_at=? WHERE id='default'")

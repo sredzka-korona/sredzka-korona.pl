@@ -387,8 +387,8 @@
 
   function normalizeDocumentsPage(documentsPage) {
     const source = documentsPage && typeof documentsPage === "object" ? documentsPage : {};
-    return {
-      documents: (Array.isArray(source.documents) ? source.documents : [])
+    const mapDocumentsPageDocuments = (rawList) =>
+      (Array.isArray(rawList) ? rawList : [])
         .map((doc) => ({
           title: String(doc?.title || "").trim(),
           subtitle: String(doc?.subtitle || "").trim(),
@@ -399,8 +399,13 @@
             }))
             .filter((section) => section.title || section.text),
         }))
-        .filter((doc) => doc.title || doc.subtitle || doc.sections.length),
-    };
+        .filter((doc) => doc.title || doc.subtitle || doc.sections.length);
+
+    let documents = mapDocumentsPageDocuments(source.documents);
+    if (!documents.length) {
+      documents = mapDocumentsPageDocuments(defaultContent.documentsPage?.documents);
+    }
+    return { documents };
   }
 
   function normalizeEventHalls(halls) {
@@ -1543,6 +1548,7 @@
 
   function scheduleItemsForDate(ymd) {
     return state.schedule.items
+      .filter((item) => item.status !== "email_verification_pending")
       .filter((item) => scheduleItemOnDate(item, ymd))
       .sort((left, right) => left.startMs - right.startMs);
   }
@@ -1732,6 +1738,7 @@
           .map(
             (item) => `
               <article class="schedule-quick-item">
+                <button type="button" class="button secondary schedule-card-action-details" data-schedule-action="details" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Szczegóły</button>
                 <div class="schedule-quick-head">
                   <strong>${escapeHtml(scheduleCardHeading(item))}</strong>
                   <span class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</span>
@@ -1740,15 +1747,14 @@
                 <p>${escapeHtml(item.title || "Rezerwacja")}</p>
                 <p class="helper">${escapeHtml(item.subtitle || "")}</p>
                 ${scheduleCountdownInlineMarkup(item)}
-                <div class="inline-actions">
-                  ${
-                    item.status === "pending"
-                      ? `<button type="button" class="button secondary" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>
-                         <button type="button" class="button secondary danger-muted" data-schedule-action="reject" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odrzuć</button>`
-                      : ""
-                  }
-                  <button type="button" class="button secondary" data-schedule-action="details" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Szczegóły</button>
-                </div>
+                ${
+                  item.status === "pending"
+                    ? `<div class="schedule-card-actions-bottom">
+                        <button type="button" class="button secondary danger-muted" data-schedule-action="reject" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odrzuć</button>
+                        <button type="button" class="button secondary schedule-card-action-confirm" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>
+                      </div>`
+                    : ""
+                }
               </article>
             `
           )
@@ -1834,19 +1840,17 @@
     `;
   }
 
-  function scheduleListItemActionsMarkup(kind, item) {
-    const actions = [
-      `<button type="button" class="button secondary" data-schedule-action="details" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Szczegóły</button>`,
-    ];
+  function scheduleListItemDetailsButton(item) {
+    return `<button type="button" class="button secondary schedule-card-action-details" data-schedule-action="details" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Szczegóły</button>`;
+  }
+
+  function scheduleListItemBottomActionsMarkup(kind, item) {
+    const cancelBtn = `<button type="button" class="button secondary danger-muted schedule-inline-cancel schedule-card-action-cancel" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`;
     if (kind === "pending") {
-      actions.push(
-        `<button type="button" class="button secondary" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>`
-      );
+      const confirmBtn = `<button type="button" class="button secondary schedule-card-action-confirm" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>`;
+      return `${cancelBtn}${confirmBtn}`;
     }
-    actions.push(
-      `<button type="button" class="button secondary danger-muted schedule-inline-cancel" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`
-    );
-    return actions.join("");
+    return cancelBtn;
   }
 
   function scheduleGroupedListMarkup(items, kind, { emptyText = "", floorYmd = "" } = {}) {
@@ -1866,6 +1870,7 @@
                 .map(
                   (item) => `
                     <article class="schedule-day-item schedule-modal-list-item">
+                      ${scheduleListItemDetailsButton(item)}
                       <div class="schedule-day-item-head">
                         <div class="schedule-day-item-meta">
                           <strong>${escapeHtml(scheduleCardHeading(item))}</strong>
@@ -1876,7 +1881,7 @@
                       <p>${escapeHtml(item.title || "Rezerwacja")}</p>
                       <p class="helper">${escapeHtml(item.subtitle || "")}</p>
                       ${scheduleCountdownInlineMarkup(item)}
-                      <div class="inline-actions">${scheduleListItemActionsMarkup(kind, item)}</div>
+                      <div class="schedule-card-actions-bottom">${scheduleListItemBottomActionsMarkup(kind, item)}</div>
                     </article>
                   `
                 )
@@ -2016,6 +2021,7 @@
         ${scheduleSummaryTilesMarkup()}
         <section class="schedule-calendar-card">
           <div class="schedule-calendar-head">
+            <div class="schedule-calendar-head-spacer" aria-hidden="true"></div>
             <div class="schedule-calendar-nav">
               <button type="button" class="button secondary icon-button" data-schedule-month="-1" aria-label="Poprzedni miesiąc">←</button>
               <h3 class="schedule-calendar-title">${escapeHtml(scheduleMonthLabel(monthCursor))}</h3>
@@ -2071,29 +2077,29 @@
                     .map(
                       (item) => `
                         <article class="schedule-day-item">
+                          ${scheduleListItemDetailsButton(item)}
                           <div class="schedule-day-item-head">
                             <div class="schedule-day-item-meta">
                               <strong>${escapeHtml(scheduleCardHeading(item))}</strong>
                               <span class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</span>
                               <span class="pill schedule-status-pill ${scheduleStatusPillClass(item.status)}">${escapeHtml(item.statusLabel || scheduleStatusLabel(item.status))}</span>
                             </div>
-                            <button type="button" class="button secondary schedule-details-chip" data-schedule-action="details" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Szczegóły</button>
                           </div>
                           <p>${escapeHtml(item.title || "Rezerwacja")}</p>
                           <p class="helper">${escapeHtml(item.subtitle || "")}</p>
                           ${scheduleCountdownInlineMarkup(item)}
-                          <div class="inline-actions">
+                          ${
+                            item.status !== "manual_block"
+                              ? `<div class="schedule-card-actions-bottom">
+                            <button type="button" class="button secondary danger-muted schedule-inline-cancel schedule-card-action-cancel" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>
                             ${
                               item.status === "pending"
-                                ? `<button type="button" class="button secondary" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>`
+                                ? `<button type="button" class="button secondary schedule-card-action-confirm" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>`
                                 : ""
                             }
-                            ${
-                              item.status !== "manual_block"
-                                ? `<button type="button" class="button secondary danger-muted schedule-inline-cancel" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`
-                                : ""
-                            }
-                          </div>
+                          </div>`
+                              : ""
+                          }
                         </article>
                       `
                     )

@@ -1,5 +1,6 @@
 const { FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { enumerateNights, nightsCount, parseYmd, todayYmd } = require("./dates");
+const { allocateSharedReservationNumber } = require("./humanNumber");
 
 const BLOCKING = new Set(["email_verification_pending", "pending", "confirmed", "manual_block"]);
 
@@ -151,23 +152,7 @@ function computeLineItems(roomsById, roomIds, dateFrom, dateTo) {
 }
 
 async function allocateReservationNumber(db) {
-  const year = new Date().getFullYear();
-  return db.runTransaction(async (tx) => {
-    const ref = db.collection("hotelSettings").doc("counters");
-    const snap = await tx.get(ref);
-    const data = snap.exists ? snap.data() : {};
-    const field = `seq_${year}`;
-    const seq = Number(data[field] || 0) + 1;
-    tx.set(
-      ref,
-      {
-        [field]: seq,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-    return `HK-${year}-${String(seq).padStart(5, "0")}`;
-  });
+  return allocateSharedReservationNumber(db, "hotel");
 }
 
 function assertDatesValid(dateFrom, dateTo) {

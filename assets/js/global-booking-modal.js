@@ -22,7 +22,7 @@
       confirmPath: "../dokumenty/index.html#regulamin-rezerwacji-restauracja",
     },
     events: {
-      label: "Przyjecia",
+      label: "Przyjęcia",
       subtitle: "Sale i wydarzenia",
       apiService: "hall",
       confirmPath: "../dokumenty/index.html#regulamin-rezerwacji-sali",
@@ -95,6 +95,7 @@
       eventType: "",
       customerNote: "",
       exclusive: false,
+      durationUnspecified: false,
     },
   };
 
@@ -264,7 +265,7 @@
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || "Nie udalo sie polaczyc z systemem rezerwacji.");
+      throw new Error(data.error || "Nie udało się połączyć z systemem rezerwacji.");
     }
     return data;
   }
@@ -401,6 +402,7 @@
       reservationDate: todayYmdLocal(),
       startTime: "12:00",
       durationHours: 4,
+      durationUnspecified: false,
       guestsCount: 60,
       hallAvailability: {},
       selectedHallId: "",
@@ -518,6 +520,7 @@
         reservationDate: cleanString(draft.events?.reservationDate, 10) || todayYmdLocal(),
         startTime: cleanString(draft.events?.startTime, 5) || "12:00",
         durationHours: Number(draft.events?.durationHours || 4),
+        durationUnspecified: Boolean(draft.events?.durationUnspecified),
         guestsCount: clamp(toInt(draft.events?.guestsCount, 60), 1, 120),
         hallAvailability: draft.events?.hallAvailability && typeof draft.events.hallAvailability === "object" ? draft.events.hallAvailability : {},
         selectedHallId: cleanString(draft.events?.selectedHallId, 80),
@@ -683,7 +686,7 @@
       if (state.events.guestsCount > 40) {
         state.events.hallAvailability[smallHall.id] = {
           available: false,
-          reason: "Mala sala obsluguje maksymalnie 40 gosci.",
+          reason: "Mała sala obsługuje maksymalnie 40 gości.",
           maxGuests: Math.min(40, Number(smallHall.capacity || 40)),
         };
       } else {
@@ -702,14 +705,14 @@
             .then((response) => {
               state.events.hallAvailability[smallHall.id] = {
                 available: Boolean(response?.available),
-                reason: response?.available ? "" : "Termin jest zajety lub zablokowany.",
+                reason: response?.available ? "" : "Termin jest zajęty lub zablokowany.",
                 maxGuests: Number(response?.maxGuests || Math.min(40, Number(smallHall.capacity || 40))),
               };
             })
             .catch(() => {
               state.events.hallAvailability[smallHall.id] = {
                 available: false,
-                reason: "Nie udalo sie sprawdzic dostepnosci.",
+                reason: "Nie udało się sprawdzić dostępności.",
                 maxGuests: Math.min(40, Number(smallHall.capacity || 40)),
               };
             })
@@ -734,14 +737,14 @@
             const maxGuests = Number(response?.maxGuests || Number(largeHall.capacity || 120));
             state.events.hallAvailability[largeHall.id] = {
               available: Boolean(response?.available),
-              reason: response?.available ? "" : "Brak dostepnej pojemnosci sali dla tego terminu.",
+              reason: response?.available ? "" : "Brak dostępnej pojemności sali dla tego terminu.",
               maxGuests,
             };
           })
           .catch(() => {
             state.events.hallAvailability[largeHall.id] = {
               available: false,
-              reason: "Nie udalo sie sprawdzic dostepnosci.",
+              reason: "Nie udało się sprawdzić dostępności.",
               maxGuests: Number(largeHall.capacity || 120),
             };
           })
@@ -760,7 +763,7 @@
 
   async function checkSelectedHallAvailability() {
     const hallId = state.events.selectedHallId;
-    if (!hallId) return { ok: false, error: "Wybierz sale." };
+    if (!hallId) return { ok: false, error: "Wybierz salę." };
 
     try {
       const response = await api("events", "public-availability", {
@@ -775,11 +778,11 @@
         },
       });
       if (!response?.available) {
-        return { ok: false, error: "Wybrana sala nie jest dostepna dla podanego terminu." };
+        return { ok: false, error: "Wybrana sala nie jest dostępna dla podanego terminu." };
       }
       return { ok: true };
     } catch (error) {
-      return { ok: false, error: error.message || "Nie udalo sie sprawdzic sali." };
+      return { ok: false, error: error.message || "Nie udało się sprawdzić sali." };
     }
   }
 
@@ -795,16 +798,16 @@
   function currentStepTitle() {
     const map = {
       service: "System Rezerwacji",
-      hotelDates: "Hotel - termin pobytu",
-      hotelRooms: "Hotel - pokoje",
-      restaurantDateTime: "Restauracja - termin",
+      hotelDates: "Termin pobytu",
+      hotelRooms: "Pokoje",
+      restaurantDateTime: "Termin",
       restaurantDetails: "SZCZEGÓŁY",
-      eventsDateTime: "Przyjecia - termin i liczba gosci",
-      eventsHall: "Przyjecia - wybor sali",
-      eventsDetails: "Przyjecia - szczegoly wydarzenia",
+      eventsDateTime: "Termin",
+      eventsHall: "Wybór sali",
+      eventsDetails: "Szczegóły wydarzenia",
       personal: "Dane osobowe",
       summary: "Podsumowanie",
-      success: "Potwierdzenie wysylki",
+      success: "Potwierdzenie wysyłki",
     };
     return map[state.step] || "System Rezerwacji";
   }
@@ -825,7 +828,7 @@
                 ${enabled ? "" : "disabled"}
               >
                 <strong>${escapeHtml(meta.label)}</strong>
-                <small>${enabled ? escapeHtml(meta.subtitle) : "Rezerwacje wylaczone"}</small>
+                <small>${enabled ? escapeHtml(meta.subtitle) : "Rezerwacje wyłączone"}</small>
               </button>
             `;
           }).join("")}
@@ -849,7 +852,7 @@
           </label>
         </div>
         <div class="gb-actions">
-          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wroc</button>
+          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wróć</button>
           <button type="button" class="gb-btn gb-btn-primary" id="gb-next">Dalej</button>
         </div>
         <p class="gb-error" id="gb-error">${escapeHtml(state.error)}</p>
@@ -875,27 +878,31 @@
                     const guests = Math.max(1, toInt(room.maxGuests, 1));
                     return `
                       <article class="gb-room-card">
-                        <strong class="gb-room-name">${escapeHtml(room.name)}</strong>
+                        <div class="gb-room-card-header">
+                          <strong class="gb-room-name">${escapeHtml(room.name)}</strong>
+                          <div class="gb-room-price-wrap">
+                            <span class="gb-room-price">${escapeHtml(unit.toFixed(2))} PLN / noc</span>
+                            <small class="gb-room-price-note">${escapeHtml(subtotal)} PLN / za ${escapeHtml(String(nights))} ${nights === 1 ? "noc" : "nocy"}</small>
+                          </div>
+                        </div>
                         <p class="gb-room-line">
                           <span class="gb-room-line-left">
                             <span class="gb-room-icon" aria-hidden="true">👤</span>
-                            ${escapeHtml(String(guests))} osobowy
+                            ${escapeHtml(String(guests))}-osobowy
                           </span>
                         </p>
-                        <div class="gb-room-line gb-room-line--beds">
+                        <p class="gb-room-line gb-room-line--beds">
                           <span class="gb-room-line-left">
                             <span class="gb-room-icon" aria-hidden="true">🛏️</span>
                             ${escapeHtml(hotelBedSummary(room))}
                           </span>
+                        </p>
+                        <div class="gb-room-card-bottom">
+                          ${room.description ? `<p class="gb-room-meta">${escapeHtml(room.description)}</p>` : "<span></span>"}
                           <button type="button" class="gb-pill-btn ${isSelected ? "is-active" : ""}" data-toggle-room="${escapeHtml(room.id)}">
                             ${isSelected ? "W koszyku" : "Dodaj do koszyka"}
                           </button>
                         </div>
-                        <div class="gb-room-price-wrap">
-                          <span class="gb-room-price">${escapeHtml(unit.toFixed(2))} PLN / noc</span>
-                          <small class="gb-room-price-note">${escapeHtml(subtotal)} PLN / za ${escapeHtml(String(nights))} nocy</small>
-                        </div>
-                        ${room.description ? `<p class="gb-room-meta">${escapeHtml(room.description)}</p>` : ""}
                       </article>
                     `;
                   })
@@ -916,12 +923,12 @@
               : " <span>brak</span>"
           }
           <div class="gb-cart-total-row">
-            <span><strong>Liczba nocy:</strong> ${escapeHtml(String(nights))}</span>
+            <span><strong>Liczba noclegów:</strong> ${escapeHtml(String(nights))}</span>
             <strong class="gb-cart-total">Razem ${escapeHtml(hotelTotalPrice().toFixed(2))} PLN</strong>
           </div>
         </div>
         <div class="gb-actions">
-          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wroc</button>
+          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wróć</button>
           <button type="button" class="gb-btn gb-btn-primary" id="gb-next" ${state.hotel.selectedRoomIds.length ? "" : "disabled"}>Dalej</button>
         </div>
         <p class="gb-error" id="gb-error">${escapeHtml(state.error)}</p>
@@ -931,7 +938,7 @@
 
   function renderRestaurantDateTimeStep() {
     if (state.restaurant.loading) {
-      return `<p class="gb-hint">Ladowanie godzin otwarcia i dostepnych slotow...</p>`;
+      return `<p class="gb-hint">Ładowanie godzin otwarcia i dostępnych slotów…</p>`;
     }
 
     const slots = restaurantSlotsForDuration();
@@ -944,9 +951,8 @@
 
     return `
       <section>
-        <h3>Restauracja - data, godzina i czas</h3>
-        <p class="gb-hint">Godzina musi pokrywac sie z godzinami otwarcia restauracji.</p>
-        ${dayHint ? `<p class="gb-inline-note">${escapeHtml(dayHint)}</p>` : ""}
+        <h3>Data, godzina i czas</h3>
+        ${dayHint ? `<p class="gb-inline-note gb-opening-hours-note">${escapeHtml(dayHint)}</p>` : ""}
         <div class="gb-grid-3">
           <label class="gb-field">
             <span>Data rezerwacji</span>
@@ -963,7 +969,7 @@
                           `<option value="${escapeHtml(slot)}" ${state.restaurant.startTime === slot ? "selected" : ""}>${escapeHtml(slot)}</option>`
                       )
                       .join("")
-                  : '<option value="">Brak dostepnych godzin</option>'
+                  : '<option value="">Brak dostępnych godzin</option>'
               }
             </select>
           </label>
@@ -980,7 +986,7 @@
           </label>
         </div>
         <div class="gb-actions">
-          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wroc</button>
+          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wróć</button>
           <button type="button" class="gb-btn gb-btn-primary" id="gb-next">Dalej</button>
         </div>
         <p class="gb-error" id="gb-error">${escapeHtml(state.error)}</p>
@@ -996,11 +1002,11 @@
         <h3>SZCZEGÓŁY</h3>
         <div class="gb-grid-3">
           <label class="gb-field">
-            <span>Liczba stolow</span>
+            <span>Liczba stołów</span>
             <input type="number" id="gb-rest-tables" min="1" max="30" value="${escapeHtml(String(state.restaurant.tablesCount))}" required />
           </label>
           <label class="gb-field">
-            <span>Liczba gosci</span>
+            <span>Liczba gości</span>
             <input type="number" id="gb-rest-guests" min="1" max="${escapeHtml(String(maxGuests))}" value="${escapeHtml(String(state.restaurant.guestsCount))}" required />
           </label>
           <label class="gb-field">
@@ -1012,17 +1018,17 @@
             </select>
           </label>
         </div>
-        <p class="gb-inline-note">Maksymalna liczba gosci dla aktualnych ustawien: <strong id="gb-rest-max">${escapeHtml(String(maxGuests))}</strong>.</p>
+        <p class="gb-inline-note">Maksymalna liczba gości dla aktualnych ustawień: <strong id="gb-rest-max">${escapeHtml(String(maxGuests))}</strong>.</p>
         <label class="gb-check">
           <input type="checkbox" id="gb-rest-join" ${state.restaurant.joinTables ? "checked" : ""} />
-          <span>Prosba o polaczenie stolow (opcja)</span>
+          <span>Prośba o połączenie stołów</span>
         </label>
         <label class="gb-field" style="margin-top:0.7rem;">
-          <span>Dodatkowe informacje (opcja)</span>
+          <span>Dodatkowe informacje</span>
           <textarea id="gb-rest-note" maxlength="2000">${escapeHtml(state.restaurant.customerNote)}</textarea>
         </label>
         <div class="gb-actions">
-          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wroc</button>
+          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wróć</button>
           <button type="button" class="gb-btn gb-btn-primary" id="gb-next">Dalej</button>
         </div>
         <p class="gb-error" id="gb-error">${escapeHtml(state.error)}</p>
@@ -1031,33 +1037,35 @@
   }
 
   function renderEventsDateTimeStep() {
+    const durOpts = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const durSelectHtml = durOpts
+      .map(
+        (h) =>
+          `<option value="${h}" ${!state.events.durationUnspecified && Number(state.events.durationHours) === h ? "selected" : ""}>${h} h</option>`
+      )
+      .join("");
     return `
       <section>
-        <h3>Przyjecia - termin i liczba gosci</h3>
         <div class="gb-grid-3">
           <label class="gb-field">
             <span>Data rezerwacji</span>
             <input type="date" id="gb-events-date" min="${escapeHtml(todayYmdLocal())}" value="${escapeHtml(state.events.reservationDate)}" required />
           </label>
-          <label class="gb-field">
+          <label class="gb-field gb-field--time-like">
             <span>Godzina rezerwacji</span>
             <input type="time" id="gb-events-time" value="${escapeHtml(state.events.startTime)}" required />
           </label>
-          <label class="gb-field">
+          <label class="gb-field gb-field--time-like">
             <span>Czas rezerwacji (h)</span>
             <select id="gb-events-duration">
-              ${[1, 2, 3, 4, 5, 6, 8]
-                .map(
-                  (h) =>
-                    `<option value="${h}" ${Number(state.events.durationHours) === h ? "selected" : ""}>${h} h</option>`
-                )
-                .join("")}
+              ${durSelectHtml}
+              <option value="unspecified" ${state.events.durationUnspecified ? "selected" : ""}>Nie określaj</option>
             </select>
           </label>
         </div>
 
         <div class="gb-range-wrap" style="margin-top:0.75rem;">
-          <span class="gb-range-label">Liczba gosci (1-120, domyslnie 60)</span>
+          <span class="gb-range-label">Liczba gości (1–120)</span>
           <div class="gb-range-pair">
             <input type="range" id="gb-events-guests-range" min="1" max="120" value="${escapeHtml(String(clamp(toInt(state.events.guestsCount, 60), 1, 120)))}" />
             <input type="number" id="gb-events-guests-number" min="1" max="120" value="${escapeHtml(String(clamp(toInt(state.events.guestsCount, 60), 1, 120)))}" required />
@@ -1065,7 +1073,7 @@
         </div>
 
         <div class="gb-actions">
-          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wroc</button>
+          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wróć</button>
           <button type="button" class="gb-btn gb-btn-primary" id="gb-next">Dalej</button>
         </div>
         <p class="gb-error" id="gb-error">${escapeHtml(state.error)}</p>
@@ -1075,24 +1083,22 @@
 
   function renderEventsHallStep() {
     if (state.events.loading) {
-      return `<p class="gb-hint">Ladowanie konfiguracji sal...</p>`;
+      return `<p class="gb-hint">Ładowanie konfiguracji sal…</p>`;
     }
     const smallHall = eventHallByKind("small");
     const largeHall = eventHallByKind("large");
 
     const smallInfo = smallHall
-      ? state.events.hallAvailability[smallHall.id] || { available: false, reason: "Sprawdzanie dostepnosci..." }
-      : { available: false, reason: "Brak skonfigurowanej malej sali." };
+      ? state.events.hallAvailability[smallHall.id] || { available: false, reason: "Sprawdzanie dostępności…" }
+      : { available: false, reason: "Brak skonfigurowanej małej sali." };
     const largeInfo = largeHall
-      ? state.events.hallAvailability[largeHall.id] || { available: false, reason: "Sprawdzanie dostepnosci..." }
-      : { available: false, reason: "Brak skonfigurowanej duzej sali." };
+      ? state.events.hallAvailability[largeHall.id] || { available: false, reason: "Sprawdzanie dostępności…" }
+      : { available: false, reason: "Brak skonfigurowanej dużej sali." };
 
     const noHallAvailable = !smallInfo.available && !largeInfo.available;
 
     return `
       <section>
-        <h3>Przyjecia - wybor sali</h3>
-        <p class="gb-hint">Mala sala: tylko na wylacznosc do 40 osob. Duza sala: wspoldzielona do sumy 120 osob, chyba ze zaznaczysz wylacznosc.</p>
         <div class="gb-hall-tiles">
           <button
             type="button"
@@ -1101,7 +1107,7 @@
             ${smallInfo.available && smallHall ? "" : "disabled"}
           >
             <strong>${escapeHtml(smallHall?.name || "Sala mala")}</strong>
-            <small>${smallInfo.available ? "Dostepna" : escapeHtml(smallInfo.reason || "Niedostepna")}</small>
+            <small>${smallInfo.available ? "Dostępna" : escapeHtml(smallInfo.reason || "Niedostępna")}</small>
           </button>
 
           <button
@@ -1111,14 +1117,14 @@
             ${largeInfo.available && largeHall ? "" : "disabled"}
           >
             <strong>${escapeHtml(largeHall?.name || "Sala duza")}</strong>
-            <small>${largeInfo.available ? `Dostepna (wolne miejsca: ${escapeHtml(String(largeInfo.maxGuests || 0))})` : escapeHtml(largeInfo.reason || "Niedostepna")}</small>
+            <small>${largeInfo.available ? `Dostępna (wolne miejsca: ${escapeHtml(String(largeInfo.maxGuests || 0))})` : escapeHtml(largeInfo.reason || "Niedostępna")}</small>
           </button>
         </div>
 
-        ${noHallAvailable ? '<p class="gb-inline-note">Brak dostepnej sali dla podanego terminu i liczby gosci.</p>' : ""}
+        ${noHallAvailable ? '<p class="gb-inline-note">Brak dostępnej sali dla podanego terminu i liczby gości.</p>' : ""}
 
         <div class="gb-actions">
-          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wroc</button>
+          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wróć</button>
           <button type="button" class="gb-btn gb-btn-primary" id="gb-next" ${state.events.selectedHallId ? "" : "disabled"}>Dalej</button>
         </div>
         <p class="gb-error" id="gb-error">${escapeHtml(state.error)}</p>
@@ -1131,7 +1137,6 @@
     const isLarge = selectedHall?.hallKind === "large";
     return `
       <section>
-        <h3>Przyjecia - szczegoly wydarzenia</h3>
         <p class="gb-hint">Podaj rodzaj imprezy oraz dodatkowe informacje do rezerwacji.</p>
         <div class="gb-grid-2">
           <label class="gb-field">
@@ -1145,11 +1150,11 @@
         </label>
         ${
           isLarge
-            ? `<label class="gb-check"><input type="checkbox" id="gb-events-exclusive" ${state.events.exclusive ? "checked" : ""} /><span>Sala na wylacznosc (rezerwuje cala duza sale, niezaleznie od liczby osob)</span></label>`
+            ? `<label class="gb-check"><input type="checkbox" id="gb-events-exclusive" ${state.events.exclusive ? "checked" : ""} /><span>Sala na wyłączność (rezerwuje całą dużą salę, niezależnie od liczby osób)</span></label>`
             : ""
         }
         <div class="gb-actions">
-          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wroc</button>
+          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wróć</button>
           <button type="button" class="gb-btn gb-btn-primary" id="gb-next">Dalej</button>
         </div>
         <p class="gb-error" id="gb-error">${escapeHtml(state.error)}</p>
@@ -1193,7 +1198,7 @@
           </div>
 
           <div class="gb-actions">
-            <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wroc</button>
+            <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wróć</button>
             <button type="submit" class="gb-btn gb-btn-primary">Dalej</button>
           </div>
         </form>
@@ -1208,17 +1213,30 @@
     if (service === "hotel") {
       const nights = nightsCount();
       const roomsById = hotelRoomMap();
+      const nightsLabel = nights === 1 ? "1 nocleg" : `${nights} noclegów`;
       return `
         <div class="gb-summary-box gb-summary-box--hotel">
-          <h3 style="margin-bottom:0.3rem;">Podsumowanie</h3>
-          <ul class="gb-summary-list">
-            <li><strong>Termin:</strong> ${escapeHtml(state.hotel.dateFrom)} - ${escapeHtml(state.hotel.dateTo)} (${escapeHtml(String(nights))} nocy)</li>
+          <h3 class="gb-summary-box-title">Podsumowanie</h3>
+          <div class="gb-summary-hotel-term">
+            <div class="gb-summary-row">
+              <span class="gb-summary-k">Termin pobytu</span>
+              <span class="gb-summary-v">${escapeHtml(state.hotel.dateFrom)} — ${escapeHtml(state.hotel.dateTo)}</span>
+            </div>
+            <p class="gb-summary-sub">${escapeHtml(nightsLabel)}</p>
+          </div>
+          <ul class="gb-summary-room-list">
             ${state.hotel.selectedRoomIds
               .map((id) => {
                 const room = roomsById.get(id);
                 const unit = Number(room?.pricePerNight || 0);
                 const lineTotal = (unit * nights).toFixed(2);
-                return `<li><strong>${escapeHtml(room?.name || id)}</strong> — ${escapeHtml(unit.toFixed(2))} PLN / noc — ${escapeHtml(lineTotal)} PLN</li>`;
+                return `<li class="gb-summary-room-item">
+                  <span class="gb-summary-room-name">${escapeHtml(room?.name || id)}</span>
+                  <span class="gb-summary-room-prices">
+                    <span class="gb-summary-room-unit">${escapeHtml(unit.toFixed(2))} PLN / noc</span>
+                    <span class="gb-summary-room-total">${escapeHtml(lineTotal)} PLN</span>
+                  </span>
+                </li>`;
               })
               .join("")}
           </ul>
@@ -1230,22 +1248,22 @@
     if (service === "restaurant") {
       return `
         <div class="gb-summary-box">
-          <h3 style="margin-bottom:0.3rem;">Podsumowanie - Restauracja</h3>
-          <ul class="gb-summary-list">
-            <li><strong>Data:</strong> ${escapeHtml(state.restaurant.reservationDate)}</li>
-            <li><strong>Godzina:</strong> ${escapeHtml(state.restaurant.startTime)}</li>
-            <li><strong>Czas rezerwacji:</strong> ${escapeHtml(String(state.restaurant.durationHours))} h</li>
-            <li><strong>Liczba stolow:</strong> ${escapeHtml(String(state.restaurant.tablesCount))}</li>
-            <li><strong>Liczba gosci:</strong> ${escapeHtml(String(state.restaurant.guestsCount))}</li>
-            <li><strong>Miejsce:</strong> ${escapeHtml(
+          <h3 class="gb-summary-box-title">Podsumowanie — Restauracja</h3>
+          <ul class="gb-summary-list gb-summary-list--stacked">
+            <li class="gb-summary-li"><span class="gb-summary-k">Data</span><span class="gb-summary-v">${escapeHtml(state.restaurant.reservationDate)}</span></li>
+            <li class="gb-summary-li"><span class="gb-summary-k">Godzina</span><span class="gb-summary-v">${escapeHtml(state.restaurant.startTime)}</span></li>
+            <li class="gb-summary-li"><span class="gb-summary-k">Czas rezerwacji</span><span class="gb-summary-v">${escapeHtml(String(state.restaurant.durationHours))} h</span></li>
+            <li class="gb-summary-li"><span class="gb-summary-k">Liczba stołów</span><span class="gb-summary-v">${escapeHtml(String(state.restaurant.tablesCount))}</span></li>
+            <li class="gb-summary-li"><span class="gb-summary-k">Liczba gości</span><span class="gb-summary-v">${escapeHtml(String(state.restaurant.guestsCount))}</span></li>
+            <li class="gb-summary-li"><span class="gb-summary-k">Miejsce</span><span class="gb-summary-v">${escapeHtml(
               state.restaurant.placePreference === "inside"
                 ? "W lokalu"
                 : state.restaurant.placePreference === "terrace"
                   ? "Na tarasie"
                   : "Brak preferencji"
-            )}</li>
-            <li><strong>Prosba o polaczenie stolow:</strong> ${state.restaurant.joinTables ? "tak" : "nie"}</li>
-            ${state.restaurant.customerNote ? `<li><strong>Dodatkowe informacje:</strong> ${escapeHtml(state.restaurant.customerNote)}</li>` : ""}
+            )}</span></li>
+            <li class="gb-summary-li"><span class="gb-summary-k">Prośba o połączenie stołów</span><span class="gb-summary-v">${state.restaurant.joinTables ? "tak" : "nie"}</span></li>
+            ${state.restaurant.customerNote ? `<li class="gb-summary-li gb-summary-li--block"><span class="gb-summary-k">Dodatkowe informacje</span><span class="gb-summary-v">${escapeHtml(state.restaurant.customerNote)}</span></li>` : ""}
           </ul>
         </div>
       `;
@@ -1254,17 +1272,17 @@
     const selectedHall = state.events.halls.find((hall) => hall.id === state.events.selectedHallId);
     return `
       <div class="gb-summary-box">
-        <h3 style="margin-bottom:0.3rem;">Podsumowanie - Przyjecia</h3>
-        <ul class="gb-summary-list">
-          <li><strong>Data:</strong> ${escapeHtml(state.events.reservationDate)}</li>
-          <li><strong>Godzina:</strong> ${escapeHtml(state.events.startTime)}</li>
-          <li><strong>Czas rezerwacji:</strong> ${escapeHtml(String(state.events.durationHours))} h</li>
-          <li><strong>Liczba gosci:</strong> ${escapeHtml(String(state.events.guestsCount))}</li>
-          <li><strong>Sala:</strong> ${escapeHtml(selectedHall?.name || "-")}</li>
-          <li><strong>Rodzaj imprezy:</strong> ${escapeHtml(state.events.eventType)}</li>
-          <li><strong>Dodatkowe informacje:</strong> ${escapeHtml(state.events.customerNote)}</li>
-          ${selectedHall?.hallKind === "large" ? `<li><strong>Sala na wylacznosc:</strong> ${state.events.exclusive ? "tak" : "nie"}</li>` : ""}
-          <li><strong>Koszt:</strong> ustalany indywidualnie.</li>
+        <h3 class="gb-summary-box-title">Podsumowanie — Przyjęcia</h3>
+        <ul class="gb-summary-list gb-summary-list--stacked">
+          <li class="gb-summary-li"><span class="gb-summary-k">Data</span><span class="gb-summary-v">${escapeHtml(state.events.reservationDate)}</span></li>
+          <li class="gb-summary-li"><span class="gb-summary-k">Godzina</span><span class="gb-summary-v">${escapeHtml(state.events.startTime)}</span></li>
+          <li class="gb-summary-li"><span class="gb-summary-k">Czas rezerwacji</span><span class="gb-summary-v">${state.events.durationUnspecified ? "nie określono" : `${escapeHtml(String(state.events.durationHours))} h`}</span></li>
+          <li class="gb-summary-li"><span class="gb-summary-k">Liczba gości</span><span class="gb-summary-v">${escapeHtml(String(state.events.guestsCount))}</span></li>
+          <li class="gb-summary-li"><span class="gb-summary-k">Sala</span><span class="gb-summary-v">${escapeHtml(selectedHall?.name || "—")}</span></li>
+          <li class="gb-summary-li gb-summary-li--block"><span class="gb-summary-k">Rodzaj imprezy</span><span class="gb-summary-v">${escapeHtml(state.events.eventType)}</span></li>
+          <li class="gb-summary-li gb-summary-li--block"><span class="gb-summary-k">Dodatkowe informacje</span><span class="gb-summary-v">${escapeHtml(state.events.customerNote)}</span></li>
+          ${selectedHall?.hallKind === "large" ? `<li class="gb-summary-li"><span class="gb-summary-k">Sala na wyłączność</span><span class="gb-summary-v">${state.events.exclusive ? "tak" : "nie"}</span></li>` : ""}
+          <li class="gb-summary-li"><span class="gb-summary-k">Koszt</span><span class="gb-summary-v">ustalany indywidualnie</span></li>
         </ul>
       </div>
     `;
@@ -1277,7 +1295,7 @@
     return `
       <label class="gb-check gb-antibot-wrap">
         <input type="checkbox" id="gb-human-check" ${state.humanCheck ? "checked" : ""} />
-        <span>Potwierdzam, ze nie jestem botem.</span>
+        <span>Potwierdzam, że nie jestem botem.</span>
       </label>
     `;
   }
@@ -1292,7 +1310,7 @@
 
         <div class="gb-summary-grid">
           <div class="gb-summary-box">
-            <h3 style="margin-bottom:0.3rem;">Dane zamawiającego</h3>
+            <h3 class="gb-summary-box-title">Dane zamawiającego</h3>
             <ul class="gb-summary-list">
               <li><strong>Imię i nazwisko:</strong> ${escapeHtml(fullName())}</li>
               <li><strong>E-mail:</strong> ${escapeHtml(state.personal.email)}</li>
@@ -1308,7 +1326,7 @@
         </label>
 
         <div class="gb-actions">
-          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wroc</button>
+          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wróć</button>
           <div class="gb-submit-slot">
             ${
               showSubmitButton
@@ -1333,9 +1351,11 @@
           state.requiresEmailConfirmation
             ? `<div class="gb-success-card">
                 <p class="gb-hint">Wysłaliśmy link potwierdzający na Twój adres e-mail. Kliknij go, aby aktywować zgłoszenie.</p>
-                <p class="gb-countdown"><strong>Czas na potwierdzenie:</strong> <span id="gb-countdown-value">${escapeHtml(formatCountdown(left))}</span></p>
-                <p class="gb-hint" style="margin-top:0.75rem;">Po potwierdzeniu maila rezerwacja przejdzie na status <strong>oczekująca</strong>. Decyzję o przyjęciu lub odrzuceniu wyślemy e-mailowo w ciągu <strong>3 dni</strong>. Rezerwacja może nie zostać przyjęta.</p>
+                <p class="gb-hint" style="margin-top:0.75rem;">Po potwierdzeniu maila rezerwacja zostanie wysłana. Rezerwacja może nie zostać przyjęta. Decyzję wyślemy mailowo w ciągu <strong>3 dni</strong>.</p>
                 ${supportNotice}
+                <div class="gb-countdown-footer">
+                  <p class="gb-countdown"><strong>Czas na potwierdzenie:</strong> <span id="gb-countdown-value">${escapeHtml(formatCountdown(left))}</span></p>
+                </div>
               </div>`
             : `<div class="gb-success-card">
                 <p class="gb-hint">Zgłoszenie trafiło już do kolejki oczekującej. Mail potwierdzający nie był wymagany dla tego zgłoszenia.</p>
@@ -1354,7 +1374,7 @@
   function renderSessionExpired() {
     return `
       <section class="gb-session-expired">
-        <h3>Sesja wygasla</h3>
+        <h3>Sesja wygasła</h3>
         <p class="gb-hint">Sesja rezerwacji trwa maksymalnie 30 minut. Rozpocznij proces od nowa.</p>
         <div class="gb-actions gb-actions--end">
           <button type="button" class="gb-btn gb-btn-primary" id="gb-restart">Zacznij od nowa</button>
@@ -1453,7 +1473,14 @@
     if (state.step === "eventsDateTime") {
       state.events.reservationDate = String(document.getElementById("gb-events-date")?.value || state.events.reservationDate || "");
       state.events.startTime = String(document.getElementById("gb-events-time")?.value || state.events.startTime || "");
-      state.events.durationHours = Number(document.getElementById("gb-events-duration")?.value || state.events.durationHours || 4);
+      const durVal = String(document.getElementById("gb-events-duration")?.value || "");
+      if (durVal === "unspecified") {
+        state.events.durationUnspecified = true;
+        state.events.durationHours = 12;
+      } else {
+        state.events.durationUnspecified = false;
+        state.events.durationHours = Number(durVal || state.events.durationHours || 4);
+      }
       state.events.guestsCount = clamp(toInt(document.getElementById("gb-events-guests-number")?.value || state.events.guestsCount || 60, 60), 1, 120);
       return;
     }
@@ -1568,15 +1595,15 @@
         const today = todayYmdLocal();
 
         if (!from || !to) {
-          setError("Wypelnij oba pola dat.");
+          setError("Wypełnij oba pola dat.");
           return;
         }
         if (from < today) {
-          setError("Data przyjazdu nie moze byc w przeszlosci.");
+          setError("Data przyjazdu nie może być w przeszłości.");
           return;
         }
         if (to <= from) {
-          setError("Data wyjazdu musi byc pozniejsza niz data przyjazdu.");
+          setError("Data wyjazdu musi być późniejsza niż data przyjazdu.");
           return;
         }
 
@@ -1600,7 +1627,7 @@
           state.step = "hotelRooms";
           render();
         } catch (error) {
-          setError(error.message || "Nie udalo sie sprawdzic dostepnosci pokoi.");
+          setError(error.message || "Nie udało się sprawdzić dostępności pokoi.");
         }
       });
       return;
@@ -1623,7 +1650,7 @@
       document.getElementById("gb-next")?.addEventListener("click", () => {
         renewSession({ persist: false });
         if (!state.hotel.selectedRoomIds.length) {
-          setError("Wybierz przynajmniej jeden pokoj.");
+          setError("Wybierz przynajmniej jeden pokój.");
           return;
         }
         setError("");
@@ -1667,15 +1694,15 @@
         state.restaurant.durationHours = Number(durationInput?.value || 2);
 
         if (!dateValue || dateValue < today) {
-          setError("Wybierz poprawna date (nie moze byc z przeszlosci).");
+          setError("Wybierz poprawną datę (nie może być z przeszłości).");
           return;
         }
         if (!slots.length || !selectedTime) {
-          setError("Brak dostepnych godzin dla wybranego dnia i czasu trwania.");
+          setError("Brak dostępnych godzin dla wybranego dnia i czasu trwania.");
           return;
         }
         if (!slots.includes(selectedTime)) {
-          setError("Wybrana godzina nie miesci sie w godzinach otwarcia.");
+          setError("Wybrana godzina nie mieści się w godzinach otwarcia.");
           return;
         }
 
@@ -1725,7 +1752,7 @@
         state.restaurant.customerNote = String(noteInput?.value || "").trim();
 
         if (guestsCount < 1 || guestsCount > maxGuests) {
-          setError(`Liczba gosci musi miescic sie w zakresie 1-${maxGuests}.`);
+          setError(`Liczba gości musi mieścić się w zakresie 1–${maxGuests}.`);
           return;
         }
 
@@ -1743,13 +1770,13 @@
             },
           });
           if (!check?.available) {
-            setError("Brak wystarczajacej liczby wolnych stolikow w tym terminie.");
+            setError("Brak wystarczającej liczby wolnych stolików w tym terminie.");
             return;
           }
           state.step = "personal";
           render();
         } catch (error) {
-          setError(error.message || "Nie udalo sie sprawdzic dostepnosci stolikow.");
+          setError(error.message || "Nie udało się sprawdzić dostępności stolików.");
         }
       });
       return;
@@ -1779,18 +1806,25 @@
 
         state.events.reservationDate = dateValue;
         state.events.startTime = timeValue;
-        state.events.durationHours = Number(durationInput?.value || 4);
+        const durVal = String(durationInput?.value || "");
+        if (durVal === "unspecified") {
+          state.events.durationUnspecified = true;
+          state.events.durationHours = 12;
+        } else {
+          state.events.durationUnspecified = false;
+          state.events.durationHours = Number(durVal || 4);
+        }
         state.events.guestsCount = clamp(toInt(guestsNumber?.value || 60, 60), 1, 120);
 
         if (!dateValue || dateValue < today) {
-          setError("Data rezerwacji nie moze byc z przeszlosci.");
+          setError("Data rezerwacji nie może być z przeszłości.");
           return;
         }
         if (!timeValue || hmToMinutes(timeValue) == null) {
-          setError("Podaj poprawna godzine rezerwacji.");
+          setError("Podaj poprawną godzinę rezerwacji.");
           return;
         }
-        if (!Number.isFinite(state.events.durationHours) || state.events.durationHours <= 0) {
+        if (!state.events.durationUnspecified && (!Number.isFinite(state.events.durationHours) || state.events.durationHours <= 0)) {
           setError("Podaj poprawny czas rezerwacji.");
           return;
         }
@@ -1823,7 +1857,7 @@
       document.getElementById("gb-next")?.addEventListener("click", () => {
         renewSession({ persist: false });
         if (!state.events.selectedHallId) {
-          setError("Wybierz dostepna sale.");
+          setError("Wybierz dostępną salę.");
           return;
         }
         setError("");
@@ -1851,13 +1885,13 @@
           return;
         }
         if (!state.events.customerNote) {
-          setError("Uzupelnij dodatkowe informacje do rezerwacji.");
+          setError("Uzupełnij dodatkowe informacje do rezerwacji.");
           return;
         }
 
         const availability = await checkSelectedHallAvailability();
         if (!availability.ok) {
-          setError(availability.error || "Sala jest niedostepna.");
+          setError(availability.error || "Sala jest niedostępna.");
           return;
         }
 
@@ -1886,11 +1920,11 @@
         const phoneDigits = phoneNationalDigits(state.personal.phoneNational);
 
         if (!state.personal.firstName || !state.personal.lastName || !state.personal.email || !state.personal.phoneNational) {
-          setError("Wypelnij wszystkie wymagane pola danych osobowych.");
+          setError("Wypełnij wszystkie wymagane pola danych osobowych.");
           return;
         }
         if (phoneDigits.length < 6 || phoneDigits.length > 15) {
-          setError("Podaj poprawny numer telefonu (6-15 cyfr, spacje i myslniki sa dozwolone).");
+          setError("Podaj poprawny numer telefonu (6–15 cyfr, spacje i myślniki są dozwolone).");
           return;
         }
 
@@ -1984,7 +2018,7 @@
 
     const mounted = await ensureTurnstileScript();
     if (!mounted || !window.turnstile) {
-      setError("Nie udalo sie uruchomic weryfikacji anty-bot. Sprobuj ponownie.");
+      setError("Nie udało się uruchomić weryfikacji antybotowej. Spróbuj ponownie.");
       updateSummarySubmitState();
       return;
     }
@@ -2013,13 +2047,13 @@
         },
         "error-callback": () => {
           state.turnstileToken = "";
-          setError("Weryfikacja anty-bot nie powiodla sie. Sprobuj ponownie.");
+          setError("Weryfikacja antybotowa nie powiodła się. Spróbuj ponownie.");
           persistDraftState();
           updateSummarySubmitState();
         },
       });
     } catch {
-      setError("Nie udalo sie uruchomic weryfikacji anty-bot.");
+      setError("Nie udało się uruchomić weryfikacji antybotowej.");
     }
 
     updateSummarySubmitState();
@@ -2069,6 +2103,7 @@
     }
 
     const selectedHall = state.events.halls.find((hall) => hall.id === state.events.selectedHallId);
+    const effectiveDuration = state.events.durationUnspecified ? 12 : state.events.durationHours;
     return {
       service,
       payload: {
@@ -2076,7 +2111,8 @@
         hallId: state.events.selectedHallId,
         reservationDate: state.events.reservationDate,
         startTime: state.events.startTime,
-        durationHours: state.events.durationHours,
+        durationHours: effectiveDuration,
+        durationUnspecified: Boolean(state.events.durationUnspecified),
         guestsCount: state.events.guestsCount,
         exclusive: selectedHall?.hallKind === "large" ? state.events.exclusive : true,
         eventType: state.events.eventType,
@@ -2089,17 +2125,17 @@
     if (state.submitting) return;
 
     if (!state.termsAccepted) {
-      setError("Zaakceptuj regulamin, aby kontynuowac.");
+      setError("Zaakceptuj regulamin, aby kontynuować.");
       return;
     }
 
     if (config.turnstileSiteKey && !antiBotVerified()) {
-      setError("Potwierdz weryfikacje anty-bot.");
+      setError("Potwierdź weryfikację antybotową.");
       return;
     }
 
     if (!config.turnstileSiteKey && !antiBotVerified()) {
-      setError("Potwierdz, ze nie jestes botem.");
+      setError("Potwierdź, że nie jesteś botem.");
       return;
     }
 
@@ -2135,7 +2171,7 @@
         }
         state.turnstileToken = "";
       }
-      setError(error.message || "Nie udalo sie zapisac rezerwacji.");
+      setError(error.message || "Nie udało się zapisać rezerwacji.");
       updateSummarySubmitState();
     }
   }

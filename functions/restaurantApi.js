@@ -45,6 +45,7 @@ const {
   cleanupBufferMinutes,
   BLOCKING,
 } = require("./lib/restaurantLogic");
+const { formatHumanReservationNumber } = require("./lib/humanNumber");
 
 if (!getApps().length) {
   initializeApp();
@@ -161,7 +162,7 @@ function buildRestaurantMailVars(res, tableDocsById, extra = {}) {
   const endMs = res.endDateTime?.toMillis?.() || res.endMs;
   return {
     reservationId: res.id,
-    reservationNumber: res.humanNumber || res.id,
+    reservationNumber: formatHumanReservationNumber(res, "restaurant") || res.id,
     fullName: res.fullName || "",
     email: res.email || "",
     phone: `${res.phonePrefix || ""} ${res.phoneNational || ""}`.trim(),
@@ -399,6 +400,7 @@ function formatRestaurantRow(x, tableMap) {
   return {
     id: x.id,
     humanNumber: x.humanNumber,
+    humanNumberLabel: formatHumanReservationNumber(x, "restaurant") || x.humanNumber || x.id,
     fullName: x.fullName,
     email: x.email,
     phonePrefix: x.phonePrefix || "",
@@ -700,7 +702,12 @@ const restaurantApi = onRequest(
         const reservationId = doc.id;
 
         if (resData.status === "pending" || resData.status === "confirmed") {
-          json(res, { ok: true, status: resData.status, reservationId, humanNumber: resData.humanNumber });
+          json(res, {
+            ok: true,
+            status: resData.status,
+            reservationId,
+            humanNumber: formatHumanReservationNumber(resData, "restaurant") || resData.humanNumber,
+          });
           return;
         }
         if (resData.status !== "email_verification_pending") {
@@ -760,7 +767,12 @@ const restaurantApi = onRequest(
           if (e.message === "STATUS_CHANGED") {
             const latest = await getReservation(db, reservationId);
             if (latest && (latest.status === "pending" || latest.status === "confirmed")) {
-              json(res, { ok: true, status: latest.status, reservationId, humanNumber: latest.humanNumber });
+              json(res, {
+                ok: true,
+                status: latest.status,
+                reservationId,
+                humanNumber: formatHumanReservationNumber(latest, "restaurant") || latest.humanNumber,
+              });
               return;
             }
             json(res, { error: "Ta rezerwacja została już przetworzona." }, 400);
@@ -773,22 +785,18 @@ const restaurantApi = onRequest(
           throw e;
         }
 
-        const reread = await getReservation(db, reservationId);
-        const tableMap = await loadTablesMap(db);
-        const vars = buildRestaurantMailVars({ ...reread, id: reservationId }, tableMap, {});
-        await sendRestaurantTemplated(db, "restaurant_pending_client", vars.email, vars);
-        const adm = adminNotifyEmail();
-        if (adm) {
-          await sendRestaurantTemplated(db, "restaurant_pending_admin", adm, vars);
-        }
-
         await appendRestaurantAudit(db, {
           action: "restaurant_email_confirmed",
           reservationId,
           details: {},
         });
 
-        json(res, { ok: true, status: "pending", reservationId, humanNumber: reread.humanNumber });
+        json(res, {
+          ok: true,
+          status: "pending",
+          reservationId,
+          humanNumber: formatHumanReservationNumber(resData, "restaurant") || resData.humanNumber,
+        });
         return;
       }
 
@@ -1172,9 +1180,7 @@ const restaurantApi = onRequest(
         const r0 = await getReservation(db, resRef.id);
         const tableMap = await loadTablesMap(db);
         const vars = buildRestaurantMailVars({ ...r0, id: resRef.id }, tableMap, {});
-        if (st === "pending") {
-          await sendRestaurantTemplated(db, "restaurant_pending_client", vars.email, vars);
-        } else {
+        if (st === "confirmed") {
           await sendRestaurantTemplated(db, "restaurant_confirmed_client", vars.email, vars);
         }
         await appendRestaurantAudit(db, {

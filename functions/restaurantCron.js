@@ -7,6 +7,7 @@ const { initializeApp, getApps } = require("firebase-admin/app");
 
 const { renderTemplate, getRestaurantMailTemplate, sendMail, buildBrandedEmail } = require("./lib/mail");
 const { releaseLocksForReservation, loadTablesList } = require("./lib/restaurantLogic");
+const { formatHumanReservationNumber } = require("./lib/humanNumber");
 
 if (!getApps().length) {
   initializeApp();
@@ -56,7 +57,7 @@ async function buildVars(res, tableMap) {
   const endMs = res.endDateTime?.toMillis?.() || res.endMs;
   return {
     reservationId: res.id,
-    reservationNumber: res.humanNumber || res.id,
+    reservationNumber: formatHumanReservationNumber(res, "restaurant") || res.id,
     fullName: res.fullName || "",
     email: res.email || "",
     phone: `${res.phonePrefix || ""} ${res.phoneNational || ""}`.trim(),

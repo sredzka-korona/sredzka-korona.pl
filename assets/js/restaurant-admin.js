@@ -35,9 +35,21 @@
       },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     });
-    const data = await res.json().catch(() => ({}));
+    const raw = await res.text();
+    let data = {};
+    if (raw) {
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = { _nonJson: raw.slice(0, 400) };
+      }
+    }
     if (!res.ok) {
-      throw new Error(data.error || "Błąd API restauracji.");
+      const hint =
+        data.error ||
+        data.message ||
+        (data._nonJson ? `Odpowiedź serwera (${res.status}): ${data._nonJson}` : "");
+      throw new Error(hint || `Błąd API restauracji (HTTP ${res.status}).`);
     }
     return data;
   }
@@ -93,7 +105,106 @@
     rest_cancelled_client: "To samo — wariant skrócony.",
     restaurant_changed_client: "Po edycji rezerwacji przez admina (opcjonalna wysyłka).",
     rest_changed_client: "To samo — wariant skrócony.",
+    restaurant_expired_pending_client: "Klient — wygasło oczekiwanie na decyzję restauracji.",
+    restaurant_expired_pending_admin: "Obsługa — informacja o automatycznym wygaśnięciu rezerwacji.",
+    restaurant_expired_email_client: "Klient — nie potwierdzono adresu e-mail w terminie 2 godzin.",
   };
+
+  const REST_TEMPLATE_PREVIEW_VARS = Object.freeze({
+    reservationNumber: "5/2026/RESTAURACJA",
+    reservationSubject: "Kolacja degustacyjna",
+    decisionDeadline: "6 maja 2026, godz. 16:00",
+    fullName: "Marek Nowak",
+    email: "marek.nowak@example.com",
+    phone: "+48 601 222 333",
+    date: "8 maja 2026",
+    timeFrom: "19:00",
+    timeTo: "22:00",
+    durationHours: "3",
+    tablesList: "Stolik 4 i 5",
+    guestsCount: "6",
+    customerNote: "Prosimy o spokojne miejsce, krzesełko dla dziecka i możliwość wniesienia tortu.",
+    confirmationLink: "https://www.sredzkakorona.pl/restauracja/potwierdzenie?token=podglad",
+    restaurantName: "Restauracja Średzka Korona",
+  });
+
+  function renderTemplatePreviewString(template, vars) {
+    return String(template || "").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
+      const value = vars?.[key];
+      if (value === undefined || value === null) return "";
+      return escapeHtml(String(value));
+    });
+  }
+
+  function sanitizeTemplatePreviewHtml(html) {
+    return String(html || "")
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, "")
+      .replace(/\s(href|src)\s*=\s*(['"])\s*javascript:[\s\S]*?\2/gi, ' $1="#"');
+  }
+
+  function buildMailPreviewMarkup({ subject, bodyHtml, serviceLabel, footerLabel, actionLabel = "" }) {
+    return `
+      <div class="mail-preview-shell">
+        <div class="mail-preview-note">Podgląd na przykładowych danych. Branding i układ odpowiadają faktycznie wysyłanej wiadomości.</div>
+        <div class="mail-preview-frame">
+          <div class="mail-preview-canvas">
+            <div class="mail-preview-brand" aria-label="Średzka Korona">
+              <span>ŚREDZKA</span>
+              <img src="/ikony/logo-korona.png" alt="Korona" width="42" height="42" />
+              <span>KORONA</span>
+            </div>
+            <div class="mail-preview-service">${escapeHtml(serviceLabel)}</div>
+            <div class="mail-preview-card">
+              <div class="mail-preview-subject">${escapeHtml(subject || "Temat wiadomości")}</div>
+              ${actionLabel ? `<a class="mail-preview-button" href="#" onclick="return false;">${escapeHtml(actionLabel)}</a>` : ""}
+              <div class="mail-preview-body">${bodyHtml || "<p>Brak treści wiadomości.</p>"}</div>
+            </div>
+            <div class="mail-preview-footer">
+              <div>Wiadomość transakcyjna dotycząca rezerwacji w obiekcie Średzka Korona.</div>
+              <div class="mail-preview-footer-link">${escapeHtml(footerLabel)}</div>
+              <div>Jeśli masz pytania, odpowiedz na tę wiadomość.</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function restaurantPreviewActionLabel(key) {
+    return key === "restaurant_confirm_email" || key === "rest_confirm_email"
+      ? "Potwierdź adres e-mail"
+      : "";
+  }
+
+  function updateRestaurantTemplatePreview(key) {
+    if (!key) return;
+    const subjectField = document.querySelector(`[data-rest-tpl-key="${key}"][data-field="subject"]`);
+    const bodyField = document.querySelector(`[data-rest-tpl-key="${key}"][data-field="bodyHtml"]`);
+    const previewHost = document.querySelector(`[data-rest-preview-key="${key}"]`);
+    if (!subjectField || !bodyField || !previewHost) return;
+    const renderedSubject = renderTemplatePreviewString(subjectField.value, REST_TEMPLATE_PREVIEW_VARS);
+    const renderedBody = sanitizeTemplatePreviewHtml(
+      renderTemplatePreviewString(bodyField.value, REST_TEMPLATE_PREVIEW_VARS)
+    );
+    previewHost.innerHTML = buildMailPreviewMarkup({
+      subject: renderedSubject,
+      bodyHtml: renderedBody,
+      serviceLabel: "Restauracja",
+      footerLabel: "Restauracja Średzka Korona",
+      actionLabel: restaurantPreviewActionLabel(key),
+    });
+  }
+
+  function bindRestaurantTemplatePreviews() {
+    const keys = new Set();
+    document.querySelectorAll("[data-rest-tpl-key][data-field]").forEach((field) => {
+      const key = field.getAttribute("data-rest-tpl-key");
+      if (!key) return;
+      keys.add(key);
+      field.addEventListener("input", () => updateRestaurantTemplatePreview(key));
+    });
+    keys.forEach((key) => updateRestaurantTemplatePreview(key));
+  }
 
   async function loadSettings() {
     const d = await restaurantApi("admin-settings", { method: "GET" });
@@ -262,7 +373,9 @@
     return `
       <div class="hotel-subpanel">
         <h3>Szablony mailingowe — restauracja</h3>
-        <p class="helper">Zmienne: <code>{{reservationNumber}}</code> (np. 5/2026), <code>{{fullName}}</code>, <code>{{email}}</code>, <code>{{phone}}</code>, <code>{{date}}</code>, <code>{{timeFrom}}</code>, <code>{{timeTo}}</code>, <code>{{durationHours}}</code>, <code>{{tablesList}}</code>, <code>{{guestsCount}}</code>, <code>{{customerNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{restaurantName}}</code>.</p>
+        <p class="helper">Zmienne: <code>{{reservationNumber}}</code> (np. 5/2026/RESTAURACJA), <code>{{reservationSubject}}</code>, <code>{{decisionDeadline}}</code>, <code>{{adminActionLink}}</code>, <code>{{fullName}}</code>, <code>{{email}}</code>, <code>{{phone}}</code>, <code>{{date}}</code>, <code>{{timeFrom}}</code>, <code>{{timeTo}}</code>, <code>{{durationHours}}</code>, <code>{{tablesList}}</code>, <code>{{guestsCount}}</code>, <code>{{customerNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{restaurantName}}</code>.</p>
+        <p class="helper">Logo, przycisk akcji i premium-layout wiadomości są dodawane automatycznie przy wysyłce. W polu poniżej edytujesz główną treść maila.</p>
+        <p class="helper">Podgląd pokazuje od razu, jak mail będzie wyglądał po podstawieniu danych rezerwacji restauracyjnej.</p>
         <div id="rest-template-forms">
           ${keys
             .map(
@@ -270,7 +383,14 @@
             <details class="hotel-template-card">
               <summary><span class="tpl-key">${escapeHtml(k)}</span>${REST_TEMPLATE_LABELS[k] ? `<span class="tpl-desc"> — ${escapeHtml(REST_TEMPLATE_LABELS[k])}</span>` : ""}</summary>
               <label>Temat<input type="text" data-rest-tpl-key="${escapeHtml(k)}" data-field="subject" value="${escapeHtml(templatesData[k]?.subject || "")}" /></label>
-              <label>Treść HTML<textarea data-rest-tpl-key="${escapeHtml(k)}" data-field="bodyHtml" rows="10">${escapeHtml(templatesData[k]?.bodyHtml || "")}</textarea></label>
+              <label>Treść HTML<textarea data-rest-tpl-key="${escapeHtml(k)}" data-field="bodyHtml" rows="18">${escapeHtml(templatesData[k]?.bodyHtml || "")}</textarea></label>
+              <div class="mail-preview-panel">
+                <div class="mail-preview-panel-head">
+                  <strong>Podgląd wiadomości</strong>
+                  <span class="helper">Wersja z przykładową rezerwacją stolika i realnym brandingiem.</span>
+                </div>
+                <div class="mail-preview-render" data-rest-preview-key="${escapeHtml(k)}"></div>
+              </div>
               <button type="button" class="button rest-save-tpl" data-key="${escapeHtml(k)}">Zapisz szablon</button>
             </details>`
             )
@@ -527,6 +647,7 @@
             .catch((err) => alert(err.message));
         });
       });
+      bindRestaurantTemplatePreviews();
 
       document.querySelector("#rest-block-all-tables")?.addEventListener("change", (ev) => {
         const on = ev.target.checked;

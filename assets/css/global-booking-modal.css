@@ -212,6 +212,12 @@ body.gb-modal-open {
   font-size: 0.95rem;
   width: 100%;
   box-sizing: border-box;
+  min-height: 2.75rem;
+  line-height: 1.35;
+}
+
+#gb-modal select {
+  appearance: auto;
 }
 
 #gb-modal textarea {
@@ -223,13 +229,16 @@ body.gb-modal-open {
   accent-color: #b7894d;
   padding: 0;
   background: transparent;
+  min-height: 0;
 }
 
 #gb-modal .gb-service-tiles,
 #gb-modal .gb-hall-tiles {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 0.85rem;
+  padding: 0.2rem;
 }
 
 #gb-modal .gb-service-tile,
@@ -239,9 +248,16 @@ body.gb-modal-open {
   background: var(--gb-card-bg);
   color: #fff9ef;
   min-height: 136px;
+  flex: 1 1 280px;
+  max-width: 400px;
   padding: 1.25rem 1rem;
   text-align: center;
   cursor: pointer;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 0;
+  transform-origin: center;
+  will-change: transform;
   transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 
@@ -249,7 +265,8 @@ body.gb-modal-open {
 #gb-modal .gb-hall-tile:hover {
   background: var(--gb-card-bg-hover);
   border-color: rgba(255, 229, 184, 0.72);
-  transform: translateY(-1px);
+  transform: translateY(-1px) scale(1.02);
+  z-index: 1;
 }
 
 #gb-modal .gb-service-tile strong,
@@ -290,8 +307,31 @@ body.gb-modal-open {
   border-radius: 15px;
   background: rgba(255, 245, 226, 0.1);
   padding: 0.95rem;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0.35rem;
+}
+
+#gb-modal .gb-room-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+#gb-modal .gb-room-card-bottom {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.15rem;
+}
+
+#gb-modal .gb-room-card-bottom .gb-room-meta {
+  flex: 1;
+  margin: 0;
+  text-align: left;
+  min-width: 0;
 }
 
 #gb-modal .gb-room-name {
@@ -313,10 +353,7 @@ body.gb-modal-open {
 }
 
 #gb-modal .gb-room-line--beds {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.7rem;
+  display: block;
 }
 
 #gb-modal .gb-room-icon {
@@ -328,6 +365,9 @@ body.gb-modal-open {
 #gb-modal .gb-room-price-wrap {
   display: grid;
   gap: 0.06rem;
+  text-align: right;
+  justify-items: end;
+  flex-shrink: 0;
 }
 
 #gb-modal .gb-room-price {
@@ -454,6 +494,120 @@ body.gb-modal-open {
   margin-top: 0.3rem;
 }
 
+#gb-modal .gb-summary-box-title {
+  margin: 0 0 0.65rem;
+  font-size: 1.12rem;
+  font-weight: 600;
+}
+
+#gb-modal .gb-summary-hotel-term {
+  margin: 0.35rem 0 0.85rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 225, 179, 0.22);
+}
+
+#gb-modal .gb-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
+}
+
+#gb-modal .gb-summary-k {
+  font-size: 0.82rem;
+  color: rgba(255, 236, 205, 0.88);
+  font-weight: 600;
+  min-width: 6.5rem;
+}
+
+#gb-modal .gb-summary-v {
+  font-size: 0.98rem;
+  color: var(--gb-text);
+  font-weight: 600;
+}
+
+#gb-modal .gb-summary-sub {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  color: var(--gb-text-muted);
+}
+
+#gb-modal .gb-summary-room-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+#gb-modal .gb-summary-room-item {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem 0.75rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid rgba(255, 225, 179, 0.15);
+}
+
+#gb-modal .gb-summary-room-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+#gb-modal .gb-summary-room-name {
+  font-weight: 600;
+  color: var(--gb-text);
+  flex: 1 1 8rem;
+}
+
+#gb-modal .gb-summary-room-prices {
+  display: grid;
+  gap: 0.2rem;
+  text-align: right;
+  font-size: 0.9rem;
+}
+
+#gb-modal .gb-summary-room-unit {
+  color: rgba(255, 231, 200, 0.92);
+}
+
+#gb-modal .gb-summary-room-total {
+  color: var(--gb-text-muted);
+  font-size: 0.86rem;
+}
+
+#gb-modal .gb-summary-list--stacked .gb-summary-li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin: 0.38rem 0;
+  padding: 0.28rem 0;
+  border-bottom: 1px solid rgba(255, 225, 179, 0.12);
+  align-items: baseline;
+}
+
+#gb-modal .gb-summary-list--stacked .gb-summary-li:last-child {
+  border-bottom: none;
+}
+
+#gb-modal .gb-summary-list--stacked .gb-summary-li--block {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.2rem;
+}
+
+#gb-modal .gb-summary-list--stacked .gb-summary-li .gb-summary-k {
+  flex: 0 0 42%;
+  max-width: 12rem;
+}
+
+#gb-modal .gb-summary-list--stacked .gb-summary-li .gb-summary-v {
+  flex: 1 1 55%;
+  font-weight: 500;
+  font-size: 0.92rem;
+}
+
 #gb-modal .gb-summary-box li {
   margin: 0.24rem 0;
 }
@@ -538,6 +692,17 @@ body.gb-modal-open {
   font-size: 0.9rem;
 }
 
+#gb-modal .gb-countdown-footer {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 0.85rem;
+}
+
+#gb-modal .gb-countdown-footer .gb-countdown {
+  margin-top: 0;
+}
+
 #gb-modal .gb-session-expired {
   border-radius: 14px;
   border: 1px solid rgba(255, 205, 205, 0.45);
@@ -568,6 +733,10 @@ body.gb-modal-open {
   font-size: 0.83rem;
 }
 
+#gb-modal .gb-opening-hours-note {
+  margin-bottom: 1.15rem;
+}
+
 #gb-modal .gb-link {
   color: #ffe0ad;
 }
@@ -579,7 +748,6 @@ body.gb-modal-open {
   }
 
   #gb-modal .gb-service-tiles,
-  #gb-modal .gb-hall-tiles,
   #gb-modal .gb-grid-3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -617,21 +785,42 @@ body.gb-modal-open {
   }
 
   #gb-modal .gb-service-tiles,
-  #gb-modal .gb-hall-tiles,
   #gb-modal .gb-grid-2,
   #gb-modal .gb-grid-3,
   #gb-modal .gb-range-pair {
     grid-template-columns: 1fr;
   }
 
+  #gb-modal .gb-hall-tile {
+    max-width: none;
+  }
+
   #gb-modal .gb-phone-row {
     grid-template-columns: 80px minmax(0, 1fr);
   }
 
-  #gb-modal .gb-room-line--beds,
   #gb-modal .gb-cart-total-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  #gb-modal .gb-room-card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #gb-modal .gb-room-price-wrap {
+    text-align: left;
+    justify-items: start;
+  }
+
+  #gb-modal .gb-room-card-bottom {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  #gb-modal .gb-room-card-bottom .gb-pill-btn {
+    align-self: flex-end;
   }
 
   #gb-modal .gb-actions {

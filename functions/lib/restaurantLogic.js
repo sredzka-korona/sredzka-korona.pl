@@ -1,5 +1,6 @@
 const { FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { DateTime } = require("luxon");
+const { allocateSharedReservationNumber } = require("./humanNumber");
 
 const BUFFER_MS = 30 * 60 * 1000;
 const BLOCKING = new Set(["pending", "confirmed", "manual_block"]);
@@ -156,23 +157,7 @@ async function findAvailableTableIds(db, { startMs, endMs, tablesNeeded, joinTab
 }
 
 async function allocateRestaurantNumber(db) {
-  const year = new Date().getFullYear();
-  return db.runTransaction(async (tx) => {
-    const ref = db.collection("restaurantSettings").doc("counters");
-    const snap = await tx.get(ref);
-    const data = snap.exists ? snap.data() : {};
-    const field = `seq_${year}`;
-    const seq = Number(data[field] || 0) + 1;
-    tx.set(
-      ref,
-      {
-        [field]: seq,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-    return `RS-${year}-${String(seq).padStart(5, "0")}`;
-  });
+  return allocateSharedReservationNumber(db, "restaurant");
 }
 
 async function releaseLocksForReservation(db, reservationId) {

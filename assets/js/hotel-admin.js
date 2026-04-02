@@ -123,6 +123,10 @@
     confirmed_client: "Klient — rezerwacja zaakceptowana (pokoje zarezerwowane).",
     cancelled_client: "Klient — rezerwacja anulowana przez hotel lub po upływie czasu.",
     changed_client: "Klient — po edycji rezerwacji przez administratora (wysyłane tylko gdy zaznaczysz wysyłkę).",
+    expired_pending_client: "Klient — wygasło oczekiwanie na decyzję recepcji.",
+    expired_pending_admin: "Obsługa — informacja o automatycznym wygaśnięciu oczekującej rezerwacji.",
+    expired_email_client: "Klient — nie potwierdzono adresu e-mail w terminie 2 godzin.",
+    cancelled_admin: "Obsługa — informacja o anulowaniu rezerwacji.",
   };
 
   const HOTEL_TEMPLATE_DEFAULTS = {
@@ -188,6 +192,100 @@
         "<p>Witaj {{fullName}},</p><p>Wprowadziliśmy zmiany w rezerwacji <strong>{{reservationNumber}}</strong>.</p><p>Termin pobytu: {{dateFrom}} — {{dateTo}} ({{nights}} nocy).<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>{{customerNote}}</p><p>W razie pytań odpowiedz na tę wiadomość lub skontaktuj się z recepcją.</p>",
     },
   };
+
+  const HOTEL_TEMPLATE_PREVIEW_VARS = Object.freeze({
+    reservationNumber: "18/2026/HOTEL",
+    reservationSubject: "Weekend w apartamencie premium",
+    decisionDeadline: "10 maja 2026, godz. 18:00",
+    fullName: "Anna Kowalska",
+    email: "anna.kowalska@example.com",
+    phone: "+48 600 700 800",
+    roomsList: "Apartament Premium, Pokój Deluxe",
+    dateFrom: "14 maja 2026",
+    dateTo: "16 maja 2026",
+    nights: "2",
+    totalPrice: "1240",
+    customerNote: "Prosimy o spokojny pokój i możliwość późniejszego zameldowania około 20:30.",
+    adminNote: "Gość preferuje apartament od strony dziedzińca.",
+    confirmationLink: "https://www.sredzkakorona.pl/hotel/potwierdzenie?token=podglad",
+    hotelName: "Średzka Korona",
+  });
+
+  function renderTemplatePreviewString(template, vars) {
+    return String(template || "").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
+      const value = vars?.[key];
+      if (value === undefined || value === null) return "";
+      return escapeHtml(String(value));
+    });
+  }
+
+  function sanitizeTemplatePreviewHtml(html) {
+    return String(html || "")
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, "")
+      .replace(/\s(href|src)\s*=\s*(['"])\s*javascript:[\s\S]*?\2/gi, ' $1="#"');
+  }
+
+  function buildMailPreviewMarkup({ subject, bodyHtml, serviceLabel, footerLabel, actionLabel = "" }) {
+    return `
+      <div class="mail-preview-shell">
+        <div class="mail-preview-note">Podgląd na przykładowych danych. Branding i układ odpowiadają faktycznie wysyłanej wiadomości.</div>
+        <div class="mail-preview-frame">
+          <div class="mail-preview-canvas">
+            <div class="mail-preview-brand" aria-label="Średzka Korona">
+              <span>ŚREDZKA</span>
+              <img src="/ikony/logo-korona.png" alt="Korona" width="42" height="42" />
+              <span>KORONA</span>
+            </div>
+            <div class="mail-preview-service">${escapeHtml(serviceLabel)}</div>
+            <div class="mail-preview-card">
+              <div class="mail-preview-subject">${escapeHtml(subject || "Temat wiadomości")}</div>
+              ${actionLabel ? `<a class="mail-preview-button" href="#" onclick="return false;">${escapeHtml(actionLabel)}</a>` : ""}
+              <div class="mail-preview-body">${bodyHtml || "<p>Brak treści wiadomości.</p>"}</div>
+            </div>
+            <div class="mail-preview-footer">
+              <div>Wiadomość transakcyjna dotycząca rezerwacji w obiekcie Średzka Korona.</div>
+              <div class="mail-preview-footer-link">${escapeHtml(footerLabel)}</div>
+              <div>Jeśli masz pytania, odpowiedz na tę wiadomość.</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function hotelPreviewActionLabel(key) {
+    return key === "confirm_email" ? "Potwierdź adres e-mail" : "";
+  }
+
+  function updateHotelTemplatePreview(key) {
+    if (!key) return;
+    const subjectField = document.querySelector(`[data-tpl-key="${key}"][data-field="subject"]`);
+    const bodyField = document.querySelector(`[data-tpl-key="${key}"][data-field="bodyHtml"]`);
+    const previewHost = document.querySelector(`[data-hotel-preview-key="${key}"]`);
+    if (!subjectField || !bodyField || !previewHost) return;
+    const renderedSubject = renderTemplatePreviewString(subjectField.value, HOTEL_TEMPLATE_PREVIEW_VARS);
+    const renderedBody = sanitizeTemplatePreviewHtml(
+      renderTemplatePreviewString(bodyField.value, HOTEL_TEMPLATE_PREVIEW_VARS)
+    );
+    previewHost.innerHTML = buildMailPreviewMarkup({
+      subject: renderedSubject,
+      bodyHtml: renderedBody,
+      serviceLabel: "Hotel",
+      footerLabel: "Hotel Średzka Korona",
+      actionLabel: hotelPreviewActionLabel(key),
+    });
+  }
+
+  function bindHotelTemplatePreviews() {
+    const keys = new Set();
+    document.querySelectorAll("[data-tpl-key][data-field]").forEach((field) => {
+      const key = field.getAttribute("data-tpl-key");
+      if (!key) return;
+      keys.add(key);
+      field.addEventListener("input", () => updateHotelTemplatePreview(key));
+    });
+    keys.forEach((key) => updateHotelTemplatePreview(key));
+  }
 
   function slugifyRoomId(value) {
     const map = { ą: "a", ć: "c", ę: "e", ł: "l", ń: "n", ó: "o", ś: "s", ż: "z", ź: "z" };
@@ -429,11 +527,13 @@
   }
 
   function renderTemplatesEditor() {
-    const keys = Object.keys(HOTEL_TEMPLATE_DEFAULTS);
+    const keys = Object.keys(templatesData || {});
     return `
       <div class="hotel-subpanel">
         <h3>Szablony mailingowe</h3>
-        <p class="helper">Zmienne we wszystkich szablonach: <code>{{reservationNumber}}</code> (numer w formacie np. 12/2026), <code>{{fullName}}</code>, <code>{{email}}</code>, <code>{{phone}}</code>, <code>{{roomsList}}</code>, <code>{{dateFrom}}</code>, <code>{{dateTo}}</code>, <code>{{nights}}</code>, <code>{{totalPrice}}</code>, <code>{{customerNote}}</code>, <code>{{adminNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{hotelName}}</code>.</p>
+        <p class="helper">Zmienne we wszystkich szablonach: <code>{{reservationNumber}}</code> (numer w formacie np. 12/2026/HOTEL), <code>{{reservationSubject}}</code>, <code>{{decisionDeadline}}</code>, <code>{{adminActionLink}}</code>, <code>{{fullName}}</code>, <code>{{email}}</code>, <code>{{phone}}</code>, <code>{{roomsList}}</code>, <code>{{dateFrom}}</code>, <code>{{dateTo}}</code>, <code>{{nights}}</code>, <code>{{totalPrice}}</code>, <code>{{customerNote}}</code>, <code>{{adminNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{hotelName}}</code>.</p>
+        <p class="helper">Logo, przycisk akcji i elegancka oprawa wiadomości są dodawane automatycznie podczas wysyłki. W edytorze zmieniasz główną treść maila wewnątrz tego layoutu.</p>
+        <p class="helper">Pod każdym szablonem widzisz live preview z przykładowymi danymi gościa. Przycisk akcji pojawia się tylko tam, gdzie system realnie wysyła link.</p>
         <div id="hotel-template-forms">
           ${keys
             .map(
@@ -441,7 +541,14 @@
             <details class="hotel-template-card">
               <summary><span class="tpl-key">${escapeHtml(k)}</span>${HOTEL_TEMPLATE_LABELS[k] ? `<span class="tpl-desc"> — ${escapeHtml(HOTEL_TEMPLATE_LABELS[k])}</span>` : ""}</summary>
               <label>Temat<input type="text" data-tpl-key="${escapeHtml(k)}" data-field="subject" value="${escapeHtml(templatesData[k]?.subject || "")}" /></label>
-              <label>Treść HTML<textarea data-tpl-key="${escapeHtml(k)}" data-field="bodyHtml" rows="10">${escapeHtml(templatesData[k]?.bodyHtml || "")}</textarea></label>
+              <label>Treść HTML<textarea data-tpl-key="${escapeHtml(k)}" data-field="bodyHtml" rows="18">${escapeHtml(templatesData[k]?.bodyHtml || "")}</textarea></label>
+              <div class="mail-preview-panel">
+                <div class="mail-preview-panel-head">
+                  <strong>Podgląd wiadomości</strong>
+                  <span class="helper">Układ zbliżony do finalnego maila wysyłanego do klienta.</span>
+                </div>
+                <div class="mail-preview-render" data-hotel-preview-key="${escapeHtml(k)}"></div>
+              </div>
               <button type="button" class="button hotel-save-tpl" data-key="${escapeHtml(k)}">Zapisz szablon</button>
             </details>`
             )
@@ -653,6 +760,7 @@
       document.querySelectorAll(".hotel-save-tpl").forEach((btn) => {
         btn.addEventListener("click", () => saveTemplate(btn.getAttribute("data-key")));
       });
+      bindHotelTemplatePreviews();
       document.querySelector("#hotel-block-all-rooms")?.addEventListener("change", (ev) => {
         const on = ev.target.checked;
         document.querySelectorAll('#hotel-block-form input[name="roomId"]').forEach((cb) => {

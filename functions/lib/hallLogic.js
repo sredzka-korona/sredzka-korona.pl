@@ -1,5 +1,6 @@
 const { DateTime } = require("luxon");
 const { FieldValue } = require("firebase-admin/firestore");
+const { allocateSharedReservationNumber } = require("./humanNumber");
 
 const WARSAW = "Europe/Warsaw";
 
@@ -223,21 +224,7 @@ async function checkHallAvailability(db, hallDoc, input, excludeReservationId) {
 }
 
 async function allocateHallReservationNumber(db) {
-  const ref = db.collection("venueSettings").doc("default");
-  return db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    const cur = snap.exists ? snap.data() : {};
-    const next = Number(cur.nextHallHumanNumber || 2000);
-    tx.set(
-      ref,
-      {
-        nextHallHumanNumber: next + 1,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-    return next;
-  });
+  return allocateSharedReservationNumber(db, "hall");
 }
 
 module.exports = {

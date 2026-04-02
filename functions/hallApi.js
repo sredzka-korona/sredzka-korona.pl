@@ -21,6 +21,7 @@ const {
   WARSAW,
   assertNotPastCalendarDateWarsaw,
 } = require("./lib/hallLogic");
+const { formatHumanReservationNumber } = require("./lib/humanNumber");
 const {
   renderTemplate,
   getHallMailTemplate,
@@ -181,7 +182,7 @@ function buildHallMailVars(res, hall, extra = {}) {
     Boolean(res.exclusive) || Number(res.guestsCount || 0) >= thr;
   return {
     reservationId: res.id,
-    reservationNumber: String(res.humanNumber || res.id),
+    reservationNumber: formatHumanReservationNumber(res, "hall") || String(res.id),
     fullName: res.fullName || "",
     email: res.email || "",
     phone: `${res.phonePrefix || ""} ${res.phoneNational || ""}`.trim() || res.phoneE164 || "",
@@ -189,7 +190,9 @@ function buildHallMailVars(res, hall, extra = {}) {
     date: res.reservationDate || "",
     timeFrom: res.startTimeLabel || start.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit", timeZone: WARSAW }),
     timeTo: res.endTimeLabel || end.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit", timeZone: WARSAW }),
-    durationHours: String(res.durationHours ?? ""),
+    durationHours: res.durationUnspecified
+      ? "nie określono"
+      : `${Number(res.durationHours ?? 0)} h`,
     guestsCount: String(res.guestsCount ?? ""),
     eventType: res.eventType || "",
     exclusive: res.exclusive ? "tak" : "nie",
@@ -246,6 +249,7 @@ function formatHallRow(x, hallMap = {}) {
   return {
     id: x.id,
     humanNumber: x.humanNumber,
+    humanNumberLabel: formatHumanReservationNumber(x, "hall") || x.humanNumber || x.id,
     hallId: x.hallId,
     hallName: x.hallNameSnapshot || hall.name || x.hallId,
     hallKindSnapshot: x.hallKindSnapshot,
@@ -257,6 +261,7 @@ function formatHallRow(x, hallMap = {}) {
     reservationDate: x.reservationDate,
     startTime: x.startTime,
     durationHours: x.durationHours,
+    durationUnspecified: Boolean(x.durationUnspecified),
     startDateTime: x.startDateTime?.toMillis?.() || x.startMs,
     endDateTime: x.endDateTime?.toMillis?.() || x.endMs,
     guestsCount: x.guestsCount,
@@ -426,6 +431,7 @@ const hallApi = onRequest(
           reservationDate,
           startTime,
           durationHours,
+          durationUnspecified,
           guestsCount,
           exclusive,
           eventType,
@@ -496,6 +502,7 @@ const hallApi = onRequest(
         const confirmationLink = `${publicSiteUrl()}/Przyjec/potwierdzenie.html?token=${encodeURIComponent(token)}`;
 
         const dur = Number(durationHours);
+        const durationUnspecifiedFlag = Boolean(durationUnspecified);
 
         await db.runTransaction(async (tx) => {
           tx.set(resRef, {
@@ -518,6 +525,7 @@ const hallApi = onRequest(
             reservationDate: String(reservationDate).trim(),
             startTime: String(startTime).trim(),
             durationHours: dur,
+            durationUnspecified: durationUnspecifiedFlag,
             startTimeLabel: chk.startTimeLabel,
             endTimeLabel: chk.endTimeLabel,
             startDateTime: Timestamp.fromMillis(chk.startMs),
@@ -547,6 +555,7 @@ const hallApi = onRequest(
             reservationDate,
             startTime,
             durationHours: dur,
+            durationUnspecified: durationUnspecifiedFlag,
             guestsCount: gc,
             exclusive: excl,
             eventType,
@@ -595,7 +604,12 @@ const hallApi = onRequest(
         const reservationId = doc.id;
 
         if (resData.status === "pending" || resData.status === "confirmed") {
-          json(res, { ok: true, status: resData.status, reservationId, humanNumber: resData.humanNumber });
+          json(res, {
+            ok: true,
+            status: resData.status,
+            reservationId,
+            humanNumber: formatHumanReservationNumber(resData, "hall") || resData.humanNumber,
+          });
           return;
         }
         if (resData.status !== "email_verification_pending") {
@@ -654,7 +668,12 @@ const hallApi = onRequest(
             if (latest.exists) {
               const latestData = latest.data();
               if (latestData && (latestData.status === "pending" || latestData.status === "confirmed")) {
-                json(res, { ok: true, status: latestData.status, reservationId, humanNumber: latestData.humanNumber });
+                json(res, {
+                  ok: true,
+                  status: latestData.status,
+                  reservationId,
+                  humanNumber: formatHumanReservationNumber(latestData, "hall") || latestData.humanNumber,
+                });
                 return;
               }
             }
@@ -668,22 +687,18 @@ const hallApi = onRequest(
           throw e;
         }
 
-        const reread = (await doc.ref.get()).data();
-        const hall2 = (await db.collection("venueHalls").doc(reread.hallId).get()).data();
-        const vars = buildHallMailVars({ ...reread, id: reservationId }, hall2, {});
-        await sendHallTemplated(db, "hall_pending_client", vars.email, vars);
-        const adm = adminNotifyEmail();
-        if (adm) {
-          await sendHallTemplated(db, "hall_pending_admin", adm, vars);
-        }
-
         await appendVenueAudit(db, {
           action: "hall_email_confirmed",
           reservationId,
           details: {},
         });
 
-        json(res, { ok: true, status: "pending", reservationId, humanNumber: reread.humanNumber });
+        json(res, {
+          ok: true,
+          status: "pending",
+          reservationId,
+          humanNumber: formatHumanReservationNumber(resData, "hall") || resData.humanNumber,
+        });
         return;
       }
 

@@ -20,6 +20,7 @@ const {
   releaseNightsForReservation,
   nightsCount,
 } = require("./lib/reservationLogic");
+const { formatHumanReservationNumber } = require("./lib/humanNumber");
 
 const { checkRateLimit } = require("./lib/rateLimit");
 const { checkSpamBlock, setSpamBlock } = require("./lib/bookingSpamBlock");
@@ -156,7 +157,7 @@ function buildMailVars(reservation, items, extra = {}) {
   const nights = nightsCount(reservation.dateFrom, reservation.dateTo);
   return {
     reservationId: reservation.id,
-    reservationNumber: reservation.humanNumber || reservation.id,
+    reservationNumber: formatHumanReservationNumber(reservation, "hotel") || reservation.id,
     fullName: reservation.customerName || "",
     email: reservation.email || "",
     phone: `${reservation.phonePrefix || ""} ${reservation.phoneNational || ""}`.trim(),
@@ -419,7 +420,12 @@ exports.hotelApi = onRequest(
         const reservationId = doc.id;
 
         if (resData.status === "pending" || resData.status === "confirmed") {
-          json(res, { ok: true, status: resData.status, reservationId, humanNumber: resData.humanNumber });
+          json(res, {
+            ok: true,
+            status: resData.status,
+            reservationId,
+            humanNumber: formatHumanReservationNumber(resData, "hotel") || resData.humanNumber,
+          });
           return;
         }
         if (resData.status !== "email_verification_pending") {
@@ -472,7 +478,12 @@ exports.hotelApi = onRequest(
           if (e.message === "STATUS_CHANGED") {
             const latest = await getReservation(db, reservationId);
             if (latest && (latest.status === "pending" || latest.status === "confirmed")) {
-              json(res, { ok: true, status: latest.status, reservationId, humanNumber: latest.humanNumber });
+              json(res, {
+                ok: true,
+                status: latest.status,
+                reservationId,
+                humanNumber: formatHumanReservationNumber(latest, "hotel") || latest.humanNumber,
+              });
               return;
             }
             json(res, { error: "Ta rezerwacja została już przetworzona." }, 400);
@@ -486,16 +497,6 @@ exports.hotelApi = onRequest(
         }
 
         const reread = await getReservation(db, reservationId);
-        const items2 = [];
-        const iq = await db.collection("hotelReservationItems").where("reservationId", "==", reservationId).get();
-        iq.forEach((d) => items2.push(d.data()));
-
-        const varsBase = buildMailVars({ ...reread, id: reservationId }, items2, {});
-        await sendTemplated(db, "pending_client", varsBase.email, varsBase);
-        const adm = adminNotifyEmail();
-        if (adm) {
-          await sendTemplated(db, "pending_admin", adm, varsBase);
-        }
 
         await appendAudit(db, {
           action: "email_confirmed_pending",
@@ -503,7 +504,12 @@ exports.hotelApi = onRequest(
           details: {},
         });
 
-        json(res, { ok: true, status: "pending", reservationId, humanNumber: reread.humanNumber });
+        json(res, {
+          ok: true,
+          status: "pending",
+          reservationId,
+          humanNumber: formatHumanReservationNumber(reread, "hotel") || reread.humanNumber,
+        });
         return;
       }
 
@@ -548,6 +554,26 @@ exports.hotelApi = onRequest(
           { merge: true }
         );
         await appendAudit(db, { action: "room_upsert", actorEmail: adminUser.email, details: { id } });
+        json(res, { ok: true });
+        return;
+      }
+
+      if (req.method === "DELETE" && op === "admin-room-delete") {
+        const body =
+          typeof req.body === "object" && req.body ? req.body : JSON.parse(req.body || "{}");
+        const id = String(url.searchParams.get("id") || body.id || "").trim();
+        if (!id) {
+          json(res, { error: "Brak id pokoju." }, 400);
+          return;
+        }
+        try {
+          await assertHotelRoomDeletableFirestore(db, id);
+        } catch (e) {
+          json(res, { error: e.message || "Nie można usunąć pokoju." }, 400);
+          return;
+        }
+        await db.collection("hotelRooms").doc(id).delete();
+        await appendAudit(db, { action: "room_delete", actorEmail: adminUser.email, details: { id } });
         json(res, { ok: true });
         return;
       }
@@ -750,9 +776,7 @@ exports.hotelApi = onRequest(
 
         const r0 = await getReservation(db, resRef.id);
         const vars = buildMailVars({ ...r0, id: resRef.id }, items, {});
-        if (st === "pending") {
-          await sendTemplated(db, "pending_client", vars.email, vars);
-        } else {
+        if (st === "confirmed") {
           await sendTemplated(db, "confirmed_client", vars.email, vars);
         }
         await appendAudit(db, {
@@ -962,6 +986,7 @@ function formatReservationRow(x, items) {
   return {
     id: x.id,
     humanNumber: x.humanNumber,
+    humanNumberLabel: formatHumanReservationNumber(x, "hotel") || x.humanNumber || x.id,
     customerName: x.customerName,
     email: x.email,
     phone: `${x.phonePrefix || ""} ${x.phoneNational || ""}`.trim() || x.phoneE164,
@@ -986,6 +1011,33 @@ async function itemsRoomIds(db, reservationId) {
   const ids = [];
   q.forEach((d) => ids.push(d.data().roomId));
   return [...new Set(ids)];
+}
+
+const HOTEL_ROOM_DELETE_BLOCKING_STATUSES = new Set([
+  "email_verification_pending",
+  "pending",
+  "confirmed",
+  "manual_block",
+]);
+
+async function assertHotelRoomDeletableFirestore(db, roomId) {
+  const rid = String(roomId || "").trim();
+  if (!rid) {
+    throw new Error("Brak ID pokoju.");
+  }
+  const q = await db.collection("hotelReservationItems").where("roomId", "==", rid).get();
+  for (const doc of q.docs) {
+    const reservationId = doc.data().reservationId;
+    if (!reservationId) continue;
+    const resSnap = await db.collection("hotelReservations").doc(reservationId).get();
+    if (!resSnap.exists) continue;
+    const st = resSnap.data().status;
+    if (HOTEL_ROOM_DELETE_BLOCKING_STATUSES.has(st)) {
+      throw new Error(
+        "Nie można usunąć pokoju — jest używany w aktywnej rezerwacji lub blokadzie. Usuń pokój z rezerwacji lub anuluj wpis, potem spróbuj ponownie."
+      );
+    }
+  }
 }
 
 /** Cron: wygaśnięcie linku e-mail (2h) oraz oczekiwania na admina (3 dni) */
