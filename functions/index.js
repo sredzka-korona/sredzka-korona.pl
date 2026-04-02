@@ -20,7 +20,7 @@ const {
   releaseNightsForReservation,
   nightsCount,
 } = require("./lib/reservationLogic");
-const { formatHumanReservationNumber } = require("./lib/humanNumber");
+const { ensureFormattedReservationNumber, formatHumanReservationNumber } = require("./lib/humanNumber");
 
 const { checkRateLimit } = require("./lib/rateLimit");
 const { checkSpamBlock, setSpamBlock } = require("./lib/bookingSpamBlock");
@@ -157,7 +157,7 @@ function buildMailVars(reservation, items, extra = {}) {
   const nights = nightsCount(reservation.dateFrom, reservation.dateTo);
   return {
     reservationId: reservation.id,
-    reservationNumber: formatHumanReservationNumber(reservation, "hotel") || reservation.id,
+    reservationNumber: ensureFormattedReservationNumber(reservation, "hotel") || reservation.id,
     fullName: reservation.customerName || "",
     email: reservation.email || "",
     phone: `${reservation.phonePrefix || ""} ${reservation.phoneNational || ""}`.trim(),
@@ -390,13 +390,13 @@ exports.hotelApi = onRequest(
         await appendAudit(db, {
           action: "reservation_draft_created",
           reservationId: resRef.id,
-          details: { humanNumber },
+          details: { humanNumber: ensureFormattedReservationNumber(humanNumber, "hotel") || humanNumber },
         });
 
         json(res, {
           ok: true,
           reservationId: resRef.id,
-          humanNumber,
+          humanNumber: ensureFormattedReservationNumber(humanNumber, "hotel") || humanNumber,
           message: "Wysłano wiadomość z linkiem potwierdzającym.",
         });
         return;

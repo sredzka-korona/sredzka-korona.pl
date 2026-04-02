@@ -50,6 +50,8 @@
     submitting: false,
     turnstileToken: "",
     turnstileWidgetId: null,
+    turnstileReady: false,
+    turnstileFailed: false,
     humanCheck: false,
     countdownUntil: 0,
     countdownTimer: null,
@@ -204,7 +206,7 @@
   }
 
   function antiBotVerified() {
-    return config.turnstileSiteKey ? Boolean(state.turnstileToken) : Boolean(state.humanCheck);
+    return config.turnstileSiteKey && !state.turnstileFailed ? Boolean(state.turnstileToken) : Boolean(state.humanCheck);
   }
 
   function getFlow() {
@@ -379,6 +381,8 @@
     state.submitting = false;
     state.turnstileToken = "";
     state.turnstileWidgetId = null;
+    state.turnstileReady = false;
+    state.turnstileFailed = false;
     state.humanCheck = false;
     state.countdownUntil = 0;
     state.pendingEmailSent = false;
@@ -489,6 +493,8 @@
       state.humanCheck = Boolean(draft.humanCheck);
       state.turnstileToken = "";
       state.turnstileWidgetId = null;
+      state.turnstileReady = false;
+      state.turnstileFailed = false;
 
       state.personal = {
         firstName: cleanString(draft.personal?.firstName, 60),
@@ -1325,13 +1331,18 @@
   }
 
   function renderAntiBotSection() {
-    if (config.turnstileSiteKey) {
-      return `<div class="gb-antibot-wrap"><div id="gb-turnstile-slot"></div></div>`;
+    if (config.turnstileSiteKey && !state.turnstileFailed) {
+      return `
+        <div class="gb-antibot-wrap gb-antibot-wrap--turnstile">
+          <div id="gb-turnstile-slot"></div>
+          ${state.turnstileReady ? "" : '<p class="gb-antibot-note">Ladowanie weryfikacji antybotowej...</p>'}
+        </div>
+      `;
     }
     return `
       <label class="gb-check gb-antibot-wrap">
         <input type="checkbox" id="gb-human-check" ${state.humanCheck ? "checked" : ""} />
-        <span>Potwierdzam, że nie jestem botem.</span>
+        <span>${config.turnstileSiteKey ? "Potwierdzam, że nie jestem botem (tryb awaryjny)." : "Potwierdzam, że nie jestem botem."}</span>
       </label>
     `;
   }
@@ -1576,6 +1587,8 @@
       state.step = flow[index - 1];
       if (state.step !== "summary") {
         state.turnstileToken = "";
+        state.turnstileReady = false;
+        state.turnstileFailed = false;
         state.humanCheck = false;
         state.termsAccepted = false;
       }
@@ -2042,7 +2055,7 @@
       updateSummarySubmitState();
     });
 
-    if (!config.turnstileSiteKey) {
+    if (!config.turnstileSiteKey || state.turnstileFailed) {
       const human = document.getElementById("gb-human-check");
       human?.addEventListener("change", () => {
         state.humanCheck = Boolean(human.checked);
@@ -2060,8 +2073,12 @@
 
     const mounted = await ensureTurnstileScript();
     if (!mounted || !window.turnstile) {
-      setError("Nie udało się uruchomić weryfikacji antybotowej. Spróbuj ponownie.");
-      updateSummarySubmitState();
+      state.turnstileReady = false;
+      state.turnstileFailed = true;
+      state.humanCheck = false;
+      setError("Nie udało się uruchomić weryfikacji antybotowej. Użyj potwierdzenia awaryjnego.");
+      persistDraftState();
+      render();
       return;
     }
 
@@ -2073,12 +2090,15 @@
 
     slot.innerHTML = "";
     state.turnstileToken = "";
+    state.turnstileReady = true;
+    state.turnstileFailed = false;
 
     try {
       state.turnstileWidgetId = window.turnstile.render(slot, {
         sitekey: config.turnstileSiteKey,
         callback: (token) => {
           state.turnstileToken = String(token || "");
+          state.turnstileFailed = false;
           persistDraftState();
           render();
         },
@@ -2089,13 +2109,22 @@
         },
         "error-callback": () => {
           state.turnstileToken = "";
-          setError("Weryfikacja antybotowa nie powiodła się. Spróbuj ponownie.");
+          state.turnstileReady = false;
+          state.turnstileFailed = true;
+          state.humanCheck = false;
+          setError("Weryfikacja antybotowa nie powiodła się. Użyj potwierdzenia awaryjnego.");
           persistDraftState();
-          updateSummarySubmitState();
+          render();
         },
       });
     } catch {
-      setError("Nie udało się uruchomić weryfikacji antybotowej.");
+      state.turnstileReady = false;
+      state.turnstileFailed = true;
+      state.humanCheck = false;
+      setError("Nie udało się uruchomić weryfikacji antybotowej. Użyj potwierdzenia awaryjnego.");
+      persistDraftState();
+      render();
+      return;
     }
 
     updateSummarySubmitState();
@@ -2171,12 +2200,12 @@
       return;
     }
 
-    if (config.turnstileSiteKey && !antiBotVerified()) {
+    if (config.turnstileSiteKey && !state.turnstileFailed && !antiBotVerified()) {
       setError("Potwierdź weryfikację antybotową.");
       return;
     }
 
-    if (!config.turnstileSiteKey && !antiBotVerified()) {
+    if ((!config.turnstileSiteKey || state.turnstileFailed) && !antiBotVerified()) {
       setError("Potwierdź, że nie jesteś botem.");
       return;
     }
@@ -2212,6 +2241,7 @@
           /* bezpieczny fallback */
         }
         state.turnstileToken = "";
+        state.turnstileReady = false;
       }
       setError(error.message || "Nie udało się zapisać rezerwacji.");
       updateSummarySubmitState();
@@ -2267,6 +2297,8 @@
     state.isOpen = false;
     state.turnstileToken = "";
     state.turnstileWidgetId = null;
+    state.turnstileReady = false;
+    state.turnstileFailed = false;
     state.humanCheck = false;
 
     const modal = document.getElementById("gb-modal");

@@ -82,6 +82,18 @@ function formatHumanReservationNumber(recordOrRaw, service) {
   return rawText;
 }
 
+function ensureFormattedReservationNumber(recordOrRaw, service, fallbackYear = currentWarsawYear()) {
+  const formatted = formatHumanReservationNumber(recordOrRaw, service);
+  if (!formatted) return "";
+  if (!/^\d+$/u.test(formatted)) return formatted;
+  const sequence = Number(formatted);
+  const year = Number(fallbackYear);
+  if (!Number.isInteger(sequence) || !Number.isInteger(year) || year < 2000 || year > 2100) {
+    return formatted;
+  }
+  return `${sequence}/${year}/${reservationTypeLabel(service)}`;
+}
+
 function yearBounds(year) {
   const start = DateTime.fromObject({ year, month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 }, { zone: WARSAW });
   const end = start.plus({ years: 1 });
@@ -141,5 +153,6 @@ module.exports = {
   reservationTypeLabel,
   currentWarsawYear,
   formatHumanReservationNumber,
+  ensureFormattedReservationNumber,
   allocateSharedReservationNumber,
 };

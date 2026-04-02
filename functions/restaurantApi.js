@@ -45,7 +45,7 @@ const {
   cleanupBufferMinutes,
   BLOCKING,
 } = require("./lib/restaurantLogic");
-const { formatHumanReservationNumber } = require("./lib/humanNumber");
+const { ensureFormattedReservationNumber, formatHumanReservationNumber } = require("./lib/humanNumber");
 
 if (!getApps().length) {
   initializeApp();
@@ -162,7 +162,7 @@ function buildRestaurantMailVars(res, tableDocsById, extra = {}) {
   const endMs = res.endDateTime?.toMillis?.() || res.endMs;
   return {
     reservationId: res.id,
-    reservationNumber: formatHumanReservationNumber(res, "restaurant") || res.id,
+    reservationNumber: ensureFormattedReservationNumber(res, "restaurant") || res.id,
     fullName: res.fullName || "",
     email: res.email || "",
     phone: `${res.phonePrefix || ""} ${res.phoneNational || ""}`.trim(),
@@ -672,13 +672,13 @@ const restaurantApi = onRequest(
         await appendRestaurantAudit(db, {
           action: "restaurant_draft_created",
           reservationId: resRef.id,
-          details: { humanNumber },
+          details: { humanNumber: ensureFormattedReservationNumber(humanNumber, "restaurant") || humanNumber },
         });
 
         json(res, {
           ok: true,
           reservationId: resRef.id,
-          humanNumber,
+          humanNumber: ensureFormattedReservationNumber(humanNumber, "restaurant") || humanNumber,
           message: "Wysłano wiadomość z linkiem potwierdzającym.",
         });
         return;

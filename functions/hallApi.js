@@ -21,7 +21,7 @@ const {
   WARSAW,
   assertNotPastCalendarDateWarsaw,
 } = require("./lib/hallLogic");
-const { formatHumanReservationNumber } = require("./lib/humanNumber");
+const { ensureFormattedReservationNumber, formatHumanReservationNumber } = require("./lib/humanNumber");
 const {
   renderTemplate,
   getHallMailTemplate,
@@ -182,7 +182,7 @@ function buildHallMailVars(res, hall, extra = {}) {
     Boolean(res.exclusive) || Number(res.guestsCount || 0) >= thr;
   return {
     reservationId: res.id,
-    reservationNumber: formatHumanReservationNumber(res, "hall") || String(res.id),
+    reservationNumber: ensureFormattedReservationNumber(res, "hall") || String(res.id),
     fullName: res.fullName || "",
     email: res.email || "",
     phone: `${res.phonePrefix || ""} ${res.phoneNational || ""}`.trim() || res.phoneE164 || "",
@@ -574,13 +574,13 @@ const hallApi = onRequest(
         await appendVenueAudit(db, {
           action: "hall_draft_created",
           reservationId: resRef.id,
-          details: { humanNumber },
+          details: { humanNumber: ensureFormattedReservationNumber(humanNumber, "hall") || humanNumber },
         });
 
         json(res, {
           ok: true,
           reservationId: resRef.id,
-          humanNumber,
+          humanNumber: ensureFormattedReservationNumber(humanNumber, "hall") || humanNumber,
           message: "Wysłano wiadomość z linkiem potwierdzającym.",
         });
         return;

@@ -37,10 +37,11 @@ body.gb-modal-open {
 }
 
 #gb-modal .gb-shell {
-  width: min(784px, calc(100vw - 2rem));
-  max-width: calc(100vw - 2rem);
+  width: min(784px, 100%);
+  max-width: 100%;
   max-height: min(94dvh, 980px);
   overflow: hidden;
+  box-sizing: border-box;
   border-radius: 28px;
   border: 1px solid var(--gb-shell-border);
   background:
@@ -197,18 +198,27 @@ body.gb-modal-open {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 #gb-modal .gb-grid-3 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 #gb-modal .gb-field {
   display: grid;
   gap: 0.33rem;
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 #gb-modal .gb-field > span {
@@ -225,6 +235,13 @@ body.gb-modal-open {
   max-width: 100%;
 }
 
+#gb-modal section,
+#gb-modal form {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
 #gb-modal input,
 #gb-modal select,
 #gb-modal textarea {
@@ -235,9 +252,14 @@ body.gb-modal-open {
   padding: 0.6rem 0.72rem;
   font-size: 0.95rem;
   width: 100%;
+  inline-size: 100%;
+  min-inline-size: 0;
+  max-inline-size: 100%;
   box-sizing: border-box;
   min-height: 2.75rem;
   line-height: 1.35;
+  display: block;
+  overflow: hidden;
 }
 
 #gb-modal input[type="date"],
@@ -247,6 +269,26 @@ body.gb-modal-open {
 #gb-modal input[type="email"],
 #gb-modal select {
   height: 2.95rem;
+}
+
+#gb-modal input[type="date"],
+#gb-modal input[type="time"] {
+  padding-right: 0.55rem;
+}
+
+#gb-modal input[type="date"]::-webkit-date-and-time-value,
+#gb-modal input[type="time"]::-webkit-date-and-time-value {
+  min-width: 0;
+}
+
+#gb-modal input[type="date"]::-webkit-datetime-edit,
+#gb-modal input[type="time"]::-webkit-datetime-edit {
+  padding: 0;
+}
+
+#gb-modal input[type="date"]::-webkit-calendar-picker-indicator,
+#gb-modal input[type="time"]::-webkit-calendar-picker-indicator {
+  margin: 0;
 }
 
 #gb-modal select {
@@ -567,6 +609,9 @@ body.gb-modal-open {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
   gap: 0.5rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 #gb-modal .gb-phone-prefix {
@@ -620,6 +665,31 @@ body.gb-modal-open {
   margin-top: 0;
   justify-self: flex-end;
   max-width: 100%;
+}
+
+#gb-modal .gb-antibot-wrap--turnstile {
+  display: grid;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+#gb-modal #gb-turnstile-slot {
+  width: 100%;
+  min-height: 70px;
+  display: grid;
+  justify-items: end;
+  overflow: hidden;
+}
+
+#gb-modal #gb-turnstile-slot > * {
+  max-width: 100%;
+}
+
+#gb-modal .gb-antibot-note {
+  margin: 0;
+  color: rgba(255, 239, 211, 0.8);
+  font-size: 0.83rem;
+  line-height: 1.4;
 }
 
 #gb-modal .gb-success-card {
@@ -895,6 +965,9 @@ body.gb-modal-open {
   grid-template-columns: minmax(0, 1fr) 88px;
   gap: 0.45rem;
   align-items: center;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 #gb-modal .gb-inline-note {
@@ -946,7 +1019,7 @@ body.gb-modal-open {
 
 @media (max-width: 860px) {
   #gb-modal .gb-shell {
-    width: min(576px, calc(100vw - 1rem));
+    width: min(576px, 100%);
     border-radius: 22px;
   }
 
@@ -994,7 +1067,7 @@ body.gb-modal-open {
   }
 
   #gb-modal .gb-shell {
-    width: calc(100vw - 1rem);
+    width: 100%;
     max-height: calc(100dvh - 1rem);
     border-radius: 18px;
   }
@@ -1047,6 +1120,18 @@ body.gb-modal-open {
     grid-template-columns: 80px minmax(0, 1fr);
   }
 
+  #gb-modal input,
+  #gb-modal select,
+  #gb-modal textarea {
+    font-size: 0.92rem;
+  }
+
+  #gb-modal input[type="date"],
+  #gb-modal input[type="time"] {
+    padding-left: 0.65rem;
+    padding-right: 0.45rem;
+  }
+
   #gb-modal .gb-cart-total-row {
     flex-direction: column;
     align-items: flex-start;
@@ -1090,12 +1175,16 @@ body.gb-modal-open {
   #gb-modal .gb-btn {
     width: 100%;
   }
+
+  #gb-modal #gb-turnstile-slot {
+    justify-items: start;
+  }
 }
 
 @media (max-width: 420px) {
   #gb-modal .gb-shell {
-    width: calc(100vw - 0.5rem);
-    max-width: calc(100vw - 0.5rem);
+    width: 100%;
+    max-width: 100%;
     border-radius: 16px;
   }
 
@@ -1120,5 +1209,17 @@ body.gb-modal-open {
 
   #gb-modal .gb-phone-row {
     grid-template-columns: 74px minmax(0, 1fr);
+  }
+
+  #gb-modal input,
+  #gb-modal select,
+  #gb-modal textarea {
+    font-size: 0.88rem;
+  }
+
+  #gb-modal input[type="date"],
+  #gb-modal input[type="time"] {
+    padding-left: 0.6rem;
+    padding-right: 0.35rem;
   }
 }
