@@ -5,6 +5,11 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  "triggers": {
+    "crons": [
+      "*/15 * * * *"
+    ]
+  },
   "workers_dev": true,
   "d1_databases": [
     {

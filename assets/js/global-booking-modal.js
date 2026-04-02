@@ -4,6 +4,7 @@
   const SESSION_REFRESH_LEEWAY_MS = 30 * 1000;
   const EMAIL_CONFIRM_MS = 2 * 60 * 60 * 1000;
   const DRAFT_STORAGE_KEY = "sredzka-korona:global-booking-draft:v1";
+  const CONTACT_EMAIL = "kontakt@sredzka-korona.pl";
   const PAGE_VISIT_ID =
     window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const SERVICE_KEYS = ["hotel", "restaurant", "events"];
@@ -1497,6 +1498,8 @@
     const left = state.countdownUntil ? Math.max(0, state.countdownUntil - Date.now()) : EMAIL_CONFIRM_MS;
     const supportNotice =
       '<p class="gb-hint" style="margin-top:0.75rem;">Jeśli nie widzisz wiadomości e-mail, sprawdź folder SPAM. W razie problemów skontaktuj się z nami mailowo lub telefonicznie.</p>';
+    const emergencyNotice =
+      `<p class="gb-hint" style="margin-top:0.75rem;"><strong>Nie udało się wysłać wiadomości potwierdzającej.</strong> Skontaktuj się z nami natychmiast mailowo: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>`;
     const decisionDaysLabel =
       state.decisionDaysLabel === "7 dni" || state.selectedService === "events" ? "7 dni" : "3 dni";
     return `
@@ -1513,9 +1516,9 @@
                 </div>
               </div>`
             : `<div class="gb-success-card">
-                <p class="gb-hint">Zgłoszenie trafiło już do kolejki oczekującej. Mail potwierdzający nie był wymagany dla tego zgłoszenia.</p>
-                <p class="gb-hint" style="margin-top:0.5rem;">Decyzję o przyjęciu lub odrzuceniu otrzymasz e-mailowo w ciągu <strong>${decisionDaysLabel}</strong>. Rezerwacja może nie zostać przyjęta.</p>
-                ${supportNotice}
+                <p class="gb-hint">Zgłoszenie zostało zapisane, ale system nie potwierdził wysłania maila potwierdzającego.</p>
+                <p class="gb-hint" style="margin-top:0.5rem;">Aby obsługa mogła szybko zweryfikować rezerwację, wyślij wiadomość na adres kontaktowy obiektu.</p>
+                ${emergencyNotice}
               </div>`
         }
 

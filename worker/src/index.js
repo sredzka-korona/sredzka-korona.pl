@@ -1,6 +1,6 @@
 import { DEFAULT_CONTENT } from "./default-content.js";
 import { parseAdminEmailAllowlist, verifyFirebaseIdToken } from "./firebase-verify.js";
-import { handleD1BookingApi } from "./booking-d1.js";
+import { handleD1BookingApi, runBookingMaintenance } from "./booking-d1.js";
 
 const MAX_MEDIA_FILE_BYTES = 1_700_000;
 
@@ -273,6 +273,19 @@ export default {
       const status = error.status || 500;
       return jsonResponse({ error: error.message || "Wystapil blad." }, status, request, env);
     }
+  },
+
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(
+      (async () => {
+        const result = await runBookingMaintenance(env);
+        console.log("Booking maintenance completed", {
+          cron: controller.cron || "",
+          scheduledTime: controller.scheduledTime || 0,
+          ...result,
+        });
+      })()
+    );
   },
 };
 

@@ -3,6 +3,7 @@
  */
 (function () {
   const config = window.SREDZKA_CONFIG || {};
+  const CONTACT_EMAIL = "kontakt@sredzka-korona.pl";
 
   function restaurantApiBase() {
     if (config.restaurantApiBase) {
@@ -81,6 +82,7 @@
     joinTables: false,
     customerNote: "",
     customer: {},
+    requiresEmailConfirmation: true,
   };
 
   function todayYmdLocal() {
@@ -174,6 +176,7 @@
     state.joinTables = false;
     state.customerNote = "";
     state.customer = {};
+    state.requiresEmailConfirmation = true;
   }
 
   function maxGuestsAllowed() {
@@ -324,12 +327,23 @@
           <button type="button" class="booking-btn" id="rb-submit">Wyślij i otrzymaj link e-mail</button>
         </div>`;
     } else {
-      inner = `
+      inner = state.requiresEmailConfirmation
+        ? `
         <div class="booking-success">
           <h3>Wysłano wiadomość</h3>
           <p>Na podany adres e-mail wysłaliśmy <strong>link potwierdzający</strong>. Kliknij w niego w ciągu <strong>2 godzin</strong>.</p>
           <p>Po kliknięciu linku rezerwacja otrzyma status <strong>oczekujące na akceptację przez restaurację</strong> — wtedy stoliki zostaną wstępnie zablokowane.</p>
           <p>Jeśli nie widzisz wiadomości e-mail, sprawdź folder SPAM. W razie problemów skontaktuj się z nami mailowo lub telefonicznie.</p>
+        </div>
+        <div class="booking-actions">
+          <button type="button" class="booking-btn" id="rb-close-final">Zamknij</button>
+        </div>`
+        : `
+        <div class="booking-success booking-success--warning">
+          <h3>Nie udało się wysłać e-maila</h3>
+          <p>Nie udało się wysłać wiadomości potwierdzającej do tej rezerwacji stolika.</p>
+          <p><strong>Skontaktuj się z nami natychmiast mailowo:</strong> <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></p>
+          <p>Zgłoszenie zostało zapisane w systemie jako oczekujące, ale wymaga ręcznej weryfikacji przez obsługę.</p>
         </div>
         <div class="booking-actions">
           <button type="button" class="booking-btn" id="rb-close-final">Zamknij</button>
@@ -586,7 +600,7 @@
           }
         }
         try {
-          await api("public-reservation-draft", {
+          const response = await api("public-reservation-draft", {
             method: "POST",
             body: {
               reservationDate: state.reservationDate,
@@ -607,6 +621,7 @@
               fingerprint: fingerprint(),
             },
           });
+          state.requiresEmailConfirmation = response?.requiresEmailConfirmation !== false;
           state.step = 5;
           renderBody();
         } catch (e) {

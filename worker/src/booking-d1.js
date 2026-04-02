@@ -1236,36 +1236,50 @@ async function seedDefaults(env) {
 
 async function expireReservations(env) {
   const now = nowMs();
-  await env.DB.prepare(
+  const hotelEmail = await env.DB.prepare(
     "UPDATE hotel_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='email_verification_pending' AND email_verification_expires_at IS NOT NULL AND email_verification_expires_at < ?"
   )
     .bind(now, now)
     .run();
-  await env.DB.prepare(
+  const hotelPending = await env.DB.prepare(
     "UPDATE hotel_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='pending' AND pending_expires_at IS NOT NULL AND pending_expires_at < ?"
   )
     .bind(now, now)
     .run();
-  await env.DB.prepare(
+  const restaurantEmail = await env.DB.prepare(
     "UPDATE restaurant_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='email_verification_pending' AND email_verification_expires_at IS NOT NULL AND email_verification_expires_at < ?"
   )
     .bind(now, now)
     .run();
-  await env.DB.prepare(
+  const restaurantPending = await env.DB.prepare(
     "UPDATE restaurant_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='pending' AND pending_expires_at IS NOT NULL AND pending_expires_at < ?"
   )
     .bind(now, now)
     .run();
-  await env.DB.prepare(
+  const venueEmail = await env.DB.prepare(
     "UPDATE venue_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='email_verification_pending' AND email_verification_expires_at IS NOT NULL AND email_verification_expires_at < ?"
   )
     .bind(now, now)
     .run();
-  await env.DB.prepare(
+  const venuePending = await env.DB.prepare(
     "UPDATE venue_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='pending' AND pending_expires_at IS NOT NULL AND pending_expires_at < ?"
   )
     .bind(now, now)
     .run();
+  return {
+    hotel: {
+      emailVerification: Number(hotelEmail.meta?.changes || 0),
+      pending: Number(hotelPending.meta?.changes || 0),
+    },
+    restaurant: {
+      emailVerification: Number(restaurantEmail.meta?.changes || 0),
+      pending: Number(restaurantPending.meta?.changes || 0),
+    },
+    hall: {
+      emailVerification: Number(venueEmail.meta?.changes || 0),
+      pending: Number(venuePending.meta?.changes || 0),
+    },
+  };
 }
 
 async function hotelRooms(env) {
@@ -4632,4 +4646,9 @@ export async function handleD1BookingApi({ service, op, request, env, isAdmin, v
       data: { error: error.message || "Wystąpił błąd modułu rezerwacji D1." },
     };
   }
+}
+
+export async function runBookingMaintenance(env) {
+  await ensureSchema(env);
+  return expireReservations(env);
 }

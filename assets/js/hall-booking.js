@@ -3,6 +3,7 @@
  */
 (function () {
   const config = window.SREDZKA_CONFIG || {};
+  const CONTACT_EMAIL = "kontakt@sredzka-korona.pl";
 
   function hallApiBase() {
     if (config.hallApiBase) {
@@ -66,6 +67,7 @@
     customer: {},
     availabilityOk: false,
     turnstileToken: "",
+    requiresEmailConfirmation: true,
   };
 
   function escapeHtml(s) {
@@ -158,6 +160,7 @@
     state.customer = {};
     state.availabilityOk = false;
     state.turnstileToken = "";
+    state.requiresEmailConfirmation = true;
   }
 
   function timeOptions() {
@@ -440,12 +443,21 @@
           <button type="button" class="hb-btn" id="hb-submit">Wyślij zgłoszenie</button>
         </div>`;
     } else {
-      inner = `
+      inner = state.requiresEmailConfirmation
+        ? `
         <div class="hb-success">
           <h3>Wysłano wiadomość</h3>
           <p>Na podany adres e-mail wysłaliśmy <strong>link potwierdzający</strong>. Kliknij w niego w ciągu <strong>2 godzin</strong>.</p>
           <p>Po kliknięciu linku zgłoszenie otrzyma status <strong>oczekujące</strong> — obsługa skontaktuje się telefonicznie w sprawie wyceny i dalszego potwierdzenia.</p>
           <p>Jeśli nie widzisz wiadomości e-mail, sprawdź folder SPAM. W razie problemów skontaktuj się z nami mailowo lub telefonicznie.</p>
+        </div>
+        <div class="hb-actions hb-actions--end"><button type="button" class="hb-btn" id="hb-close-final">Zamknij</button></div>`
+        : `
+        <div class="hb-success hb-success--warning">
+          <h3>Nie udało się wysłać e-maila</h3>
+          <p>Nie udało się wysłać wiadomości potwierdzającej do tego zgłoszenia sali.</p>
+          <p><strong>Skontaktuj się z nami natychmiast mailowo:</strong> <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></p>
+          <p>Zgłoszenie zostało zapisane jako oczekujące, ale dalsza obsługa wymaga ręcznej weryfikacji.</p>
         </div>
         <div class="hb-actions hb-actions--end"><button type="button" class="hb-btn" id="hb-close-final">Zamknij</button></div>`;
     }
@@ -683,7 +695,7 @@
             err.textContent = "Potwierdź weryfikację anty-spam.";
             return;
           }
-          await api("public-reservation-draft", {
+          const response = await api("public-reservation-draft", {
             method: "POST",
             body: {
               hpCompanyWebsite: state.customer.hpCompanyWebsite || "",
@@ -704,6 +716,7 @@
               termsAccepted: true,
             },
           });
+          state.requiresEmailConfirmation = response?.requiresEmailConfirmation !== false;
           state.step = 6;
           renderBody();
         } catch (e) {

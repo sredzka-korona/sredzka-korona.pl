@@ -4,6 +4,7 @@
  */
 (function () {
   const config = window.SREDZKA_CONFIG || {};
+  const CONTACT_EMAIL = "kontakt@sredzka-korona.pl";
 
   function hotelApiBase() {
     if (config.hotelApiBase) {
@@ -59,6 +60,7 @@
     roomsById: {},
     customer: {},
     turnstileToken: "",
+    requiresEmailConfirmation: true,
   };
 
   function escapeHtml(s) {
@@ -85,6 +87,7 @@
     state.cart = {};
     state.roomsById = {};
     state.customer = {};
+    state.requiresEmailConfirmation = true;
   }
 
   function cartRoomIds() {
@@ -286,12 +289,23 @@
           </div>
         </div>`;
     } else {
-      inner = `
+      inner = state.requiresEmailConfirmation
+        ? `
         <div class="booking-success">
           <h3>Wysłano wiadomość</h3>
           <p>Na podany adres e-mail wysłaliśmy link potwierdzający. Kliknij w niego w ciągu 2 godzin, w celu dokończenia rezerwacji.</p>
           <p>O przyjęciu rezerwacji zostaną Państwo poinformowani mailowo w ciągu 3 dni.</p>
           <p>Jeśli nie widzisz wiadomości e-mail, sprawdź folder SPAM. W razie problemów skontaktuj się z nami mailowo lub telefonicznie.</p>
+        </div>
+        <div class="booking-actions">
+          <button type="button" class="booking-btn" id="booking-close-final">Zamknij</button>
+        </div>`
+        : `
+        <div class="booking-success booking-success--warning">
+          <h3>Nie udało się wysłać e-maila</h3>
+          <p>Nie udało się wysłać wiadomości potwierdzającej do tej rezerwacji.</p>
+          <p><strong>Skontaktuj się z nami natychmiast mailowo:</strong> <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></p>
+          <p>Rezerwacja została zapisana w systemie jako oczekująca, ale bez potwierdzenia e-mailowego obsługa może wymagać ręcznej weryfikacji zgłoszenia.</p>
         </div>
         <div class="booking-actions">
           <button type="button" class="booking-btn" id="booking-close-final">Zamknij</button>
@@ -455,7 +469,7 @@
       return;
     }
     try {
-      await api("public-reservation-draft", {
+      const response = await api("public-reservation-draft", {
         method: "POST",
         body: {
           dateFrom: state.dateFrom,
@@ -472,6 +486,7 @@
           turnstileToken: state.turnstileToken,
         },
       });
+      state.requiresEmailConfirmation = response?.requiresEmailConfirmation !== false;
       state.step = 5;
       renderBody();
     } catch (e) {
