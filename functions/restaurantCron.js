@@ -5,7 +5,7 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { initializeApp, getApps } = require("firebase-admin/app");
 
-const { renderTemplate, getRestaurantMailTemplate, sendMail } = require("./lib/mail");
+const { renderTemplate, getRestaurantMailTemplate, sendMail, buildBrandedEmail } = require("./lib/mail");
 const { releaseLocksForReservation, loadTablesList } = require("./lib/restaurantLogic");
 
 if (!getApps().length) {
@@ -20,6 +20,10 @@ function restaurantName() {
 
 function adminNotifyEmail() {
   return process.env.ADMIN_NOTIFY_EMAIL || "";
+}
+
+function publicSiteUrl() {
+  return (process.env.PUBLIC_SITE_URL || "https://example.com").replace(/\/$/, "");
 }
 
 async function appendRestaurantAudit(dbConn, { action, reservationId, details }) {
@@ -73,8 +77,17 @@ async function buildVars(res, tableMap) {
 async function sendTemplated(dbConn, key, to, vars) {
   const t = await getRestaurantMailTemplate(dbConn, key);
   const subject = renderTemplate(t.subject, vars);
-  const html = renderTemplate(t.bodyHtml, vars);
-  await sendMail(key, { to, subject, html });
+  const htmlFragment = renderTemplate(t.bodyHtml, vars);
+  const email = buildBrandedEmail({
+    subject,
+    htmlFragment,
+    brandName: restaurantName(),
+    serviceLabel: "Restauracja",
+    siteUrl: publicSiteUrl(),
+    serviceUrl: `${publicSiteUrl()}/Restauracja/`,
+    preheader: `Rezerwacja stolika ${vars.reservationNumber || ""}`.trim(),
+  });
+  await sendMail(key, { to, subject, html: email.html });
 }
 
 exports.restaurantExpireCron = onSchedule(

@@ -26,6 +26,7 @@ const {
   getHallMailTemplate,
   sendMail,
   HALL_DEFAULT_TEMPLATES,
+  buildBrandedEmail,
 } = require("./lib/mail");
 const {
   json,
@@ -40,6 +41,8 @@ if (!getApps().length) {
 }
 
 const db = getFirestore();
+const FIXED_HALL_OPEN_TIME = "00:00";
+const FIXED_HALL_CLOSE_TIME = "00:00";
 
 function venueName() {
   return process.env.VENUE_NAME || process.env.HOTEL_NAME || "Średzka Korona";
@@ -103,8 +106,8 @@ async function ensureVenueSettings(db) {
   const s = await ref.get();
   if (!s.exists) {
     await ref.set({
-      hallOpenTime: "08:00",
-      hallCloseTime: "23:00",
+      hallOpenTime: FIXED_HALL_OPEN_TIME,
+      hallCloseTime: FIXED_HALL_CLOSE_TIME,
       nextHallHumanNumber: 3000,
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -147,8 +150,8 @@ async function ensureHallDefaults(db) {
 }
 
 function assertEventWithinHallHours(settings, reservationDate, startTime, durationHours) {
-  const openT = String(settings.hallOpenTime || "08:00").trim();
-  const closeT = String(settings.hallCloseTime || "23:00").trim();
+  const openT = FIXED_HALL_OPEN_TIME;
+  const closeT = FIXED_HALL_CLOSE_TIME;
   const start = dtFromDateAndTime(reservationDate, startTime);
   if (!start) return { ok: false, error: "Nieprawidłowa data lub godzina." };
   const end = start.plus({ hours: Number(durationHours) || 0 });
@@ -158,7 +161,10 @@ function assertEventWithinHallHours(settings, reservationDate, startTime, durati
   const [oh, om] = openT.split(":").map((x) => parseInt(x, 10));
   const [ch, cm] = closeT.split(":").map((x) => parseInt(x, 10));
   const openM = oh * 60 + (om || 0);
-  const closeM = ch * 60 + (cm || 0);
+  let closeM = ch * 60 + (cm || 0);
+  if (closeM <= openM) {
+    closeM += 24 * 60;
+  }
   const sm = start.hour * 60 + start.minute;
   const em = end.hour * 60 + end.minute;
   if (sm < openM || em > closeM) {
@@ -200,8 +206,19 @@ function buildHallMailVars(res, hall, extra = {}) {
 async function sendHallTemplated(db, key, to, vars) {
   const t = await getHallMailTemplate(db, key);
   const subject = renderTemplate(t.subject, vars);
-  const html = renderTemplate(t.bodyHtml, vars);
-  await sendMail(key, { to, subject, html });
+  const htmlFragment = renderTemplate(t.bodyHtml, vars);
+  const email = buildBrandedEmail({
+    subject,
+    htmlFragment,
+    brandName: venueName(),
+    serviceLabel: "Przyjęcia i sale",
+    siteUrl: publicSiteUrl(),
+    serviceUrl: `${publicSiteUrl()}/Przyjec/`,
+    preheader: `Zgłoszenie ${vars.reservationNumber || ""}`.trim(),
+    actionUrl: key === "hall_confirm_email" ? vars.confirmationLink || "" : "",
+    actionLabel: "Potwierdź zgłoszenie",
+  });
+  await sendMail(key, { to, subject, html: email.html });
 }
 
 function formatHallRow(x, hallMap = {}) {
@@ -577,8 +594,16 @@ const hallApi = onRequest(
         const resData = doc.data();
         const reservationId = doc.id;
 
+        if (resData.status === "pending" || resData.status === "confirmed") {
+          json(res, { ok: true, status: resData.status, reservationId, humanNumber: resData.humanNumber });
+          return;
+        }
         if (resData.status !== "email_verification_pending") {
-          json(res, { error: "Ta rezerwacja została już przetworzona." }, 400);
+          json(
+            res,
+            { error: resData.status === "expired" ? "Link wygasł (minęło 2 godziny). Złóż zgłoszenie ponownie." : "Ta rezerwacja została już przetworzona." },
+            400
+          );
           return;
         }
         const exp = resData.emailVerificationExpiresAt?.toMillis?.() || 0;
@@ -618,7 +643,6 @@ const hallApi = onRequest(
               status: "pending",
               blockStartMs: chk.startMs,
               blockEndMs: chk.blockEndMs,
-              confirmationTokenHash: FieldValue.delete(),
               emailVerificationExpiresAt: FieldValue.delete(),
               pendingExpiresAt: pendingUntil,
               updatedAt: FieldValue.serverTimestamp(),
@@ -626,6 +650,14 @@ const hallApi = onRequest(
           });
         } catch (e) {
           if (e.message === "STATUS_CHANGED") {
+            const latest = await db.collection("venueReservations").doc(reservationId).get();
+            if (latest.exists) {
+              const latestData = latest.data();
+              if (latestData && (latestData.status === "pending" || latestData.status === "confirmed")) {
+                json(res, { ok: true, status: latestData.status, reservationId, humanNumber: latestData.humanNumber });
+                return;
+              }
+            }
             json(res, { error: "Ta rezerwacja została już przetworzona." }, 400);
             return;
           }
@@ -702,7 +734,13 @@ const hallApi = onRequest(
         await ensureHallDefaults(db);
         const status = url.searchParams.get("status") || "all";
         let query = db.collection("venueReservations").orderBy("createdAt", "desc").limit(300);
-        if (status && status !== "all") {
+        if (status === "active") {
+          query = db
+            .collection("venueReservations")
+            .where("status", "in", ["pending", "confirmed"])
+            .orderBy("createdAt", "desc")
+            .limit(300);
+        } else if (status && status !== "all") {
           query = db
             .collection("venueReservations")
             .where("status", "==", status)
@@ -1092,23 +1130,21 @@ const hallApi = onRequest(
 
       if (req.method === "GET" && op === "admin-venue-settings") {
         await ensureVenueSettings(db);
-        const d = (await db.collection("venueSettings").doc("default").get()).data() || {};
         json(res, {
           settings: {
-            hallOpenTime: d.hallOpenTime || "08:00",
-            hallCloseTime: d.hallCloseTime || "23:00",
+            hallOpenTime: FIXED_HALL_OPEN_TIME,
+            hallCloseTime: FIXED_HALL_CLOSE_TIME,
           },
         });
         return;
       }
 
       if (req.method === "PUT" && op === "admin-venue-settings-save") {
-        const body = typeof req.body === "object" && req.body ? req.body : JSON.parse(req.body || "{}");
         await ensureVenueSettings(db);
         await db.collection("venueSettings").doc("default").set(
           {
-            hallOpenTime: String(body.hallOpenTime || "08:00").trim(),
-            hallCloseTime: String(body.hallCloseTime || "23:00").trim(),
+            hallOpenTime: FIXED_HALL_OPEN_TIME,
+            hallCloseTime: FIXED_HALL_CLOSE_TIME,
             updatedAt: FieldValue.serverTimestamp(),
             updatedBy: adminUser.email,
           },

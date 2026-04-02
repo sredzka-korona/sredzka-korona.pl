@@ -21,33 +21,179 @@ function renderTemplate(template, vars) {
   });
 }
 
+function decodeHtmlEntities(value) {
+  return String(value ?? "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+}
+
+function enhanceFragmentHtml(html) {
+  return String(html || "").replace(/<a\b([^>]*)>/gi, (match, attrs) => {
+    if (/\bstyle\s*=/i.test(attrs)) return `<a${attrs}>`;
+    return `<a${attrs} style="color:#7b5a24;font-weight:700;text-decoration:none;border-bottom:1px solid #c8aa78;">`;
+  });
+}
+
+function htmlToText(html) {
+  if (!html) return "";
+  return decodeHtmlEntities(
+    String(html)
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<head[\s\S]*?<\/head>/gi, "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n\n")
+      .replace(/<\/div>/gi, "\n")
+      .replace(/<\/tr>/gi, "\n")
+      .replace(/<\/h[1-6]>/gi, "\n\n")
+      .replace(/<li[^>]*>/gi, "- ")
+      .replace(/<\/li>/gi, "\n")
+      .replace(/<a\b[^>]*href=(['"])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi, (_, __, href, label) => {
+        const text = decodeHtmlEntities(String(label || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+        return text ? `${text} (${href})` : href;
+      })
+      .replace(/<[^>]+>/g, " ")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/[ \t]{2,}/g, " ")
+  )
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .trim();
+}
+
+function buildBrandedEmail({
+  subject,
+  htmlFragment,
+  brandName = "Średzka Korona",
+  serviceLabel = "",
+  siteUrl = "",
+  serviceUrl = "",
+  preheader = "",
+  actionUrl = "",
+  actionLabel = "",
+}) {
+  const safeBrandName = escapeHtml(brandName);
+  const safeSubject = escapeHtml(subject || brandName);
+  const safeServiceLabel = escapeHtml(serviceLabel);
+  const safePreheader = escapeHtml(preheader || subject || brandName);
+  const safeSiteUrl = String(siteUrl || "").replace(/\/$/, "");
+  const safeServiceUrl = String(serviceUrl || "").replace(/\/$/, "");
+  const logoUrl = safeSiteUrl ? `${safeSiteUrl}/ikony/logo-korona.png` : "";
+  const enhancedContent = enhanceFragmentHtml(htmlFragment);
+  const actionHref = actionUrl ? escapeHtml(actionUrl) : "";
+  const actionTitle = escapeHtml(actionLabel || "Zobacz szczegóły");
+  const footerHref = safeServiceUrl || safeSiteUrl;
+  const footerLabel = safeServiceLabel || "Strona główna";
+
+  const html = `<!doctype html>
+<html lang="pl">
+  <body style="margin:0;padding:0;background-color:#f6f1e8;color:#1f1712;font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${safePreheader}</div>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background:#f6f1e8;">
+      <tr>
+        <td align="center" style="padding:28px 12px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;max-width:680px;">
+            <tr>
+              <td align="center" style="padding:0 0 16px 0;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1;letter-spacing:0.28em;color:#7b5a24;font-weight:700;padding-right:10px;">ŚREDZKA</td>
+                    <td style="padding:0 2px;">${
+                      logoUrl
+                        ? `<img src="${escapeHtml(logoUrl)}" alt="Korona" width="42" height="42" style="display:block;width:42px;height:42px;border:0;outline:none;text-decoration:none;" />`
+                        : `<span style="display:inline-block;font-size:26px;line-height:1;color:#c8aa78;">&#9819;</span>`
+                    }</td>
+                    <td style="font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1;letter-spacing:0.28em;color:#7b5a24;font-weight:700;padding-left:10px;">KORONA</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:0 18px 18px 18px;font-size:12px;line-height:1.5;letter-spacing:0.18em;text-transform:uppercase;color:#8b7a67;">
+                ${safeServiceLabel || "Hotel • Restauracja • Przyjęcia"}
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#ffffff;border:1px solid #e8dcc8;border-radius:22px;padding:34px 32px;box-shadow:0 10px 30px rgba(52,33,14,0.08);">
+                <div style="font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.2;color:#1f1712;font-weight:700;margin:0 0 22px 0;">
+                  ${safeSubject}
+                </div>
+                ${
+                  actionHref
+                    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 26px 0;">
+                        <tr>
+                          <td style="border-radius:999px;background:#7b5a24;">
+                            <a href="${actionHref}" style="display:inline-block;padding:14px 24px;font-size:15px;line-height:1.2;font-weight:700;color:#ffffff;text-decoration:none;">${actionTitle}</a>
+                          </td>
+                        </tr>
+                      </table>`
+                    : ""
+                }
+                <div style="font-size:16px;line-height:1.75;color:#3e3125;">
+                  ${enhancedContent}
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 10px 0 10px;text-align:center;font-size:13px;line-height:1.7;color:#7c6a58;">
+                <div>Wiadomość transakcyjna dotycząca rezerwacji w obiekcie ${safeBrandName}.</div>
+                <div style="padding-top:6px;">
+                  ${
+                    footerHref
+                      ? `<a href="${escapeHtml(footerHref)}" style="color:#7b5a24;text-decoration:none;font-weight:700;">${footerLabel}</a>`
+                      : safeBrandName
+                  }
+                </div>
+                <div style="padding-top:6px;">Jeśli masz pytania, odpowiedz na tę wiadomość.</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  return {
+    html,
+    text: htmlToText(`${subject || ""}\n\n${html}`),
+  };
+}
+
 const DEFAULT_TEMPLATES = {
   confirm_email: {
     subject: "{{hotelName}} — potwierdź rezerwację ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
-<p>Dziękujemy za zainteresowanie pobytem w {{hotelName}}.</p>
-<p>Aby <strong>potwierdzić zgłoszenie</strong>, kliknij w link (ważny 2 godziny):</p>
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Dziękujemy za wysłanie zapytania rezerwacyjnego do {{hotelName}}.</p>
+<p>Aby przekazać zgłoszenie do dalszej obsługi, potwierdź adres e-mail klikając w link ważny przez 2 godziny:</p>
 <p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p>
-<p>Numer: {{reservationNumber}}<br/>
-Termin: {{dateFrom}} — {{dateTo}} ({{nights}} nocy)<br/>
-Łącznie: {{totalPrice}} PLN</p>
+<p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br/>
+Termin pobytu: {{dateFrom}} — {{dateTo}} ({{nights}} nocy)<br/>
+Szacunkowa wartość pobytu: {{totalPrice}} PLN</p>
 <p>{{roomsList}}</p>
-<p>Pozdrawiamy,<br/>{{hotelName}}</p>`,
+<p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>
+<p>Pozdrawiamy,<br/>Recepcja {{hotelName}}</p>`,
   },
   pending_client: {
     subject: "{{hotelName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
-<p>Twoja rezerwacja została <strong>potwierdzona e-mailem</strong> i ma status <strong>oczekujący na akceptację przez hotel</strong>.</p>
-<p>Numer: {{reservationNumber}}<br/>
-Termin: {{dateFrom}} — {{dateTo}} ({{nights}} nocy)<br/>
-Kwota: {{totalPrice}} PLN</p>
-<p>Hotel ma do <strong>3 dni kalendarzowych</strong> na potwierdzenie. Brak odpowiedzi w tym czasie może skutkować automatycznym anulowaniem zgodnie z regulaminem.</p>
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Adres e-mail został potwierdzony, a zgłoszenie <strong>{{reservationNumber}}</strong> trafiło do recepcji.</p>
+<p>Status rezerwacji: <strong>oczekuje na akceptację hotelu</strong>.</p>
+<p>Termin pobytu: {{dateFrom}} — {{dateTo}} ({{nights}} nocy)<br/>
+Szacunkowa kwota: {{totalPrice}} PLN</p>
 <p>{{roomsList}}</p>
-<p>{{hotelName}}</p>`,
+<p>Po decyzji recepcji wyślemy kolejną wiadomość. Do czasu ostatecznego potwierdzenia rezerwacja nie jest jeszcze gwarantowana.</p>
+<p>Pozdrawiamy,<br/>Recepcja {{hotelName}}</p>`,
   },
   pending_admin: {
     subject: "[{{hotelName}}] Nowa rezerwacja oczekująca {{reservationNumber}}",
-    bodyHtml: `<p>Nowa rezerwacja wymaga decyzji.</p>
+    bodyHtml: `<p>Nowa rezerwacja oczekuje na decyzję recepcji.</p>
 <p><strong>{{fullName}}</strong><br/>{{email}}<br/>{{phone}}</p>
 <p>Numer: {{reservationNumber}}<br/>
 Termin: {{dateFrom}} — {{dateTo}} ({{nights}} nocy)<br/>
@@ -57,28 +203,39 @@ Kwota: {{totalPrice}} PLN</p>
   },
   confirmed_client: {
     subject: "{{hotelName}} — rezerwacja potwierdzona ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
-<p>Twoja rezerwacja została <strong>potwierdzona przez hotel</strong>.</p>
-<p>Numer: {{reservationNumber}}<br/>
-Termin: {{dateFrom}} — {{dateTo}}<br/>
-Kwota: {{totalPrice}} PLN</p>
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Potwierdzamy rezerwację pobytu o numerze <strong>{{reservationNumber}}</strong>.</p>
+<p>Termin pobytu: {{dateFrom}} — {{dateTo}} ({{nights}} nocy)<br/>
+Szacunkowa kwota: {{totalPrice}} PLN</p>
 <p>{{roomsList}}</p>
-<p>{{hotelName}}</p>`,
+<p>Jeżeli chcesz doprecyzować godzinę przyjazdu lub inne szczegóły pobytu, odpowiedz na tę wiadomość albo skontaktuj się z recepcją.</p>
+<p>Pozdrawiamy,<br/>Recepcja {{hotelName}}</p>`,
   },
   cancelled_client: {
     subject: "{{hotelName}} — rezerwacja anulowana ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
-<p>Twoja rezerwacja <strong>{{reservationNumber}}</strong> została anulowana.</p>
-<p>Termin był: {{dateFrom}} — {{dateTo}}</p>
-<p>W razie pytań skontaktuj się z recepcją.</p>
-<p>{{hotelName}}</p>`,
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Informujemy, że rezerwacja <strong>{{reservationNumber}}</strong> została anulowana.</p>
+<p>Pierwotny termin pobytu: {{dateFrom}} — {{dateTo}}</p>
+<p>Jeżeli chcesz ustalić nowy termin lub wyjaśnić anulowanie, skontaktuj się z recepcją.</p>
+<p>Pozdrawiamy,<br/>Recepcja {{hotelName}}</p>`,
+  },
+  changed_client: {
+    subject: "{{hotelName}} — zmiana w rezerwacji {{reservationNumber}}",
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Wprowadziliśmy zmiany w rezerwacji <strong>{{reservationNumber}}</strong>.</p>
+<p>Aktualny termin pobytu: {{dateFrom}} — {{dateTo}} ({{nights}} nocy)<br/>
+Szacunkowa kwota: {{totalPrice}} PLN</p>
+<p>{{roomsList}}</p>
+<p>Uwagi do rezerwacji: {{customerNote}}</p>
+<p>W razie pytań odpowiedz na tę wiadomość lub skontaktuj się z recepcją.</p>
+<p>Pozdrawiamy,<br/>Recepcja {{hotelName}}</p>`,
   },
   expired_pending_client: {
     subject: "{{hotelName}} — rezerwacja wygasła ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
-<p>Rezerwacja <strong>{{reservationNumber}}</strong> wygasła, ponieważ hotel nie potwierdził jej w wymaganym terminie.</p>
-<p>Terminy zostały zwolnione. Możesz złożyć nowe zgłoszenie na stronie obiektu.</p>
-<p>{{hotelName}}</p>`,
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Rezerwacja <strong>{{reservationNumber}}</strong> wygasła, ponieważ nie została potwierdzona w wymaganym czasie.</p>
+<p>Terminy wróciły do puli dostępności. Jeśli nadal planujesz pobyt, możesz wysłać nowe zgłoszenie.</p>
+<p>Pozdrawiamy,<br/>Recepcja {{hotelName}}</p>`,
   },
   expired_pending_admin: {
     subject: "[{{hotelName}}] Wygasła rezerwacja oczekująca {{reservationNumber}}",
@@ -88,9 +245,10 @@ Kwota: {{totalPrice}} PLN</p>
   },
   expired_email_client: {
     subject: "{{hotelName}} — zgłoszenie wygasło (bez potwierdzenia e-mail)",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
-<p>Nie otrzymaliśmy potwierdzenia e-mailem w ciągu 2 godzin. Zgłoszenie zostało anulowane — terminy nie zostały zablokowane.</p>
-<p>{{hotelName}}</p>`,
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Nie otrzymaliśmy potwierdzenia adresu e-mail w ciągu 2 godzin, dlatego zgłoszenie zostało anulowane.</p>
+<p>Terminy nie zostały zablokowane i nadal mogą być dostępne dla innych gości.</p>
+<p>Pozdrawiamy,<br/>Recepcja {{hotelName}}</p>`,
   },
   cancelled_admin: {
     subject: "[{{hotelName}}] Anulowano rezerwację {{reservationNumber}}",
@@ -102,29 +260,30 @@ Kwota: {{totalPrice}} PLN</p>
 const RESTAURANT_DEFAULT_TEMPLATES = {
   restaurant_confirm_email: {
     subject: "{{restaurantName}} — potwierdź rezerwację stolika ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
-<p>Dziękujemy za zainteresowanie rezerwacją stolika w {{restaurantName}}.</p>
-<p>Aby <strong>potwierdzić zgłoszenie</strong>, kliknij w link (ważny 2 godziny):</p>
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Dziękujemy za wysłanie rezerwacji stolika do {{restaurantName}}.</p>
+<p>Aby przekazać zgłoszenie do obsługi, potwierdź adres e-mail klikając w link ważny przez 2 godziny:</p>
 <p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p>
-<p>Numer: {{reservationNumber}}<br/>
+<p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br/>
 {{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br/>
-Stoliki: {{tablesCount}} · Goście: {{guestsCount}}</p>
+Liczba gości: {{guestsCount}}</p>
 <p>{{tablesList}}</p>
+<p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>
 <p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
   },
   restaurant_pending_client: {
     subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
-<p>Twoja rezerwacja została <strong>potwierdzona e-mailem</strong> i ma status <strong>oczekujący na akceptację przez restaurację</strong>.</p>
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Adres e-mail został potwierdzony, a zgłoszenie <strong>{{reservationNumber}}</strong> oczekuje teraz na akceptację restauracji.</p>
 <p>Numer: {{reservationNumber}}<br/>
 {{date}} · {{timeFrom}}–{{timeTo}}</p>
 <p>Stoliki: {{tablesList}} · Goście: {{guestsCount}}</p>
-<p>Restauracja ma do <strong>3 dni</strong> na potwierdzenie. Brak odpowiedzi może skutkować automatycznym anulowaniem zgodnie z regulaminem.</p>
-<p>{{restaurantName}}</p>`,
+<p>Po zatwierdzeniu otrzymasz osobne potwierdzenie. Do tego czasu rezerwacja nie jest jeszcze gwarantowana.</p>
+<p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
   },
   restaurant_pending_admin: {
     subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
-    bodyHtml: `<p>Nowa rezerwacja wymaga decyzji.</p>
+    bodyHtml: `<p>Nowa rezerwacja stolika oczekuje na decyzję obsługi.</p>
 <p><strong>{{fullName}}</strong><br/>{{email}}<br/>{{phone}}</p>
 <p>Numer: {{reservationNumber}}<br/>
 {{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p>
@@ -133,26 +292,39 @@ Stoliki: {{tablesCount}} · Goście: {{guestsCount}}</p>
   },
   restaurant_confirmed_client: {
     subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
-<p>Twoja rezerwacja została <strong>potwierdzona przez restaurację</strong>.</p>
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Potwierdzamy rezerwację stolika o numerze <strong>{{reservationNumber}}</strong>.</p>
 <p>Numer: {{reservationNumber}}<br/>
 {{date}} · {{timeFrom}}–{{timeTo}}</p>
 <p>{{tablesList}}</p>
-<p>{{restaurantName}}</p>`,
+<p>W przypadku spóźnienia lub potrzeby zmiany godziny prosimy o wcześniejszy kontakt z restauracją.</p>
+<p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
   },
   restaurant_cancelled_client: {
     subject: "{{restaurantName}} — rezerwacja anulowana ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
-<p>Rezerwacja <strong>{{reservationNumber}}</strong> została anulowana.</p>
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Rezerwacja stolika <strong>{{reservationNumber}}</strong> została anulowana.</p>
 <p>Termin: {{date}} · {{timeFrom}}–{{timeTo}}</p>
-<p>{{restaurantName}}</p>`,
+<p>Jeżeli chcesz zarezerwować inny termin, zapraszamy do ponownego kontaktu.</p>
+<p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
+  },
+  restaurant_changed_client: {
+    subject: "{{restaurantName}} — zmiana rezerwacji stolika ({{reservationNumber}})",
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Zaktualizowaliśmy rezerwację <strong>{{reservationNumber}}</strong>.</p>
+<p>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br/>
+Goście: {{guestsCount}}</p>
+<p>{{tablesList}}</p>
+<p>Uwagi do rezerwacji: {{customerNote}}</p>
+<p>W razie pytań odpowiedz na tę wiadomość lub skontaktuj się z restauracją.</p>
+<p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
   },
   restaurant_expired_pending_client: {
     subject: "{{restaurantName}} — rezerwacja wygasła ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
-<p>Rezerwacja <strong>{{reservationNumber}}</strong> wygasła — restauracja nie potwierdziła jej w wymaganym terminie.</p>
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Rezerwacja <strong>{{reservationNumber}}</strong> wygasła, ponieważ nie została potwierdzona w wymaganym czasie.</p>
 <p>Stoliki zostały zwolnione. Możesz złożyć nowe zgłoszenie na stronie.</p>
-<p>{{restaurantName}}</p>`,
+<p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
   },
   restaurant_expired_pending_admin: {
     subject: "[{{restaurantName}}] Wygasła rezerwacja oczekująca {{reservationNumber}}",
@@ -162,17 +334,72 @@ Stoliki: {{tablesCount}} · Goście: {{guestsCount}}</p>
   },
   restaurant_expired_email_client: {
     subject: "{{restaurantName}} — zgłoszenie wygasło (bez potwierdzenia e-mail)",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
-<p>Nie otrzymaliśmy potwierdzenia e-mailem w ciągu 2 godzin. Zgłoszenie zostało anulowane — stoliki nie zostały zablokowane.</p>
-<p>{{restaurantName}}</p>`,
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Nie otrzymaliśmy potwierdzenia adresu e-mail w ciągu 2 godzin, dlatego zgłoszenie zostało anulowane.</p>
+<p>Stoliki nie zostały zablokowane.</p>
+<p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
+  },
+  rest_confirm_email: {
+    subject: "{{restaurantName}} — potwierdź rezerwację stolika ({{reservationNumber}})",
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Dziękujemy za wysłanie rezerwacji stolika do {{restaurantName}}.</p>
+<p>Aby przekazać zgłoszenie do obsługi, potwierdź adres e-mail klikając w link ważny przez 2 godziny:</p>
+<p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p>
+<p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br/>
+{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br/>
+Liczba gości: {{guestsCount}}</p>
+<p>{{tablesList}}</p>
+<p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
+  },
+  rest_pending_client: {
+    subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Adres e-mail został potwierdzony, a zgłoszenie <strong>{{reservationNumber}}</strong> oczekuje teraz na akceptację restauracji.</p>
+<p>{{date}} · {{timeFrom}}–{{timeTo}}<br/>
+Goście: {{guestsCount}}</p>
+<p>{{tablesList}}</p>
+<p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
+  },
+  rest_pending_admin: {
+    subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
+    bodyHtml: `<p>Nowa rezerwacja stolika oczekuje na decyzję obsługi.</p>
+<p><strong>{{fullName}}</strong><br/>{{email}}<br/>{{phone}}</p>
+<p>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p>
+<p>{{tablesList}} · Goście: {{guestsCount}} · Łączenie: {{joinTables}}</p>
+<p>Uwagi klienta: {{customerNote}}</p>`,
+  },
+  rest_confirmed_client: {
+    subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Potwierdzamy rezerwację stolika o numerze <strong>{{reservationNumber}}</strong>.</p>
+<p>{{date}} · {{timeFrom}}–{{timeTo}}</p>
+<p>{{tablesList}}</p>
+<p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
+  },
+  rest_cancelled_client: {
+    subject: "{{restaurantName}} — rezerwacja anulowana ({{reservationNumber}})",
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Rezerwacja stolika <strong>{{reservationNumber}}</strong> została anulowana.</p>
+<p>Termin: {{date}} · {{timeFrom}}–{{timeTo}}</p>
+<p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
+  },
+  rest_changed_client: {
+    subject: "{{restaurantName}} — zmiana rezerwacji stolika ({{reservationNumber}})",
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Zaktualizowaliśmy rezerwację <strong>{{reservationNumber}}</strong>.</p>
+<p>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br/>
+Goście: {{guestsCount}}</p>
+<p>{{tablesList}}</p>
+<p>Uwagi do rezerwacji: {{customerNote}}</p>
+<p>Pozdrawiamy,<br/>{{restaurantName}}</p>`,
   },
 };
 
 const HALL_DEFAULT_TEMPLATES = {
   hall_confirm_email: {
     subject: "{{venueName}} — potwierdź zgłoszenie rezerwacji sali ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
-<p>Dziękujemy za zainteresowanie rezerwacją sali w {{venueName}}.</p>
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Dziękujemy za przesłanie zgłoszenia rezerwacji sali w {{venueName}}.</p>
 <p>To jest <strong>zgłoszenie rezerwacyjne</strong> — wycena zostanie ustalona indywidualnie po kontakcie telefonicznym z obiektu.</p>
 <p>Aby potwierdzić zgłoszenie e-mailem (ważne 2 godziny), kliknij:</p>
 <p><a href="{{confirmationLink}}">Potwierdź zgłoszenie</a></p>
@@ -181,21 +408,21 @@ Sala: {{hallName}}<br/>
 {{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br/>
 Goście: {{guestsCount}} · {{eventType}}<br/>
 Wyłączność: {{exclusive}}</p>
-<p>{{venueName}}</p>`,
+<p>Pozdrawiamy,<br/>{{venueName}}</p>`,
   },
   hall_pending_client: {
     subject: "{{venueName}} — zgłoszenie oczekuje na decyzję obiektu ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>Zgłoszenie zostało <strong>potwierdzone linkiem e-mail</strong>. Status: <strong>oczekujące na akceptację przez obiekt</strong>.</p>
 <p><strong>Wycena zostanie podana telefonicznie</strong> — obsługa skontaktuje się z Tobą w sprawie kosztów i dalszego potwierdzenia.</p>
 <p>Obiekt ma <strong>7 dni</strong> na decyzję (możliwe jest przedłużenie terminu przez obsługę).</p>
 <p>Numer: {{reservationNumber}} · {{hallName}}<br/>
 {{date}} · {{timeFrom}}–{{timeTo}}</p>
-<p>{{venueName}}</p>`,
+<p>Pozdrawiamy,<br/>{{venueName}}</p>`,
   },
   hall_pending_admin: {
     subject: "[{{venueName}}] Nowe zgłoszenie sali {{reservationNumber}}",
-    bodyHtml: `<p>Nowe zgłoszenie rezerwacji sali wymaga decyzji.</p>
+    bodyHtml: `<p>Nowe zgłoszenie rezerwacji sali wymaga decyzji obsługi.</p>
 <p><strong>{{fullName}}</strong><br/>{{email}}<br/>{{phone}}</p>
 <p>Numer: {{reservationNumber}}<br/>
 Sala: {{hallName}} · {{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br/>
@@ -205,25 +432,38 @@ Goście: {{guestsCount}} · Wyłączność: {{exclusive}} · 100+: {{fullBlockLa
   },
   hall_confirmed_client: {
     subject: "{{venueName}} — rezerwacja sali potwierdzona ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>Rezerwacja sali została <strong>potwierdzona przez obiekt</strong> ({{hallName}}).</p>
 <p>Termin: {{date}} · {{timeFrom}}–{{timeTo}}</p>
 <p>Szczegóły i wycena — zgodnie z ustaleniami telefonicznymi.</p>
-<p>{{venueName}}</p>`,
+<p>Pozdrawiamy,<br/>{{venueName}}</p>`,
   },
   hall_cancelled_client: {
     subject: "{{venueName}} — rezerwacja sali anulowana ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>Rezerwacja <strong>{{reservationNumber}}</strong> została anulowana.</p>
 <p>Termin: {{date}} · {{hallName}}</p>
-<p>{{venueName}}</p>`,
+<p>Jeżeli chcesz ustalić inny termin, skontaktuj się z obiektem.</p>
+<p>Pozdrawiamy,<br/>{{venueName}}</p>`,
+  },
+  hall_changed_client: {
+    subject: "{{venueName}} — zmiana rezerwacji sali ({{reservationNumber}})",
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>Wprowadziliśmy zmiany w zgłoszeniu <strong>{{reservationNumber}}</strong>.</p>
+<p>Sala: {{hallName}}<br/>
+Termin: {{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br/>
+Liczba gości: {{guestsCount}}<br/>
+Rodzaj wydarzenia: {{eventType}}</p>
+<p>Uwagi do rezerwacji: {{customerNote}}</p>
+<p>W razie pytań odpowiedz na tę wiadomość lub skontaktuj się z obiektem.</p>
+<p>Pozdrawiamy,<br/>{{venueName}}</p>`,
   },
   hall_expired_pending_client: {
     subject: "{{venueName}} — zgłoszenie sali wygasło ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>Zgłoszenie <strong>{{reservationNumber}}</strong> wygasło — obiekt nie potwierdził rezerwacji w wymaganym terminie.</p>
 <p>Możesz złożyć nowe zgłoszenie na stronie.</p>
-<p>{{venueName}}</p>`,
+<p>Pozdrawiamy,<br/>{{venueName}}</p>`,
   },
   hall_expired_pending_admin: {
     subject: "[{{venueName}}] Wygasła rezerwacja sali {{reservationNumber}}",
@@ -233,15 +473,15 @@ Goście: {{guestsCount}} · Wyłączność: {{exclusive}} · 100+: {{fullBlockLa
   },
   hall_expired_email_client: {
     subject: "{{venueName}} — zgłoszenie wygasło (bez potwierdzenia e-mail)",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>Nie otrzymaliśmy potwierdzenia e-mailem w ciągu 2 godzin. Zgłoszenie zostało anulowane — termin nie został zablokowany.</p>
-<p>{{venueName}}</p>`,
+<p>Pozdrawiamy,<br/>{{venueName}}</p>`,
   },
   hall_extended_pending_client: {
     subject: "{{venueName}} — przedłużono termin oczekiwania ({{reservationNumber}})",
-    bodyHtml: `<p>Witaj {{fullName}},</p>
+    bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>Termin oczekiwania na decyzję dotyczącą zgłoszenia <strong>{{reservationNumber}}</strong> został przedłużony do: <strong>{{expiresAt}}</strong>.</p>
-<p>{{venueName}}</p>`,
+<p>Pozdrawiamy,<br/>{{venueName}}</p>`,
   },
 };
 
@@ -311,7 +551,12 @@ async function sendMail(envLabel, { to, subject, html, replyTo }) {
     to,
     subject,
     html,
+    text: htmlToText(html),
     replyTo: replyTo || undefined,
+    headers: {
+      "Auto-Submitted": "auto-generated",
+      "X-Auto-Response-Suppress": "All",
+    },
   });
   return { ok: true };
 }
@@ -319,6 +564,8 @@ async function sendMail(envLabel, { to, subject, html, replyTo }) {
 module.exports = {
   escapeHtml,
   renderTemplate,
+  htmlToText,
+  buildBrandedEmail,
   DEFAULT_TEMPLATES,
   RESTAURANT_DEFAULT_TEMPLATES,
   HALL_DEFAULT_TEMPLATES,

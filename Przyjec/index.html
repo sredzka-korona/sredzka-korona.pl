@@ -2315,6 +2315,10 @@
           gap: 0.75rem;
         }
 
+        .gallery-choice-grid {
+          grid-template-columns: 1fr;
+        }
+
         @media (min-width: 600px) {
           .hall-tiles-grid {
             grid-template-columns: repeat(2, 1fr);
@@ -2457,6 +2461,66 @@
         gap: 1.5rem;
       }
 
+      .gallery-choice-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .gallery-choice-grid .hall-tile {
+        min-height: 160px;
+        height: auto;
+        gap: 0.6rem;
+        padding: 1.4rem 1.1rem;
+      }
+
+      .gallery-choice-copy {
+        font-size: 0.92rem;
+        color: var(--muted);
+        line-height: 1.5;
+        text-transform: none;
+        letter-spacing: 0;
+      }
+
+      .gallery-album-card {
+        border: 0;
+        padding: 0;
+        background: rgba(250, 248, 245, 0.82);
+        border-radius: 20px;
+        overflow: hidden;
+        cursor: pointer;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+        text-align: left;
+      }
+
+      .gallery-album-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.14);
+      }
+
+      .gallery-album-cover {
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        object-fit: cover;
+        display: block;
+      }
+
+      .gallery-album-meta {
+        display: grid;
+        gap: 0.35rem;
+        padding: 1rem 1.1rem 1.15rem;
+      }
+
+      .gallery-album-meta strong {
+        font-family: "Cormorant Garamond", serif;
+        font-size: clamp(1.35rem, 2vw, 1.6rem);
+        color: var(--text);
+      }
+
+      .gallery-album-meta span {
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
       .gallery-item {
         aspect-ratio: 4 / 3;
         border-radius: 16px;
@@ -2529,11 +2593,29 @@
           "1": "Sala Duża",
           "2": "Sala Mała",
         };
+        const GALLERY_CHOICES = [
+          {
+            key: "2",
+            label: "Mała Sala",
+            description: "Kameralne przyjecia, komunie i rodzinne uroczystosci.",
+          },
+          {
+            key: "1",
+            label: "Duża Sala",
+            description: "Wesela, bale i wieksze wydarzenia z oprawa.",
+          },
+          {
+            key: "events",
+            label: "Imprezy",
+            description: "Albumy z realizacji, wydarzen i dekoracji.",
+          },
+        ];
 
         let hallGalleries = {
           "1": [],
           "2": [],
         };
+        let eventAlbums = [];
 
         let ofertaModalBodyHtml =
           (window.SREDZKA_DEFAULT_CONTENT &&
@@ -2593,6 +2675,9 @@
               occasionMenu = Array.isArray(window.SREDZKA_DEFAULT_CONTENT?.events?.menu)
                 ? window.SREDZKA_DEFAULT_CONTENT.events.menu
                 : [];
+              eventAlbums = Array.isArray(window.SREDZKA_DEFAULT_CONTENT?.gallery?.albums)
+                ? window.SREDZKA_DEFAULT_CONTENT.gallery.albums
+                : [];
               return;
             }
             const response = await fetch(fallbackApiBase + "/api/public/bootstrap");
@@ -2609,6 +2694,9 @@
             if (Array.isArray(payload.content?.events?.menu)) {
               occasionMenu = payload.content.events.menu;
             }
+            if (Array.isArray(payload.galleryAlbums)) {
+              eventAlbums = payload.galleryAlbums;
+            }
           } catch (error) {
             console.warn("Nie udało się załadować galerii sal:", error);
           }
@@ -2620,89 +2708,198 @@
           return div.innerHTML;
         }
 
+        function renderGalleryImages(images, fallbackAlt) {
+          const safeImages = Array.isArray(images) ? images : [];
+          if (!safeImages.length) {
+            return `<p>Brak zdjec w tej sekcji.</p>`;
+          }
+          return `
+            <div class="gallery-grid">
+              ${safeImages
+                .map(
+                  (img) => `
+                    <div class="gallery-item">
+                      <img src="${escapeHtml(img.url || img)}" alt="${escapeHtml(img.alt || fallbackAlt)}" loading="lazy" />
+                    </div>
+                  `
+                )
+                .join("")}
+            </div>
+          `;
+        }
+
+        function renderGalleryHubModal() {
+          return `
+            <div class="modal-body">
+              <div class="modal-header">
+                <h2>Galeria</h2>
+                <button class="modal-close" type="button" data-close-gallery aria-label="Zamknij galerię">×</button>
+              </div>
+              <div class="modal-content">
+                <p>Wybierz, ktora czesc galerii chcesz zobaczyc.</p>
+                <div class="hall-tiles-grid gallery-choice-grid">
+                  ${GALLERY_CHOICES
+                    .map(
+                      (choice) => `
+                        <button class="hall-tile" type="button" data-gallery-choice="${escapeHtml(choice.key)}">
+                          <strong class="hall-tile-label">${escapeHtml(choice.label)}</strong>
+                          <span class="gallery-choice-copy">${escapeHtml(choice.description)}</span>
+                        </button>
+                      `
+                    )
+                    .join("")}
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
         function renderHallGallery(hallNumber, images) {
           return `
             <div class="modal-body">
               <div class="modal-header">
+                <div class="modal-header-actions">
+                  <button class="back-button" type="button" data-gallery-home>Wroc</button>
+                </div>
                 <h2>${escapeHtml(HALL_LABELS[hallNumber] || "Galeria Sal")}</h2>
-                <button class="modal-close" id="close-gallery" aria-label="Zamknij galerię">×</button>
+                <button class="modal-close" type="button" data-close-gallery aria-label="Zamknij galerię">×</button>
               </div>
-              <div class="gallery-grid">
-                ${(images || []).map(img => 
-                  `<div class="gallery-item">
-                    <img src="${escapeHtml(img.url || img)}" alt="${escapeHtml(img.alt || HALL_LABELS[hallNumber] || "Sala")}" loading="lazy" />
-                  </div>`
-                ).join('')}
+              <div class="modal-content">
+                ${renderGalleryImages(images, HALL_LABELS[hallNumber] || "Sala")}
               </div>
             </div>
           `;
         }
 
-        function renderHallsGalleryModal() {
-          const allImages = Object.keys(HALL_LABELS).reduce((acc, hallNum) => {
-            const images = hallGalleries[hallNum] || [];
-            if (images.length > 0) {
-              acc[hallNum] = images;
-            }
-            return acc;
-          }, {});
+        function renderEventAlbumsModal() {
+          const albums = Array.isArray(eventAlbums) ? eventAlbums : [];
+          return `
+            <div class="modal-body">
+              <div class="modal-header">
+                <div class="modal-header-actions">
+                  <button class="back-button" type="button" data-gallery-home>Wroc</button>
+                </div>
+                <h2>Imprezy</h2>
+                <button class="modal-close" type="button" data-close-gallery aria-label="Zamknij galerię">×</button>
+              </div>
+              <div class="modal-content">
+                ${
+                  albums.length
+                    ? `
+                      <div class="gallery-grid">
+                        ${albums
+                          .map(
+                            (album) => `
+                              <button class="gallery-album-card" type="button" data-open-event-album="${escapeHtml(album.id)}">
+                                <img class="gallery-album-cover" src="${escapeHtml(album.coverUrl || album.images?.[0]?.url || "")}" alt="${escapeHtml(album.title || "Album wydarzen")}" loading="lazy" />
+                                <span class="gallery-album-meta">
+                                  <strong>${escapeHtml(album.title || "Bez tytulu")}</strong>
+                                  <span>${escapeHtml(String(album.images?.length || 0))} zdjec</span>
+                                </span>
+                              </button>
+                            `
+                          )
+                          .join("")}
+                      </div>
+                    `
+                    : "<p>Brak albumow w sekcji Imprezy.</p>"
+                }
+              </div>
+            </div>
+          `;
+        }
 
-          if (Object.keys(allImages).length === 0) {
+        function renderEventAlbumModal(albumId) {
+          const album = (Array.isArray(eventAlbums) ? eventAlbums : []).find((entry) => String(entry.id) === String(albumId));
+          if (!album) {
             return `
               <div class="modal-body">
                 <div class="modal-header">
-                  <h2>Galeria Sal</h2>
-                  <button class="modal-close" id="close-gallery" aria-label="Zamknij galerię">×</button>
+                  <div class="modal-header-actions">
+                    <button class="back-button" type="button" data-gallery-events>Wroc</button>
+                  </div>
+                  <h2>Imprezy</h2>
+                  <button class="modal-close" type="button" data-close-gallery aria-label="Zamknij galerię">×</button>
                 </div>
                 <div class="modal-content">
-                  <p>Brak zdjęć w galerii sal.</p>
+                  <p>Nie znaleziono wybranego albumu.</p>
                 </div>
               </div>
             `;
           }
-
           return `
             <div class="modal-body">
               <div class="modal-header">
-                <h2>Galeria Sal</h2>
-                <button class="modal-close" id="close-gallery" aria-label="Zamknij galerię">×</button>
+                <div class="modal-header-actions">
+                  <button class="back-button" type="button" data-gallery-events>Wroc</button>
+                </div>
+                <h2>${escapeHtml(album.title || "Album wydarzen")}</h2>
+                <button class="modal-close" type="button" data-close-gallery aria-label="Zamknij galerię">×</button>
               </div>
               <div class="modal-content">
-                ${Object.keys(HALL_LABELS).map(hallNumber => {
-                  const images = hallGalleries[hallNumber] || [];
-                  if (images.length === 0) return '';
-                  return `
-                    <div class="gallery-section">
-                      <h3 class="gallery-section-title">${escapeHtml(HALL_LABELS[hallNumber] || `Sala ${hallNumber}`)}</h3>
-                      <div class="gallery-grid">
-                        ${images.map(img => 
-                          `<div class="gallery-item">
-                            <img src="${escapeHtml(img.url || img)}" alt="${escapeHtml(img.alt || HALL_LABELS[hallNumber] || "Sala")}" loading="lazy" />
-                          </div>`
-                        ).join('')}
-                      </div>
-                    </div>
-                  `;
-                }).filter(section => section !== '').join('')}
+                ${renderGalleryImages(album.images, album.title || "Album wydarzen")}
               </div>
             </div>
           `;
         }
 
-        function openHallsGallery() {
+        function mountGalleryModal(content, bind) {
           modal.classList.remove("modal--occasion-menu");
-          modal.innerHTML = renderHallsGalleryModal();
+          modal.innerHTML = content;
           modal.classList.add("open");
-          const closeBtn = modal.querySelector("#close-gallery");
-          if (closeBtn) {
-            closeBtn.addEventListener("click", closeGallery);
-          }
-          modal.addEventListener("click", (e) => {
+          modal.onclick = (e) => {
             if (e.target === modal) closeGallery();
+          };
+          modal.querySelectorAll("[data-close-gallery]").forEach((button) => {
+            button.addEventListener("click", closeGallery);
+          });
+          if (typeof bind === "function") {
+            bind();
+          }
+        }
+
+        function openGalleryHome() {
+          mountGalleryModal(renderGalleryHubModal(), () => {
+            modal.querySelectorAll("[data-gallery-choice]").forEach((button) => {
+              button.addEventListener("click", () => {
+                const choice = String(button.getAttribute("data-gallery-choice") || "");
+                if (choice === "events") {
+                  openEventAlbums();
+                  return;
+                }
+                openSingleHallGallery(choice);
+              });
+            });
           });
         }
 
+        function openSingleHallGallery(hallNumber) {
+          mountGalleryModal(renderHallGallery(hallNumber, hallGalleries[hallNumber] || []), () => {
+            modal.querySelector("[data-gallery-home]")?.addEventListener("click", openGalleryHome);
+          });
+        }
+
+        function openEventAlbums() {
+          mountGalleryModal(renderEventAlbumsModal(), () => {
+            modal.querySelector("[data-gallery-home]")?.addEventListener("click", openGalleryHome);
+            modal.querySelectorAll("[data-open-event-album]").forEach((button) => {
+              button.addEventListener("click", () => openEventAlbum(button.getAttribute("data-open-event-album")));
+            });
+          });
+        }
+
+        function openEventAlbum(albumId) {
+          mountGalleryModal(renderEventAlbumModal(albumId), () => {
+            modal.querySelector("[data-gallery-events]")?.addEventListener("click", openEventAlbums);
+          });
+        }
+
+        function openHallsGallery() {
+          openGalleryHome();
+        }
+
         function closeGallery() {
+          modal.onclick = null;
           modal.classList.remove("open");
           modal.classList.remove("modal--occasion-menu");
           modal.innerHTML = "";
@@ -3007,6 +3204,7 @@
         }
 
         function closeModal() {
+          modal.onclick = null;
           modal.classList.remove("open");
           modal.classList.remove("modal--occasion-menu");
           modal.innerHTML = "";

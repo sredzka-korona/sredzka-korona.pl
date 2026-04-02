@@ -118,9 +118,8 @@
 
   function timeOptions() {
     const out = [];
-    for (let h = 8; h <= 22; h++) {
+    for (let h = 0; h <= 23; h++) {
       for (let m = 0; m < 60; m += 30) {
-        if (h === 22 && m > 0) break;
         out.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
       }
     }
@@ -402,6 +401,7 @@
           <h3>Wysłano wiadomość</h3>
           <p>Na podany adres e-mail wysłaliśmy <strong>link potwierdzający</strong>. Kliknij w niego w ciągu <strong>2 godzin</strong>.</p>
           <p>Po kliknięciu linku zgłoszenie otrzyma status <strong>oczekujące</strong> — obsługa skontaktuje się telefonicznie w sprawie wyceny i dalszego potwierdzenia.</p>
+          <p>Jeśli nie widzisz wiadomości e-mail, sprawdź folder SPAM. W razie problemów skontaktuj się z nami mailowo lub telefonicznie.</p>
         </div>
         <div class="hb-actions hb-actions--end"><button type="button" class="hb-btn" id="hb-close-final">Zamknij</button></div>`;
     }

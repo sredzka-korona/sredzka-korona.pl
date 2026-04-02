@@ -128,14 +128,22 @@
     templatesData = d.templates || {};
   }
 
+  function currentRestaurantTableCount() {
+    return Math.max(0, Array.isArray(tablesData) ? tablesData.length : 0);
+  }
+
+  function currentRestaurantTableLimit() {
+    return Math.max(0, currentRestaurantTableCount() || Number(settingsData.tableCount || 0) || 0);
+  }
+
   function renderSettings() {
     const s = settingsData;
     return `
       <div class="hotel-subpanel">
         <h3>Ustawienia restauracji</h3>
+        <p class="helper">Aktualnie aktywnych stolików: <strong>${currentRestaurantTableCount()}</strong>. Dodawanie i usuwanie stolików znajdziesz w zakładce „Stoliki”.</p>
         <form id="rest-settings-form" class="stack">
           <div class="field-grid">
-            <label>Liczba stolików (docelowa)<input name="tableCount" type="number" min="1" max="200" value="${escapeHtml(String(s.tableCount ?? 5))}" required /></label>
             <label>Max osób przy 1 stoliku<input name="maxGuestsPerTable" type="number" min="1" max="50" value="${escapeHtml(String(s.maxGuestsPerTable ?? 4))}" required /></label>
             <label>Rezerwacje od (HH:MM)<input name="reservationOpenTime" value="${escapeHtml(s.reservationOpenTime || "12:00")}" required /></label>
             <label>Rezerwacje do (HH:MM)<input name="reservationCloseTime" value="${escapeHtml(s.reservationCloseTime || "22:00")}" required /></label>
@@ -154,27 +162,32 @@
   }
 
   function renderTables() {
+    const activeCount = currentRestaurantTableCount();
     const body = tablesData
       .map(
         (t) => `
       <tr data-id="${escapeHtml(t.id)}">
         <td>${escapeHtml(String(t.number ?? ""))}</td>
-        <td>${escapeHtml(t.zone || "")}</td>
-        <td>${t.active !== false ? "tak" : "nie"}</td>
-        <td>${t.hidden ? "ukryty" : "widoczny"}</td>
-        <td>${escapeHtml(t.description || "")}</td>
-        <td><button type="button" class="button secondary rest-edit-table" data-id="${escapeHtml(t.id)}">Edytuj</button></td>
+        <td>Aktywny</td>
+        <td><button type="button" class="button secondary rest-remove-table" data-id="${escapeHtml(t.id)}" data-number="${escapeHtml(String(t.number ?? ""))}">Usuń</button></td>
       </tr>`
       )
       .join("");
     return `
       <div class="hotel-subpanel">
-        <h3>Stoliki (${tablesData.length})</h3>
-        <p class="helper">Ukryte stoliki nie biorą udziału w automatycznym przydziale. Zwiększenie liczby stolików w ustawieniach tworzy brakujące numery.</p>
+        <div class="admin-toolbar-row hotel-filters">
+          <div class="admin-toolbar-filters">
+            <h3>Stoliki (${activeCount})</h3>
+          </div>
+          <div class="admin-toolbar-actions">
+            <button type="button" class="button" id="rest-table-add">Dodaj stolik</button>
+          </div>
+        </div>
+        <p class="helper">Tutaj zarządzasz wyłącznie liczbą dostępnych stolików. Każda aktywna rezerwacja odejmuje tyle stolików z puli, ile została zarezerwowana.</p>
         <div class="table-scroll">
           <table class="hotel-table">
-            <thead><tr><th>Nr</th><th>Strefa</th><th>Aktywny</th><th>Widoczność</th><th>Opis</th><th></th></tr></thead>
-            <tbody>${body || "<tr><td colspan='6'>Brak</td></tr>"}</tbody>
+            <thead><tr><th>Nr</th><th>Status</th><th></th></tr></thead>
+            <tbody>${body || "<tr><td colspan='3'>Brak aktywnych stolików.</td></tr>"}</tbody>
           </table>
         </div>
       </div>`;
@@ -266,7 +279,7 @@
         (t) => `
       <label class="admin-check-line">
         <input type="checkbox" name="tableId" value="${escapeHtml(t.id)}" />
-        <span>Stół ${escapeHtml(String(t.number))} <span class="muted">(${escapeHtml(t.id)})</span></span>
+        <span>Stół ${escapeHtml(String(t.number))}</span>
       </label>`
       )
       .join("");
@@ -298,7 +311,7 @@
               <input type="checkbox" id="rest-block-all-tables" />
               <span>Zaznacz / odznacz wszystkie</span>
             </label>
-            <div class="admin-room-checks">${tableChecks || "<p class=\"helper\">Brak stolików — ustaw liczbę stolików w Ustawieniach.</p>"}</div>
+            <div class="admin-room-checks">${tableChecks || "<p class=\"helper\">Brak stolików — dodaj je w zakładce Stoliki.</p>"}</div>
           </fieldset>
           <label>Notatka<input name="note" placeholder="np. wieczór zamknięty" /></label>
           <button type="submit" class="button">Utwórz blokadę</button>
@@ -407,7 +420,6 @@
           const out = await restaurantApi("admin-settings-save", {
             method: "PUT",
             body: {
-              tableCount: fd.get("tableCount"),
               maxGuestsPerTable: fd.get("maxGuestsPerTable"),
               reservationOpenTime: fd.get("reservationOpenTime"),
               reservationCloseTime: fd.get("reservationCloseTime"),
@@ -422,29 +434,32 @@
         }
       });
 
-      document.querySelectorAll(".rest-edit-table").forEach((btn) => {
+      document.querySelector("#rest-table-add")?.addEventListener("click", async () => {
+        try {
+          await restaurantApi("admin-table-create", { method: "POST" });
+          await loadSettings();
+          await loadTables();
+          restSubTab = "tables";
+          paint();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+
+      document.querySelectorAll(".rest-remove-table").forEach((btn) => {
         btn.addEventListener("click", async () => {
           const id = btn.getAttribute("data-id");
-          const t = tablesData.find((x) => x.id === id);
-          if (!t) return;
-          const zone = prompt("Strefa: sala lub taras", t.zone || "sala");
-          if (zone === null) return;
-          const active = confirm("Aktywny (uwzględniany w przydziale)?");
-          const hidden = confirm("Ukryć przed automatycznym przydziałem?");
-          const desc = prompt("Opis (opcjonalnie)", t.description || "");
+          const number = btn.getAttribute("data-number");
+          if (!id) return;
+          if (!confirm(`Usunąć stolik ${number}? Operacja zostanie zablokowana, jeśli stolik ma przyszłą rezerwację lub blokadę.`)) {
+            return;
+          }
           try {
-            await restaurantApi("admin-table-upsert", {
-              method: "PUT",
-              body: {
-                id,
-                number: t.number,
-                zone: zone.trim() || "sala",
-                active,
-                hidden,
-                description: desc || "",
-                sortOrder: t.sortOrder ?? t.number,
-              },
+            await restaurantApi("admin-table-delete", {
+              method: "DELETE",
+              body: { id },
             });
+            await loadSettings();
             await loadTables();
             restSubTab = "tables";
             paint();
@@ -548,9 +563,14 @@
     }
 
     async function quickCancelRestaurant(id) {
-      if (!confirm("Anulować tę rezerwację? Klient może otrzymać e-mail.")) return;
+      const cancelReason = window.prompt("Podaj powód anulowania rezerwacji:");
+      if (cancelReason == null) return;
+      if (!String(cancelReason).trim()) {
+        alert("Powód anulowania jest wymagany.");
+        return;
+      }
       try {
-        await restaurantApi("admin-reservation-cancel", { method: "POST", body: { id } });
+        await restaurantApi("admin-reservation-cancel", { method: "POST", body: { id, cancelReason } });
         await loadReservations(restResFilter);
         document.querySelector("#rest-sub-content").innerHTML = renderReservations();
         const f = document.querySelector("#rest-res-filter");
@@ -562,6 +582,11 @@
     }
 
     function openManualRestaurantModal() {
+      const tableLimit = currentRestaurantTableLimit();
+      if (!tableLimit) {
+        alert("Brak aktywnych stolików. Najpierw dodaj stolik w zakładce Stoliki.");
+        return;
+      }
       closeRestExtraModal();
       const host = document.createElement("div");
       host.id = "rest-extra-modal-mount";
@@ -578,15 +603,16 @@
               <label>Start (HH:MM)<input name="startTime" required placeholder="18:00" /></label>
               <label>Czas trwania (h)<input name="durationHours" type="number" step="0.5" min="0.5" value="2" required /></label>
               <div class="field-grid">
-                <label>Liczba stolików<input name="tablesCount" type="number" min="1" value="1" required /></label>
+                <label>Liczba stolików<input name="tablesCount" type="number" min="1" max="${escapeHtml(String(tableLimit))}" value="1" required /></label>
                 <label>Liczba gości<input name="guestsCount" type="number" min="1" value="2" required /></label>
               </div>
+              <p class="helper">Maksymalnie ${tableLimit} stolików w jednej rezerwacji, bo tyle jest teraz aktywnych.</p>
               <label class="admin-check-line"><input type="checkbox" name="joinTables" /> <span>Łączyć stoliki (jeśli możliwe)</span></label>
               <label>Imię i nazwisko<input name="fullName" required /></label>
-              <label>E-mail<input name="email" type="email" required /></label>
+              <label>E-mail<input name="email" type="email" /></label>
               <div class="field-grid">
                 <label>Prefiks<input name="phonePrefix" value="+48" /></label>
-                <label>Numer<input name="phoneNational" required /></label>
+                <label>Numer<input name="phoneNational" /></label>
               </div>
               <label>Uwagi<textarea name="customerNote" rows="2"></textarea></label>
               <label class="admin-check-line"><input type="checkbox" name="asPending" /> <span>Oczekuje na akceptację</span></label>
@@ -607,6 +633,11 @@
         ev.preventDefault();
         const fd = new FormData(ev.target);
         const status = fd.get("asPending") === "on" ? "pending" : "confirmed";
+        const tablesCount = Number(fd.get("tablesCount") || 1);
+        if (tablesCount > tableLimit) {
+          alert(`Możesz wybrać maksymalnie ${tableLimit} stolików.`);
+          return;
+        }
         try {
           await restaurantApi("admin-reservation-create", {
             method: "POST",
@@ -614,13 +645,13 @@
               reservationDate: fd.get("reservationDate"),
               startTime: fd.get("startTime"),
               durationHours: Number(fd.get("durationHours")),
-              tablesCount: Number(fd.get("tablesCount")),
+              tablesCount,
               guestsCount: Number(fd.get("guestsCount")),
               joinTables: fd.get("joinTables") === "on",
               fullName: fd.get("fullName"),
-              email: fd.get("email"),
-              phonePrefix: fd.get("phonePrefix") || "+48",
-              phoneNational: fd.get("phoneNational"),
+              email: String(fd.get("email") || "").trim(),
+              phonePrefix: String(fd.get("phoneNational") || "").trim() ? String(fd.get("phonePrefix") || "+48").trim() : "",
+              phoneNational: String(fd.get("phoneNational") || "").trim(),
               customerNote: fd.get("customerNote") || "",
               adminNote: "",
               status,
@@ -648,6 +679,11 @@
         return;
       }
       const r = d.reservation;
+      const tableLimit = currentRestaurantTableLimit();
+      if (!tableLimit) {
+        alert("Brak aktywnych stolików. Najpierw dodaj stolik w zakładce Stoliki.");
+        return;
+      }
       closeRestExtraModal();
       const host = document.createElement("div");
       host.id = "rest-extra-modal-mount";
@@ -667,9 +703,10 @@
               <label>Start (HH:MM)<input name="startTime" value="${escapeHtml(r.startTime || "")}" required /></label>
               <label>Czas trwania (h)<input name="durationHours" type="number" step="0.5" min="0.5" value="${escapeHtml(String(r.durationHours || 2))}" required /></label>
               <div class="field-grid">
-                <label>Liczba stolików<input name="tablesCount" type="number" min="1" value="${escapeHtml(String(r.tablesCount || 1))}" required /></label>
+                <label>Liczba stolików<input name="tablesCount" type="number" min="1" max="${escapeHtml(String(tableLimit))}" value="${escapeHtml(String(r.tablesCount || 1))}" required /></label>
                 <label>Goście<input name="guestsCount" type="number" min="1" value="${escapeHtml(String(r.guestsCount || 1))}" required /></label>
               </div>
+              <p class="helper">Aktualnie aktywnych stolików: ${tableLimit}.</p>
               <label class="admin-check-line"><input type="checkbox" name="joinTables" ${r.joinTables ? "checked" : ""} /> <span>Łączyć stoliki</span></label>
               <label>Imię i nazwisko<input name="fullName" value="${escapeHtml(r.fullName || "")}" required /></label>
               <label>E-mail<input name="email" type="email" value="${escapeHtml(r.email || "")}" required /></label>
@@ -710,6 +747,11 @@
       host.querySelector("#rest-edit-form")?.addEventListener("submit", async (ev) => {
         ev.preventDefault();
         const fd = new FormData(ev.target);
+        const tablesCount = Number(fd.get("tablesCount") || 1);
+        if (tablesCount > tableLimit) {
+          alert(`Możesz wybrać maksymalnie ${tableLimit} stolików.`);
+          return;
+        }
         const notifyClient = confirm(
           "Wysłać e-mail o zmianach do klienta?\n\nOK — tak\nAnuluj — tylko zapis"
         );
@@ -721,7 +763,7 @@
               reservationDate: fd.get("reservationDate"),
               startTime: fd.get("startTime"),
               durationHours: Number(fd.get("durationHours")),
-              tablesCount: Number(fd.get("tablesCount")),
+              tablesCount,
               guestsCount: Number(fd.get("guestsCount")),
               joinTables: fd.get("joinTables") === "on",
               fullName: fd.get("fullName"),

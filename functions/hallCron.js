@@ -2,7 +2,7 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { initializeApp, getApps } = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 
-const { renderTemplate, getHallMailTemplate, sendMail } = require("./lib/mail");
+const { renderTemplate, getHallMailTemplate, sendMail, buildBrandedEmail } = require("./lib/mail");
 
 if (!getApps().length) {
   initializeApp();
@@ -16,6 +16,10 @@ function venueName() {
 
 function adminNotifyEmail() {
   return process.env.ADMIN_NOTIFY_EMAIL || "";
+}
+
+function publicSiteUrl() {
+  return (process.env.PUBLIC_SITE_URL || "https://example.com").replace(/\/$/, "");
 }
 
 function buildHallMailVars(data) {
@@ -46,8 +50,17 @@ function buildHallMailVars(data) {
 async function sendHallTemplated(db, key, to, vars) {
   const t = await getHallMailTemplate(db, key);
   const subject = renderTemplate(t.subject, vars);
-  const html = renderTemplate(t.bodyHtml, vars);
-  await sendMail(key, { to, subject, html });
+  const htmlFragment = renderTemplate(t.bodyHtml, vars);
+  const email = buildBrandedEmail({
+    subject,
+    htmlFragment,
+    brandName: venueName(),
+    serviceLabel: "Przyjęcia i sale",
+    siteUrl: publicSiteUrl(),
+    serviceUrl: `${publicSiteUrl()}/Przyjec/`,
+    preheader: `Zgłoszenie ${vars.reservationNumber || ""}`.trim(),
+  });
+  await sendMail(key, { to, subject, html: email.html });
 }
 
 async function appendVenueAudit(db, payload) {

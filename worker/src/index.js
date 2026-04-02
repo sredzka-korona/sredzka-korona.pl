@@ -91,17 +91,25 @@ export default {
       if (url.pathname === "/api/admin/gallery/albums" && request.method === "POST") {
         await requireFirebaseAdmin(request, env);
         const payload = await request.json();
-        const now = nowIso();
-        const slug = sanitizeSlug(payload.slug || payload.title);
-        if (!slug || !payload.title) {
-          return jsonResponse({ error: "Tytul i slug sa wymagane." }, 400, request, env);
+        const title = String(payload.title || "").trim();
+        if (!title) {
+          return jsonResponse({ error: "Tytul albumu jest wymagany." }, 400, request, env);
         }
+        const now = nowIso();
+        const slug = await findUniqueGalleryAlbumSlug(payload.slug || title, env);
         await env.DB.prepare(
           "INSERT INTO gallery_albums (slug, title, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
         )
-          .bind(slug, payload.title.trim(), (payload.description || "").trim(), now, now)
+          .bind(slug, title, (payload.description || "").trim(), now, now)
           .run();
         return jsonResponse({ ok: true }, 201, request, env);
+      }
+
+      if (url.pathname === "/api/admin/gallery/albums/reorder" && request.method === "POST") {
+        await requireFirebaseAdmin(request, env);
+        const payload = await request.json();
+        await reorderGalleryAlbums(payload.albumIds, env);
+        return jsonResponse({ ok: true }, 200, request, env);
       }
 
       if (
@@ -112,6 +120,17 @@ export default {
         const albumId = Number(url.pathname.split("/")[5]);
         await uploadGalleryImages(albumId, request, env);
         return jsonResponse({ ok: true }, 201, request, env);
+      }
+
+      if (
+        url.pathname.match(/^\/api\/admin\/gallery\/albums\/\d+\/reorder-images$/) &&
+        request.method === "POST"
+      ) {
+        await requireFirebaseAdmin(request, env);
+        const albumId = Number(url.pathname.split("/")[5]);
+        const payload = await request.json();
+        await reorderGalleryAlbumImages(albumId, payload.imageIds, env);
+        return jsonResponse({ ok: true }, 200, request, env);
       }
 
       if (
@@ -325,10 +344,10 @@ async function listDocuments(env, url) {
 
 async function listGalleryAlbums(env, url) {
   const albumResult = await env.DB.prepare(
-    "SELECT id, slug, title, description, cover_image_id AS coverImageId FROM gallery_albums ORDER BY created_at DESC"
+    "SELECT id, slug, title, description FROM gallery_albums ORDER BY created_at ASC, id ASC"
   ).all();
   const imageResult = await env.DB.prepare(
-    "SELECT id, album_id AS albumId, alt_text AS altText FROM gallery_images ORDER BY created_at ASC"
+    "SELECT id, album_id AS albumId, alt_text AS altText FROM gallery_images ORDER BY created_at ASC, id ASC"
   ).all();
   const imagesByAlbum = new Map();
   for (const image of imageResult.results || []) {
@@ -343,7 +362,7 @@ async function listGalleryAlbums(env, url) {
   }
   return (albumResult.results || []).map((album) => {
     const images = imagesByAlbum.get(album.id) || [];
-    const cover = images.find((image) => image.id === album.coverImageId) || images[0] || null;
+    const cover = images[0] || null;
     return {
       id: String(album.id),
       slug: album.slug,
@@ -353,6 +372,21 @@ async function listGalleryAlbums(env, url) {
       images,
     };
   });
+}
+
+async function findUniqueGalleryAlbumSlug(value, env) {
+  const baseSlug = sanitizeSlug(value) || "album";
+  let candidate = baseSlug;
+  let attempt = 1;
+
+  while (true) {
+    const existing = await env.DB.prepare("SELECT id FROM gallery_albums WHERE slug = ?").bind(candidate).first();
+    if (!existing) {
+      return candidate;
+    }
+    attempt += 1;
+    candidate = `${baseSlug}-${attempt}`;
+  }
 }
 
 function normalizeHotelRoomType(roomType) {
@@ -528,7 +562,7 @@ async function requireFirebaseAdmin(request, env) {
 
 async function uploadGalleryImages(albumId, request, env) {
   const album = await env.DB.prepare(
-    "SELECT id, slug, cover_image_id AS coverImageId FROM gallery_albums WHERE id = ?"
+    "SELECT id, slug FROM gallery_albums WHERE id = ?"
   )
     .bind(albumId)
     .first();
@@ -541,14 +575,13 @@ async function uploadGalleryImages(albumId, request, env) {
     throw badRequest("Wybierz co najmniej jedno zdjecie.");
   }
 
-  let firstInsertedId = null;
   try {
     for (const file of files) {
       assertFileWithinLimit(file, "Zdjecie");
       const safeName = sanitizeFileName(file.name);
       const objectKey = `gallery/${album.slug}/${crypto.randomUUID()}-${safeName}`;
       const blobData = new Uint8Array(await file.arrayBuffer());
-      const insert = await env.DB.prepare(
+      await env.DB.prepare(
         "INSERT INTO gallery_images (album_id, object_key, file_name, alt_text, mime_type, blob_data, byte_size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
       )
         .bind(
@@ -562,9 +595,6 @@ async function uploadGalleryImages(albumId, request, env) {
           nowIso()
         )
         .run();
-      if (!firstInsertedId) {
-        firstInsertedId = insert.meta.last_row_id;
-      }
     }
   } catch (error) {
     if (isMissingGalleryImagesStorageSchemaError(error)) {
@@ -573,11 +603,6 @@ async function uploadGalleryImages(albumId, request, env) {
       );
     }
     throw error;
-  }
-  if (!album.coverImageId && firstInsertedId) {
-    await env.DB.prepare("UPDATE gallery_albums SET cover_image_id = ?, updated_at = ? WHERE id = ?")
-      .bind(firstInsertedId, nowIso(), album.id)
-      .run();
   }
 }
 
@@ -605,13 +630,55 @@ async function deleteGalleryImage(imageId, env) {
     throw badRequest("Zdjecie nie istnieje.");
   }
   await env.DB.prepare("DELETE FROM gallery_images WHERE id = ?").bind(imageId).run();
-  const nextImage = await env.DB.prepare(
-    "SELECT id FROM gallery_images WHERE album_id = ? ORDER BY created_at ASC LIMIT 1"
+  await env.DB.prepare("UPDATE gallery_albums SET updated_at = ? WHERE id = ?")
+    .bind(nowIso(), image.albumId)
+    .run();
+}
+
+async function reorderGalleryAlbums(albumIds, env) {
+  const ids = Array.isArray(albumIds)
+    ? albumIds.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)
+    : [];
+  if (!ids.length) {
+    throw badRequest("Brak listy albumow do ustawienia kolejnosci.");
+  }
+  const existing = await env.DB.prepare("SELECT id FROM gallery_albums ORDER BY created_at ASC, id ASC").all();
+  const existingIds = (existing.results || []).map((row) => Number(row.id));
+  assertMatchingOrderSet(existingIds, ids, "Lista albumow jest nieprawidlowa.");
+
+  for (let index = 0; index < ids.length; index += 1) {
+    await env.DB.prepare("UPDATE gallery_albums SET created_at = ?, updated_at = ? WHERE id = ?")
+      .bind(sortIsoStamp(index, ids.length), nowIso(), ids[index])
+      .run();
+  }
+}
+
+async function reorderGalleryAlbumImages(albumId, imageIds, env) {
+  const currentAlbumId = Number(albumId);
+  if (!Number.isInteger(currentAlbumId) || currentAlbumId <= 0) {
+    throw badRequest("Album nie istnieje.");
+  }
+  const ids = Array.isArray(imageIds)
+    ? imageIds.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)
+    : [];
+  if (!ids.length) {
+    throw badRequest("Brak listy zdjec do ustawienia kolejnosci.");
+  }
+  const existing = await env.DB.prepare(
+    "SELECT id FROM gallery_images WHERE album_id = ? ORDER BY created_at ASC, id ASC"
   )
-    .bind(image.albumId)
-    .first();
-  await env.DB.prepare("UPDATE gallery_albums SET cover_image_id = ?, updated_at = ? WHERE id = ?")
-    .bind(nextImage ? nextImage.id : null, nowIso(), image.albumId)
+    .bind(currentAlbumId)
+    .all();
+  const existingIds = (existing.results || []).map((row) => Number(row.id));
+  assertMatchingOrderSet(existingIds, ids, "Lista zdjec jest nieprawidlowa.");
+
+  for (let index = 0; index < ids.length; index += 1) {
+    await env.DB.prepare("UPDATE gallery_images SET created_at = ? WHERE id = ?")
+      .bind(sortIsoStamp(index, ids.length), ids[index])
+      .run();
+  }
+  await env.DB.prepare("UPDATE gallery_albums SET updated_at = ? WHERE id = ?")
+    .bind(nowIso(), currentAlbumId)
     .run();
 }
 
@@ -1199,6 +1266,24 @@ function sanitizeHeaderValue(value) {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function sortIsoStamp(index, total) {
+  const base = Date.UTC(2020, 0, 1, 0, 0, 0);
+  const safeIndex = Math.max(0, Number(index) || 0);
+  const safeTotal = Math.max(1, Number(total) || 1);
+  return new Date(base + (safeTotal * 1000 + safeIndex) * 1000).toISOString();
+}
+
+function assertMatchingOrderSet(existingIds, receivedIds, message) {
+  if (existingIds.length !== receivedIds.length) {
+    throw badRequest(message);
+  }
+  const expected = [...existingIds].sort((a, b) => a - b).join(",");
+  const received = [...receivedIds].sort((a, b) => a - b).join(",");
+  if (expected !== received) {
+    throw badRequest(message);
+  }
 }
 
 function badRequest(message) {

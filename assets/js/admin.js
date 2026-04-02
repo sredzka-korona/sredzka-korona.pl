@@ -511,9 +511,12 @@
       items: [],
       pendingItems: [],
       tomorrowItems: [],
+      upcomingItems: [],
+      unconfirmedItems: [],
       roomOptions: [],
       tableOptions: [],
       hallOptions: [],
+      countdownTimer: null,
       isLoading: false,
       lastError: "",
     },
@@ -544,28 +547,26 @@
       label: "Restauracja",
       description: "Menu, media i konfiguracja systemu rezerwacji restauracji.",
       tiles: [
-        { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Restauracja na stronie głównej (pozycja i zoom)." },
         { key: "menu", label: "Menu", description: "Kategorie, pozycje, składniki i kolejność." },
         { key: "gallery", label: "Galeria", description: "Zdjęcia restauracji i ich kolejność." },
         { key: "orders", label: "Zamówienia / Catering", description: "Edycja treści modala zamówień i cateringu widocznej na stronie restauracji." },
         { key: "hours", label: "Godziny otwarcia", description: "Dni i godziny widoczne na stronie restauracji." },
         { key: "tables", label: "Stoliki", description: "Konfiguracja stolików i godzin systemu rezerwacji." },
-        { key: "templates", label: "Szablony maili", description: "Wiadomości wysyłane dla rezerwacji restauracji." },
+        { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Restauracja na stronie głównej (pozycja i zoom)." },
+        { key: "templates", label: "Szablony", description: "Wiadomości wysyłane dla rezerwacji restauracji." },
         { key: "settings", label: "Ustawienia rezerwacji", description: "Włączenie i przerwy w przyjmowaniu rezerwacji." },
       ],
     },
     {
       key: "przyjecia",
       label: "Przyjęcia",
-      description: "Oferta, sale, galerie oraz konfiguracja rezerwacji i komunikacji.",
+      description: "Oferta, galeria, menu oraz konfiguracja rezerwacji i komunikacji.",
       tiles: [
-        { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Przyjęcia na stronie głównej (pozycja i zoom)." },
         { key: "oferta", label: "Oferta", description: "Edycja treści kafelka Oferta i modala." },
-        { key: "sale", label: "Sale", description: "Nazwy, opisy i pojemności sal." },
         { key: "gallery", label: "Galeria", description: "Galerie sal i albumy wydarzeń." },
         { key: "menu", label: "Menu okolicznościowe", description: "Sekcje, pozycje i kolejność menu." },
-        { key: "venue", label: "Konfiguracja sal", description: "Parametry sal w silniku rezerwacji." },
-        { key: "templates", label: "Szablony maili", description: "Wiadomości wysyłane dla rezerwacji przyjęć." },
+        { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Przyjęcia na stronie głównej (pozycja i zoom)." },
+        { key: "templates", label: "Szablony", description: "Wiadomości wysyłane dla rezerwacji przyjęć." },
         { key: "settings", label: "Ustawienia rezerwacji", description: "Włączenie rezerwacji i blokady terminów sal." },
       ],
     },
@@ -1161,6 +1162,70 @@
     return `${total} wpisów`;
   }
 
+  function adminViewsCountLabel(count) {
+    const total = Math.max(0, Number(count) || 0);
+    if (total === 1) return "1 widok";
+    const mod10 = total % 10;
+    const mod100 = total % 100;
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+      return `${total} widoki`;
+    }
+    return `${total} widoków`;
+  }
+
+  function adminHomeIconMarkup(tabKey) {
+    if (tabKey === "grafik") {
+      return scheduleIconMarkup("calendar");
+    }
+
+    const icons = {
+      hotel:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 18.5V7.5"></path><path d="M4 11.5h16"></path><path d="M20 18.5V9.5a2 2 0 0 0-2-2H6"></path><path d="M7.5 14.5h3"></path><path d="M13.5 14.5h3"></path><path d="M4 18.5h16"></path></svg>',
+      restauracja:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 3.5v7"></path><path d="M10 3.5v7"></path><path d="M7 7h3"></path><path d="M8.5 10.5v10"></path><path d="M16.5 3.5c1.8 1.9 2.4 4.4 1.6 6.6-.5 1.4-1.4 2.5-2.6 3.3v7.1"></path></svg>',
+      przyjecia:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 20.5v-6"></path><path d="M17 20.5v-6"></path><path d="M4 12.5h16"></path><path d="M6 12.5V9.8a2.8 2.8 0 0 1 2.8-2.8h6.4A2.8 2.8 0 0 1 18 9.8v2.7"></path><path d="M12 7V3.5"></path><path d="M9.5 5.5 12 3l2.5 2.5"></path></svg>',
+      dokumenty:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 3.5h7l4 4v13H7z"></path><path d="M14 3.5v4h4"></path><path d="M9.5 12h5"></path><path d="M9.5 15.5h5"></path></svg>',
+      kontakt:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5.5 7.5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2z"></path><path d="M7 8.5 12 12l5-3.5"></path></svg>',
+    };
+    return `<span class="icon-inline icon-${escapeAttribute(tabKey)}">${icons[tabKey] || ""}</span>`;
+  }
+
+  function renderAdminEntryCard(tab, options = {}) {
+    const { compact = false, featured = false, highlights = [] } = options;
+    const tagItems = (Array.isArray(highlights) && highlights.length ? highlights : tab.tiles.map((tile) => tile.label))
+      .filter(Boolean)
+      .slice(0, compact ? 2 : 3);
+    const modifier = compact ? " admin-entry-tile--compact" : "";
+    const featuredModifier = featured ? " admin-entry-tile--featured" : "";
+    return `
+      <button
+        type="button"
+        class="admin-tile admin-entry-tile admin-entry-tile--${escapeAttribute(tab.key)}${modifier}${featuredModifier}"
+        data-admin-entry="${escapeAttribute(tab.key)}"
+      >
+        <span class="admin-entry-kicker">${featured ? "Najszybszy dostęp" : compact ? "Moduł pomocniczy" : "Moduł główny"}</span>
+        <span class="admin-entry-head">
+          <span class="admin-entry-icon" aria-hidden="true">${adminHomeIconMarkup(tab.key)}</span>
+          <span class="admin-entry-heading">
+            <span class="admin-tile-title">${escapeHtml(tab.label)}</span>
+            <span class="admin-entry-count">${escapeHtml(adminViewsCountLabel(tab.tiles.length))}</span>
+          </span>
+        </span>
+        <span class="admin-tile-copy">${escapeHtml(tab.description)}</span>
+        ${
+          tagItems.length
+            ? `<span class="admin-entry-tags">${tagItems
+                .map((item) => `<span>${escapeHtml(item)}</span>`)
+                .join("")}</span>`
+            : ""
+        }
+      </button>
+    `;
+  }
+
   function scheduleOverlapWarningMessage(overlapItems) {
     const entries = Array.isArray(overlapItems) ? overlapItems : [];
     if (!entries.length) return "";
@@ -1278,6 +1343,63 @@
     return new Date(ms).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
   }
 
+  function scheduleCountdownText(deadlineMs) {
+    const target = Number(deadlineMs || 0);
+    if (!Number.isFinite(target) || target <= 0) return "—";
+    const left = Math.max(0, target - Date.now());
+    const totalHours = Math.floor(left / 3600000);
+    const minutes = Math.floor((left % 3600000) / 60000);
+    const seconds = Math.floor((left % 60000) / 1000);
+    return `${totalHours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+  }
+
+  function scheduleItemDeadlineMs(item) {
+    if (!item) return 0;
+    if (item.status === "pending") return Number(item.pendingExpiresAt || item.raw?.pendingExpiresAt || 0);
+    if (item.status === "email_verification_pending") {
+      return Number(item.emailVerificationExpiresAt || item.raw?.emailVerificationExpiresAt || 0);
+    }
+    return 0;
+  }
+
+  function scheduleCountdownInlineMarkup(item) {
+    const deadlineMs = scheduleItemDeadlineMs(item);
+    if (!deadlineMs) return "";
+    return `<p class="helper">Pozostały czas: <strong data-schedule-countdown-deadline="${escapeAttribute(String(deadlineMs))}">${escapeHtml(
+      scheduleCountdownText(deadlineMs)
+    )}</strong></p>`;
+  }
+
+  function scheduleCountdownCardMarkup(item, label = "Pozostały czas") {
+    const deadlineMs = scheduleItemDeadlineMs(item);
+    if (!deadlineMs) return "";
+    return `
+      <article class="schedule-detail-card">
+        <span class="schedule-detail-label">${escapeHtml(label)}</span>
+        <strong class="schedule-detail-value" data-schedule-countdown-deadline="${escapeAttribute(String(deadlineMs))}">${escapeHtml(
+          scheduleCountdownText(deadlineMs)
+        )}</strong>
+      </article>
+    `;
+  }
+
+  function refreshScheduleCountdownNodes() {
+    document.querySelectorAll("[data-schedule-countdown-deadline]").forEach((node) => {
+      const deadlineMs = Number(node.getAttribute("data-schedule-countdown-deadline") || 0);
+      node.textContent = scheduleCountdownText(deadlineMs);
+    });
+  }
+
+  function syncScheduleCountdownTicker() {
+    if (state.schedule.countdownTimer) {
+      window.clearInterval(state.schedule.countdownTimer);
+      state.schedule.countdownTimer = null;
+    }
+    refreshScheduleCountdownNodes();
+    if (!document.querySelector("[data-schedule-countdown-deadline]")) return;
+    state.schedule.countdownTimer = window.setInterval(refreshScheduleCountdownNodes, 1000);
+  }
+
   function scheduleFormatCompactDate(ymd) {
     if (!ymd) return "—";
     return scheduleYmdToDate(ymd).toLocaleDateString("pl-PL", {
@@ -1344,6 +1466,8 @@
         startMs,
         endMs,
         resourceIds: Array.isArray(row.roomIds) ? row.roomIds : [],
+        pendingExpiresAt: Number(row.pendingExpiresAt || 0) || null,
+        emailVerificationExpiresAt: Number(row.emailVerificationExpiresAt || 0) || null,
         raw: row,
       };
     }
@@ -1365,6 +1489,8 @@
         startMs,
         endMs,
         resourceIds: Array.isArray(row.assignedTableIds) ? row.assignedTableIds : [],
+        pendingExpiresAt: Number(row.pendingExpiresAt || 0) || null,
+        emailVerificationExpiresAt: Number(row.emailVerificationExpiresAt || 0) || null,
         raw: row,
       };
     }
@@ -1387,6 +1513,8 @@
       startMs,
       endMs,
       resourceIds: row.hallId ? [row.hallId] : [],
+      pendingExpiresAt: Number(row.pendingExpiresAt || 0) || null,
+      emailVerificationExpiresAt: Number(row.emailVerificationExpiresAt || 0) || null,
       raw: row,
     };
   }
@@ -1423,6 +1551,8 @@
       state.schedule.items = [];
       state.schedule.pendingItems = [];
       state.schedule.tomorrowItems = [];
+      state.schedule.upcomingItems = [];
+      state.schedule.unconfirmedItems = [];
       state.schedule.lastError = "";
       return;
     }
@@ -1461,9 +1591,17 @@
         .sort((left, right) => left.startMs - right.startMs);
 
       const tomorrow = scheduleAddDays(getTodayIsoDate(), 1);
+      const tomorrowStartMs = scheduleYmdToDate(tomorrow).getTime();
+      const reservationItems = items.filter((item) => item.status !== "manual_block");
       state.schedule.items = items;
-      state.schedule.pendingItems = items.filter((item) => item.status === "pending" || item.status === "email_verification_pending");
-      state.schedule.tomorrowItems = items.filter((item) => scheduleItemOnDate(item, tomorrow));
+      state.schedule.pendingItems = reservationItems.filter((item) => item.status === "pending");
+      state.schedule.tomorrowItems = reservationItems.filter(
+        (item) => item.status !== "email_verification_pending" && scheduleItemOnDate(item, tomorrow)
+      );
+      state.schedule.upcomingItems = reservationItems
+        .filter((item) => item.status !== "email_verification_pending" && item.endMs > tomorrowStartMs)
+        .sort((left, right) => left.startMs - right.startMs);
+      state.schedule.unconfirmedItems = reservationItems.filter((item) => item.status === "email_verification_pending");
       state.schedule.roomOptions = Array.isArray(hotelRooms?.rooms) ? hotelRooms.rooms : [];
       state.schedule.tableOptions = Array.isArray(restaurantTables?.tables) ? restaurantTables.tables : [];
       state.schedule.hallOptions = Array.isArray(hallList?.halls) ? hallList.halls : [];
@@ -1472,6 +1610,8 @@
       state.schedule.items = [];
       state.schedule.pendingItems = [];
       state.schedule.tomorrowItems = [];
+      state.schedule.upcomingItems = [];
+      state.schedule.unconfirmedItems = [];
       state.schedule.lastError = error.message || "Nie udało się pobrać danych grafiku.";
     } finally {
       state.schedule.isLoading = false;
@@ -1581,9 +1721,10 @@
                 </div>
                 <p>${escapeHtml(item.title || "Rezerwacja")}</p>
                 <p class="helper">${escapeHtml(item.subtitle || "")}</p>
+                ${scheduleCountdownInlineMarkup(item)}
                 <div class="inline-actions">
                   ${
-                    item.status === "pending" || item.status === "email_verification_pending"
+                    item.status === "pending"
                       ? `<button type="button" class="button secondary" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>
                          <button type="button" class="button secondary danger-muted" data-schedule-action="reject" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odrzuć</button>`
                       : ""
@@ -1596,6 +1737,239 @@
           .join("")}
       </div>
     `;
+  }
+
+  function scheduleItemGroupDate(item, floorYmd = "") {
+    if (!item) return "";
+    const baseYmd = String(item.dateFrom || "").slice(0, 10) || scheduleDateToYmd(new Date(item.startMs || Date.now()));
+    if (floorYmd && item.service === "hotel" && item.dateFrom < floorYmd && item.dateTo > floorYmd) {
+      return floorYmd;
+    }
+    return baseYmd;
+  }
+
+  function scheduleGroupItemsByDate(items, floorYmd = "") {
+    const groups = [];
+    const groupMap = new Map();
+    (Array.isArray(items) ? items : []).forEach((item) => {
+      const ymd = scheduleItemGroupDate(item, floorYmd);
+      if (!groupMap.has(ymd)) {
+        const group = { ymd, items: [] };
+        groupMap.set(ymd, group);
+        groups.push(group);
+      }
+      groupMap.get(ymd).items.push(item);
+    });
+    return groups;
+  }
+
+  function scheduleTileCountClass(kind, count) {
+    if (kind === "unconfirmed") return "schedule-stat-count is-muted";
+    if (!(count > 0)) return "schedule-stat-count is-zero";
+    if (kind === "pending" && count > 1) return "schedule-stat-count is-danger";
+    if (kind === "tomorrow" && count > 1) return "schedule-stat-count is-success";
+    return "schedule-stat-count";
+  }
+
+  function scheduleSummaryTilesMarkup() {
+    const tomorrowYmd = scheduleAddDays(getTodayIsoDate(), 1);
+    const tiles = [
+      {
+        key: "tomorrow",
+        title: "Jutrzejsze rezerwacje",
+        description: `Na ${scheduleFormatDateLabel(tomorrowYmd)}. Po kliknięciu też kolejne najbliższe terminy.`,
+        count: state.schedule.tomorrowItems.length,
+      },
+      {
+        key: "pending",
+        title: "Oczekujące na akceptację",
+        description: "Rezerwacje czekające na decyzję administratora.",
+        count: state.schedule.pendingItems.length,
+      },
+      {
+        key: "unconfirmed",
+        title: "Rezerwacje niepotwierdzone",
+        description: "Zgłoszenia bez potwierdzenia adresu e-mail.",
+        count: state.schedule.unconfirmedItems.length,
+      },
+    ];
+    return `
+      <div class="schedule-summary-grid schedule-summary-grid--compact">
+        ${tiles
+          .map(
+            (tile) => `
+              <button
+                type="button"
+                class="schedule-stat-tile schedule-stat-tile--${escapeAttribute(tile.key)}"
+                data-schedule-list="${escapeAttribute(tile.key)}"
+              >
+                <span class="schedule-stat-head">
+                  <strong>${escapeHtml(tile.title)}</strong>
+                  <span class="${scheduleTileCountClass(tile.key, tile.count)}">${escapeHtml(String(tile.count))}</span>
+                </span>
+                <span class="schedule-stat-description">${escapeHtml(tile.description)}</span>
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
+  function scheduleListItemActionsMarkup(kind, item) {
+    const actions = [
+      `<button type="button" class="button secondary" data-schedule-action="details" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Szczegóły</button>`,
+    ];
+    if (kind === "pending") {
+      actions.push(
+        `<button type="button" class="button secondary" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>`
+      );
+    }
+    actions.push(
+      `<button type="button" class="button secondary danger-muted" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`
+    );
+    return actions.join("");
+  }
+
+  function scheduleGroupedListMarkup(items, kind, { emptyText = "", floorYmd = "" } = {}) {
+    if (!items.length) {
+      return `<p class="empty">${escapeHtml(emptyText)}</p>`;
+    }
+    return scheduleGroupItemsByDate(items, floorYmd)
+      .map(
+        (group) => `
+          <section class="schedule-modal-list-group">
+            <div class="schedule-modal-list-group-head">
+              <h4>${escapeHtml(scheduleFormatDateLabel(group.ymd))}</h4>
+              <span class="pill">${escapeHtml(String(group.items.length))}</span>
+            </div>
+            <div class="schedule-day-list">
+              ${group.items
+                .map(
+                  (item) => `
+                    <article class="schedule-day-item schedule-modal-list-item">
+                      <div class="schedule-day-item-head">
+                        <div class="schedule-day-item-meta">
+                          <strong>${escapeHtml(scheduleCardHeading(item))}</strong>
+                          <span class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</span>
+                          <span class="pill schedule-status-pill ${scheduleStatusPillClass(item.status)}">${escapeHtml(item.statusLabel || scheduleStatusLabel(item.status))}</span>
+                        </div>
+                      </div>
+                      <p>${escapeHtml(item.title || "Rezerwacja")}</p>
+                      <p class="helper">${escapeHtml(item.subtitle || "")}</p>
+                      ${scheduleCountdownInlineMarkup(item)}
+                      <div class="inline-actions">${scheduleListItemActionsMarkup(kind, item)}</div>
+                    </article>
+                  `
+                )
+                .join("")}
+            </div>
+          </section>
+        `
+      )
+      .join("");
+  }
+
+  function scheduleListConfig(kind) {
+    const tomorrowYmd = scheduleAddDays(getTodayIsoDate(), 1);
+    if (kind === "pending") {
+      return {
+        title: "Oczekujące na akceptację",
+        count: state.schedule.pendingItems.length,
+        description: "Wszystkie rezerwacje czekające na decyzję administratora.",
+        items: state.schedule.pendingItems,
+        emptyText: "Brak rezerwacji oczekujących na akceptację.",
+        floorYmd: "",
+      };
+    }
+    if (kind === "unconfirmed") {
+      return {
+        title: "Rezerwacje niepotwierdzone",
+        count: state.schedule.unconfirmedItems.length,
+        description: "Zgłoszenia, które nie potwierdziły jeszcze adresu e-mail.",
+        items: state.schedule.unconfirmedItems,
+        emptyText: "Brak niepotwierdzonych rezerwacji.",
+        floorYmd: "",
+      };
+    }
+    return {
+      title: "Jutrzejsze i najbliższe rezerwacje",
+      count: state.schedule.tomorrowItems.length,
+      description: `Kafelek pokazuje liczbę pozycji na ${scheduleFormatDateLabel(
+        tomorrowYmd
+      )}. Lista niżej obejmuje też kolejne najbliższe rezerwacje.`,
+      items: state.schedule.upcomingItems,
+      emptyText: "Brak jutrzejszych i najbliższych rezerwacji.",
+      floorYmd: tomorrowYmd,
+    };
+  }
+
+  function openScheduleListModal(kind) {
+    const config = scheduleListConfig(kind);
+    let visibleCount = 10;
+
+    const renderContent = () => {
+      const visibleItems = config.items.slice(0, visibleCount);
+      return `
+        <div class="admin-modal-head">
+          <div>
+            <p class="pill">${escapeHtml(String(config.count))}</p>
+            <h3>${escapeHtml(config.title)}</h3>
+            <p class="helper">${escapeHtml(config.description)}</p>
+          </div>
+          <button type="button" class="button secondary icon-button" data-schedule-modal-close aria-label="Zamknij">${scheduleIconMarkup("close")}</button>
+        </div>
+        <div class="schedule-modal-list">
+          ${scheduleGroupedListMarkup(visibleItems, kind, {
+            emptyText: config.emptyText,
+            floorYmd: config.floorYmd,
+          })}
+        </div>
+        <div class="admin-modal-footer schedule-modal-footer">
+          ${
+            visibleCount < config.items.length
+              ? `<button type="button" class="button secondary" data-schedule-list-more>Załaduj więcej</button>`
+              : `<p class="helper schedule-modal-summary">Pokazano ${escapeHtml(String(visibleItems.length))} z ${escapeHtml(
+                  String(config.items.length)
+                )} pozycji.</p>`
+          }
+        </div>
+      `;
+    };
+
+    openScheduleModal(renderContent(), (mount) => {
+      const bindModal = () => {
+        mount.querySelectorAll("[data-schedule-modal-close]").forEach((button) => {
+          button.addEventListener("click", closeScheduleModal);
+        });
+        mount.querySelector("[data-schedule-list-more]")?.addEventListener("click", () => {
+          visibleCount += 10;
+          mount.querySelector(".schedule-modal").innerHTML = renderContent();
+          bindModal();
+        });
+        mount.querySelectorAll("[data-schedule-action]").forEach((button) => {
+          button.addEventListener("click", async () => {
+            const action = button.dataset.scheduleAction;
+            const service = button.dataset.scheduleService;
+            const id = button.dataset.scheduleId;
+            if (action === "details") {
+              openScheduleDetailsModal(service, id);
+              return;
+            }
+            if (action === "confirm") {
+              await scheduleConfirmReservation(service, id);
+              closeScheduleModal();
+              return;
+            }
+            if (action === "cancel") {
+              openScheduleCancelModal(service, id);
+            }
+          });
+        });
+      };
+
+      bindModal();
+    });
   }
 
   function renderSchedulePanel(statusMessage = "") {
@@ -1618,29 +1992,10 @@
     state.schedule.monthCursor = monthCursor;
     const monthCells = scheduleBuildMonthCells(monthCursor);
     const dayItems = scheduleItemsForDate(selectedDate);
-    const pendingPreview = state.schedule.pendingItems.slice(0, 10);
-    const tomorrowPreview = state.schedule.tomorrowItems.slice(0, 10);
-    const tomorrowLabel = scheduleAddDays(getTodayIsoDate(), 1);
 
     panel.innerHTML = `
       <div class="schedule-shell">
-        <div class="schedule-summary-grid">
-          <section class="schedule-summary-card">
-            <div class="schedule-summary-head">
-              <h3>Oczekujące na akceptację</h3>
-              <span class="pill">${escapeHtml(String(state.schedule.pendingItems.length))}</span>
-            </div>
-            ${scheduleQuickListMarkup(pendingPreview, "Brak rezerwacji oczekujących na akceptację.")}
-          </section>
-          <section class="schedule-summary-card">
-            <div class="schedule-summary-head">
-              <h3>Jutrzejsze rezerwacje</h3>
-              <span class="pill">${escapeHtml(String(state.schedule.tomorrowItems.length))}</span>
-            </div>
-            <p class="helper">${escapeHtml(scheduleFormatDateLabel(tomorrowLabel))}</p>
-            ${scheduleQuickListMarkup(tomorrowPreview, "Brak pozycji na jutro.")}
-          </section>
-        </div>
+        ${scheduleSummaryTilesMarkup()}
         <section class="schedule-calendar-card">
           <div class="schedule-calendar-head">
             <div class="schedule-calendar-nav">
@@ -1708,11 +2063,16 @@
                           </div>
                           <p>${escapeHtml(item.title || "Rezerwacja")}</p>
                           <p class="helper">${escapeHtml(item.subtitle || "")}</p>
+                          ${scheduleCountdownInlineMarkup(item)}
                           <div class="inline-actions">
                             ${
-                              item.status === "pending" || item.status === "email_verification_pending"
-                                ? `<button type="button" class="button secondary" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>
-                                   <button type="button" class="button secondary danger-muted" data-schedule-action="reject" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odrzuć</button>`
+                              item.status === "pending"
+                                ? `<button type="button" class="button secondary" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>`
+                                : ""
+                            }
+                            ${
+                              item.status !== "manual_block"
+                                ? `<button type="button" class="button secondary danger-muted" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`
                                 : ""
                             }
                           </div>
@@ -1749,6 +2109,11 @@
     panel.querySelector("[data-schedule-add]")?.addEventListener("click", () => {
       openScheduleCreateModal(state.schedule.selectedDate || getTodayIsoDate());
     });
+    panel.querySelectorAll("[data-schedule-list]").forEach((button) => {
+      button.addEventListener("click", () => {
+        openScheduleListModal(button.dataset.scheduleList || "tomorrow");
+      });
+    });
     panel.querySelectorAll("[data-schedule-action]").forEach((button) => {
       button.addEventListener("click", () => {
         handleScheduleAction(
@@ -1758,6 +2123,7 @@
         );
       });
     });
+    syncScheduleCountdownTicker();
   }
 
   async function handleScheduleAction(action, service, id) {
@@ -1770,8 +2136,8 @@
       await scheduleConfirmReservation(service, id);
       return;
     }
-    if (action === "reject") {
-      await scheduleCancelReservation(service, id, "Rezerwacja została odrzucona.");
+    if (action === "cancel" || action === "reject") {
+      openScheduleCancelModal(service, id);
     }
   }
 
@@ -1785,9 +2151,9 @@
     }
   }
 
-  async function scheduleCancelReservation(service, id, successMessage = "Rezerwacja została anulowana.") {
+  async function scheduleCancelReservation(service, id, cancelReason = "", successMessage = "Rezerwacja została odwołana.") {
     try {
-      await bookingAdminApi(service, "admin-reservation-cancel", { method: "POST", body: { id } });
+      await bookingAdminApi(service, "admin-reservation-cancel", { method: "POST", body: { id, cancelReason } });
       await loadScheduleData({ silent: true });
       renderSchedulePanel(successMessage);
     } catch (error) {
@@ -1795,9 +2161,56 @@
     }
   }
 
+  function openScheduleCancelModal(service, id, successMessage = "Rezerwacja została odwołana.") {
+    const item = scheduleFindItem(service, id);
+    if (!item) return;
+    if (item.status === "manual_block") {
+      if (!window.confirm("Czy na pewno usunąć tę blokadę?")) return;
+      scheduleCancelReservation(item.service, item.id, "", "Blokada została usunięta.");
+      return;
+    }
+    openScheduleModal(
+      `
+        <div class="admin-modal-head">
+          <div>
+            <p class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</p>
+            <h3>Odwołaj rezerwację</h3>
+            <p class="helper">Powód zostanie wysłany do klienta w automatycznym mailu o anulowaniu.</p>
+          </div>
+          <button type="button" class="button secondary icon-button" data-schedule-modal-close aria-label="Zamknij">${scheduleIconMarkup("close")}</button>
+        </div>
+        <form class="schedule-cancel-form" data-schedule-cancel-form>
+          <label>
+            <span>Powód anulowania</span>
+            <textarea name="cancelReason" rows="5" maxlength="2000" required placeholder="Podaj powód odwołania rezerwacji."></textarea>
+          </label>
+          <div class="admin-modal-footer schedule-modal-footer">
+            <button type="button" class="button secondary" data-schedule-modal-close>Anuluj</button>
+            <button type="submit" class="button danger">Odwołaj rezerwację</button>
+          </div>
+        </form>
+      `,
+      (mount) => {
+        mount.querySelector("[data-schedule-cancel-form]")?.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const form = event.currentTarget;
+          const formData = new FormData(form);
+          const cancelReason = String(formData.get("cancelReason") || "").trim();
+          if (!cancelReason) {
+            form.querySelector("textarea")?.focus();
+            return;
+          }
+          await scheduleCancelReservation(item.service, item.id, cancelReason, successMessage);
+          closeScheduleModal();
+        });
+      }
+    );
+  }
+
   function closeScheduleModal() {
     document.querySelector("#schedule-modal-mount")?.remove();
     document.body.classList.remove("admin-modal-open");
+    syncScheduleCountdownTicker();
   }
 
   function openScheduleModal(contentMarkup, bindEvents) {
@@ -1823,6 +2236,7 @@
     if (typeof bindEvents === "function") {
       bindEvents(mount);
     }
+    syncScheduleCountdownTicker();
   }
 
   function scheduleReservationDetailsMarkup(item) {
@@ -1867,6 +2281,7 @@
     }
 
     cards.push(scheduleDetailCardMarkup("Status", item.statusLabel || scheduleStatusLabel(item.status)));
+    cards.push(scheduleCountdownCardMarkup(item));
     if (item.service === "hotel") {
       cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatCompactDate(item.raw.dateFrom)} - ${scheduleFormatCompactDate(item.raw.dateTo)}`));
       cards.push(scheduleDetailCardMarkup("Pokoje", scheduleRoomLabels(item.raw.roomIds || item.resourceIds || []) || "—", true));
@@ -1925,17 +2340,16 @@
         ${scheduleReservationDetailsMarkup(item)}
         <div class="admin-modal-footer schedule-modal-footer">
           ${
-            item.status === "pending" || item.status === "email_verification_pending"
+            item.status === "pending"
               ? `<div class="inline-actions">
                    <button type="button" class="button secondary" data-schedule-details-action="confirm">Potwierdź</button>
-                   <button type="button" class="button secondary danger-muted" data-schedule-details-action="reject">Odrzuć</button>
                  </div>`
               : ""
           }
           <div class="inline-actions schedule-modal-danger">
             <button type="button" class="button ${isBlock ? "danger icon-button" : "danger"}" data-schedule-details-action="delete" aria-label="${escapeAttribute(
-              isBlock ? "Usuń blokadę" : "Anuluj rezerwację"
-            )}">${isBlock ? scheduleIconMarkup("trash") : "Anuluj rezerwację"}</button>
+              isBlock ? "Usuń blokadę" : "Odwołaj rezerwację"
+            )}">${isBlock ? scheduleIconMarkup("trash") : "Odwołaj rezerwację"}</button>
           </div>
         </div>
       `,
@@ -1952,20 +2366,14 @@
               closeScheduleModal();
               return;
             }
-            if (action === "reject") {
-              if (!window.confirm("Czy na pewno odrzucić tę rezerwację?")) return;
-              await scheduleCancelReservation(item.service, item.id, "Rezerwacja została odrzucona.");
-              closeScheduleModal();
-              return;
-            }
             if (action === "delete") {
-              if (!window.confirm(isBlock ? "Czy na pewno usunąć tę blokadę?" : "Czy na pewno anulować tę rezerwację?")) return;
-              await scheduleCancelReservation(
-                item.service,
-                item.id,
-                isBlock ? "Blokada została usunięta." : "Rezerwacja została anulowana."
-              );
-              closeScheduleModal();
+              if (isBlock) {
+                if (!window.confirm("Czy na pewno usunąć tę blokadę?")) return;
+                await scheduleCancelReservation(item.service, item.id, "", "Blokada została usunięta.");
+                closeScheduleModal();
+                return;
+              }
+              openScheduleCancelModal(item.service, item.id);
             }
           });
         });
@@ -2015,12 +2423,16 @@
     `;
   }
 
+  function scheduleRestaurantTableLimit() {
+    return Math.max(0, Array.isArray(state.schedule.tableOptions) ? state.schedule.tableOptions.length : 0);
+  }
+
   function scheduleHallOptionsMarkup(selectedHallId) {
     const current = String(selectedHallId || "");
     return `
       <label class="field">
         <span>Sala</span>
-        <select name="hallId" required>
+        <select name="hallId" required data-schedule-hall-select>
           ${state.schedule.hallOptions
             .map(
               (hall) =>
@@ -2032,11 +2444,30 @@
     `;
   }
 
+  function scheduleSelectedHall(selectedHallId) {
+    const current = String(selectedHallId || "");
+    return state.schedule.hallOptions.find((hall) => String(hall.id) === current) || state.schedule.hallOptions[0] || null;
+  }
+
+  function scheduleHallIsSmall(selectedHallId) {
+    return String(scheduleSelectedHall(selectedHallId)?.hallKind || "").toLowerCase() === "small";
+  }
+
+  function scheduleHallExclusiveFieldMarkup(selectedHallId, selectedValue = "0") {
+    if (scheduleHallIsSmall(selectedHallId)) {
+      return "";
+    }
+    return `<label class="field"><span>Na wyłączność</span><select name="exclusive"><option value="0" ${
+      String(selectedValue) === "1" ? "" : "selected"
+    }>Nie</option><option value="1" ${String(selectedValue) === "1" ? "selected" : ""}>Tak</option></select></label>`;
+  }
+
   function openScheduleEditModal(item) {
     if (!item) return;
     const isBlock = item.status === "manual_block";
     const title = isBlock ? "Edycja blokady" : "Edycja rezerwacji";
     const raw = item.raw || {};
+    const restaurantTableLimit = scheduleRestaurantTableLimit();
     let fieldsMarkup = "";
 
     if (isBlock) {
@@ -2068,7 +2499,7 @@
           <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(raw.reservationDate || "")}" required /></label>
           <label class="field"><span>Start</span><input type="time" name="startTime" value="${escapeAttribute(raw.startTime || "")}" required /></label>
           <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="${escapeAttribute(String(raw.durationHours || 2))}" required /></label>
-          <label class="field"><span>Liczba stolików</span><input type="number" min="1" name="tablesCount" value="${escapeAttribute(String(raw.tablesCount || 1))}" required /></label>
+          <label class="field"><span>Liczba stolików</span><input type="number" min="1" max="${escapeAttribute(String(Math.max(1, restaurantTableLimit)))}" name="tablesCount" value="${escapeAttribute(String(raw.tablesCount || 1))}" required /></label>
           <label class="field"><span>Liczba gości</span><input type="number" min="1" name="guestsCount" value="${escapeAttribute(String(raw.guestsCount || 1))}" required /></label>
           <label class="field"><span>Łączone stoliki</span><select name="joinTables"><option value="0" ${raw.joinTables ? "" : "selected"}>Nie</option><option value="1" ${raw.joinTables ? "selected" : ""}>Tak</option></select></label>
           <label class="field"><span>Imię i nazwisko</span><input name="fullName" value="${escapeAttribute(raw.fullName || "")}" required /></label>
@@ -2078,6 +2509,7 @@
           <label class="field-full"><span>Uwagi klienta</span><textarea name="customerNote">${escapeHtml(raw.customerNote || "")}</textarea></label>
           <label class="field-full"><span>Notatka administratora</span><textarea name="adminNote">${escapeHtml(raw.adminNote || "")}</textarea></label>
         </div>
+        <p class="helper">Aktualnie aktywnych stolików: ${escapeHtml(String(restaurantTableLimit))}.</p>
       `;
     } else {
       fieldsMarkup = `
@@ -2087,7 +2519,7 @@
           <label class="field"><span>Start</span><input type="time" name="startTime" value="${escapeAttribute(raw.startTime || "")}" required /></label>
           <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="${escapeAttribute(String(raw.durationHours || 2))}" required /></label>
           <label class="field"><span>Liczba gości</span><input type="number" min="0" name="guestsCount" value="${escapeAttribute(String(raw.guestsCount || 0))}" required /></label>
-          <label class="field"><span>Na wyłączność</span><select name="exclusive"><option value="0" ${raw.exclusive ? "" : "selected"}>Nie</option><option value="1" ${raw.exclusive ? "selected" : ""}>Tak</option></select></label>
+          ${scheduleHallExclusiveFieldMarkup(raw.hallId || "", raw.exclusive ? "1" : "0")}
           <label class="field"><span>Typ wydarzenia</span><input name="eventType" value="${escapeAttribute(raw.eventType || "")}" /></label>
           <label class="field"><span>Imię i nazwisko</span><input name="fullName" value="${escapeAttribute(raw.fullName || "")}" required /></label>
           <label class="field"><span>E-mail</span><input name="email" type="email" value="${escapeAttribute(raw.email || "")}" required /></label>
@@ -2145,6 +2577,12 @@
             body.startTime = formData.get("startTime");
             body.durationHours = Number(formData.get("durationHours") || 0);
             body.tablesCount = Number(formData.get("tablesCount") || 1);
+            if (!restaurantTableLimit) {
+              throw new Error("Brak aktywnych stolików w restauracji.");
+            }
+            if (body.tablesCount > restaurantTableLimit) {
+              throw new Error(`Mozesz wybrac maksymalnie ${restaurantTableLimit} stolikow.`);
+            }
             body.guestsCount = Number(formData.get("guestsCount") || 1);
             body.joinTables = formData.get("joinTables") === "1";
             body.fullName = formData.get("fullName");
@@ -2159,7 +2597,7 @@
             body.startTime = formData.get("startTime");
             body.durationHours = Number(formData.get("durationHours") || 0);
             body.guestsCount = Number(formData.get("guestsCount") || 0);
-            body.exclusive = formData.get("exclusive") === "1";
+            body.exclusive = scheduleHallIsSmall(formData.get("hallId")) ? true : formData.get("exclusive") === "1";
             body.eventType = formData.get("eventType") || "";
             body.fullName = formData.get("fullName");
             body.email = formData.get("email");
@@ -2199,6 +2637,7 @@
       service: "",
       mode: "reservation",
       date: String(defaultDate || getTodayIsoDate()).slice(0, 10),
+      hallId: String(state.schedule.hallOptions[0]?.id || ""),
     };
 
     const renderContent = () => {
@@ -2222,6 +2661,7 @@
       const isHotel = model.service === "hotel";
       const isRestaurant = model.service === "restaurant";
       const isHall = model.service === "hall";
+      const restaurantTableLimit = scheduleRestaurantTableLimit();
 
       let fields = "";
       if (isHotel) {
@@ -2243,10 +2683,9 @@
               ${scheduleHotelRoomOptionsMarkup([])}
               <div class="field-grid">
                 <label class="field"><span>Imię i nazwisko</span><input name="fullName" required /></label>
-                <label class="field"><span>E-mail</span><input name="email" type="email" required /></label>
-                <label class="field"><span>Prefiks</span><input name="phonePrefix" value="+48" required /></label>
-                <label class="field"><span>Numer telefonu</span><input name="phoneNational" required /></label>
-                <label class="field"><span>Status</span><select name="status"><option value="pending">Do potwierdzenia</option><option value="confirmed">Potwierdzona (od razu aktywna)</option></select></label>
+                <label class="field"><span>E-mail</span><input name="email" type="email" /></label>
+                <label class="field"><span>Prefiks</span><input name="phonePrefix" value="+48" /></label>
+                <label class="field"><span>Numer telefonu</span><input name="phoneNational" /></label>
                 <label class="field-full"><span>Uwagi klienta</span><textarea name="customerNote"></textarea></label>
               </div>
             `;
@@ -2267,23 +2706,23 @@
                 <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
                 <label class="field"><span>Start</span><input type="time" name="startTime" value="12:00" required /></label>
                 <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="2" required /></label>
-                <label class="field"><span>Liczba stolików</span><input type="number" min="1" name="tablesCount" value="1" required /></label>
+                <label class="field"><span>Liczba stolików</span><input type="number" min="1" max="${escapeAttribute(String(Math.max(1, restaurantTableLimit)))}" name="tablesCount" value="1" required /></label>
                 <label class="field"><span>Liczba gości</span><input type="number" min="1" name="guestsCount" value="2" required /></label>
                 <label class="field"><span>Łączone stoliki</span><select name="joinTables"><option value="0">Nie</option><option value="1">Tak</option></select></label>
                 <label class="field"><span>Imię i nazwisko</span><input name="fullName" required /></label>
-                <label class="field"><span>E-mail</span><input name="email" type="email" required /></label>
-                <label class="field"><span>Prefiks</span><input name="phonePrefix" value="+48" required /></label>
-                <label class="field"><span>Numer telefonu</span><input name="phoneNational" required /></label>
-                <label class="field"><span>Status</span><select name="status"><option value="pending">Do potwierdzenia</option><option value="confirmed">Potwierdzona (od razu aktywna)</option></select></label>
+                <label class="field"><span>E-mail</span><input name="email" type="email" /></label>
+                <label class="field"><span>Prefiks</span><input name="phonePrefix" value="+48" /></label>
+                <label class="field"><span>Numer telefonu</span><input name="phoneNational" /></label>
                 <label class="field-full"><span>Uwagi klienta</span><textarea name="customerNote"></textarea></label>
               </div>
+              <p class="helper">Aktualnie aktywnych stolików: ${escapeHtml(String(restaurantTableLimit))}.</p>
             `;
       } else if (isHall) {
         fields =
           model.mode === "block"
             ? `
               <div class="field-grid">
-                ${scheduleHallOptionsMarkup(state.schedule.hallOptions[0]?.id || "")}
+                ${scheduleHallOptionsMarkup(model.hallId || state.schedule.hallOptions[0]?.id || "")}
                 <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
                 <label class="field"><span>Start</span><input type="time" name="startTime" value="12:00" required /></label>
                 <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="3" required /></label>
@@ -2292,18 +2731,17 @@
             `
             : `
               <div class="field-grid">
-                ${scheduleHallOptionsMarkup(state.schedule.hallOptions[0]?.id || "")}
+                ${scheduleHallOptionsMarkup(model.hallId || state.schedule.hallOptions[0]?.id || "")}
                 <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
                 <label class="field"><span>Start</span><input type="time" name="startTime" value="12:00" required /></label>
                 <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="3" required /></label>
                 <label class="field"><span>Liczba gości</span><input type="number" min="1" name="guestsCount" value="40" required /></label>
-                <label class="field"><span>Na wyłączność</span><select name="exclusive"><option value="0">Nie</option><option value="1">Tak</option></select></label>
+                ${scheduleHallExclusiveFieldMarkup(model.hallId || state.schedule.hallOptions[0]?.id || "", "0")}
                 <label class="field"><span>Rodzaj wydarzenia</span><input name="eventType" value="Wydarzenie" /></label>
                 <label class="field"><span>Imię i nazwisko</span><input name="fullName" required /></label>
-                <label class="field"><span>E-mail</span><input name="email" type="email" required /></label>
-                <label class="field"><span>Prefiks</span><input name="phonePrefix" value="+48" required /></label>
-                <label class="field"><span>Numer telefonu</span><input name="phoneNational" required /></label>
-                <label class="field"><span>Status</span><select name="status"><option value="pending">Do potwierdzenia</option><option value="confirmed">Potwierdzona (od razu aktywna)</option></select></label>
+                <label class="field"><span>E-mail</span><input name="email" type="email" /></label>
+                <label class="field"><span>Prefiks</span><input name="phonePrefix" value="+48" /></label>
+                <label class="field"><span>Numer telefonu</span><input name="phoneNational" /></label>
                 <label class="field-full"><span>Uwagi klienta</span><textarea name="customerNote"></textarea></label>
               </div>
             `;
@@ -2357,6 +2795,10 @@
         model.service = "";
         rerender();
       });
+      mount.querySelector("[data-schedule-hall-select]")?.addEventListener("change", (event) => {
+        model.hallId = String(event.currentTarget?.value || "");
+        rerender();
+      });
       mount.querySelector("#schedule-create-form")?.addEventListener("submit", async (event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
@@ -2389,12 +2831,14 @@
                   dateTo: formData.get("dateTo"),
                   roomIds: formData.getAll("roomIds"),
                   fullName: formData.get("fullName"),
-                  email: formData.get("email"),
-                  phonePrefix: formData.get("phonePrefix"),
-                  phoneNational: formData.get("phoneNational"),
+                  email: String(formData.get("email") || "").trim(),
+                  phonePrefix: String(formData.get("phoneNational") || "").trim()
+                    ? String(formData.get("phonePrefix") || "+48").trim()
+                    : "",
+                  phoneNational: String(formData.get("phoneNational") || "").trim(),
                   customerNote: formData.get("customerNote") || "",
                   adminNote: "",
-                  status: formData.get("status") || "pending",
+                  status: "confirmed",
                 },
               });
             }
@@ -2423,22 +2867,31 @@
                 },
               });
             } else {
+              const tablesCount = Number(formData.get("tablesCount") || 1);
+              if (!restaurantTableLimit) {
+                throw new Error("Brak aktywnych stolików w restauracji.");
+              }
+              if (tablesCount > restaurantTableLimit) {
+                throw new Error(`Mozesz wybrac maksymalnie ${restaurantTableLimit} stolikow.`);
+              }
               await bookingAdminApi("restaurant", "admin-reservation-create", {
                 method: "POST",
                 body: {
                   reservationDate: formData.get("reservationDate"),
                   startTime: formData.get("startTime"),
                   durationHours: Number(formData.get("durationHours") || 0),
-                  tablesCount: Number(formData.get("tablesCount") || 1),
+                  tablesCount,
                   guestsCount: Number(formData.get("guestsCount") || 1),
                   joinTables: formData.get("joinTables") === "1",
                   fullName: formData.get("fullName"),
-                  email: formData.get("email"),
-                  phonePrefix: formData.get("phonePrefix"),
-                  phoneNational: formData.get("phoneNational"),
+                  email: String(formData.get("email") || "").trim(),
+                  phonePrefix: String(formData.get("phoneNational") || "").trim()
+                    ? String(formData.get("phonePrefix") || "+48").trim()
+                    : "",
+                  phoneNational: String(formData.get("phoneNational") || "").trim(),
                   customerNote: formData.get("customerNote") || "",
                   adminNote: "",
-                  status: formData.get("status") || "pending",
+                  status: "confirmed",
                 },
               });
             }
@@ -2483,15 +2936,17 @@
                   startTime: formData.get("startTime"),
                   durationHours: Number(formData.get("durationHours") || 0),
                   guestsCount: Number(formData.get("guestsCount") || 0),
-                  exclusive: formData.get("exclusive") === "1",
+                  exclusive: scheduleHallIsSmall(formData.get("hallId")) ? true : formData.get("exclusive") === "1",
                   eventType: formData.get("eventType") || "Wydarzenie",
                   fullName: formData.get("fullName"),
-                  email: formData.get("email"),
-                  phonePrefix: formData.get("phonePrefix"),
-                  phoneNational: formData.get("phoneNational"),
+                  email: String(formData.get("email") || "").trim(),
+                  phonePrefix: String(formData.get("phoneNational") || "").trim()
+                    ? String(formData.get("phonePrefix") || "+48").trim()
+                    : "",
+                  phoneNational: String(formData.get("phoneNational") || "").trim(),
                   customerNote: formData.get("customerNote") || "",
                   adminNote: "",
-                  status: formData.get("status") || "pending",
+                  status: "confirmed",
                 },
               });
             }
@@ -2929,6 +3384,15 @@
     const activeTab = getAdminTabConfig();
     const activeTile = getActiveAdminTile(activeTab.key);
     const inSectionView = state.ui.view === "section";
+    const homeTabs = HOME_TAB_ORDER.map((tabKey) => ADMIN_TABS.find((tab) => tab.key === tabKey)).filter(Boolean);
+    const primaryHomeTabs = homeTabs.filter((tab) => ["hotel", "restauracja", "przyjecia"].includes(tab.key));
+    const secondaryHomeTabs = homeTabs.filter((tab) => ["dokumenty", "kontakt"].includes(tab.key));
+    const scheduleTab = ADMIN_TABS.find((tab) => tab.key === "grafik");
+    const totalHomeAreas = ADMIN_TABS.length;
+    const totalEditorViews = ADMIN_TABS.reduce(
+      (sum, tab) => sum + (Array.isArray(tab.tiles) ? tab.tiles.length : 0),
+      0
+    );
 
     app.innerHTML = `
       <div class="admin-shell">
@@ -2996,36 +3460,49 @@
             `
               : `
               <div class="admin-home-layout">
-                ${(() => {
-                  const scheduleTab = ADMIN_TABS.find((tab) => tab.key === "grafik");
-                  if (!scheduleTab) return "";
-                  return `
-                    <button
-                      type="button"
-                      class="admin-tile admin-entry-tile admin-entry-tile--schedule"
-                      data-admin-entry="${escapeAttribute(scheduleTab.key)}"
-                    >
-                      <span class="admin-entry-icon" aria-hidden="true">${scheduleIconMarkup("calendar")}</span>
-                      <span class="admin-tile-title">${escapeHtml(scheduleTab.label)}</span>
-                    </button>
-                  `;
-                })()}
-                <div class="admin-tile-grid admin-entry-grid" aria-label="Glowne sekcje panelu administracyjnego">
-                  ${HOME_TAB_ORDER.map((tabKey) => ADMIN_TABS.find((tab) => tab.key === tabKey))
-                    .filter(Boolean)
-                    .map(
-                    (tab) => `
-                      <button
-                        type="button"
-                        class="admin-tile admin-entry-tile"
-                        data-admin-entry="${escapeAttribute(tab.key)}"
-                      >
-                        <span class="admin-tile-title">${escapeHtml(tab.label)}</span>
-                        <span class="admin-tile-copy">${escapeHtml(tab.description)}</span>
-                      </button>
-                    `
-                  )
-                    .join("")}
+                <section class="admin-home-hero">
+                  <div class="admin-home-hero-copy">
+                    <p class="pill">Panel administratora</p>
+                    <h2>Centrum zarządzania Średzką Koroną</h2>
+                    <p class="section-intro">Najważniejsze moduły są na pierwszym planie, a rzadziej używane sekcje pomocnicze pozostają pod ręką po prawej stronie.</p>
+                  </div>
+                  <div class="admin-home-hero-stats" aria-label="Podsumowanie panelu">
+                    <article class="admin-home-stat">
+                      <strong>${totalHomeAreas}</strong>
+                      <span>obszarów pracy</span>
+                    </article>
+                    <article class="admin-home-stat">
+                      <strong>${totalEditorViews}</strong>
+                      <span>widoków edycji</span>
+                    </article>
+                    <article class="admin-home-stat">
+                      <strong>Grafik</strong>
+                      <span>akceptacje i terminy</span>
+                    </article>
+                  </div>
+                </section>
+                <div class="admin-home-dashboard">
+                  <div class="admin-home-main">
+                    ${
+                      scheduleTab
+                        ? renderAdminEntryCard(scheduleTab, {
+                            featured: true,
+                            highlights: ["Akceptacje", "Dzisiejsze terminy", "Kalendarz"],
+                          })
+                        : ""
+                    }
+                    <div class="admin-home-primary-grid" aria-label="Glowne sekcje panelu administracyjnego">
+                      ${primaryHomeTabs.map((tab) => renderAdminEntryCard(tab)).join("")}
+                    </div>
+                  </div>
+                  <aside class="admin-home-side" aria-label="Sekcje pomocnicze panelu administracyjnego">
+                    <div class="admin-home-side-copy">
+                      <p class="pill">Pomocnicze</p>
+                      <h3>Treści i dane firmowe</h3>
+                      <p class="section-intro">Sekcje używane rzadziej, ale ważne przy aktualizacji dokumentów i danych kontaktowych.</p>
+                    </div>
+                    ${secondaryHomeTabs.map((tab) => renderAdminEntryCard(tab, { compact: true })).join("")}
+                  </aside>
                 </div>
               </div>
             `
@@ -3904,7 +4381,6 @@
     state.content.home.sectionMedia = normalizeHomeSectionMedia(state.content.home.sectionMedia);
     const media = state.content.home.sectionMedia[sectionKey];
     const defaults = HOME_SECTION_MEDIA_DEFAULTS[sectionKey] || HOME_SECTION_MEDIA_DEFAULTS.hotel;
-    const draft = structuredClone(media);
     const messageId = `home-media-status-${sectionKey}`;
 
     panel.innerHTML = `
@@ -3924,22 +4400,22 @@
           <label class="field-full">
             <span>Pozycja pozioma (X)</span>
             <div class="home-media-control-pair">
-              <input type="range" min="0" max="100" step="1" data-home-media-field="focusX" value="${escapeAttribute(String(draft.focusX))}" />
-              <input type="number" min="0" max="100" step="1" data-home-media-field="focusX" value="${escapeAttribute(String(draft.focusX))}" />
+              <input type="range" min="0" max="100" step="1" data-home-media-field="focusX" value="${escapeAttribute(String(clampNumber(media.focusX, 0, 100, defaults.focusX)))}" />
+              <input type="number" min="0" max="100" step="1" data-home-media-field="focusX" value="${escapeAttribute(String(clampNumber(media.focusX, 0, 100, defaults.focusX)))}" />
             </div>
           </label>
           <label class="field-full">
             <span>Pozycja pionowa (Y)</span>
             <div class="home-media-control-pair">
-              <input type="range" min="0" max="100" step="1" data-home-media-field="focusY" value="${escapeAttribute(String(draft.focusY))}" />
-              <input type="number" min="0" max="100" step="1" data-home-media-field="focusY" value="${escapeAttribute(String(draft.focusY))}" />
+              <input type="range" min="0" max="100" step="1" data-home-media-field="focusY" value="${escapeAttribute(String(clampNumber(media.focusY, 0, 100, defaults.focusY)))}" />
+              <input type="number" min="0" max="100" step="1" data-home-media-field="focusY" value="${escapeAttribute(String(clampNumber(media.focusY, 0, 100, defaults.focusY)))}" />
             </div>
           </label>
           <label class="field-full">
             <span>Zoom</span>
             <div class="home-media-control-pair">
-              <input type="range" min="1" max="2.5" step="0.01" data-home-media-field="zoom" value="${escapeAttribute(String(draft.zoom))}" />
-              <input type="number" min="1" max="2.5" step="0.01" data-home-media-field="zoom" value="${escapeAttribute(String(draft.zoom))}" />
+              <input type="range" min="1" max="2.5" step="0.01" data-home-media-field="zoom" value="${escapeAttribute(String(clampNumber(media.zoom, 1, 2.5, defaults.zoom)))}" />
+              <input type="number" min="1" max="2.5" step="0.01" data-home-media-field="zoom" value="${escapeAttribute(String(clampNumber(media.zoom, 1, 2.5, defaults.zoom)))}" />
             </div>
           </label>
         </div>
@@ -3947,13 +4423,9 @@
         <div class="home-media-preview-shell">
           <strong>Podglad kafelka</strong>
           <div class="home-media-preview" id="home-media-preview-${escapeAttribute(sectionKey)}">
-            <img src="${escapeAttribute(draft.imageUrl || "")}" alt="${escapeAttribute(draft.imageAlt || panelLabel)}" />
+            <img src="${escapeAttribute(media.imageUrl || "")}" alt="${escapeAttribute(media.imageAlt || panelLabel)}" />
             <div class="home-media-preview-overlay">${escapeHtml(panelLabel)}</div>
           </div>
-        </div>
-        <div class="admin-toolbar-actions home-media-draft-actions">
-          <button class="button secondary" type="button" data-home-media-cancel="${escapeAttribute(sectionKey)}">Anuluj</button>
-          <button class="button" type="button" data-home-media-apply="${escapeAttribute(sectionKey)}">Zapisz</button>
         </div>
         <p class="status" id="${escapeAttribute(messageId)}">${escapeHtml(statusMessage)}</p>
       </div>
@@ -3962,8 +4434,6 @@
     const statusNode = panel.querySelector(`#${messageId}`);
     const preview = panel.querySelector(`#home-media-preview-${sectionKey}`);
     const previewImg = preview?.querySelector("img");
-    const applyButton = panel.querySelector(`[data-home-media-apply="${sectionKey}"]`);
-    const cancelButton = panel.querySelector(`[data-home-media-cancel="${sectionKey}"]`);
 
     const setStatus = (text) => {
       if (statusNode) {
@@ -3971,46 +4441,15 @@
       }
     };
 
-    const sameMediaState = (left, right) =>
-      JSON.stringify({
-        imageUrl: left.imageUrl || "",
-        imageAlt: left.imageAlt || "",
-        focusX: Number(left.focusX ?? defaults.focusX),
-        focusY: Number(left.focusY ?? defaults.focusY),
-        zoom: Number(left.zoom ?? defaults.zoom),
-      }) ===
-      JSON.stringify({
-        imageUrl: right.imageUrl || "",
-        imageAlt: right.imageAlt || "",
-        focusX: Number(right.focusX ?? defaults.focusX),
-        focusY: Number(right.focusY ?? defaults.focusY),
-        zoom: Number(right.zoom ?? defaults.zoom),
-      });
-
-    const syncDraftFrom = (source) => {
-      draft.imageUrl = source.imageUrl || defaults.imageUrl;
-      draft.imageAlt = source.imageAlt || defaults.imageAlt || panelLabel;
-      draft.focusX = clampNumber(source.focusX, 0, 100, defaults.focusX);
-      draft.focusY = clampNumber(source.focusY, 0, 100, defaults.focusY);
-      draft.zoom = clampNumber(source.zoom, 1, 2.5, defaults.zoom);
-    };
-
-    const refreshDraftActions = () => {
-      const isDirty = !sameMediaState(draft, media);
-      if (applyButton) applyButton.disabled = !isDirty;
-      if (cancelButton) cancelButton.disabled = !isDirty;
-    };
-
     const applyPreview = () => {
       if (!preview) return;
-      preview.style.setProperty("--home-media-focus-x", `${draft.focusX}%`);
-      preview.style.setProperty("--home-media-focus-y", `${draft.focusY}%`);
-      preview.style.setProperty("--home-media-zoom", String(draft.zoom));
+      preview.style.setProperty("--home-media-focus-x", `${clampNumber(media.focusX, 0, 100, defaults.focusX)}%`);
+      preview.style.setProperty("--home-media-focus-y", `${clampNumber(media.focusY, 0, 100, defaults.focusY)}%`);
+      preview.style.setProperty("--home-media-zoom", String(clampNumber(media.zoom, 1, 2.5, defaults.zoom)));
       if (previewImg) {
-        previewImg.src = draft.imageUrl || defaults.imageUrl;
-        previewImg.alt = draft.imageAlt || panelLabel;
+        previewImg.src = media.imageUrl || defaults.imageUrl;
+        previewImg.alt = media.imageAlt || panelLabel;
       }
-      refreshDraftActions();
     };
 
     const syncFieldInputs = (field, value) => {
@@ -4023,16 +4462,18 @@
 
     const updateMediaField = (field, rawValue) => {
       if (field === "zoom") {
-        draft.zoom = clampNumber(rawValue, 1, 2.5, defaults.zoom);
-        syncFieldInputs(field, draft.zoom);
+        media.zoom = clampNumber(rawValue, 1, 2.5, defaults.zoom);
+        syncFieldInputs(field, media.zoom);
       } else if (field === "focusX") {
-        draft.focusX = clampNumber(rawValue, 0, 100, defaults.focusX);
-        syncFieldInputs(field, draft.focusX);
+        media.focusX = clampNumber(rawValue, 0, 100, defaults.focusX);
+        syncFieldInputs(field, media.focusX);
       } else if (field === "focusY") {
-        draft.focusY = clampNumber(rawValue, 0, 100, defaults.focusY);
-        syncFieldInputs(field, draft.focusY);
+        media.focusY = clampNumber(rawValue, 0, 100, defaults.focusY);
+        syncFieldInputs(field, media.focusY);
       }
+      refreshSaveDockVisibility();
       applyPreview();
+      setStatus("Zmiany sa gotowe do publikacji. Wystarczy uzyc glownego przycisku Zapisz.");
     };
 
     panel.querySelectorAll('[data-home-media-field="focusX"], [data-home-media-field="focusY"], [data-home-media-field="zoom"]').forEach((input) => {
@@ -4045,12 +4486,17 @@
     });
 
     panel.querySelector(`[data-home-media-reset="${sectionKey}"]`)?.addEventListener("click", () => {
-      syncDraftFrom(defaults);
-      syncFieldInputs("focusX", draft.focusX);
-      syncFieldInputs("focusY", draft.focusY);
-      syncFieldInputs("zoom", draft.zoom);
+      media.imageUrl = defaults.imageUrl;
+      media.imageAlt = defaults.imageAlt || panelLabel;
+      media.focusX = clampNumber(defaults.focusX, 0, 100, defaults.focusX);
+      media.focusY = clampNumber(defaults.focusY, 0, 100, defaults.focusY);
+      media.zoom = clampNumber(defaults.zoom, 1, 2.5, defaults.zoom);
+      syncFieldInputs("focusX", media.focusX);
+      syncFieldInputs("focusY", media.focusY);
+      syncFieldInputs("zoom", media.zoom);
+      refreshSaveDockVisibility();
       applyPreview();
-      setStatus("Przywrocono domyslny obraz i domyslne kadrowanie.");
+      setStatus("Przywrocono domyslny obraz i kadrowanie. Zapiszesz to glownym przyciskiem Zapisz.");
     });
 
     panel.querySelector(`[data-home-media-upload-form="${sectionKey}"]`)?.addEventListener("submit", async (event) => {
@@ -4066,36 +4512,17 @@
       try {
         setStatus("Kompresowanie i przygotowanie zdjecia...");
         const compressed = await compressImageFile(file, { maxBytes: INLINE_IMAGE_MAX_BYTES });
-        draft.imageUrl = await blobToDataUrl(compressed);
-        if (!draft.imageAlt) {
-          draft.imageAlt = defaults.imageAlt || panelLabel;
+        media.imageUrl = await blobToDataUrl(compressed);
+        if (!media.imageAlt) {
+          media.imageAlt = defaults.imageAlt || panelLabel;
         }
+        refreshSaveDockVisibility();
         applyPreview();
-        setStatus("Zdjecie zostalo wgrane do szkicu. Kliknij Zapisz, aby zatwierdzic ustawienia.");
+        setStatus("Zdjecie zostalo podmienione. Wystarczy teraz uzyc glownego przycisku Zapisz.");
         form.reset();
       } catch (error) {
         setStatus(error.message || "Nie udalo sie przygotowac zdjecia.");
       }
-    });
-
-    applyButton?.addEventListener("click", () => {
-      media.imageUrl = draft.imageUrl;
-      media.imageAlt = draft.imageAlt;
-      media.focusX = draft.focusX;
-      media.focusY = draft.focusY;
-      media.zoom = draft.zoom;
-      refreshSaveDockVisibility();
-      refreshDraftActions();
-      setStatus("Ustawienia kafelka zapisano w panelu. Kliknij glowne Zapisz, aby opublikowac je na stronie.");
-    });
-
-    cancelButton?.addEventListener("click", () => {
-      syncDraftFrom(media);
-      syncFieldInputs("focusX", draft.focusX);
-      syncFieldInputs("focusY", draft.focusY);
-      syncFieldInputs("zoom", draft.zoom);
-      applyPreview();
-      setStatus("Przywrocono ostatnio zapisane ustawienia tego kafelka.");
     });
 
     applyPreview();
@@ -4321,80 +4748,103 @@
     const panel = document.querySelector("#gallery-panel");
     if (!panel) return;
     const mediaEnabled = state.capabilities?.mediaStorageEnabled === true;
+    const albums = Array.isArray(state.galleryAlbums) ? state.galleryAlbums : [];
     panel.innerHTML = `
-      <p class="pill">Galeria</p>
-      <h2>Albumy i zdjecia</h2>
-      <p class="section-intro">Dodaj album, potem wgraj zdjecia i ustaw okladke widoczna na stronie.</p>
+      <p class="pill">Imprezy</p>
+      <h2>Albumy wydarzen</h2>
+      <p class="section-intro">Albumy dodawane tutaj trafiaja do sekcji "Imprezy" w galerii strony Przyjecia. Wystarczy sam tytul albumu.</p>
       ${mediaEnabled ? "" : '<p class="status">Upload galerii jest obecnie niedostepny.</p>'}
-      <div class="grid">
-        <div class="col-4">
-          <div class="repeater-item">
-            <h3>Nowy album</h3>
-            <form id="album-form" class="stack">
-              <label class="field-full"><span>Tytul</span><input name="title" required ${mediaEnabled ? "" : "disabled"} /></label>
-              <label class="field-full"><span>Slug</span><input name="slug" placeholder="np-wesele-anna-piotr" required ${mediaEnabled ? "" : "disabled"} /></label>
-              <label class="field-full"><span>Opis</span><textarea name="description" ${mediaEnabled ? "" : "disabled"}></textarea></label>
-              <button class="button" type="submit" ${mediaEnabled ? "" : "disabled"}>Dodaj album</button>
-              <p class="status">${escapeHtml(statusMessage)}</p>
-            </form>
-          </div>
+      <div class="events-gallery-admin">
+        <div class="repeater-item events-gallery-admin__create">
+          <h3>Nowy album</h3>
+          <p class="helper">Nowe albumy pojawiaja sie w sekcji "Imprezy". Kolejnosc albumow i zdjec ustawiasz przyciskami obok.</p>
+          <form id="album-form" class="stack">
+            <label class="field-full"><span>Tytul albumu</span><input name="title" required ${mediaEnabled ? "" : "disabled"} /></label>
+            <button class="button" type="submit" ${mediaEnabled ? "" : "disabled"}>Dodaj album</button>
+          </form>
+          <p class="status">${escapeHtml(statusMessage)}</p>
         </div>
-        <div class="col-8">
-          <div class="stack">
-            ${
-              state.galleryAlbums.length
-                ? state.galleryAlbums
-                    .map(
-                      (album) => `
-                        <article class="repeater-item">
-                          <div class="repeater-head">
-                            <div>
-                              <h3>${escapeHtml(album.title)}</h3>
-                              <p class="helper">${escapeHtml(album.description || "")}</p>
-                            </div>
-                            <span class="pill">${escapeHtml(album.slug)}</span>
+        <div class="events-gallery-admin__content stack">
+          ${
+            albums.length
+              ? albums
+                  .map(
+                    (album, albumIndex) => `
+                      <article class="repeater-item events-gallery-album-card">
+                        <div class="repeater-head">
+                          <div>
+                            <h3>${escapeHtml(album.title)}</h3>
+                            <p class="helper">${escapeHtml(String(album.images?.length || 0))} zdjec w albumie</p>
                           </div>
-                          <form class="stack" data-upload-album="${album.id}">
-                            <label class="field-full">
-                              <span>Dodaj zdjecia do albumu</span>
-                              <input type="file" name="images" accept="image/*" multiple ${mediaEnabled ? "" : "disabled"} />
-                            </label>
-                            <button class="button secondary" type="submit" ${mediaEnabled ? "" : "disabled"}>Wgraj zdjecia</button>
-                          </form>
-                          <div class="thumb-grid">
-                            ${
-                              album.images && album.images.length
-                                ? album.images
-                                    .map(
-                                      (image) => `
-                                        <article class="thumb-card">
-                                          <img src="${escapeAttribute(image.url)}" alt="${escapeAttribute(image.alt || album.title)}" />
-                                          <div class="inline-actions">
-                                            <button class="button secondary" type="button" data-cover-image="${image.id}" ${mediaEnabled ? "" : "disabled"}>Ustaw jako glowne</button>
-                                            <button class="button danger" type="button" data-delete-image="${image.id}" ${mediaEnabled ? "" : "disabled"}>Usun</button>
-                                          </div>
-                                        </article>`
-                                    )
-                                    .join("")
-                                : `<p class="empty">Brak zdjec w albumie.</p>`
-                            }
+                          <div class="inline-actions">
+                            <button class="button secondary" type="button" data-move-album="${escapeAttribute(album.id)}" data-direction="-1" aria-label="Przesun album w gore" ${albumIndex === 0 || !mediaEnabled ? "disabled" : ""}>↑</button>
+                            <button class="button secondary" type="button" data-move-album="${escapeAttribute(album.id)}" data-direction="1" aria-label="Przesun album w dol" ${albumIndex === albums.length - 1 || !mediaEnabled ? "disabled" : ""}>↓</button>
                           </div>
-                        </article>`
-                    )
-                    .join("")
-                : `<p class="empty">Nie ma jeszcze albumow.</p>`
-            }
-          </div>
+                        </div>
+                        <form class="upload-room-gallery-form upload-room-gallery-form--album" data-upload-album="${escapeAttribute(album.id)}">
+                          <label class="field field-full upload-room-gallery-picker">
+                            <span>Dodaj zdjecia do albumu</span>
+                            <input class="upload-room-gallery-picker__input" type="file" name="images" accept="image/*" multiple ${mediaEnabled ? "" : "disabled"} />
+                            <span class="upload-room-gallery-picker__surface">
+                              <strong class="upload-room-gallery-picker__button">Wybierz pliki</strong>
+                              <span class="upload-room-gallery-picker__text" data-gallery-file-label="${escapeAttribute(album.id)}">Nie wybrano jeszcze zadnych plikow.</span>
+                            </span>
+                          </label>
+                          <button class="button secondary" type="submit" ${mediaEnabled ? "" : "disabled"}>Wgraj zdjecia</button>
+                        </form>
+                        <div class="thumb-grid">
+                          ${
+                            album.images && album.images.length
+                              ? album.images
+                                  .map(
+                                    (image, imageIndex) => `
+                                      <article class="thumb-card">
+                                        <img src="${escapeAttribute(image.url)}" alt="${escapeAttribute(image.alt || album.title)}" />
+                                        <div class="inline-actions">
+                                          <button class="button secondary" type="button" data-move-album-image="${escapeAttribute(album.id)}" data-image-id="${escapeAttribute(image.id)}" data-direction="-1" aria-label="Przesun zdjecie w lewo" ${imageIndex === 0 || !mediaEnabled ? "disabled" : ""}>←</button>
+                                          <button class="button secondary" type="button" data-move-album-image="${escapeAttribute(album.id)}" data-image-id="${escapeAttribute(image.id)}" data-direction="1" aria-label="Przesun zdjecie w prawo" ${imageIndex === album.images.length - 1 || !mediaEnabled ? "disabled" : ""}>→</button>
+                                          <button class="button danger" type="button" data-delete-image="${escapeAttribute(image.id)}" ${mediaEnabled ? "" : "disabled"}>Usun</button>
+                                        </div>
+                                      </article>`
+                                  )
+                                  .join("")
+                              : `<p class="empty">Brak zdjec w albumie.</p>`
+                          }
+                        </div>
+                      </article>`
+                  )
+                  .join("")
+              : `<div class="repeater-item"><p class="empty">Nie ma jeszcze albumow wydarzen.</p></div>`
+          }
         </div>
       </div>
     `;
 
-    document.querySelector("#album-form").addEventListener("submit", createAlbum);
+    const albumForm = document.querySelector("#album-form");
+    albumForm?.addEventListener("submit", createAlbum);
     panel.querySelectorAll("[data-upload-album]").forEach((form) => {
       form.addEventListener("submit", uploadAlbumImages);
+      const fileInput = form.querySelector('input[name="images"]');
+      const fileLabel = form.querySelector("[data-gallery-file-label]");
+      fileInput?.addEventListener("change", () => {
+        const count = fileInput.files?.length || 0;
+        if (!fileLabel) return;
+        if (!count) {
+          fileLabel.textContent = "Nie wybrano jeszcze zadnych plikow.";
+        } else if (count === 1) {
+          fileLabel.textContent = fileInput.files[0]?.name || "Wybrano 1 plik.";
+        } else {
+          fileLabel.textContent = `Wybrano ${count} pliki do wgrania.`;
+        }
+      });
     });
-    panel.querySelectorAll("[data-cover-image]").forEach((button) => {
-      button.addEventListener("click", () => setCoverImage(button.dataset.coverImage));
+    panel.querySelectorAll("[data-move-album]").forEach((button) => {
+      button.addEventListener("click", () => moveAlbum(button.dataset.moveAlbum, Number(button.dataset.direction)));
+    });
+    panel.querySelectorAll("[data-move-album-image]").forEach((button) => {
+      button.addEventListener("click", () =>
+        moveAlbumImage(button.dataset.moveAlbumImage, button.dataset.imageId, Number(button.dataset.direction))
+      );
     });
     panel.querySelectorAll("[data-delete-image]").forEach((button) => {
       button.addEventListener("click", () => deleteImage(button.dataset.deleteImage));
@@ -4404,13 +4854,14 @@
   async function createAlbum(event) {
     event.preventDefault();
     const form = event.currentTarget;
-    const payload = Object.fromEntries(new FormData(form).entries());
+    const title = String(new FormData(form).get("title") || "").trim();
     try {
       await api("/api/admin/gallery/albums", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ title }),
       });
+      form.reset();
       await loadDashboard("Album zostal dodany.");
     } catch (error) {
       renderGalleryPanel(error.message);
@@ -4451,9 +4902,48 @@
     }
   }
 
-  async function setCoverImage(imageId) {
-    await api(`/api/admin/gallery/images/${imageId}/cover`, { method: "POST" });
-    await loadDashboard("Okladka albumu zostala zaktualizowana.");
+  async function moveAlbum(albumId, direction) {
+    try {
+      const albums = Array.isArray(state.galleryAlbums) ? [...state.galleryAlbums] : [];
+      const index = albums.findIndex((album) => String(album.id) === String(albumId));
+      const nextIndex = index + direction;
+      if (index === -1 || nextIndex < 0 || nextIndex >= albums.length) {
+        return;
+      }
+      [albums[index], albums[nextIndex]] = [albums[nextIndex], albums[index]];
+      await api("/api/admin/gallery/albums/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ albumIds: albums.map((album) => Number(album.id)) }),
+      });
+      await loadDashboard("Kolejnosc albumow zostala zmieniona.");
+    } catch (error) {
+      renderGalleryPanel(error.message || "Nie udalo sie zmienic kolejnosci albumow.");
+    }
+  }
+
+  async function moveAlbumImage(albumId, imageId, direction) {
+    try {
+      const album = (state.galleryAlbums || []).find((entry) => String(entry.id) === String(albumId));
+      if (!album || !Array.isArray(album.images)) {
+        return;
+      }
+      const images = [...album.images];
+      const index = images.findIndex((image) => String(image.id) === String(imageId));
+      const nextIndex = index + direction;
+      if (index === -1 || nextIndex < 0 || nextIndex >= images.length) {
+        return;
+      }
+      [images[index], images[nextIndex]] = [images[nextIndex], images[index]];
+      await api(`/api/admin/gallery/albums/${albumId}/reorder-images`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageIds: images.map((image) => Number(image.id)) }),
+      });
+      await loadDashboard("Kolejnosc zdjec zostala zmieniona.");
+    } catch (error) {
+      renderGalleryPanel(error.message || "Nie udalo sie zmienic kolejnosci zdjec.");
+    }
   }
 
   async function deleteImage(imageId) {
@@ -5055,7 +5545,7 @@
               : `<p class="helper">Najpierw dodaj przynajmniej jedna kategorie, aby przypisywac podkategorie i produkty.</p>`
           }
           <div class="admin-modal-footer">
-            <p class="helper">Zmiany lokalne zapiszesz przyciskiem "Zapisz" w gornej belce panelu.</p>
+            <p class="helper">Zmiany lokalne zapiszesz przyciskiem "Zapisz" w dolnym, przypietym pasku akcji.</p>
             <button class="button secondary" type="button" data-menu-modal-close>Zamknij</button>
           </div>
         </section>
@@ -5861,6 +6351,10 @@
   function renderHotelRoomGalleriesPanel(statusMessage = "") {
     const panel = document.querySelector("#hotel-room-galleries-panel");
     if (!panel) return;
+    const status = typeof statusMessage === "string" ? { tone: statusMessage ? "neutral" : "", text: statusMessage } : {
+      tone: statusMessage?.tone || "",
+      text: statusMessage?.text || "",
+    };
     const roomGalleries = state.content.hotel?.roomGalleries || {
       "1-osobowe": [],
       "2-osobowe": [],
@@ -5880,11 +6374,15 @@
       <h2>Galeria Pokoi</h2>
       <p class="section-intro">Wspolna galeria pokoi. Przy dodawaniu zdjec wskazujesz album (1/2/3/4-osobowe), a nizej zarzadzasz kolejnoscia i usuwaniem.</p>
       <form class="repeater-item upload-room-gallery-form upload-room-gallery-form--album" id="hotel-room-gallery-upload-form">
-        <label class="field">
-          <span>Wgraj zdjecie</span>
-          <input type="file" name="images" accept="image/*" multiple required />
+        <label class="field field-full upload-room-gallery-picker">
+          <span>Wgraj zdjecia</span>
+          <input class="upload-room-gallery-picker__input" type="file" name="images" accept="image/*" multiple required />
+          <span class="upload-room-gallery-picker__surface">
+            <strong class="upload-room-gallery-picker__button">Wybierz pliki</strong>
+            <span class="upload-room-gallery-picker__text" data-room-gallery-file-label>Nie wybrano jeszcze zadnych plikow.</span>
+          </span>
         </label>
-        <label class="field">
+        <label class="field upload-room-gallery-form__album">
           <span>Wybierz album</span>
           <select name="roomType" required>
             ${roomTypes
@@ -5892,9 +6390,9 @@
               .join("")}
           </select>
         </label>
-        <button class="button secondary" type="submit">Wgraj</button>
+        <button class="button" type="submit">Wgraj</button>
       </form>
-      <p class="status">${escapeHtml(statusMessage)}</p>
+      <p class="status${status.tone ? ` status--${escapeAttribute(status.tone)}` : ""}">${escapeHtml(status.text)}</p>
       <div class="grid">
         ${roomTypes
           .map(
@@ -5928,7 +6426,22 @@
       </div>
     `;
 
-    panel.querySelector("#hotel-room-gallery-upload-form")?.addEventListener("submit", (event) => {
+    const uploadForm = panel.querySelector("#hotel-room-gallery-upload-form");
+    const fileInput = uploadForm?.querySelector('input[name="images"]');
+    const fileLabel = uploadForm?.querySelector("[data-room-gallery-file-label]");
+    fileInput?.addEventListener("change", () => {
+      const count = fileInput.files?.length || 0;
+      if (!fileLabel) return;
+      if (!count) {
+        fileLabel.textContent = "Nie wybrano jeszcze zadnych plikow.";
+      } else if (count === 1) {
+        fileLabel.textContent = fileInput.files[0]?.name || "Wybrano 1 plik.";
+      } else {
+        fileLabel.textContent = `Wybrano ${count} pliki do wgrania.`;
+      }
+    });
+
+    uploadForm?.addEventListener("submit", (event) => {
       const form = event.currentTarget;
       const selectedRoomType = form?.querySelector('[name="roomType"]')?.value;
       uploadRoomGalleryImages(event, selectedRoomType);
@@ -5968,7 +6481,7 @@
   async function uploadRoomGalleryImages(event, roomType) {
     event.preventDefault();
     if (!roomType) {
-      renderHotelRoomGalleriesPanel("Wybierz album docelowy.");
+      renderHotelRoomGalleriesPanel({ tone: "error", text: "Wybierz album docelowy." });
       return;
     }
     const form = event.currentTarget;
@@ -5980,7 +6493,7 @@
       if (fileInput) {
         fileInput.click();
       } else {
-        renderHotelRoomGalleriesPanel("Wybierz pliki do wgrania.");
+        renderHotelRoomGalleriesPanel({ tone: "error", text: "Wybierz pliki do wgrania." });
       }
       return;
     }
@@ -5996,7 +6509,7 @@
         payload.append("images", file, file.name);
       });
       if (!payload.getAll("images").length) {
-        renderHotelRoomGalleriesPanel("Wybierz pliki do wgrania.");
+        renderHotelRoomGalleriesPanel({ tone: "error", text: "Wybierz pliki do wgrania." });
         return;
       }
       const response = await api(`/api/admin/hotel/room-galleries/${encodeURIComponent(roomType)}/images`, {
@@ -6004,9 +6517,9 @@
         body: payload,
       });
       setHotelRoomGalleries(response?.roomGalleries);
-      renderHotelRoomGalleriesPanel("Zdjecia zostaly dodane.");
+      renderHotelRoomGalleriesPanel({ tone: "success", text: "Zdjecia zostaly wgrane poprawnie." });
     } catch (error) {
-      renderHotelRoomGalleriesPanel(error.message || "Blad podczas wgrywania zdjec.");
+      renderHotelRoomGalleriesPanel({ tone: "error", text: error.message || "Blad podczas wgrywania zdjec." });
     }
   }
 
@@ -6021,9 +6534,9 @@
         method: "DELETE",
       });
       setHotelRoomGalleries(response?.roomGalleries);
-      renderHotelRoomGalleriesPanel("Zdjecie zostalo usuniete.");
+      renderHotelRoomGalleriesPanel({ tone: "success", text: "Zdjecie zostalo usuniete." });
     } catch (error) {
-      renderHotelRoomGalleriesPanel(error.message || "Nie udalo sie usunac zdjecia.");
+      renderHotelRoomGalleriesPanel({ tone: "error", text: error.message || "Nie udalo sie usunac zdjecia." });
     }
   }
 
@@ -6042,7 +6555,7 @@
       .map((entry) => Number(entry?.id))
       .filter((id) => Number.isInteger(id) && id > 0);
     if (imageIds.length !== reordered.length) {
-      renderHotelRoomGalleriesPanel("Nie udalo sie zmienic kolejnosci. Odswiez panel.");
+      renderHotelRoomGalleriesPanel({ tone: "error", text: "Nie udalo sie zmienic kolejnosci. Odswiez panel." });
       return;
     }
     try {
@@ -6052,9 +6565,9 @@
         body: JSON.stringify({ imageIds }),
       });
       setHotelRoomGalleries(response?.roomGalleries);
-      renderHotelRoomGalleriesPanel("Kolejnosc zdjec zostala zmieniona.");
+      renderHotelRoomGalleriesPanel({ tone: "success", text: "Kolejnosc zdjec zostala zmieniona." });
     } catch (error) {
-      renderHotelRoomGalleriesPanel(error.message || "Nie udalo sie zmienic kolejnosci zdjec.");
+      renderHotelRoomGalleriesPanel({ tone: "error", text: error.message || "Nie udalo sie zmienic kolejnosci zdjec." });
     }
   }
 

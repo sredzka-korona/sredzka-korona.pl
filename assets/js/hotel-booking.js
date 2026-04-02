@@ -291,6 +291,7 @@
           <h3>Wysłano wiadomość</h3>
           <p>Na podany adres e-mail wysłaliśmy link potwierdzający. Kliknij w niego w ciągu 2 godzin, w celu dokończenia rezerwacji.</p>
           <p>O przyjęciu rezerwacji zostaną Państwo poinformowani mailowo w ciągu 3 dni.</p>
+          <p>Jeśli nie widzisz wiadomości e-mail, sprawdź folder SPAM. W razie problemów skontaktuj się z nami mailowo lub telefonicznie.</p>
         </div>
         <div class="booking-actions">
           <button type="button" class="booking-btn" id="booking-close-final">Zamknij</button>

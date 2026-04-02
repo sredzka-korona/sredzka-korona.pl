@@ -148,6 +148,10 @@ body.gb-modal-open {
   z-index: 1;
 }
 
+#gb-modal .gb-body.gb-body--summary {
+  padding-bottom: 0.8rem;
+}
+
 #gb-modal h3 {
   margin: 0 0 0.45rem;
   font-size: 1.22rem;
@@ -475,6 +479,15 @@ body.gb-modal-open {
   align-items: center;
   gap: 0.6rem;
   margin-top: 1rem;
+}
+
+#gb-modal .gb-body.gb-body--summary .gb-actions {
+  margin-top: 0.75rem;
+}
+
+#gb-modal .gb-body.gb-body--summary .gb-error {
+  margin-top: 0.45rem;
+  min-height: 0;
 }
 
 #gb-modal .gb-actions--end {

@@ -17,6 +17,7 @@ const {
   renderTemplate,
   getRestaurantMailTemplate,
   sendMail,
+  buildBrandedEmail,
 } = require("./lib/mail");
 const {
   json,
@@ -32,6 +33,7 @@ const {
   getReservation,
   loadSettings,
   loadTablesList,
+  filterBookableTables,
   findAvailableTableIds,
   allocateRestaurantNumber,
   releaseLocksForReservation,
@@ -153,7 +155,7 @@ function buildRestaurantMailVars(res, tableDocsById, extra = {}) {
   const tid = res.assignedTableIds || [];
   const labels = tid.map((id) => {
     const t = tableDocsById[id];
-    return t ? `Stół ${t.number} (${t.zone || "sala"})` : id;
+    return t ? `Stół ${t.number}` : id;
   });
   const startMs = res.startDateTime?.toMillis?.() || res.startMs;
   const endMs = res.endDateTime?.toMillis?.() || res.endMs;
@@ -182,8 +184,20 @@ function buildRestaurantMailVars(res, tableDocsById, extra = {}) {
 async function sendRestaurantTemplated(db, key, to, vars) {
   const t = await getRestaurantMailTemplate(db, key);
   const subject = renderTemplate(t.subject, vars);
-  const html = renderTemplate(t.bodyHtml, vars);
-  await sendMail(key, { to, subject, html });
+  const htmlFragment = renderTemplate(t.bodyHtml, vars);
+  const email = buildBrandedEmail({
+    subject,
+    htmlFragment,
+    brandName: restaurantName(),
+    serviceLabel: "Restauracja",
+    siteUrl: publicSiteUrl(),
+    serviceUrl: `${publicSiteUrl()}/Restauracja/`,
+    preheader: `Rezerwacja stolika ${vars.reservationNumber || ""}`.trim(),
+    actionUrl:
+      key === "restaurant_confirm_email" || key === "rest_confirm_email" ? vars.confirmationLink || "" : "",
+    actionLabel: "Potwierdź adres e-mail",
+  });
+  await sendMail(key, { to, subject, html: email.html });
 }
 
 async function loadTablesMap(db) {
@@ -193,6 +207,104 @@ async function loadTablesMap(db) {
     map[t.id] = t;
   });
   return map;
+}
+
+async function loadBookableTables(db) {
+  return filterBookableTables(await loadTablesList(db));
+}
+
+async function syncSettingsTableCount(db, updatedBy) {
+  const activeTables = await loadBookableTables(db);
+  const tableCount = activeTables.length;
+  await db.collection("restaurantSettings").doc("default").set(
+    {
+      tableCount,
+      updatedAt: FieldValue.serverTimestamp(),
+      ...(updatedBy ? { updatedBy } : {}),
+    },
+    { merge: true }
+  );
+  return tableCount;
+}
+
+async function createOrRestoreRestaurantTable(db, adminEmail) {
+  const list = await loadTablesList(db);
+  const removedTable = [...list]
+    .filter((table) => table.active === false || table.hidden === true)
+    .sort((left, right) => (left.number || 0) - (right.number || 0))[0];
+
+  if (removedTable) {
+    await db.collection("restaurantTables").doc(removedTable.id).set(
+      {
+        active: true,
+        hidden: false,
+        removedAt: FieldValue.delete(),
+        removedBy: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: adminEmail || null,
+      },
+      { merge: true }
+    );
+    await syncSettingsTableCount(db, adminEmail);
+    return { restored: true, table: { ...removedTable, active: true, hidden: false } };
+  }
+
+  const nextNumber = list.reduce((max, table) => Math.max(max, Number(table.number) || 0), 0) + 1;
+  const id = `table-${nextNumber}`;
+  const payload = {
+    number: nextNumber,
+    zone: "",
+    active: true,
+    hidden: false,
+    description: "",
+    sortOrder: nextNumber,
+    createdAt: FieldValue.serverTimestamp(),
+    createdBy: adminEmail || "system",
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: adminEmail || null,
+  };
+  await db.collection("restaurantTables").doc(id).set(payload, { merge: true });
+  await syncSettingsTableCount(db, adminEmail);
+  return {
+    restored: false,
+    table: {
+      id,
+      number: nextNumber,
+      zone: "",
+      active: true,
+      hidden: false,
+      description: "",
+      sortOrder: nextNumber,
+    },
+  };
+}
+
+async function removeRestaurantTable(db, tableId, adminEmail) {
+  const ref = db.collection("restaurantTables").doc(tableId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw new Error("Nie znaleziono stolika.");
+  }
+  const table = { id: snap.id, ...snap.data() };
+  if (table.active === false || table.hidden === true) {
+    throw new Error("Ten stolik jest już usunięty.");
+  }
+  if (await hasFutureBlockingReservationForTable(db, tableId)) {
+    throw new Error(`Nie można usunąć stolika ${table.number}, bo ma przyszłą rezerwację albo blokadę.`);
+  }
+  await ref.set(
+    {
+      active: false,
+      hidden: true,
+      removedAt: FieldValue.serverTimestamp(),
+      removedBy: adminEmail || null,
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: adminEmail || null,
+    },
+    { merge: true }
+  );
+  await syncSettingsTableCount(db, adminEmail);
+  return table;
 }
 
 /** Synchronizuje widoczność stolików z tableCount i zwraca ostrzeżenia */
@@ -281,7 +393,7 @@ function formatRestaurantRow(x, tableMap) {
   const tableLabels = ids
     .map((id) => {
       const t = tableMap[id];
-      return t ? `${t.number} (${t.zone || "sala"})` : id;
+      return t ? `Stół ${t.number}` : id;
     })
     .join(", ");
   return {
@@ -289,10 +401,13 @@ function formatRestaurantRow(x, tableMap) {
     humanNumber: x.humanNumber,
     fullName: x.fullName,
     email: x.email,
+    phonePrefix: x.phonePrefix || "",
+    phoneNational: x.phoneNational || "",
     phone: `${x.phonePrefix || ""} ${x.phoneNational || ""}`.trim() || x.phoneE164,
     status: x.status,
     statusLabel: statusUi[x.status] || x.status,
     reservationDate: x.reservationDate,
+    startTime: x.startTime || "",
     startDateTime: startMs,
     endDateTime: endMs,
     durationHours: x.durationHours,
@@ -584,8 +699,16 @@ const restaurantApi = onRequest(
         const resData = doc.data();
         const reservationId = doc.id;
 
+        if (resData.status === "pending" || resData.status === "confirmed") {
+          json(res, { ok: true, status: resData.status, reservationId, humanNumber: resData.humanNumber });
+          return;
+        }
         if (resData.status !== "email_verification_pending") {
-          json(res, { error: "Ta rezerwacja została już przetworzona." }, 400);
+          json(
+            res,
+            { error: resData.status === "expired" ? "Link wygasł (minęło 2 godziny). Złóż zgłoszenie ponownie." : "Ta rezerwacja została już przetworzona." },
+            400
+          );
           return;
         }
         const exp = resData.emailVerificationExpiresAt?.toMillis?.() || 0;
@@ -628,7 +751,6 @@ const restaurantApi = onRequest(
             tx.update(doc.ref, {
               status: "pending",
               assignedTableIds: alloc.tableIds,
-              confirmationTokenHash: FieldValue.delete(),
               emailVerificationExpiresAt: FieldValue.delete(),
               pendingExpiresAt: pendingUntil,
               updatedAt: FieldValue.serverTimestamp(),
@@ -636,6 +758,11 @@ const restaurantApi = onRequest(
           });
         } catch (e) {
           if (e.message === "STATUS_CHANGED") {
+            const latest = await getReservation(db, reservationId);
+            if (latest && (latest.status === "pending" || latest.status === "confirmed")) {
+              json(res, { ok: true, status: latest.status, reservationId, humanNumber: latest.humanNumber });
+              return;
+            }
             json(res, { error: "Ta rezerwacja została już przetworzona." }, 400);
             return;
           }
@@ -681,6 +808,8 @@ const restaurantApi = onRequest(
       if (req.method === "GET" && op === "admin-settings") {
         await ensureRestaurantDefaults(db);
         const settings = (await loadSettings(db)) || {};
+        const activeTables = await loadBookableTables(db);
+        settings.tableCount = activeTables.length;
         json(res, { settings });
         return;
       }
@@ -688,14 +817,13 @@ const restaurantApi = onRequest(
       if (req.method === "PUT" && op === "admin-settings-save") {
         const body = typeof req.body === "object" && req.body ? req.body : JSON.parse(req.body || "{}");
         const {
-          tableCount,
           maxGuestsPerTable,
           reservationOpenTime,
           reservationCloseTime,
           timeSlotMinutes,
         } = body;
-        const tc = Math.max(1, Math.min(200, Number(tableCount || 5)));
-        const warnings = await syncTablesWithTargetCount(db, tc, adminUser.email);
+        const activeTables = await loadBookableTables(db);
+        const tc = activeTables.length;
         await db.collection("restaurantSettings").doc("default").set(
           {
             tableCount: tc,
@@ -713,41 +841,62 @@ const restaurantApi = onRequest(
           actorEmail: adminUser.email,
           details: { tableCount: tc },
         });
-        json(res, { ok: true, warnings });
+        json(res, { ok: true, warnings: [] });
         return;
       }
 
       if (req.method === "GET" && op === "admin-tables-list") {
         await ensureRestaurantDefaults(db);
-        const tables = await loadTablesList(db);
+        const tables = await loadBookableTables(db);
         json(res, { tables });
         return;
       }
 
-      if (req.method === "PUT" && op === "admin-table-upsert") {
+      if (req.method === "POST" && op === "admin-table-create") {
+        const created = await createOrRestoreRestaurantTable(db, adminUser.email);
+        await appendRestaurantAudit(db, {
+          action: "restaurant_table_create",
+          actorEmail: adminUser.email,
+          details: {
+            id: created.table.id,
+            number: created.table.number,
+            restored: created.restored,
+          },
+        });
+        json(res, { ok: true, table: created.table, restored: created.restored });
+        return;
+      }
+
+      if (req.method === "DELETE" && op === "admin-table-delete") {
         const body = typeof req.body === "object" && req.body ? req.body : JSON.parse(req.body || "{}");
-        const { id, ...fields } = body;
-        if (!id) {
+        const tableId = String(body.id || "").trim();
+        if (!tableId) {
           json(res, { error: "Brak id stolika." }, 400);
           return;
         }
-        await db.collection("restaurantTables").doc(id).set(
-          {
-            ...fields,
-            updatedAt: FieldValue.serverTimestamp(),
-            updatedBy: adminUser.email,
+        const removed = await removeRestaurantTable(db, tableId, adminUser.email);
+        await appendRestaurantAudit(db, {
+          action: "restaurant_table_delete",
+          actorEmail: adminUser.email,
+          details: {
+            id: removed.id,
+            number: removed.number,
           },
-          { merge: true }
-        );
-        await appendRestaurantAudit(db, { action: "restaurant_table_upsert", actorEmail: adminUser.email, details: { id } });
-        json(res, { ok: true });
+        });
+        json(res, { ok: true, table: removed });
         return;
       }
 
       if (req.method === "GET" && op === "admin-reservations-list") {
         const status = url.searchParams.get("status") || "all";
         let query = db.collection("restaurantReservations").orderBy("createdAt", "desc").limit(250);
-        if (status && status !== "all") {
+        if (status === "active") {
+          query = db
+            .collection("restaurantReservations")
+            .where("status", "in", ["pending", "confirmed"])
+            .orderBy("createdAt", "desc")
+            .limit(250);
+        } else if (status && status !== "all") {
           query = db
             .collection("restaurantReservations")
             .where("status", "==", status)

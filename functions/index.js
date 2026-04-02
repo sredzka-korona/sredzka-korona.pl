@@ -33,6 +33,7 @@ const {
   getMailTemplate,
   sendMail,
   escapeHtml,
+  buildBrandedEmail,
 } = require("./lib/mail");
 const {
   json,
@@ -175,8 +176,19 @@ function buildMailVars(reservation, items, extra = {}) {
 async function sendTemplated(db, key, to, vars) {
   const t = await getMailTemplate(db, key);
   const subject = renderTemplate(t.subject, vars);
-  const html = renderTemplate(t.bodyHtml, vars);
-  await sendMail(key, { to, subject, html });
+  const htmlFragment = renderTemplate(t.bodyHtml, vars);
+  const email = buildBrandedEmail({
+    subject,
+    htmlFragment,
+    brandName: hotelName(),
+    serviceLabel: "Hotel",
+    siteUrl: publicSiteUrl(),
+    serviceUrl: `${publicSiteUrl()}/Hotel/`,
+    preheader: `Rezerwacja ${vars.reservationNumber || ""}`.trim(),
+    actionUrl: key === "confirm_email" ? vars.confirmationLink || "" : "",
+    actionLabel: "Potwierdź adres e-mail",
+  });
+  await sendMail(key, { to, subject, html: email.html });
 }
 
 exports.hotelApi = onRequest(
@@ -406,8 +418,16 @@ exports.hotelApi = onRequest(
         const resData = doc.data();
         const reservationId = doc.id;
 
+        if (resData.status === "pending" || resData.status === "confirmed") {
+          json(res, { ok: true, status: resData.status, reservationId, humanNumber: resData.humanNumber });
+          return;
+        }
         if (resData.status !== "email_verification_pending") {
-          json(res, { error: "Ta rezerwacja została już przetworzona." }, 400);
+          json(
+            res,
+            { error: resData.status === "expired" ? "Link wygasł (minęło 2 godziny). Złóż zgłoszenie ponownie." : "Ta rezerwacja została już przetworzona." },
+            400
+          );
           return;
         }
         const exp = resData.emailVerificationExpiresAt?.toMillis?.() || 0;
@@ -443,7 +463,6 @@ exports.hotelApi = onRequest(
             tx.update(doc.ref, {
               status: "pending",
               nightKeys,
-              confirmationTokenHash: FieldValue.delete(),
               emailVerificationExpiresAt: FieldValue.delete(),
               pendingExpiresAt: pendingUntil,
               updatedAt: FieldValue.serverTimestamp(),
@@ -451,6 +470,11 @@ exports.hotelApi = onRequest(
           });
         } catch (e) {
           if (e.message === "STATUS_CHANGED") {
+            const latest = await getReservation(db, reservationId);
+            if (latest && (latest.status === "pending" || latest.status === "confirmed")) {
+              json(res, { ok: true, status: latest.status, reservationId, humanNumber: latest.humanNumber });
+              return;
+            }
             json(res, { error: "Ta rezerwacja została już przetworzona." }, 400);
             return;
           }
@@ -531,7 +555,13 @@ exports.hotelApi = onRequest(
       if (req.method === "GET" && op === "admin-reservations-list") {
         const status = url.searchParams.get("status") || "all";
         let query = db.collection("hotelReservations").orderBy("createdAt", "desc").limit(200);
-        if (status && status !== "all") {
+        if (status === "active") {
+          query = db
+            .collection("hotelReservations")
+            .where("status", "in", ["pending", "confirmed"])
+            .orderBy("createdAt", "desc")
+            .limit(200);
+        } else if (status && status !== "all") {
           query = db.collection("hotelReservations").where("status", "==", status).orderBy("createdAt", "desc").limit(200);
         }
         const snap = await query.get().catch(async () => {

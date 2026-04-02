@@ -43,6 +43,151 @@ function renderTemplate(template, vars) {
   });
 }
 
+function decodeHtmlEntities(value) {
+  return String(value ?? "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+}
+
+function enhanceFragmentHtml(html) {
+  return String(html || "").replace(/<a\b([^>]*)>/gi, (match, attrs) => {
+    if (/\bstyle\s*=/i.test(attrs)) return `<a${attrs}>`;
+    return `<a${attrs} style="color:#7b5a24;font-weight:700;text-decoration:none;border-bottom:1px solid #c8aa78;">`;
+  });
+}
+
+function htmlToText(html) {
+  if (!html) return "";
+  return decodeHtmlEntities(
+    String(html)
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<head[\s\S]*?<\/head>/gi, "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n\n")
+      .replace(/<\/div>/gi, "\n")
+      .replace(/<\/tr>/gi, "\n")
+      .replace(/<\/h[1-6]>/gi, "\n\n")
+      .replace(/<li[^>]*>/gi, "- ")
+      .replace(/<\/li>/gi, "\n")
+      .replace(/<a\b[^>]*href=(['"])(.*?)\1[^>]*>([\s\S]*?)<\/a>/gi, (_, __, href, label) => {
+        const text = decodeHtmlEntities(String(label || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+        return text ? `${text} (${href})` : href;
+      })
+      .replace(/<[^>]+>/g, " ")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/[ \t]{2,}/g, " ")
+  )
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .trim();
+}
+
+function buildBrandedEmail({
+  subject,
+  htmlFragment,
+  brandName = "Średzka Korona",
+  serviceLabel = "",
+  siteUrl = "",
+  serviceUrl = "",
+  preheader = "",
+  actionUrl = "",
+  actionLabel = "",
+}) {
+  const safeBrandName = escapeHtml(brandName);
+  const safeSubject = escapeHtml(subject || brandName);
+  const safeServiceLabel = escapeHtml(serviceLabel);
+  const safePreheader = escapeHtml(preheader || subject || brandName);
+  const cleanSiteUrl = String(siteUrl || "").replace(/\/$/, "");
+  const cleanServiceUrl = String(serviceUrl || "").replace(/\/$/, "");
+  const logoUrl = cleanSiteUrl ? `${cleanSiteUrl}/ikony/logo-korona.png` : "";
+  const enhancedContent = enhanceFragmentHtml(htmlFragment);
+  const actionHref = actionUrl ? escapeHtml(actionUrl) : "";
+  const actionTitle = escapeHtml(actionLabel || "Zobacz szczegóły");
+  const footerHref = cleanServiceUrl || cleanSiteUrl;
+  const footerLabel = safeServiceLabel || "Strona główna";
+
+  const html = `<!doctype html>
+<html lang="pl">
+  <body style="margin:0;padding:0;background-color:#f6f1e8;color:#1f1712;font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${safePreheader}</div>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background:#f6f1e8;">
+      <tr>
+        <td align="center" style="padding:28px 12px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;max-width:680px;">
+            <tr>
+              <td align="center" style="padding:0 0 16px 0;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1;letter-spacing:0.28em;color:#7b5a24;font-weight:700;padding-right:10px;">ŚREDZKA</td>
+                    <td style="padding:0 2px;">${
+                      logoUrl
+                        ? `<img src="${escapeHtml(logoUrl)}" alt="Korona" width="42" height="42" style="display:block;width:42px;height:42px;border:0;outline:none;text-decoration:none;" />`
+                        : `<span style="display:inline-block;font-size:26px;line-height:1;color:#c8aa78;">&#9819;</span>`
+                    }</td>
+                    <td style="font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1;letter-spacing:0.28em;color:#7b5a24;font-weight:700;padding-left:10px;">KORONA</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:0 18px 18px 18px;font-size:12px;line-height:1.5;letter-spacing:0.18em;text-transform:uppercase;color:#8b7a67;">
+                ${safeServiceLabel || "Hotel • Restauracja • Przyjęcia"}
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#ffffff;border:1px solid #e8dcc8;border-radius:22px;padding:34px 32px;box-shadow:0 10px 30px rgba(52,33,14,0.08);">
+                <div style="font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.2;color:#1f1712;font-weight:700;margin:0 0 22px 0;">
+                  ${safeSubject}
+                </div>
+                ${
+                  actionHref
+                    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 26px 0;">
+                        <tr>
+                          <td style="border-radius:999px;background:#7b5a24;">
+                            <a href="${actionHref}" style="display:inline-block;padding:14px 24px;font-size:15px;line-height:1.2;font-weight:700;color:#ffffff;text-decoration:none;">${actionTitle}</a>
+                          </td>
+                        </tr>
+                      </table>`
+                    : ""
+                }
+                <div style="font-size:16px;line-height:1.75;color:#3e3125;">
+                  ${enhancedContent}
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 10px 0 10px;text-align:center;font-size:13px;line-height:1.7;color:#7c6a58;">
+                <div>Wiadomość transakcyjna dotycząca rezerwacji w obiekcie ${safeBrandName}.</div>
+                <div style="padding-top:6px;">
+                  ${
+                    footerHref
+                      ? `<a href="${escapeHtml(footerHref)}" style="color:#7b5a24;text-decoration:none;font-weight:700;">${footerLabel}</a>`
+                      : safeBrandName
+                  }
+                </div>
+                <div style="padding-top:6px;">Jeśli masz pytania, odpowiedz na tę wiadomość.</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  return {
+    html,
+    text: htmlToText(`${subject || ""}\n\n${html}`),
+  };
+}
+
 function base64Utf8(value) {
   const bytes = new TextEncoder().encode(String(value ?? ""));
   let binary = "";
@@ -101,6 +246,18 @@ function serviceConfirmPath(service) {
 function buildConfirmationLink(env, request, service, token) {
   const base = publicSiteUrl(env, request);
   return `${base}${serviceConfirmPath(service)}?token=${encodeURIComponent(token)}`;
+}
+
+function serviceLandingPath(service) {
+  if (service === "hotel") return "/Hotel/";
+  if (service === "restaurant") return "/Restauracja/";
+  return "/Przyjec/";
+}
+
+function serviceLabel(service) {
+  if (service === "hotel") return "Hotel";
+  if (service === "restaurant") return "Restauracja";
+  return "Przyjęcia i sale";
 }
 
 function splitLines(raw) {
@@ -168,7 +325,7 @@ async function smtpWrite(writer, line) {
   await writer.write(new TextEncoder().encode(payload));
 }
 
-async function sendMailViaSmtp(env, { to, subject, html, replyTo }) {
+async function sendMailViaSmtp(env, { to, subject, html, text, replyTo }) {
   if (!hasSmtpConfig(env)) {
     return { skipped: true };
   }
@@ -208,7 +365,10 @@ async function sendMailViaSmtp(env, { to, subject, html, replyTo }) {
     await smtpExpect(readLine, [354], "DATA odrzucone");
 
     const htmlNormalized = normalizeCrlf(html || "");
-    const body64 = base64Lines(htmlNormalized);
+    const textNormalized = normalizeCrlf(text || htmlToText(htmlNormalized));
+    const html64 = base64Lines(htmlNormalized);
+    const text64 = base64Lines(textNormalized);
+    const boundary = `=_${crypto.randomUUID()}`;
     const messageId = `<${crypto.randomUUID()}@${cleanString(env.SMTP_EHLO_HOST, 200) || "sredzka-korona.pl"}>`;
     const headers = [
       `From: ${formatAddressHeader(from)}`,
@@ -217,11 +377,22 @@ async function sendMailViaSmtp(env, { to, subject, html, replyTo }) {
       `Date: ${new Date().toUTCString()}`,
       `Message-ID: ${messageId}`,
       "MIME-Version: 1.0",
-      "Content-Type: text/html; charset=UTF-8",
-      "Content-Transfer-Encoding: base64",
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      "Auto-Submitted: auto-generated",
+      "X-Auto-Response-Suppress: All",
       replyTo ? `Reply-To: ${toMimeHeader(replyTo)}` : null,
       "",
-      body64,
+      `--${boundary}`,
+      "Content-Type: text/plain; charset=UTF-8",
+      "Content-Transfer-Encoding: base64",
+      "",
+      text64,
+      `--${boundary}`,
+      "Content-Type: text/html; charset=UTF-8",
+      "Content-Transfer-Encoding: base64",
+      "",
+      html64,
+      `--${boundary}--`,
       ".",
     ]
       .filter(Boolean)
@@ -1355,10 +1526,7 @@ async function createRestaurantReservation(env, payload, options = {}) {
 }
 
 async function venueSettings(env) {
-  const row = await env.DB.prepare(
-    "SELECT hall_open_time AS hallOpenTime, hall_close_time AS hallCloseTime FROM venue_settings WHERE id='default'"
-  ).first();
-  return row || { hallOpenTime: "08:00", hallCloseTime: "23:00" };
+  return { hallOpenTime: "00:00", hallCloseTime: "00:00" };
 }
 
 async function venueHalls(env) {
@@ -1397,12 +1565,15 @@ async function hallAvailability(env, payload, excludeId = null) {
   }
   const startMs = ymdHmToMs(reservationDate, startTime);
   const endMs = startMs + durationHours * 3600000;
-  const [openH, openM] = String(settings.hallOpenTime || "08:00").split(":").map((x) => Number(x));
-  const [closeH, closeM] = String(settings.hallCloseTime || "23:00").split(":").map((x) => Number(x));
+  const [openH, openM] = String(settings.hallOpenTime || "00:00").split(":").map((x) => Number(x));
+  const [closeH, closeM] = String(settings.hallCloseTime || "00:00").split(":").map((x) => Number(x));
   const startMinutes = toInt(startTime.slice(0, 2), 0) * 60 + toInt(startTime.slice(3, 5), 0);
   const endMinutes = startMinutes + Math.round(durationHours * 60);
   const openMinutes = openH * 60 + openM;
-  const closeMinutes = closeH * 60 + closeM;
+  let closeMinutes = closeH * 60 + closeM;
+  if (closeMinutes <= openMinutes) {
+    closeMinutes += 24 * 60;
+  }
   if (startMinutes < openMinutes || endMinutes > closeMinutes) {
     throw new Error(`Rezerwacje tylko w godzinach ${settings.hallOpenTime}-${settings.hallCloseTime}.`);
   }
@@ -1590,12 +1761,12 @@ function defaultTemplateMap(service) {
       confirm_email: {
         subject: "{{hotelName}} | potwierdzenie adresu e-mail dla rezerwacji {{reservationNumber}}",
         bodyHtml:
-          '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie formularza rezerwacji w obiekcie <strong>{{hotelName}}</strong>.</p><p>Aby przekazac zgloszenie do dalszej obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz adres e-mail</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}</p><p>Jesli to nie Ty wysylales zgloszenie, zignoruj te wiadomosc.</p>',
+          '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie zapytania rezerwacyjnego do <strong>{{hotelName}}</strong>.</p><p>Aby przekazac zgloszenie do dalszej obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz adres e-mail</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}<br>Szacunkowa kwota: {{totalPrice}} PLN</p><p>Jesli to nie Ty wysylales zgloszenie, zignoruj te wiadomosc.</p><p>Pozdrawiamy,<br>Recepcja {{hotelName}}</p>',
       },
       pending_client: {
         subject: "{{hotelName}} | rezerwacja {{reservationNumber}} oczekuje na akceptacje",
         bodyHtml:
-          "<p>Dzien dobry {{fullName}},</p><p>Twoja rezerwacja o numerze <strong>{{reservationNumber}}</strong> zostala zapisana i oczekuje teraz na akceptacje recepcji.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}<br>Orientacyjna kwota: {{totalPrice}} PLN</p><p>Po decyzji recepcji wyslemy osobna wiadomosc.</p>",
+          "<p>Dzien dobry {{fullName}},</p><p>Adres e-mail zostal potwierdzony, a zgloszenie <strong>{{reservationNumber}}</strong> trafilo do recepcji.</p><p>Status rezerwacji: <strong>oczekuje na akceptacje hotelu</strong>.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}<br>Szacunkowa kwota: {{totalPrice}} PLN</p><p>Po decyzji recepcji wyslemy osobna wiadomosc.</p><p>Pozdrawiamy,<br>Recepcja {{hotelName}}</p>",
       },
       pending_admin: {
         subject: "[{{hotelName}}] Rezerwacja do decyzji: {{reservationNumber}}",
@@ -1605,17 +1776,17 @@ function defaultTemplateMap(service) {
       confirmed_client: {
         subject: "{{hotelName}} | rezerwacja {{reservationNumber}} potwierdzona",
         bodyHtml:
-          "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje o numerze <strong>{{reservationNumber}}</strong>.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Liczba noclegow: {{nights}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>W razie pytan mozesz odpowiedziec na te wiadomosc lub skontaktowac sie bezposrednio z recepcja.</p>",
+          "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje o numerze <strong>{{reservationNumber}}</strong>.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Liczba noclegow: {{nights}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>W razie pytan mozesz odpowiedziec na te wiadomosc lub skontaktowac sie bezposrednio z recepcja.</p><p>Pozdrawiamy,<br>Recepcja {{hotelName}}</p>",
       },
       cancelled_client: {
         subject: "{{hotelName}} | anulowanie rezerwacji {{reservationNumber}}",
         bodyHtml:
-          "<p>Dzien dobry {{fullName}},</p><p>Informujemy, ze rezerwacja o numerze <strong>{{reservationNumber}}</strong> zostala anulowana.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}</p><p>Jesli potrzebujesz pomocy przy nowej rezerwacji, skontaktuj sie z recepcja.</p>",
+          "<p>Dzien dobry {{fullName}},</p><p>Informujemy, ze rezerwacja o numerze <strong>{{reservationNumber}}</strong> zostala anulowana.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}</p><p>Jesli potrzebujesz pomocy przy nowej rezerwacji, skontaktuj sie z recepcja.</p><p>Pozdrawiamy,<br>Recepcja {{hotelName}}</p>",
       },
       changed_client: {
         subject: "{{hotelName}} | zmiana rezerwacji {{reservationNumber}}",
         bodyHtml:
-          "<p>Dzien dobry {{fullName}},</p><p>Wprowadzilismy zmiany w rezerwacji o numerze <strong>{{reservationNumber}}</strong>.</p><p>Aktualny termin pobytu: {{dateFrom}} - {{dateTo}}<br>Liczba noclegow: {{nights}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>Uwagi do rezerwacji: {{customerNote}}</p><p>Jesli chcesz cos doprecyzowac, odpowiedz na te wiadomosc lub skontaktuj sie z recepcja.</p>",
+          "<p>Dzien dobry {{fullName}},</p><p>Wprowadzilismy zmiany w rezerwacji o numerze <strong>{{reservationNumber}}</strong>.</p><p>Aktualny termin pobytu: {{dateFrom}} - {{dateTo}}<br>Liczba noclegow: {{nights}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>Uwagi do rezerwacji: {{customerNote}}</p><p>Jesli chcesz cos doprecyzowac, odpowiedz na te wiadomosc lub skontaktuj sie z recepcja.</p><p>Pozdrawiamy,<br>Recepcja {{hotelName}}</p>",
       },
     };
   }
@@ -1624,55 +1795,62 @@ function defaultTemplateMap(service) {
       restaurant_confirm_email: {
         subject: "{{restaurantName}} — potwierdź rezerwację stolika ({{reservationNumber}})",
         bodyHtml:
-          '<p>Witaj {{fullName}},</p><p>Kliknij link, aby potwierdzić rezerwację stolika:</p><p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p><p>Termin: {{date}} · {{timeFrom}}–{{timeTo}}</p>',
+          '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie rezerwacji stolika do {{restaurantName}}.</p><p>Aby przekazac zgloszenie do obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz rezerwacje</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>',
       },
       restaurant_pending_client: {
         subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-        bodyHtml: "<p>Witaj {{fullName}},</p><p>Twoja rezerwacja jest oczekująca.</p>",
+        bodyHtml:
+          "<p>Dzien dobry {{fullName}},</p><p>Adres e-mail zostal potwierdzony, a zgloszenie <strong>{{reservationNumber}}</strong> oczekuje teraz na akceptacje restauracji.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
       },
       restaurant_pending_admin: {
         subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
         bodyHtml:
-          "<p>Nowa rezerwacja oczekuje na decyzję.</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}}</p>",
+          "<p>Nowa rezerwacja stolika oczekuje na decyzje obslugi.</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>{{tablesList}} · Gosci: {{guestsCount}} · Laczenie: {{joinTables}}</p><p>Uwagi klienta: {{customerNote}}</p>",
       },
       restaurant_confirmed_client: {
         subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
-        bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została potwierdzona.</p>",
+        bodyHtml:
+          "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje stolika o numerze <strong>{{reservationNumber}}</strong>.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}</p><p>{{tablesList}}</p><p>W przypadku spoznienia lub potrzeby zmiany godziny prosimy o wczesniejszy kontakt z restauracja.</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
       },
       restaurant_cancelled_client: {
         subject: "{{restaurantName}} — rezerwacja anulowana ({{reservationNumber}})",
-        bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została anulowana.</p>",
+        bodyHtml:
+          "<p>Dzien dobry {{fullName}},</p><p>Rezerwacja stolika <strong>{{reservationNumber}}</strong> zostala anulowana.</p><p>Termin: {{date}} · {{timeFrom}}–{{timeTo}}</p><p>Jesli chcesz zarezerwowac inny termin, zapraszamy do ponownego kontaktu.</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
       },
       rest_confirm_email: {
         subject: "{{restaurantName}} — potwierdź rezerwację stolika ({{reservationNumber}})",
         bodyHtml:
-          '<p>Witaj {{fullName}},</p><p>Kliknij link, aby potwierdzić rezerwację stolika:</p><p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p>',
+          '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie rezerwacji stolika do {{restaurantName}}.</p><p>Aby przekazac zgloszenie do obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz rezerwacje</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>',
       },
       rest_pending_client: {
         subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
-        bodyHtml: "<p>Witaj {{fullName}},</p><p>Twoja rezerwacja jest oczekująca.</p>",
+        bodyHtml:
+          "<p>Dzien dobry {{fullName}},</p><p>Adres e-mail zostal potwierdzony, a zgloszenie <strong>{{reservationNumber}}</strong> oczekuje teraz na akceptacje restauracji.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
       },
       rest_pending_admin: {
         subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
-        bodyHtml: "<p>Nowa rezerwacja oczekuje na decyzję.</p><p>{{fullName}} · {{email}} · {{phone}}</p>",
+        bodyHtml:
+          "<p>Nowa rezerwacja stolika oczekuje na decyzje obslugi.</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>{{tablesList}} · Gosci: {{guestsCount}} · Laczenie: {{joinTables}}</p><p>Uwagi klienta: {{customerNote}}</p>",
       },
       rest_confirmed_client: {
         subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
-        bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została potwierdzona.</p>",
+        bodyHtml:
+          "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje stolika o numerze <strong>{{reservationNumber}}</strong>.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
       },
       rest_cancelled_client: {
         subject: "{{restaurantName}} — rezerwacja anulowana ({{reservationNumber}})",
-        bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została anulowana.</p>",
+        bodyHtml:
+          "<p>Dzien dobry {{fullName}},</p><p>Rezerwacja stolika <strong>{{reservationNumber}}</strong> zostala anulowana.</p><p>Termin: {{date}} · {{timeFrom}}–{{timeTo}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
       },
       restaurant_changed_client: {
         subject: "{{restaurantName}} — zmiana rezerwacji stolika {{reservationNumber}}",
         bodyHtml:
-          "<p>Witaj {{fullName}},</p><p>Zaktualizowaliśmy Twoją rezerwację <strong>{{reservationNumber}}</strong>.</p><p>Data: {{date}}<br>Godziny: {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Stoliki: {{tablesList}}<br>Liczba gości: {{guestsCount}}</p><p>Uwagi: {{customerNote}}</p><p>W razie pytań odpowiedz na tę wiadomość.</p>",
+          "<p>Dzien dobry {{fullName}},</p><p>Zaktualizowalismy rezerwacje <strong>{{reservationNumber}}</strong>.</p><p>Data: {{date}}<br>Godziny: {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Stoliki: {{tablesList}}<br>Liczba gosci: {{guestsCount}}</p><p>Uwagi do rezerwacji: {{customerNote}}</p><p>W razie pytan odpowiedz na te wiadomosc.</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
       },
       rest_changed_client: {
         subject: "{{restaurantName}} — zmiana rezerwacji stolika {{reservationNumber}}",
         bodyHtml:
-          "<p>Witaj {{fullName}},</p><p>Zaktualizowaliśmy Twoją rezerwację <strong>{{reservationNumber}}</strong>.</p><p>Data: {{date}} · {{timeFrom}}–{{timeTo}}</p>",
+          "<p>Dzien dobry {{fullName}},</p><p>Zaktualizowalismy rezerwacje <strong>{{reservationNumber}}</strong>.</p><p>Data: {{date}} · {{timeFrom}}–{{timeTo}}<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
       },
     };
   }
@@ -1680,29 +1858,32 @@ function defaultTemplateMap(service) {
     hall_confirm_email: {
       subject: "{{venueName}} — potwierdź zgłoszenie rezerwacji sali ({{reservationNumber}})",
       bodyHtml:
-        '<p>Witaj {{fullName}},</p><p>Kliknij link, aby potwierdzić zgłoszenie:</p><p><a href="{{confirmationLink}}">Potwierdź zgłoszenie</a></p><p>{{date}} · {{timeFrom}}–{{timeTo}}</p>',
+        '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za przeslanie zgloszenia rezerwacji sali do {{venueName}}.</p><p>To jest zgloszenie rezerwacyjne, a wycena zostanie ustalona indywidualnie po kontakcie z obiektem.</p><p>Aby potwierdzic zgloszenie, kliknij w link:</p><p><a href="{{confirmationLink}}">Potwierdz zgloszenie</a></p><p>Numer: <strong>{{reservationNumber}}</strong><br>Sala: {{hallName}}<br>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Gosci: {{guestsCount}} · {{eventType}}<br>Wylacznosc: {{exclusive}}</p><p>Pozdrawiamy,<br>{{venueName}}</p>',
     },
     hall_pending_client: {
       subject: "{{venueName}} — zgłoszenie oczekuje na decyzję obiektu ({{reservationNumber}})",
-      bodyHtml: "<p>Witaj {{fullName}},</p><p>Zgłoszenie ma status oczekujące.</p>",
+      bodyHtml:
+        "<p>Dzien dobry {{fullName}},</p><p>Zgloszenie zostalo potwierdzone linkiem e-mail i oczekuje teraz na decyzje obiektu.</p><p>Wycena zostanie podana telefonicznie lub mailowo po kontakcie z obsluga.</p><p>Numer: {{reservationNumber}} · {{hallName}}<br>{{date}} · {{timeFrom}}–{{timeTo}}</p><p>Pozdrawiamy,<br>{{venueName}}</p>",
     },
     hall_pending_admin: {
       subject: "[{{venueName}}] Nowe zgłoszenie sali {{reservationNumber}}",
       bodyHtml:
-        "<p>Nowe zgłoszenie oczekuje na decyzję.</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}}</p>",
+        "<p>Nowe zgloszenie rezerwacji sali oczekuje na decyzje obslugi.</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>Numer: {{reservationNumber}}</p><p>Sala: {{hallName}} · {{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>Gosci: {{guestsCount}} · Wylacznosc: {{exclusive}} · 100+: {{fullBlockLabel}}</p><p>Rodzaj imprezy: {{eventType}}</p><p>Uwagi klienta: {{customerNote}}</p>",
     },
     hall_confirmed_client: {
       subject: "{{venueName}} — rezerwacja sali potwierdzona ({{reservationNumber}})",
-      bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została potwierdzona.</p>",
+      bodyHtml:
+        "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje sali <strong>{{hallName}}</strong> o numerze <strong>{{reservationNumber}}</strong>.</p><p>Termin: {{date}} · {{timeFrom}}–{{timeTo}}</p><p>Szczegoly i wycena - zgodnie z ustaleniami z obsluga obiektu.</p><p>Pozdrawiamy,<br>{{venueName}}</p>",
     },
     hall_cancelled_client: {
       subject: "{{venueName}} — rezerwacja sali anulowana ({{reservationNumber}})",
-      bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została anulowana.</p>",
+      bodyHtml:
+        "<p>Dzien dobry {{fullName}},</p><p>Rezerwacja sali <strong>{{reservationNumber}}</strong> zostala anulowana.</p><p>Termin: {{date}} · {{hallName}}</p><p>Jesli chcesz ustalic inny termin, skontaktuj sie z obiektem.</p><p>Pozdrawiamy,<br>{{venueName}}</p>",
     },
     hall_changed_client: {
       subject: "{{venueName}} — zmiana rezerwacji sali {{reservationNumber}}",
       bodyHtml:
-        "<p>Witaj {{fullName}},</p><p>Wprowadziliśmy zmiany w rezerwacji sali <strong>{{reservationNumber}}</strong>.</p><p>Sala: {{hallName}}<br>Data: {{date}}<br>Godziny: {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Goście: {{guestsCount}}<br>Impreza: {{eventType}}</p><p>Uwagi: {{customerNote}}</p>",
+        "<p>Dzien dobry {{fullName}},</p><p>Wprowadzilismy zmiany w rezerwacji sali <strong>{{reservationNumber}}</strong>.</p><p>Sala: {{hallName}}<br>Data: {{date}}<br>Godziny: {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Gosci: {{guestsCount}}<br>Impreza: {{eventType}}</p><p>Uwagi do rezerwacji: {{customerNote}}</p><p>W razie pytan odpowiedz na te wiadomosc lub skontaktuj sie z obiektem.</p><p>Pozdrawiamy,<br>{{venueName}}</p>",
     },
   };
 }
@@ -1792,7 +1973,7 @@ async function resolveTemplateForEvent(env, service, eventKey) {
 function listStatusWhere(status) {
   const s = cleanString(status, 40) || "active";
   if (s === "all") return { sql: "", binds: [] };
-  if (s === "active") return { sql: "WHERE status IN ('email_verification_pending','pending','confirmed')", binds: [] };
+  if (s === "active") return { sql: "WHERE status IN ('pending','confirmed')", binds: [] };
   return { sql: "WHERE status = ?", binds: [s] };
 }
 
@@ -1975,15 +2156,43 @@ async function buildMailVarsForService(env, request, service, row, token = "") {
   return buildHallMailVars(env, request, row, token);
 }
 
-async function sendTemplatedBookingMail(env, request, { service, eventKey, row, token, to }) {
+async function sendTemplatedBookingMail(env, request, { service, eventKey, row, token, to, extraVars }) {
   if (!row) return { skipped: true };
   const destination = cleanString(to || row.email, 320).toLowerCase();
   if (!destination || !destination.includes("@")) return { skipped: true };
   const template = await resolveTemplateForEvent(env, service, eventKey);
-  const vars = await buildMailVarsForService(env, request, service, row, token || "");
+  const vars = {
+    ...(await buildMailVarsForService(env, request, service, row, token || "")),
+    ...(extraVars && typeof extraVars === "object" ? extraVars : {}),
+  };
   const subject = renderTemplate(template.subject, vars);
-  const html = renderTemplate(template.bodyHtml, vars);
-  return sendMailViaSmtp(env, { to: destination, subject, html });
+  let html = renderTemplate(template.bodyHtml, vars);
+  const cancelReason = cleanString(vars.cancelReason, 2000);
+  if (eventKey === "cancelled_client" && cancelReason) {
+    html += `<p><strong>Powod anulowania:</strong><br>${escapeHtml(cancelReason).replace(/\n/g, "<br>")}</p>`;
+  }
+  const siteUrl = publicSiteUrl(env, request);
+  const brandName =
+    service === "hotel"
+      ? vars.hotelName || "Średzka Korona"
+      : service === "restaurant"
+        ? vars.restaurantName || "Średzka Korona"
+        : vars.venueName || "Średzka Korona";
+  const email = buildBrandedEmail({
+    subject,
+    htmlFragment: html,
+    brandName,
+    serviceLabel: serviceLabel(service),
+    siteUrl,
+    serviceUrl: `${siteUrl}${serviceLandingPath(service)}`,
+    preheader:
+      service === "restaurant"
+        ? `Rezerwacja stolika ${vars.reservationNumber || ""}`.trim()
+        : `Rezerwacja ${vars.reservationNumber || ""}`.trim(),
+    actionUrl: eventKey === "confirm_email" ? vars.confirmationLink || "" : "",
+    actionLabel: service === "hall" ? "Potwierdź zgłoszenie" : "Potwierdź adres e-mail",
+  });
+  return sendMailViaSmtp(env, { to: destination, subject, html: email.html, text: email.text });
 }
 
 async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
@@ -2060,9 +2269,14 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
       .bind(tokenHash)
       .first();
     if (!row) return { status: 400, data: { error: "Nieprawidłowy lub wygasły link." } };
-    if (row.status !== "email_verification_pending") return { status: 400, data: { error: "Ta rezerwacja została już przetworzona." } };
+    if (row.status === "pending" || row.status === "confirmed") {
+      return { status: 200, data: { ok: true, reservationId: row.id, humanNumber: row.human_number, status: row.status } };
+    }
+    if (row.status !== "email_verification_pending") {
+      return { status: 400, data: { error: row.status === "expired" ? "Link potwierdzający wygasł." : "Ta rezerwacja została już przetworzona." } };
+    }
     if (row.email_verification_expires_at && Number(row.email_verification_expires_at) < nowMs()) {
-      await env.DB.prepare("UPDATE hotel_reservations SET status='expired', updated_at=? WHERE id=?")
+      await env.DB.prepare("UPDATE hotel_reservations SET status='expired', email_verification_expires_at=NULL, updated_at=? WHERE id=?")
         .bind(nowMs(), row.id)
         .run();
       return { status: 400, data: { error: "Link potwierdzający wygasł." } };
@@ -2071,7 +2285,7 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
       const roomIds = parseJson(row.room_ids_json, []);
       await assertHotelRoomIdsAvailable(env, roomIds, row.date_from, row.date_to, row.id);
       await env.DB.prepare(
-        "UPDATE hotel_reservations SET status='pending', pending_expires_at=?, updated_at=? WHERE id=?"
+        "UPDATE hotel_reservations SET status='pending', email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
       )
         .bind(nowMs() + HOTEL_PENDING_MS, nowMs(), row.id)
         .run();
@@ -2210,9 +2424,14 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
       .bind(tokenHash)
       .first();
     if (!row) return { status: 400, data: { error: "Nieprawidłowy lub wygasły link." } };
-    if (row.status !== "email_verification_pending") return { status: 400, data: { error: "Ta rezerwacja została już przetworzona." } };
+    if (row.status === "pending" || row.status === "confirmed") {
+      return { status: 200, data: { ok: true, reservationId: row.id, humanNumber: row.human_number, status: row.status } };
+    }
+    if (row.status !== "email_verification_pending") {
+      return { status: 400, data: { error: row.status === "expired" ? "Link potwierdzający wygasł." : "Ta rezerwacja została już przetworzona." } };
+    }
     if (row.email_verification_expires_at && Number(row.email_verification_expires_at) < nowMs()) {
-      await env.DB.prepare("UPDATE restaurant_reservations SET status='expired', updated_at=? WHERE id=?")
+      await env.DB.prepare("UPDATE restaurant_reservations SET status='expired', email_verification_expires_at=NULL, updated_at=? WHERE id=?")
         .bind(nowMs(), row.id)
         .run();
       return { status: 400, data: { error: "Link potwierdzający wygasł." } };
@@ -2229,7 +2448,7 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
         return { status: 409, data: { error: "Brak wolnych stolików w tym terminie." } };
       }
       await env.DB.prepare(
-        "UPDATE restaurant_reservations SET status='pending', assigned_table_ids_json=?, pending_expires_at=?, updated_at=? WHERE id=?"
+        "UPDATE restaurant_reservations SET status='pending', assigned_table_ids_json=?, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
       )
         .bind(toJson(assigned), nowMs() + RESTAURANT_PENDING_MS, nowMs(), row.id)
         .run();
@@ -2360,9 +2579,14 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
       .bind(tokenHash)
       .first();
     if (!row) return { status: 400, data: { error: "Nieprawidłowy lub wygasły link." } };
-    if (row.status !== "email_verification_pending") return { status: 400, data: { error: "Ta rezerwacja została już przetworzona." } };
+    if (row.status === "pending" || row.status === "confirmed") {
+      return { status: 200, data: { ok: true, reservationId: row.id, humanNumber: row.human_number, status: row.status } };
+    }
+    if (row.status !== "email_verification_pending") {
+      return { status: 400, data: { error: row.status === "expired" ? "Link potwierdzający wygasł." : "Ta rezerwacja została już przetworzona." } };
+    }
     if (row.email_verification_expires_at && Number(row.email_verification_expires_at) < nowMs()) {
-      await env.DB.prepare("UPDATE venue_reservations SET status='expired', updated_at=? WHERE id=?")
+      await env.DB.prepare("UPDATE venue_reservations SET status='expired', email_verification_expires_at=NULL, updated_at=? WHERE id=?")
         .bind(nowMs(), row.id)
         .run();
       return { status: 400, data: { error: "Link potwierdzający wygasł." } };
@@ -2382,7 +2606,7 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
       );
       if (!chk.ok) return { status: 409, data: { error: "Termin niedostępny." } };
       await env.DB.prepare(
-        "UPDATE venue_reservations SET status='pending', pending_expires_at=?, updated_at=? WHERE id=?"
+        "UPDATE venue_reservations SET status='pending', email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
       )
         .bind(nowMs() + HALL_PENDING_MS, nowMs(), row.id)
         .run();
@@ -2621,6 +2845,12 @@ async function handleHotelAdmin(env, op, request) {
   if (op === "admin-reservation-cancel" && request.method === "POST") {
     const body = await readBody(request);
     const id = cleanString(body.id, 80);
+    const cancelReason = cleanString(body.cancelReason, 2000);
+    const existing = await getHotelReservation(env, id);
+    if (!existing) return { status: 404, data: { error: "Brak rezerwacji." } };
+    if (existing.status !== "manual_block" && !cancelReason) {
+      return { status: 400, data: { error: "Podaj powód anulowania rezerwacji." } };
+    }
     await env.DB.prepare("UPDATE hotel_reservations SET status='cancelled', pending_expires_at=NULL, updated_at=? WHERE id=?")
       .bind(nowMs(), id)
       .run();
@@ -2631,6 +2861,7 @@ async function handleHotelAdmin(env, op, request) {
         eventKey: "cancelled_client",
         row,
         to: row?.email,
+        extraVars: { cancelReason },
       });
     } catch (error) {
       console.error("Hotel cancel mail error:", error);
@@ -2913,6 +3144,12 @@ async function handleRestaurantAdmin(env, op, request) {
   if (op === "admin-reservation-cancel" && request.method === "POST") {
     const body = await readBody(request);
     const id = cleanString(body.id, 80);
+    const cancelReason = cleanString(body.cancelReason, 2000);
+    const existing = await getRestaurantReservationRow(env, id);
+    if (!existing) return { status: 404, data: { error: "Brak rezerwacji." } };
+    if (existing.status !== "manual_block" && !cancelReason) {
+      return { status: 400, data: { error: "Podaj powód anulowania rezerwacji." } };
+    }
     await env.DB.prepare("UPDATE restaurant_reservations SET status='cancelled', pending_expires_at=NULL, updated_at=? WHERE id=?")
       .bind(nowMs(), id)
       .run();
@@ -2923,6 +3160,7 @@ async function handleRestaurantAdmin(env, op, request) {
         eventKey: "cancelled_client",
         row,
         to: row?.email,
+        extraVars: { cancelReason },
       });
     } catch (error) {
       console.error("Restaurant cancel mail error:", error);
@@ -2950,7 +3188,7 @@ async function handleHallAdmin(env, op, request) {
   if (op === "admin-venue-settings-save" && request.method === "PUT") {
     const body = await readBody(request);
     await env.DB.prepare("UPDATE venue_settings SET hall_open_time=?, hall_close_time=?, updated_at=? WHERE id='default'")
-      .bind(cleanString(body.hallOpenTime, 5) || "08:00", cleanString(body.hallCloseTime, 5) || "23:00", nowMs())
+      .bind(cleanString(body.hallOpenTime, 5) || "00:00", cleanString(body.hallCloseTime, 5) || "00:00", nowMs())
       .run();
     return { status: 200, data: { ok: true } };
   }
@@ -3131,6 +3369,12 @@ async function handleHallAdmin(env, op, request) {
   if (op === "admin-reservation-cancel" && request.method === "POST") {
     const body = await readBody(request);
     const id = cleanString(body.id, 80);
+    const cancelReason = cleanString(body.cancelReason, 2000);
+    const existing = await getHallReservationRow(env, id);
+    if (!existing) return { status: 404, data: { error: "Brak rezerwacji." } };
+    if (existing.status !== "manual_block" && !cancelReason) {
+      return { status: 400, data: { error: "Podaj powód anulowania rezerwacji." } };
+    }
     await env.DB.prepare("UPDATE venue_reservations SET status='cancelled', pending_expires_at=NULL, updated_at=? WHERE id=?")
       .bind(nowMs(), id)
       .run();
@@ -3141,6 +3385,7 @@ async function handleHallAdmin(env, op, request) {
         eventKey: "cancelled_client",
         row,
         to: row?.email,
+        extraVars: { cancelReason },
       });
     } catch (error) {
       console.error("Hall cancel mail error:", error);

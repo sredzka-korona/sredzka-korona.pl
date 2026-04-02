@@ -203,6 +203,29 @@
     };
   }
 
+  function normalizeRoomIdentity(value) {
+    return String(value || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLocaleLowerCase("pl-PL");
+  }
+
+  function roomDisplayName(roomOrId) {
+    if (roomOrId && typeof roomOrId === "object") {
+      return String(roomOrId.name || roomOrId.id || "").trim() || "—";
+    }
+    const currentId = String(roomOrId || "");
+    const room = roomsData.find((entry) => String(entry.id) === currentId);
+    return String(room?.name || currentId || "").trim() || "—";
+  }
+
+  function roomListLabel(roomIds) {
+    return (Array.isArray(roomIds) ? roomIds : [])
+      .map((roomId) => roomDisplayName(roomId))
+      .filter(Boolean)
+      .join(", ");
+  }
+
   function isLegacyHotelTemplate(key, template) {
     if (!template) return true;
     const subject = String(template.subject || "").trim();
@@ -303,16 +326,19 @@
       .map(
         (r, index) => `
       <tr data-id="${escapeHtml(r.id)}">
-        <td>${escapeHtml(r.name || r.id)}</td>
+        <td>
+          <strong>${escapeHtml(roomDisplayName(r))}</strong>
+          ${r.id !== r.name ? `<div class="helper">ID systemowe: ${escapeHtml(r.id)}</div>` : ""}
+        </td>
         <td>${escapeHtml(String(r.pricePerNight ?? ""))}</td>
         <td>${escapeHtml(String(r.maxGuests ?? "—"))}</td>
         <td>${escapeHtml([toInt(r.bedsSingle) && `${toInt(r.bedsSingle)}×1os.`, toInt(r.bedsDouble) && `${toInt(r.bedsDouble)}×2os.`, toInt(r.bedsChild) && `${toInt(r.bedsChild)}×dz.`].filter(Boolean).join(", ") || "—")}</td>
         <td>${r.active !== false ? "tak" : "nie"}</td>
-        <td class="admin-row-actions">
-          <button type="button" class="button secondary hotel-move-room" data-direction="-1" data-index="${index}" aria-label="Przesun pokoj w lewo" ${index === 0 ? "disabled" : ""}>←</button>
-          <button type="button" class="button secondary hotel-move-room" data-direction="1" data-index="${index}" aria-label="Przesun pokoj w prawo" ${index === roomsData.length - 1 ? "disabled" : ""}>→</button>
+        <td class="admin-row-actions admin-row-actions--room-order">
+          <button type="button" class="button secondary hotel-move-room" data-direction="-1" data-index="${index}" aria-label="Przesun pokoj wyzej" title="Przesun wyzej" ${index === 0 ? "disabled" : ""}>↑</button>
+          <button type="button" class="button secondary hotel-move-room" data-direction="1" data-index="${index}" aria-label="Przesun pokoj nizej" title="Przesun nizej" ${index === roomsData.length - 1 ? "disabled" : ""}>↓</button>
           <button type="button" class="button secondary hotel-edit-room" data-id="${escapeHtml(r.id)}">Edytuj</button>
-          <button type="button" class="button secondary danger-muted hotel-delete-room" data-id="${escapeHtml(r.id)}" data-name="${escapeHtml(r.name || r.id)}">Usuń</button>
+          <button type="button" class="button secondary danger-muted hotel-delete-room" data-id="${escapeHtml(r.id)}" data-name="${escapeHtml(roomDisplayName(r))}">Usuń</button>
         </td>
       </tr>`
       )
@@ -414,7 +440,7 @@
         (room) => `
       <label class="admin-check-line">
         <input type="checkbox" name="roomId" value="${escapeHtml(room.id)}" />
-        <span>${escapeHtml(room.name || room.id)} <span class="muted">(${escapeHtml(room.id)})</span></span>
+        <span>${escapeHtml(roomDisplayName(room))}</span>
       </label>`
       )
       .join("");
@@ -424,7 +450,7 @@
       <tr>
         <td>${escapeHtml(b.humanNumberLabel || b.humanNumber || b.id)}</td>
         <td>${escapeHtml(b.dateFrom)} → ${escapeHtml(b.dateTo)}</td>
-        <td>${escapeHtml((b.roomIds || []).join(", "))}</td>
+        <td>${escapeHtml(roomListLabel(b.roomIds) || "—")}</td>
         <td>${escapeHtml(b.adminNote || b.customerNote || "—")}</td>
       </tr>`
       )
@@ -569,7 +595,7 @@
         btn.addEventListener("click", async () => {
           const id = btn.getAttribute("data-id");
           const name = btn.getAttribute("data-name") || id;
-          if (!confirm(`Usunąć pokój „${name}” (${id})? Nie można tego cofnąć.`)) return;
+          if (!confirm(`Usunąć pokój „${name}”? Nie można tego cofnąć.`)) return;
           try {
             await hotelApi("admin-room-delete", {
               method: "DELETE",
@@ -689,8 +715,8 @@
                   <h3 id="hotel-room-editor-title">${isNew ? "Nowy pokój" : "Edycja pokoju"}</h3>
                   <p class="helper">${
                     isNew
-                      ? "ID pokoju tworzy sie automatycznie z nazwy i jest uzywane w rezerwacjach oraz blokadach."
-                      : `ID pokoju: ${escapeHtml(r.id)}`
+                      ? "ID pokoju zapisze sie tak samo jak wpisana nazwa. To pozwala pracowac na czytelnych nazwach bez technicznego slugowania."
+                      : `ID pokoju jest powiazane z istniejacymi rezerwacjami, dlatego dla bezpieczenstwa pozostaje bez zmian: ${escapeHtml(r.id)}`
                   }</p>
                 </div>
                 <button type="button" class="button secondary" data-hotel-room-modal-close>Zamknij</button>
@@ -776,7 +802,9 @@
 
       const syncIdFromName = () => {
         if (!isNew || !idInput || !nameInput) return;
-        idInput.value = slugifyRoomId(nameInput.value);
+        idInput.value = String(nameInput.value || "")
+          .trim()
+          .replace(/\s+/g, " ");
       };
       syncIdFromName();
       nameInput?.addEventListener("input", syncIdFromName);
@@ -787,11 +815,18 @@
         const fd = new FormData(ev.target);
         const id = String(fd.get("id") || "").trim();
         if (!id) {
-          showMsg("Podaj nazwe pokoju, aby utworzyc ID.", true);
+          showMsg("Podaj nazwe pokoju.", true);
           return;
         }
-        if (isNew && roomsData.some((x) => x.id === id)) {
-          showMsg("Pokój o tym ID już istnieje — użyj innego identyfikatora albo edytuj istniejący wpis.", true);
+        if (id.includes("__")) {
+          showMsg('Nazwa pokoju nie moze zawierac ciagu "__".', true);
+          return;
+        }
+        if (
+          isNew &&
+          roomsData.some((x) => normalizeRoomIdentity(x.id) === normalizeRoomIdentity(id) || normalizeRoomIdentity(x.name) === normalizeRoomIdentity(id))
+        ) {
+          showMsg("Pokoj o takiej nazwie juz istnieje. Uzyj innej nazwy albo edytuj istniejacy wpis.", true);
           return;
         }
         const pricePerNight = Number(fd.get("pricePerNight"));
@@ -847,9 +882,14 @@
     }
 
     async function quickCancelReservation(id) {
-      if (!confirm("Anulować tę rezerwację? Do klienta może zostać wysłany e-mail o anulowaniu.")) return;
+      const cancelReason = window.prompt("Podaj powód anulowania rezerwacji:");
+      if (cancelReason == null) return;
+      if (!String(cancelReason).trim()) {
+        alert("Powód anulowania jest wymagany.");
+        return;
+      }
       try {
-        await hotelApi("admin-reservation-cancel", { method: "POST", body: { id } });
+        await hotelApi("admin-reservation-cancel", { method: "POST", body: { id, cancelReason } });
         await loadReservations(hotelResFilter);
         document.querySelector("#hotel-sub-content").innerHTML = renderReservations();
         const fs = document.querySelector("#hotel-res-filter");
@@ -890,10 +930,10 @@
               <label class="admin-check-line admin-check-all"><input type="checkbox" id="hotel-manual-all-rooms" /><span>Zaznacz / odznacz wszystkie</span></label>
               <div class="admin-room-checks">${roomChecks || "<p class=\"helper\">Brak pokoi w systemie.</p>"}</div></fieldset>
               <label>Imię i nazwisko<input name="fullName" required /></label>
-              <label>E-mail<input name="email" type="email" required /></label>
+              <label>E-mail<input name="email" type="email" /></label>
               <div class="field-grid">
                 <label>Prefiks<input name="phonePrefix" value="+48" /></label>
-                <label>Numer telefonu<input name="phoneNational" required inputmode="numeric" /></label>
+                <label>Numer telefonu<input name="phoneNational" inputmode="numeric" /></label>
               </div>
               <label>Uwagi klienta<textarea name="customerNote" rows="3"></textarea></label>
               <label class="admin-check-line"><input type="checkbox" name="asPending" /> <span>Oczekuje na akceptację (status „oczekujące”) zamiast od razu „zarezerwowane”</span></label>
@@ -933,9 +973,9 @@
               dateTo: fd.get("dateTo"),
               roomIds,
               fullName: fd.get("fullName"),
-              email: fd.get("email"),
-              phonePrefix: fd.get("phonePrefix") || "+48",
-              phoneNational: fd.get("phoneNational"),
+              email: String(fd.get("email") || "").trim(),
+              phonePrefix: String(fd.get("phoneNational") || "").trim() ? String(fd.get("phonePrefix") || "+48").trim() : "",
+              phoneNational: String(fd.get("phoneNational") || "").trim(),
               customerNote: fd.get("customerNote") || "",
               adminNote: "",
               status,

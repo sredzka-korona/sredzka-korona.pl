@@ -122,6 +122,29 @@
     venueSettings = d.settings || {};
   }
 
+  function getHallById(hallId) {
+    const current = String(hallId || "");
+    return hallsData.find((hall) => String(hall.id) === current) || hallsData[0] || null;
+  }
+
+  function hallIsSmall(hallId) {
+    return String(getHallById(hallId)?.hallKind || "").toLowerCase() === "small";
+  }
+
+  function syncHallExclusiveVisibility(form) {
+    if (!(form instanceof HTMLFormElement)) return;
+    const hallId = String(form.querySelector('[name="hallId"]')?.value || "");
+    const exclusiveField = form.querySelector("[data-hall-exclusive-field]");
+    const exclusiveInput = form.querySelector('[name="exclusive"]');
+    const isSmall = hallIsSmall(hallId);
+    if (exclusiveField) {
+      exclusiveField.hidden = isSmall;
+    }
+    if (exclusiveInput && isSmall) {
+      exclusiveInput.checked = true;
+    }
+  }
+
   function renderHalls() {
     const body = hallsData
       .map(
@@ -525,9 +548,14 @@
     }
 
     async function quickCancelHall(id) {
-      if (!confirm("Anulować tę rezerwację? Klient może otrzymać e-mail.")) return;
+      const cancelReason = window.prompt("Podaj powód anulowania rezerwacji:");
+      if (cancelReason == null) return;
+      if (!String(cancelReason).trim()) {
+        alert("Powód anulowania jest wymagany.");
+        return;
+      }
       try {
-        await hallApi("admin-reservation-cancel", { method: "POST", body: { id } });
+        await hallApi("admin-reservation-cancel", { method: "POST", body: { id, cancelReason } });
         await loadReservations(hallResFilter);
         document.querySelector("#hall-sub-content").innerHTML = renderReservations();
         const hf = document.querySelector("#hall-res-filter");
@@ -561,13 +589,13 @@
                 <label>Czas (h)<input name="durationHours" type="number" step="0.5" min="0.5" value="3" required /></label>
               </div>
               <label>Goście<input name="guestsCount" type="number" min="1" value="20" required /></label>
-              <label class="admin-check-line"><input type="checkbox" name="exclusive" checked /> <span>Sala na wyłączność (tam gdzie dotyczy)</span></label>
+              <label class="admin-check-line" data-hall-exclusive-field><input type="checkbox" name="exclusive" checked /> <span>Sala na wyłączność (tam gdzie dotyczy)</span></label>
               <label>Rodzaj imprezy<input name="eventType" value="Spotkanie" /></label>
               <label>Imię i nazwisko<input name="fullName" required /></label>
-              <label>E-mail<input name="email" type="email" required /></label>
+              <label>E-mail<input name="email" type="email" /></label>
               <div class="field-grid">
                 <label>Prefiks<input name="phonePrefix" value="+48" /></label>
-                <label>Numer<input name="phoneNational" required /></label>
+                <label>Numer<input name="phoneNational" /></label>
               </div>
               <label>Uwagi<textarea name="customerNote" rows="2"></textarea></label>
               <label class="admin-check-line"><input type="checkbox" name="asPending" /> <span>Oczekuje na akceptację</span></label>
@@ -580,11 +608,14 @@
         </div>`;
       document.body.appendChild(host);
       document.body.classList.add("admin-modal-open");
+      const form = host.querySelector("#hall-manual-form");
+      syncHallExclusiveVisibility(form);
+      form?.querySelector('[name="hallId"]')?.addEventListener("change", () => syncHallExclusiveVisibility(form));
       host.querySelectorAll("[data-hall-extra-close]").forEach((b) => b.addEventListener("click", closeHallExtraModal));
       host.querySelector("[data-hall-extra-overlay]")?.addEventListener("click", (ev) => {
         if (ev.target === ev.currentTarget) closeHallExtraModal();
       });
-      host.querySelector("#hall-manual-form")?.addEventListener("submit", async (ev) => {
+      form?.addEventListener("submit", async (ev) => {
         ev.preventDefault();
         const fd = new FormData(ev.target);
         const status = fd.get("asPending") === "on" ? "pending" : "confirmed";
@@ -597,12 +628,12 @@
               startTime: fd.get("startTime"),
               durationHours: Number(fd.get("durationHours")),
               guestsCount: Number(fd.get("guestsCount")),
-              exclusive: fd.get("exclusive") === "on",
+              exclusive: hallIsSmall(fd.get("hallId")) ? true : fd.get("exclusive") === "on",
               eventType: fd.get("eventType") || "—",
               fullName: fd.get("fullName"),
-              email: fd.get("email"),
-              phonePrefix: fd.get("phonePrefix") || "+48",
-              phoneNational: fd.get("phoneNational"),
+              email: String(fd.get("email") || "").trim(),
+              phonePrefix: String(fd.get("phoneNational") || "").trim() ? String(fd.get("phonePrefix") || "+48").trim() : "",
+              phoneNational: String(fd.get("phoneNational") || "").trim(),
               customerNote: fd.get("customerNote") || "",
               adminNote: "",
               status,
@@ -655,7 +686,7 @@
                 <label>Czas (h)<input name="durationHours" type="number" step="0.5" min="0.5" value="${escapeHtml(String(r.durationHours || 2))}" required /></label>
               </div>
               <label>Goście<input name="guestsCount" type="number" min="0" value="${escapeHtml(String(r.guestsCount ?? 0))}" required /></label>
-              <label class="admin-check-line"><input type="checkbox" name="exclusive" ${r.exclusive ? "checked" : ""} /> <span>Wyłączność</span></label>
+              <label class="admin-check-line" data-hall-exclusive-field><input type="checkbox" name="exclusive" ${r.exclusive ? "checked" : ""} /> <span>Wyłączność</span></label>
               <label>Impreza<input name="eventType" value="${escapeHtml(r.eventType || "")}" /></label>
               <label>Imię i nazwisko<input name="fullName" value="${escapeHtml(r.fullName || "")}" required /></label>
               <label>E-mail<input name="email" type="email" value="${escapeHtml(r.email || "")}" required /></label>
@@ -676,6 +707,9 @@
         </div>`;
       document.body.appendChild(host);
       document.body.classList.add("admin-modal-open");
+      const form = host.querySelector("#hall-edit-form");
+      syncHallExclusiveVisibility(form);
+      form?.querySelector('[name="hallId"]')?.addEventListener("change", () => syncHallExclusiveVisibility(form));
       host.querySelectorAll("[data-hall-extra-close]").forEach((b) => b.addEventListener("click", closeHallExtraModal));
       host.querySelector("[data-hall-extra-overlay]")?.addEventListener("click", (ev) => {
         if (ev.target === ev.currentTarget) closeHallExtraModal();
@@ -708,7 +742,7 @@
           alert(err.message);
         }
       });
-      host.querySelector("#hall-edit-form")?.addEventListener("submit", async (ev) => {
+      form?.addEventListener("submit", async (ev) => {
         ev.preventDefault();
         const fd = new FormData(ev.target);
         const notifyClient = confirm("Wysłać e-mail o zmianach do klienta?\n\nOK — tak\nAnuluj — nie");
@@ -722,7 +756,7 @@
               startTime: fd.get("startTime"),
               durationHours: Number(fd.get("durationHours")),
               guestsCount: Number(fd.get("guestsCount")),
-              exclusive: fd.get("exclusive") === "on",
+              exclusive: hallIsSmall(fd.get("hallId")) ? true : fd.get("exclusive") === "on",
               eventType: fd.get("eventType") || "",
               fullName: fd.get("fullName"),
               email: fd.get("email"),

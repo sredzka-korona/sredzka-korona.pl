@@ -181,6 +181,10 @@
     return state.tablesCount * m;
   }
 
+  function maxTablesAllowed() {
+    return Math.max(0, Number(state.publicSettings?.tableCount || 0));
+  }
+
   function renderSteps() {
     return `
       <div class="booking-steps" aria-hidden="true">
@@ -259,13 +263,14 @@
         </div>`;
     } else if (state.step === 2) {
       const maxG = maxGuestsAllowed();
+      const maxTables = maxTablesAllowed();
       inner = `
         <h3>Parametry rezerwacji</h3>
         <div class="booking-field-grid">
-          <label>Liczba stolików<input type="number" id="rb-tables" min="1" max="30" value="${state.tablesCount}" /></label>
+          <label>Liczba stolików<input type="number" id="rb-tables" min="1" max="${maxTables}" value="${Math.min(Math.max(1, state.tablesCount), Math.max(1, maxTables))}" ${maxTables ? "" : "disabled"} /></label>
           <label>Liczba gości<input type="number" id="rb-guests" min="1" max="${maxG}" value="${state.guestsCount}" /></label>
         </div>
-        <p class="booking-hint">Przy obecnych ustawieniach maksymalnie <strong id="rb-max-guests">${maxG}</strong> gości (liczba stolików × max osób przy jednym stoliku).</p>
+        <p class="booking-hint">Aktywnych stolików: <strong id="rb-max-tables">${maxTables}</strong>. Przy obecnych ustawieniach maksymalnie <strong id="rb-max-guests">${maxG}</strong> gości (liczba stolików × max osób przy jednym stoliku).</p>
         <label class="booking-checkbox">
           <input type="checkbox" id="rb-join" ${state.joinTables ? "checked" : ""} />
           <span>Poproszę o połączenie stołów (preferencja organizacyjna)</span>
@@ -324,6 +329,7 @@
           <h3>Wysłano wiadomość</h3>
           <p>Na podany adres e-mail wysłaliśmy <strong>link potwierdzający</strong>. Kliknij w niego w ciągu <strong>2 godzin</strong>.</p>
           <p>Po kliknięciu linku rezerwacja otrzyma status <strong>oczekujące na akceptację przez restaurację</strong> — wtedy stoliki zostaną wstępnie zablokowane.</p>
+          <p>Jeśli nie widzisz wiadomości e-mail, sprawdź folder SPAM. W razie problemów skontaktuj się z nami mailowo lub telefonicznie.</p>
         </div>
         <div class="booking-actions">
           <button type="button" class="booking-btn" id="rb-close-final">Zamknij</button>
@@ -456,11 +462,14 @@
       const tablesEl = document.querySelector("#rb-tables");
       const guestsEl = document.querySelector("#rb-guests");
       const maxEl = document.querySelector("#rb-max-guests");
+      const maxTablesEl = document.querySelector("#rb-max-tables");
       const next = document.querySelector("#rb-next-2");
       const err = document.querySelector("#rb-step-error");
 
       function refreshMax() {
-        state.tablesCount = Math.max(1, Number(tablesEl.value) || 1);
+        const maxTables = maxTablesAllowed();
+        if (maxTablesEl) maxTablesEl.textContent = String(maxTables);
+        state.tablesCount = Math.max(1, Math.min(maxTables || 1, Number(tablesEl.value) || 1));
         tablesEl.value = String(state.tablesCount);
         const maxG = maxGuestsAllowed();
         if (maxEl) maxEl.textContent = String(maxG);
@@ -470,7 +479,14 @@
         }
         state.guestsCount = Math.max(1, Number(guestsEl.value) || 1);
         guestsEl.min = 1;
-        next.disabled = state.guestsCount < 1 || state.guestsCount > maxG || state.tablesCount < 1;
+        if (!maxTables) {
+          err.hidden = false;
+          err.textContent = "Rezerwacje stolików są obecnie niedostępne, bo nie ma aktywnych stolików.";
+          next.disabled = true;
+          return;
+        }
+        err.hidden = true;
+        next.disabled = state.guestsCount < 1 || state.guestsCount > maxG || state.tablesCount < 1 || state.tablesCount > maxTables;
       }
       tablesEl?.addEventListener("input", refreshMax);
       guestsEl?.addEventListener("input", () => {

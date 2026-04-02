@@ -31,6 +31,7 @@
     restaurant: ["service", "restaurantDateTime", "restaurantDetails", "personal", "summary", "success"],
     events: ["service", "eventsDateTime", "eventsHall", "eventsDetails", "personal", "summary", "success"],
   };
+  const RESTAURANT_PLACE_OPTIONS = ["no_preference", "inside", "terrace"];
 
   const state = {
     isOpen: false,
@@ -74,6 +75,7 @@
       durationHours: 2,
       tablesCount: 1,
       guestsCount: 2,
+      placePreference: "no_preference",
       joinTables: false,
       customerNote: "",
     },
@@ -339,6 +341,7 @@
       durationHours: 2,
       tablesCount: 1,
       guestsCount: 2,
+      placePreference: "no_preference",
       joinTables: false,
       customerNote: "",
     };
@@ -448,6 +451,9 @@
         durationHours: Number(draft.restaurant?.durationHours || 2),
         tablesCount: clamp(toInt(draft.restaurant?.tablesCount, 1), 1, 30),
         guestsCount: clamp(toInt(draft.restaurant?.guestsCount, 2), 1, 300),
+        placePreference: RESTAURANT_PLACE_OPTIONS.includes(cleanString(draft.restaurant?.placePreference, 30))
+          ? cleanString(draft.restaurant?.placePreference, 30)
+          : "no_preference",
         joinTables: Boolean(draft.restaurant?.joinTables),
         customerNote: cleanString(draft.restaurant?.customerNote, 2000),
       };
@@ -738,7 +744,7 @@
       hotelDates: "Hotel - termin pobytu",
       hotelRooms: "Hotel - pokoje",
       restaurantDateTime: "Restauracja - termin",
-      restaurantDetails: "Restauracja - szczegoly",
+      restaurantDetails: "SZCZEGÓŁY",
       eventsDateTime: "Przyjecia - termin i liczba gosci",
       eventsHall: "Przyjecia - wybor sali",
       eventsDetails: "Przyjecia - szczegoly wydarzenia",
@@ -933,8 +939,8 @@
     const maxGuests = Math.max(1, maxGuestsPerTable * Number(state.restaurant.tablesCount || 1));
     return `
       <section>
-        <h3>Restauracja - szczegoly rezerwacji</h3>
-        <div class="gb-grid-2">
+        <h3>SZCZEGÓŁY</h3>
+        <div class="gb-grid-3">
           <label class="gb-field">
             <span>Liczba stolow</span>
             <input type="number" id="gb-rest-tables" min="1" max="30" value="${escapeHtml(String(state.restaurant.tablesCount))}" required />
@@ -942,6 +948,14 @@
           <label class="gb-field">
             <span>Liczba gosci</span>
             <input type="number" id="gb-rest-guests" min="1" max="${escapeHtml(String(maxGuests))}" value="${escapeHtml(String(state.restaurant.guestsCount))}" required />
+          </label>
+          <label class="gb-field">
+            <span>Miejsce</span>
+            <select id="gb-rest-place">
+              <option value="no_preference" ${state.restaurant.placePreference === "no_preference" ? "selected" : ""}>Brak preferencji</option>
+              <option value="inside" ${state.restaurant.placePreference === "inside" ? "selected" : ""}>W lokalu</option>
+              <option value="terrace" ${state.restaurant.placePreference === "terrace" ? "selected" : ""}>Na tarasie</option>
+            </select>
           </label>
         </div>
         <p class="gb-inline-note">Maksymalna liczba gosci dla aktualnych ustawien: <strong id="gb-rest-max">${escapeHtml(String(maxGuests))}</strong>.</p>
@@ -1169,6 +1183,13 @@
             <li><strong>Czas rezerwacji:</strong> ${escapeHtml(String(state.restaurant.durationHours))} h</li>
             <li><strong>Liczba stolow:</strong> ${escapeHtml(String(state.restaurant.tablesCount))}</li>
             <li><strong>Liczba gosci:</strong> ${escapeHtml(String(state.restaurant.guestsCount))}</li>
+            <li><strong>Miejsce:</strong> ${escapeHtml(
+              state.restaurant.placePreference === "inside"
+                ? "W lokalu"
+                : state.restaurant.placePreference === "terrace"
+                  ? "Na tarasie"
+                  : "Brak preferencji"
+            )}</li>
             <li><strong>Prosba o polaczenie stolow:</strong> ${state.restaurant.joinTables ? "tak" : "nie"}</li>
             ${state.restaurant.customerNote ? `<li><strong>Dodatkowe informacje:</strong> ${escapeHtml(state.restaurant.customerNote)}</li>` : ""}
           </ul>
@@ -1249,6 +1270,8 @@
 
   function renderSuccessStep() {
     const left = state.countdownUntil ? Math.max(0, state.countdownUntil - Date.now()) : EMAIL_CONFIRM_MS;
+    const supportNotice =
+      '<p class="gb-hint" style="margin-top:0.75rem;">Jeśli nie widzisz wiadomości e-mail, sprawdź folder SPAM. W razie problemów skontaktuj się z nami mailowo lub telefonicznie.</p>';
     return `
       <section>
         <h3>Rezerwacja została zapisana</h3>
@@ -1258,11 +1281,12 @@
                 <p class="gb-hint">Wysłaliśmy link potwierdzający na Twój adres e-mail. Kliknij go, aby aktywować zgłoszenie.</p>
                 <p class="gb-countdown"><strong>Czas na potwierdzenie:</strong> <span id="gb-countdown-value">${escapeHtml(formatCountdown(left))}</span></p>
                 <p class="gb-hint" style="margin-top:0.75rem;">Po potwierdzeniu maila rezerwacja przejdzie na status <strong>oczekująca</strong>. Decyzję o przyjęciu lub odrzuceniu wyślemy e-mailowo w ciągu <strong>3 dni</strong>. Rezerwacja może nie zostać przyjęta.</p>
-                <p class="gb-inline-note">Obsługa otrzymuje osobne powiadomienie e-mail, gdy potwierdzisz rezerwację linkiem.</p>
+                ${supportNotice}
               </div>`
             : `<div class="gb-success-card">
                 <p class="gb-hint">Zgłoszenie trafiło już do kolejki oczekującej. Mail potwierdzający nie był wymagany dla tego zgłoszenia.</p>
                 <p class="gb-hint" style="margin-top:0.5rem;">Decyzję o przyjęciu lub odrzuceniu otrzymasz e-mailowo w ciągu <strong>3 dni</strong>. Rezerwacja może nie zostać przyjęta.</p>
+                ${supportNotice}
               </div>`
         }
 
@@ -1326,6 +1350,7 @@
     } else if (state.step === "success") {
       body.innerHTML = renderSuccessStep();
     }
+    body.classList.toggle("gb-body--summary", state.step === "summary");
 
     renderProgress();
     bindCommonHandlers();
@@ -1368,6 +1393,8 @@
     if (state.step === "restaurantDetails") {
       state.restaurant.tablesCount = clamp(toInt(document.getElementById("gb-rest-tables")?.value || state.restaurant.tablesCount || 1, 1), 1, 30);
       state.restaurant.guestsCount = clamp(toInt(document.getElementById("gb-rest-guests")?.value || state.restaurant.guestsCount || 1, 1), 1, 300);
+      const placePreference = String(document.getElementById("gb-rest-place")?.value || state.restaurant.placePreference || "no_preference");
+      state.restaurant.placePreference = RESTAURANT_PLACE_OPTIONS.includes(placePreference) ? placePreference : "no_preference";
       state.restaurant.joinTables = Boolean(document.getElementById("gb-rest-join")?.checked);
       state.restaurant.customerNote = String(document.getElementById("gb-rest-note")?.value || state.restaurant.customerNote || "").trim();
       return;
@@ -1600,6 +1627,7 @@
     if (state.step === "restaurantDetails") {
       const tablesInput = document.getElementById("gb-rest-tables");
       const guestsInput = document.getElementById("gb-rest-guests");
+      const placeInput = document.getElementById("gb-rest-place");
       const joinInput = document.getElementById("gb-rest-join");
       const noteInput = document.getElementById("gb-rest-note");
 
@@ -1628,6 +1656,8 @@
 
         state.restaurant.tablesCount = tablesCount;
         state.restaurant.guestsCount = guestsCount;
+        const placePreference = String(placeInput?.value || "no_preference");
+        state.restaurant.placePreference = RESTAURANT_PLACE_OPTIONS.includes(placePreference) ? placePreference : "no_preference";
         state.restaurant.joinTables = Boolean(joinInput?.checked);
         state.restaurant.customerNote = String(noteInput?.value || "").trim();
 
@@ -1971,6 +2001,7 @@
           durationHours: state.restaurant.durationHours,
           tablesCount: state.restaurant.tablesCount,
           guestsCount: state.restaurant.guestsCount,
+          placePreference: state.restaurant.placePreference,
           joinTables: state.restaurant.joinTables,
           customerNote: state.restaurant.customerNote,
         },
