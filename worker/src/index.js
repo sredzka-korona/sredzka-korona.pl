@@ -1062,12 +1062,12 @@ function sanitizeContent(content) {
     events: { ...DEFAULT_CONTENT.events, ...(content.events || {}) },
     services: Array.isArray(content.services) ? content.services : DEFAULT_CONTENT.services,
     gallery: { ...DEFAULT_CONTENT.gallery, ...(content.gallery || {}) },
-    documentsMenu: {
-      ...DEFAULT_CONTENT.documentsMenu,
-      ...(content.documentsMenu || {}),
-      sections: Array.isArray(content.documentsMenu?.sections)
-        ? content.documentsMenu.sections
-        : DEFAULT_CONTENT.documentsMenu.sections,
+    documentsPage: {
+      ...DEFAULT_CONTENT.documentsPage,
+      ...(content.documentsPage || {}),
+      documents: Array.isArray(content.documentsPage?.documents)
+        ? content.documentsPage.documents
+        : DEFAULT_CONTENT.documentsPage.documents,
     },
     contact: { ...DEFAULT_CONTENT.contact, ...(content.contact || {}) },
     cookies: { ...DEFAULT_CONTENT.cookies, ...(content.cookies || {}) },

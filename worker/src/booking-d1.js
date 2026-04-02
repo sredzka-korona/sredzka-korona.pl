@@ -2951,6 +2951,54 @@ async function handleRestaurantAdmin(env, op, request) {
       .run();
     return { status: 200, data: { ok: true } };
   }
+  if (op === "admin-table-create" && request.method === "POST") {
+    const now = nowMs();
+    const existing = await restaurantTables(env, true);
+    const nextNumber = existing.reduce((max, row) => Math.max(max, Number(row.number || 0)), 0) + 1;
+    const nextSortOrder = existing.reduce((max, row) => Math.max(max, Number(row.sortOrder || 0)), 0) + 1;
+    const id = `table-${nextNumber}-${now}`;
+    await env.DB.prepare(
+      "INSERT INTO restaurant_tables (id, number, zone, active, hidden, description, sort_order, updated_at) VALUES (?, ?, 'sala', 1, 0, '', ?, ?)"
+    )
+      .bind(id, nextNumber, nextSortOrder, now)
+      .run();
+    const countRow = await env.DB.prepare("SELECT COUNT(*) AS c FROM restaurant_tables").first();
+    const tableCount = Math.max(1, Number(countRow?.c || 0));
+    await env.DB.prepare("UPDATE restaurant_settings SET table_count=?, updated_at=? WHERE id='default'")
+      .bind(tableCount, now)
+      .run();
+    return { status: 200, data: { ok: true, table: { id, number: nextNumber } } };
+  }
+  if (op === "admin-table-delete" && request.method === "DELETE") {
+    const body = await readBody(request);
+    const id = cleanString(body.id, 80);
+    if (!id) return { status: 400, data: { error: "Brak id stolika." } };
+    const target = await env.DB.prepare("SELECT id FROM restaurant_tables WHERE id=?").bind(id).first();
+    if (!target) return { status: 404, data: { error: "Stolik nie istnieje." } };
+    const now = nowMs();
+    const futureRowsRes = await env.DB.prepare(
+      `SELECT assigned_table_ids_json AS assignedTableIdsJson
+       FROM restaurant_reservations
+       WHERE status IN ('email_verification_pending','pending','confirmed','manual_block')
+         AND end_ms > ?`
+    )
+      .bind(now)
+      .all();
+    const hasFutureAssignment = (futureRowsRes.results || []).some((row) => {
+      const ids = parseJson(row.assignedTableIdsJson, []);
+      return Array.isArray(ids) && ids.includes(id);
+    });
+    if (hasFutureAssignment) {
+      return { status: 409, data: { error: "Nie mozna usunac stolika z przyszla rezerwacja lub blokada." } };
+    }
+    await env.DB.prepare("DELETE FROM restaurant_tables WHERE id=?").bind(id).run();
+    const countRow = await env.DB.prepare("SELECT COUNT(*) AS c FROM restaurant_tables").first();
+    const tableCount = Math.max(1, Number(countRow?.c || 0));
+    await env.DB.prepare("UPDATE restaurant_settings SET table_count=?, updated_at=? WHERE id='default'")
+      .bind(tableCount, now)
+      .run();
+    return { status: 200, data: { ok: true } };
+  }
   if (op === "admin-reservations-list" && request.method === "GET") {
     const url = new URL(request.url);
     const status = cleanString(url.searchParams.get("status"), 40);

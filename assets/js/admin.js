@@ -380,8 +380,27 @@
       content.booking.eventsPauseFrom,
       content.booking.eventsPauseTo
     );
+    content.documentsPage = normalizeDocumentsPage(content.documentsPage);
 
     return content;
+  }
+
+  function normalizeDocumentsPage(documentsPage) {
+    const source = documentsPage && typeof documentsPage === "object" ? documentsPage : {};
+    return {
+      documents: (Array.isArray(source.documents) ? source.documents : [])
+        .map((doc) => ({
+          title: String(doc?.title || "").trim(),
+          subtitle: String(doc?.subtitle || "").trim(),
+          sections: (Array.isArray(doc?.sections) ? doc.sections : [])
+            .map((section) => ({
+              title: String(section?.title || "").trim(),
+              text: String(section?.text || "").trim(),
+            }))
+            .filter((section) => section.title || section.text),
+        }))
+        .filter((doc) => doc.title || doc.subtitle || doc.sections.length),
+    };
   }
 
   function normalizeEventHalls(halls) {
@@ -549,7 +568,7 @@
       tiles: [
         { key: "menu", label: "Menu", description: "Kategorie, pozycje, składniki i kolejność." },
         { key: "gallery", label: "Galeria", description: "Zdjęcia restauracji i ich kolejność." },
-        { key: "orders", label: "Zamówienia / Catering", description: "Edycja treści modala zamówień i cateringu widocznej na stronie restauracji." },
+        { key: "orders", label: "Zamówienia i catering", description: "Edycja treści modala zamówień i cateringu widocznej na stronie restauracji." },
         { key: "hours", label: "Godziny otwarcia", description: "Dni i godziny widoczne na stronie restauracji." },
         { key: "tables", label: "Stoliki", description: "Konfiguracja stolików i godzin systemu rezerwacji." },
         { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Restauracja na stronie głównej (pozycja i zoom)." },
@@ -573,9 +592,9 @@
     {
       key: "dokumenty",
       label: "Dokumenty",
-      description: "Pliki i menu dokumentow.",
+      description: "Dokumenty podstrony i pliki do pobrania.",
       tiles: [
-        { key: "documents", label: "Dokumenty", description: "Dodawanie plikow i zarzadzanie menu dokumentow." },
+        { key: "documents", label: "Dokumenty", description: "Edycja tresci dokumentow i zarzadzanie plikami." },
       ],
     },
     {
@@ -1194,24 +1213,23 @@
   }
 
   function renderAdminEntryCard(tab, options = {}) {
-    const { compact = false, featured = false, highlights = [] } = options;
-    const tagItems = (Array.isArray(highlights) && highlights.length ? highlights : tab.tiles.map((tile) => tile.label))
+    const { featured = false, highlights = [] } = options;
+    const tagItems = (Array.isArray(highlights) ? highlights : [])
       .filter(Boolean)
-      .slice(0, compact ? 2 : 3);
-    const modifier = compact ? " admin-entry-tile--compact" : "";
+      .slice(0, 3);
+    const metaLabel = featured ? "Najważniejszy moduł" : adminViewsCountLabel(tab.tiles.length);
     const featuredModifier = featured ? " admin-entry-tile--featured" : "";
     return `
       <button
         type="button"
-        class="admin-tile admin-entry-tile admin-entry-tile--${escapeAttribute(tab.key)}${modifier}${featuredModifier}"
+        class="admin-tile admin-entry-tile admin-entry-tile--${escapeAttribute(tab.key)}${featuredModifier}"
         data-admin-entry="${escapeAttribute(tab.key)}"
       >
-        <span class="admin-entry-kicker">${featured ? "Najszybszy dostęp" : compact ? "Moduł pomocniczy" : "Moduł główny"}</span>
         <span class="admin-entry-head">
           <span class="admin-entry-icon" aria-hidden="true">${adminHomeIconMarkup(tab.key)}</span>
           <span class="admin-entry-heading">
+            <span class="admin-entry-meta">${escapeHtml(metaLabel)}</span>
             <span class="admin-tile-title">${escapeHtml(tab.label)}</span>
-            <span class="admin-entry-count">${escapeHtml(adminViewsCountLabel(tab.tiles.length))}</span>
           </span>
         </span>
         <span class="admin-tile-copy">${escapeHtml(tab.description)}</span>
@@ -1826,7 +1844,7 @@
       );
     }
     actions.push(
-      `<button type="button" class="button secondary danger-muted" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`
+      `<button type="button" class="button secondary danger-muted schedule-inline-cancel" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`
     );
     return actions.join("");
   }
@@ -2072,7 +2090,7 @@
                             }
                             ${
                               item.status !== "manual_block"
-                                ? `<button type="button" class="button secondary danger-muted" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`
+                                ? `<button type="button" class="button secondary danger-muted schedule-inline-cancel" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`
                                 : ""
                             }
                           </div>
@@ -3388,11 +3406,6 @@
     const primaryHomeTabs = homeTabs.filter((tab) => ["hotel", "restauracja", "przyjecia"].includes(tab.key));
     const secondaryHomeTabs = homeTabs.filter((tab) => ["dokumenty", "kontakt"].includes(tab.key));
     const scheduleTab = ADMIN_TABS.find((tab) => tab.key === "grafik");
-    const totalHomeAreas = ADMIN_TABS.length;
-    const totalEditorViews = ADMIN_TABS.reduce(
-      (sum, tab) => sum + (Array.isArray(tab.tiles) ? tab.tiles.length : 0),
-      0
-    );
 
     app.innerHTML = `
       <div class="admin-shell">
@@ -3412,10 +3425,6 @@
             </a>
           </div>
           <div class="admin-topbar-side admin-topbar-side-end">
-            <div class="admin-global-save-actions" id="admin-global-save-actions">
-              <button class="button secondary" id="cancel-content-button" type="button">Anuluj</button>
-              <button class="button" id="save-content-button" type="button">Zapisz</button>
-            </div>
             <button class="button danger icon-button" id="logout-button" type="button" aria-label="Wyloguj">⎋</button>
           </div>
         </header>
@@ -3460,54 +3469,28 @@
             `
               : `
               <div class="admin-home-layout">
-                <section class="admin-home-hero">
-                  <div class="admin-home-hero-copy">
-                    <p class="pill">Panel administratora</p>
-                    <h2>Centrum zarządzania Średzką Koroną</h2>
-                    <p class="section-intro">Najważniejsze moduły są na pierwszym planie, a rzadziej używane sekcje pomocnicze pozostają pod ręką po prawej stronie.</p>
-                  </div>
-                  <div class="admin-home-hero-stats" aria-label="Podsumowanie panelu">
-                    <article class="admin-home-stat">
-                      <strong>${totalHomeAreas}</strong>
-                      <span>obszarów pracy</span>
-                    </article>
-                    <article class="admin-home-stat">
-                      <strong>${totalEditorViews}</strong>
-                      <span>widoków edycji</span>
-                    </article>
-                    <article class="admin-home-stat">
-                      <strong>Grafik</strong>
-                      <span>akceptacje i terminy</span>
-                    </article>
-                  </div>
-                </section>
-                <div class="admin-home-dashboard">
-                  <div class="admin-home-main">
-                    ${
-                      scheduleTab
-                        ? renderAdminEntryCard(scheduleTab, {
-                            featured: true,
-                            highlights: ["Akceptacje", "Dzisiejsze terminy", "Kalendarz"],
-                          })
-                        : ""
-                    }
-                    <div class="admin-home-primary-grid" aria-label="Glowne sekcje panelu administracyjnego">
-                      ${primaryHomeTabs.map((tab) => renderAdminEntryCard(tab)).join("")}
-                    </div>
-                  </div>
-                  <aside class="admin-home-side" aria-label="Sekcje pomocnicze panelu administracyjnego">
-                    <div class="admin-home-side-copy">
-                      <p class="pill">Pomocnicze</p>
-                      <h3>Treści i dane firmowe</h3>
-                      <p class="section-intro">Sekcje używane rzadziej, ale ważne przy aktualizacji dokumentów i danych kontaktowych.</p>
-                    </div>
-                    ${secondaryHomeTabs.map((tab) => renderAdminEntryCard(tab, { compact: true })).join("")}
-                  </aside>
+                ${
+                  scheduleTab
+                    ? renderAdminEntryCard(scheduleTab, {
+                        featured: true,
+                        highlights: ["Akceptacje", "Dzisiejsze terminy", "Kalendarz"],
+                      })
+                    : ""
+                }
+                <div class="admin-home-simple-grid" aria-label="Glowne sekcje panelu administracyjnego">
+                  ${primaryHomeTabs.map((tab) => renderAdminEntryCard(tab)).join("")}
+                </div>
+                <div class="admin-home-secondary-grid" aria-label="Pozostale sekcje panelu administracyjnego">
+                  ${secondaryHomeTabs.map((tab) => renderAdminEntryCard(tab)).join("")}
                 </div>
               </div>
             `
           }
         </section>
+        <div class="admin-global-save-actions" id="admin-global-save-actions">
+          <button class="button secondary" id="cancel-content-button" type="button">Anuluj</button>
+          <button class="button" id="save-content-button" type="button">Zapisz</button>
+        </div>
       </div>
     `;
 
@@ -4153,8 +4136,8 @@
       content.events.menu = collectEventsMenuFromPanel();
     }
 
-    if (document.querySelector("#documents-menu-sections-list")) {
-      content.documentsMenu = collectDocumentsMenuFromPanel();
+    if (document.querySelector("#documents-page-list")) {
+      content.documentsPage = collectDocumentsPageFromPanel();
     }
 
     if (document.querySelector("[data-service-title]")) {
@@ -4554,8 +4537,8 @@
 
     panel.innerHTML = `
       <p class="pill">Restauracja</p>
-      <h2>Zamowienia / Catering</h2>
-      <p class="section-intro">Edytuj tresc modala widocznego po kliknieciu kafelka "Zamowienia / Catering" na stronie restauracji.</p>
+      <h2>Zamowienia i catering</h2>
+      <p class="section-intro">Edytuj tresc modala widocznego po kliknieciu kafelka "Zamowienia i catering" na stronie restauracji.</p>
       <div class="stack">
         <div class="field-full">
           <span>Tresc modala</span>
@@ -4601,7 +4584,7 @@
             <textarea id="restaurant-orders-info-html" rows="10" hidden>${escapeHtml(currentInfoText)}</textarea>
           </div>
         </div>
-        <p class="helper">Edytor wizualny zapisuje wyglad tresci wyswietlanej w modalu "Zamowienia / Catering".</p>
+        <p class="helper">Edytor wizualny zapisuje wyglad tresci wyswietlanej w modalu "Zamowienia i catering".</p>
         <p class="status">${escapeHtml(statusMessage)}</p>
       </div>
     `;
@@ -6700,27 +6683,23 @@
   function renderDocumentsPanel(statusMessage = "") {
     const panel = document.querySelector("#documents-panel");
     if (!panel) return;
-    const documentsMenu = state.content.documentsMenu || { title: "", intro: "", sections: [] };
+    const documentsPage = normalizeDocumentsPage(state.content.documentsPage);
     const mediaEnabled = state.capabilities?.mediaStorageEnabled === true;
     panel.innerHTML = `
       <p class="pill">Dokumenty</p>
-      <h2>Menu i pliki</h2>
+      <h2>Dokumenty strony i pliki</h2>
       <div class="stack">
         <div class="repeater-item">
           <div class="repeater-head">
             <div>
-              <h3>Menu dokumentow</h3>
-              <p class="helper">To menu wyswietla sie na stronie dokumentow jako rozwijana sekcja.</p>
+              <h3>Dokumenty na podstronie</h3>
+              <p class="helper">Te sekcje sa wyswietlane na /dokumenty. Mozesz je edytowac, usuwac i ustawiac ich kolejnosc.</p>
             </div>
-            <button class="button secondary" type="button" id="add-documents-menu-section">Dodaj sekcje</button>
+            <button class="button secondary" type="button" id="add-documents-page-document">Dodaj dokument</button>
           </div>
-          <div class="field-grid">
-            <label class="field-full"><span>Tytul</span><input id="documents-menu-title" value="${escapeAttribute(documentsMenu.title || "")}" /></label>
-            <label class="field-full"><span>Wstep</span><textarea id="documents-menu-intro">${escapeHtml(documentsMenu.intro || "")}</textarea></label>
-          </div>
-          <div id="documents-menu-sections-list" class="repeater-list"></div>
+          <div id="documents-page-list" class="repeater-list"></div>
           <div class="inline-actions">
-            <button class="button" type="button" id="save-documents-menu">Zapisz menu</button>
+            <button class="button" type="button" id="save-documents-page">Zapisz dokumenty podstrony</button>
           </div>
         </div>
         ${mediaEnabled ? "" : '<p class="status">Upload plikow jest obecnie niedostepny.</p>'}
@@ -6756,72 +6735,183 @@
       </div>
     `;
 
-    renderDocumentsMenuSections();
-    panel.querySelector("#add-documents-menu-section").addEventListener("click", addDocumentsMenuSection);
-    panel.querySelector("#save-documents-menu").addEventListener("click", saveDocumentsMenu);
+    state.content.documentsPage = documentsPage;
+    renderDocumentsPageList();
+    panel.querySelector("#add-documents-page-document").addEventListener("click", addDocumentsPageDocument);
+    panel.querySelector("#save-documents-page").addEventListener("click", saveDocumentsPage);
     document.querySelector("#document-form").addEventListener("submit", uploadDocument);
     panel.querySelectorAll("[data-delete-document]").forEach((button) => {
       button.addEventListener("click", () => deleteDocument(button.dataset.deleteDocument));
     });
   }
 
-  function renderDocumentsMenuSections() {
-    const target = document.querySelector("#documents-menu-sections-list");
+  function renderDocumentsPageList() {
+    const target = document.querySelector("#documents-page-list");
     if (!target) {
       return;
     }
-    target.innerHTML = (state.content.documentsMenu?.sections || [])
+    target.innerHTML = (state.content.documentsPage?.documents || [])
       .map(
-        (section, index) => `
+        (documentEntry, documentIndex) => `
           <div class="repeater-item">
             <div class="repeater-head">
-              <strong>Sekcja ${index + 1}</strong>
-              <button class="button danger" type="button" data-remove-documents-menu-section="${index}">Usun</button>
+              <strong>Dokument ${documentIndex + 1}</strong>
+              <div class="inline-actions">
+                <button class="button secondary" type="button" data-move-document-up="${documentIndex}" ${documentIndex === 0 ? "disabled" : ""}>↑</button>
+                <button class="button secondary" type="button" data-move-document-down="${documentIndex}" ${documentIndex === (state.content.documentsPage.documents.length - 1) ? "disabled" : ""}>↓</button>
+                <button class="button danger" type="button" data-remove-document="${documentIndex}">Usun</button>
+              </div>
             </div>
             <div class="field-grid">
-              <label class="field"><span>Nazwa sekcji</span><input data-documents-menu-title="${index}" value="${escapeAttribute(section.title || "")}" /></label>
-              <label class="field-full"><span>Pozycje, jedna w linii</span><textarea data-documents-menu-items="${index}">${escapeHtml((section.items || []).join("\n"))}</textarea></label>
+              <label class="field-full"><span>Tytul dokumentu</span><input data-doc-page-title="${documentIndex}" value="${escapeAttribute(documentEntry.title || "")}" /></label>
+              <label class="field-full"><span>Podtytul (opcjonalnie)</span><input data-doc-page-subtitle="${documentIndex}" value="${escapeAttribute(documentEntry.subtitle || "")}" /></label>
+            </div>
+            <div class="repeater-list">
+              ${(documentEntry.sections || [])
+                .map(
+                  (section, sectionIndex) => `
+                    <div class="repeater-item">
+                      <div class="repeater-head">
+                        <strong>Punkt ${sectionIndex + 1}</strong>
+                        <div class="inline-actions">
+                          <button class="button secondary" type="button" data-move-section-up="${documentIndex}" data-section-index="${sectionIndex}" ${sectionIndex === 0 ? "disabled" : ""}>↑</button>
+                          <button class="button secondary" type="button" data-move-section-down="${documentIndex}" data-section-index="${sectionIndex}" ${sectionIndex === documentEntry.sections.length - 1 ? "disabled" : ""}>↓</button>
+                          <button class="button danger" type="button" data-remove-section="${documentIndex}" data-section-index="${sectionIndex}">Usun</button>
+                        </div>
+                      </div>
+                      <div class="field-grid">
+                        <label class="field-full"><span>Naglowek punktu</span><input data-doc-page-section-title="${documentIndex}" data-section-index="${sectionIndex}" value="${escapeAttribute(section.title || "")}" /></label>
+                        <label class="field-full"><span>Tresc punktu</span><textarea data-doc-page-section-text="${documentIndex}" data-section-index="${sectionIndex}">${escapeHtml(section.text || "")}</textarea></label>
+                      </div>
+                    </div>
+                  `
+                )
+                .join("")}
+            </div>
+            <div class="inline-actions">
+              <button class="button secondary" type="button" data-add-section="${documentIndex}">Dodaj punkt</button>
             </div>
           </div>`
       )
       .join("");
 
-    target.querySelectorAll("[data-remove-documents-menu-section]").forEach((button) => {
-      button.addEventListener("click", () => removeDocumentsMenuSection(Number(button.dataset.removeDocumentsMenuSection)));
+    target.querySelectorAll("[data-remove-document]").forEach((button) => {
+      button.addEventListener("click", () => removeDocumentsPageDocument(Number(button.dataset.removeDocument)));
+    });
+    target.querySelectorAll("[data-move-document-up]").forEach((button) => {
+      button.addEventListener("click", () => moveDocumentsPageDocument(Number(button.dataset.moveDocumentUp), -1));
+    });
+    target.querySelectorAll("[data-move-document-down]").forEach((button) => {
+      button.addEventListener("click", () => moveDocumentsPageDocument(Number(button.dataset.moveDocumentDown), 1));
+    });
+    target.querySelectorAll("[data-add-section]").forEach((button) => {
+      button.addEventListener("click", () => addDocumentsPageSection(Number(button.dataset.addSection)));
+    });
+    target.querySelectorAll("[data-remove-section]").forEach((button) => {
+      button.addEventListener("click", () =>
+        removeDocumentsPageSection(Number(button.dataset.removeSection), Number(button.dataset.sectionIndex))
+      );
+    });
+    target.querySelectorAll("[data-move-section-up]").forEach((button) => {
+      button.addEventListener("click", () =>
+        moveDocumentsPageSection(Number(button.dataset.moveSectionUp), Number(button.dataset.sectionIndex), -1)
+      );
+    });
+    target.querySelectorAll("[data-move-section-down]").forEach((button) => {
+      button.addEventListener("click", () =>
+        moveDocumentsPageSection(Number(button.dataset.moveSectionDown), Number(button.dataset.sectionIndex), 1)
+      );
     });
   }
 
-  function collectDocumentsMenuFromPanel() {
+  function collectDocumentsPageFromPanel() {
+    const documents = Array.from(document.querySelectorAll("[data-doc-page-title]")).map((titleInput, documentIndex) => {
+      const subtitle = document.querySelector(`[data-doc-page-subtitle="${documentIndex}"]`)?.value.trim() || "";
+      const sectionTitleNodes = Array.from(
+        document.querySelectorAll(`[data-doc-page-section-title="${documentIndex}"]`)
+      );
+      const sections = sectionTitleNodes
+        .map((sectionTitleInput, sectionIndex) => ({
+          title: sectionTitleInput.value.trim(),
+          text: document
+            .querySelector(
+              `[data-doc-page-section-text="${documentIndex}"][data-section-index="${sectionIndex}"]`
+            )
+            ?.value.trim() || "",
+        }))
+        .filter((section) => section.title || section.text);
+      return {
+        title: titleInput.value.trim(),
+        subtitle,
+        sections,
+      };
+    });
+
     return {
-      title: document.querySelector("#documents-menu-title")?.value.trim() || "",
-      intro: document.querySelector("#documents-menu-intro")?.value.trim() || "",
-      sections: Array.from(document.querySelectorAll("[data-documents-menu-title]")).map((element, index) => ({
-        title: element.value.trim(),
-        items: (document.querySelector(`[data-documents-menu-items="${index}"]`)?.value || "")
-          .split("\n")
-          .map((item) => item.trim())
-          .filter(Boolean),
-      })),
+      documents: documents.filter((entry) => entry.title || entry.subtitle || entry.sections.length),
     };
   }
 
-  function addDocumentsMenuSection() {
-    state.content.documentsMenu = collectDocumentsMenuFromPanel();
-    state.content.documentsMenu.sections.push({ title: "", items: [] });
+  function addDocumentsPageDocument() {
+    state.content.documentsPage = collectDocumentsPageFromPanel();
+    state.content.documentsPage.documents.push({ title: "", subtitle: "", sections: [] });
     renderDocumentsPanel();
     refreshSaveDockVisibility();
   }
 
-  function removeDocumentsMenuSection(index) {
-    state.content.documentsMenu = collectDocumentsMenuFromPanel();
-    state.content.documentsMenu.sections.splice(index, 1);
+  function removeDocumentsPageDocument(index) {
+    state.content.documentsPage = collectDocumentsPageFromPanel();
+    state.content.documentsPage.documents.splice(index, 1);
     renderDocumentsPanel();
     refreshSaveDockVisibility();
   }
 
-  async function saveDocumentsMenu() {
-    state.content.documentsMenu = collectDocumentsMenuFromPanel();
-    await saveContent("Menu dokumentow zostalo zapisane.");
+  function moveDocumentsPageDocument(index, direction) {
+    state.content.documentsPage = collectDocumentsPageFromPanel();
+    const documents = state.content.documentsPage.documents;
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= documents.length) {
+      return;
+    }
+    [documents[index], documents[nextIndex]] = [documents[nextIndex], documents[index]];
+    renderDocumentsPanel();
+    refreshSaveDockVisibility();
+  }
+
+  function addDocumentsPageSection(documentIndex) {
+    state.content.documentsPage = collectDocumentsPageFromPanel();
+    const entry = state.content.documentsPage.documents[documentIndex];
+    if (!entry) return;
+    entry.sections.push({ title: "", text: "" });
+    renderDocumentsPanel();
+    refreshSaveDockVisibility();
+  }
+
+  function removeDocumentsPageSection(documentIndex, sectionIndex) {
+    state.content.documentsPage = collectDocumentsPageFromPanel();
+    const entry = state.content.documentsPage.documents[documentIndex];
+    if (!entry) return;
+    entry.sections.splice(sectionIndex, 1);
+    renderDocumentsPanel();
+    refreshSaveDockVisibility();
+  }
+
+  function moveDocumentsPageSection(documentIndex, sectionIndex, direction) {
+    state.content.documentsPage = collectDocumentsPageFromPanel();
+    const entry = state.content.documentsPage.documents[documentIndex];
+    if (!entry) return;
+    const nextIndex = sectionIndex + direction;
+    if (nextIndex < 0 || nextIndex >= entry.sections.length) {
+      return;
+    }
+    [entry.sections[sectionIndex], entry.sections[nextIndex]] = [entry.sections[nextIndex], entry.sections[sectionIndex]];
+    renderDocumentsPanel();
+    refreshSaveDockVisibility();
+  }
+
+  async function saveDocumentsPage() {
+    state.content.documentsPage = collectDocumentsPageFromPanel();
+    await saveContent("Dokumenty podstrony zostaly zapisane.");
   }
 
   async function uploadDocument(event) {

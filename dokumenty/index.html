@@ -502,7 +502,7 @@
         </div>
         <h1 class="page-title">Dokumenty</h1>
       </header>
-      <details class="card collapsible-card" id="regulamin-rezerwacji-hotel">
+      <details class="card collapsible-card" id="regulamin-rezerwacji-hotel" data-static-document>
         <summary class="collapsible-summary">
           <div>
             <h2>Regulamin rezerwacji pokoi hotelowych</h2>
@@ -557,7 +557,7 @@
           </div>
         </div>
       </details>
-      <details class="card collapsible-card" id="regulamin-rezerwacji-restauracja">
+      <details class="card collapsible-card" id="regulamin-rezerwacji-restauracja" data-static-document>
         <summary class="collapsible-summary">
           <div>
             <h2>Regulamin rezerwacji restauracji</h2>
@@ -629,7 +629,7 @@
           </div>
         </div>
       </details>
-      <details class="card collapsible-card" id="regulamin-rezerwacji-sali">
+      <details class="card collapsible-card" id="regulamin-rezerwacji-sali" data-static-document>
         <summary class="collapsible-summary">
           <div>
             <h2>Regulamin rezerwacji sali</h2>
@@ -697,6 +697,7 @@
           </div>
         </div>
       </details>
+      <div id="documents-page-dynamic-list"></div>
       <div id="documents-list"></div>
       <div class="card" id="preview-card" style="display: none;">
         <p class="eyebrow">Podglad</p>
@@ -750,43 +751,8 @@
         const config = { apiBase: "" };
         const fallbackDocs = [];
         const fallbackContent = {
-          documentsMenu: {
-            title: "Menu dokumentow",
-            intro: "Przykladowa propozycja dla imprez rodzinnych, spotkan firmowych i przyjec zamknietych.",
-            sections: [
-              {
-                title: "Przystawki",
-                items: [
-                  "Tatar wolowy z ogorkiem kiszonym i pieczywem",
-                  "Carpaccio z buraka z kozim serem i orzechami",
-                  "Deska regionalnych wedlin i serow",
-                ],
-              },
-              {
-                title: "Dania glowne",
-                items: [
-                  "Rolada z indyka w sosie tymiankowym",
-                  "Schab pieczony z sosem pieczeniowym",
-                  "Sandacz na puree ziemniaczanym i warzywach sezonowych",
-                ],
-              },
-              {
-                title: "Dodatki",
-                items: [
-                  "Ziemniaki opiekane z ziolami",
-                  "Kluski slaskie",
-                  "Bukiet salat z winegretem",
-                ],
-              },
-              {
-                title: "Desery",
-                items: [
-                  "Sernik z biala czekolada",
-                  "Szarlotka na cieplo",
-                  "Mini beza z kremem mascarpone",
-                ],
-              },
-            ],
+          documentsPage: {
+            documents: [],
           },
         };
         const isLocalPreview =
@@ -800,6 +766,8 @@
               ? "https://api." + window.location.hostname.replace(/^www\./, "")
               : "";
         const docsTarget = document.querySelector("#documents-list");
+        const pageDocumentsTarget = document.querySelector("#documents-page-dynamic-list");
+        const staticDocumentCards = Array.from(document.querySelectorAll("[data-static-document]"));
         const scrollIndicator = document.querySelector(".scroll-indicator");
         const scrollIndicatorThumb = document.querySelector(".scroll-indicator-thumb");
         const cookiesInfo = document.querySelector("#cookies-info");
@@ -959,6 +927,63 @@
           scheduleScrollIndicatorUpdate();
         }
 
+        function renderPageDocuments(documents) {
+          if (!pageDocumentsTarget) {
+            return;
+          }
+          if (!Array.isArray(documents) || !documents.length) {
+            pageDocumentsTarget.innerHTML = "";
+            staticDocumentCards.forEach((card) => {
+              card.style.display = "";
+            });
+            scheduleScrollIndicatorUpdate();
+            return;
+          }
+
+          staticDocumentCards.forEach((card) => {
+            card.style.display = "none";
+          });
+
+          pageDocumentsTarget.innerHTML = documents
+            .map(
+              (doc) => `
+                <details class="card collapsible-card">
+                  <summary class="collapsible-summary">
+                    <div>
+                      <h2>${escapeHtml(doc.title || "Dokument")}</h2>
+                      ${
+                        doc.subtitle
+                          ? `<p class="muted" style="margin: 0.35rem 0 0; font-size: 0.9rem">${escapeHtml(doc.subtitle)}</p>`
+                          : ""
+                      }
+                    </div>
+                  </summary>
+                  <div class="collapsible-content">
+                    <div class="menu-sections">
+                      ${(Array.isArray(doc.sections) ? doc.sections : [])
+                        .map(
+                          (section) => `
+                            <div class="menu-section">
+                              ${section.title ? `<h3>${escapeHtml(section.title)}</h3>` : ""}
+                              ${section.text ? `<p>${escapeHtml(section.text).replaceAll("\n", "<br />")}</p>` : ""}
+                            </div>
+                          `
+                        )
+                        .join("")}
+                    </div>
+                  </div>
+                </details>
+              `
+            )
+            .join("");
+
+          pageDocumentsTarget.querySelectorAll("details").forEach((element) => {
+            element.addEventListener("toggle", scheduleScrollIndicatorUpdate);
+          });
+
+          scheduleScrollIndicatorUpdate();
+        }
+
         async function bootstrap() {
           try {
             if (isLocalPreview && !config.apiBase) {
@@ -969,8 +994,10 @@
               throw new Error("bootstrap unavailable");
             }
             const payload = await response.json();
+            renderPageDocuments(payload.content?.documentsPage?.documents || fallbackContent.documentsPage?.documents || []);
             renderDocuments(payload.documents || fallbackDocs);
           } catch (error) {
+            renderPageDocuments(fallbackContent.documentsPage?.documents || []);
             renderDocuments(fallbackDocs);
           }
         }

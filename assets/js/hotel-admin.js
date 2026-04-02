@@ -27,7 +27,15 @@
       throw new Error("Brak sesji Firebase.");
     }
     const token = await firebase.auth().currentUser.getIdToken();
-    const res = await fetch(`${base}?op=${encodeURIComponent(op)}`, {
+    const url = new URL(base);
+    url.searchParams.set("op", op);
+    if (options.query && typeof options.query === "object") {
+      Object.entries(options.query).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === "") return;
+        url.searchParams.set(key, String(value));
+      });
+    }
+    const res = await fetch(url.toString(), {
       method: options.method || "GET",
       headers: {
         "Content-Type": "application/json",
@@ -36,9 +44,17 @@
       },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     });
-    const data = await res.json().catch(() => ({}));
+    const raw = await res.text();
+    let data = {};
+    if (raw) {
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = {};
+      }
+    }
     if (!res.ok) {
-      throw new Error(data.error || "Błąd API hotelu.");
+      throw new Error(data.error || raw || `Błąd API hotelu (${res.status}).`);
     }
     return data;
   }
@@ -599,7 +615,7 @@
           try {
             await hotelApi("admin-room-delete", {
               method: "DELETE",
-              body: { id },
+              query: { id },
             });
             await loadRooms();
             hotelSubTab = "rooms";

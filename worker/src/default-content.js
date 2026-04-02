@@ -293,40 +293,96 @@ export const DEFAULT_CONTENT = {
     intro:
       "Kazdy album ma zdjecie glowne. Po kliknieciu otwiera sie pelna biblioteka zdjec z danego wydarzenia.",
   },
-  documentsMenu: {
-    title: "Menu okolicznosciowe",
-    intro: "Przykladowa propozycja dla imprez rodzinnych, spotkan firmowych i przyjec zamknietych.",
-    sections: [
+  documentsPage: {
+    documents: [
       {
-        title: "Przystawki",
-        items: [
-          "Tatar wolowy z ogorkiem kiszonym i pieczywem",
-          "Carpaccio z buraka z kozim serem i orzechami",
-          "Deska regionalnych wedlin i serow",
+        title: "Regulamin rezerwacji pokoi hotelowych",
+        subtitle: "Proces rezerwacji przez formularz na stronie Hotelu",
+        sections: [
+          {
+            title: "1. Zgloszenie i potwierdzenie e-mail",
+            text: "Wypelnienie formularza rezerwacji nie blokuje terminu automatycznie. Po wyslaniu formularza otrzymujesz link potwierdzajacy, ktory nalezy kliknac w ciagu 2 godzin. Dopiero wtedy zgloszenie przechodzi do statusu oczekujacego i termin jest wstepnie blokowany.",
+          },
+          {
+            title: "2. Termin na potwierdzenie przez hotel",
+            text: "Hotel ma do 3 dni na potwierdzenie rezerwacji od momentu, gdy zgloszenie jest oczekujace. Brak decyzji moze skutkowac automatycznym anulowaniem i zwolnieniem terminu.",
+          },
+          {
+            title: "3. Skutki akceptacji",
+            text: "Po potwierdzeniu przez hotel rezerwacja ma charakter zobowiazujacy, a gosc zobowiazuje sie do zaplaty zgodnie z warunkami obiektu i obowiazujacymi przepisami.",
+          },
+          {
+            title: "4. Dane kontaktowe",
+            text: "Podanie nieprawidlowych danych kontaktowych moze uniemozliwic realizacje rezerwacji lub skuteczne powiadomienie goscia.",
+          },
+          {
+            title: "5. Kontakt ze strony hotelu",
+            text: "Hotel moze kontaktowac sie z gosciem mailowo i telefonicznie w sprawach dotyczacych rezerwacji.",
+          },
         ],
       },
       {
-        title: "Dania glowne",
-        items: [
-          "Rolada z indyka w sosie tymiankowym",
-          "Schab pieczony z sosem pieczeniowym",
-          "Sandacz na puree ziemniaczanym i warzywach sezonowych",
+        title: "Regulamin rezerwacji restauracji",
+        subtitle: "Rezerwacja stolikow przez formularz na stronie Restauracji",
+        sections: [
+          {
+            title: "1. Zgloszenie i potwierdzenie e-mail",
+            text: "Wypelnienie formularza nie blokuje stolikow do czasu potwierdzenia e-mail. Link potwierdzajacy nalezy kliknac w ciagu 2 godzin. Po potwierdzeniu zgloszenie przechodzi do statusu oczekujacego i stoliki sa wstepnie rezerwowane.",
+          },
+          {
+            title: "2. Termin na potwierdzenie przez restauracje",
+            text: "Restauracja ma do 3 dni na decyzje od chwili uzyskania statusu oczekujacego. Brak decyzji skutkuje automatycznym anulowaniem.",
+          },
+          {
+            title: "3. Skutki akceptacji",
+            text: "Po pozytywnym potwierdzeniu rezerwacja staje sie zobowiazujaca dla goscia.",
+          },
+          {
+            title: "4. Dane kontaktowe",
+            text: "Nalezy podac prawidlowe dane kontaktowe. Bledne dane moga uniemozliwic realizacje rezerwacji lub kontakt.",
+          },
+          {
+            title: "5. Kontakt ze strony lokalu",
+            text: "Lokal moze kontaktowac sie z gosciem mailowo i telefonicznie.",
+          },
+          {
+            title: "6. Polaczenie stolow",
+            text: "Prosba o polaczenie stolow ma charakter preferencji i zalezy od mozliwosci lokalu oraz ukladu sali.",
+          },
+          {
+            title: "7. Przerwy miedzy rezerwacjami",
+            text: "Miedzy rezerwacjami obowiazuje przerwa organizacyjna uwzgledniana przez system.",
+          },
         ],
       },
       {
-        title: "Dodatki",
-        items: [
-          "Ziemniaki opiekane z ziolami",
-          "Kluski slaskie",
-          "Bukiet salat z winegretem",
-        ],
-      },
-      {
-        title: "Desery",
-        items: [
-          "Sernik z biala czekolada",
-          "Szarlotka na cieplo",
-          "Mini beza z kremem mascarpone",
+        title: "Regulamin rezerwacji sali",
+        subtitle: "Wynajem sal na przyjecia - zgloszenie przez formularz na stronie Przyjecia",
+        sections: [
+          {
+            title: "1. Zgloszenie i potwierdzenie e-mail",
+            text: "Wyslanie formularza tworzy zgloszenie i nie blokuje sali do czasu potwierdzenia e-mail. Link potwierdzajacy jest wazny 2 godziny. Po potwierdzeniu zgloszenie przechodzi do statusu oczekujacego.",
+          },
+          {
+            title: "2. Wycena i kontakt telefoniczny",
+            text: "Nie ma stalego cennika online. Wycena jest ustalana indywidualnie po kontakcie telefonicznym z obiektem.",
+          },
+          {
+            title: "3. Termin oczekiwania na decyzje obiektu",
+            text: "Obiekt ma 7 dni kalendarzowych na potwierdzenie i moze przedluzyc termin o kolejne 7 dni. Brak decyzji w terminie skutkuje automatycznym anulowaniem.",
+          },
+          {
+            title: "4. Sala mala i sala duza - zasady zajetosci",
+            text: "Sala mala jest zawsze rezerwowana na wylacznosc. Sala duza moze byc wspoldzielona do limitu pojemnosci, chyba ze wybrano wylacznosc lub liczba gosci wymaga pelnej blokady.",
+          },
+          {
+            title: "5. Dane kontaktowe",
+            text: "Klient ma obowiazek podac prawidlowe dane kontaktowe. Bledne dane moga uniemozliwic realizacje rezerwacji.",
+          },
+          {
+            title: "6. Kontakt ze strony obiektu",
+            text: "Obsluga kontaktuje sie telefonicznie i mailowo w sprawie wyceny oraz potwierdzenia rezerwacji.",
+          },
         ],
       },
     ],
