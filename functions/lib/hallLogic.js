@@ -1,6 +1,7 @@
 const { DateTime } = require("luxon");
 const { FieldValue } = require("firebase-admin/firestore");
 const { allocateSharedReservationNumber } = require("./humanNumber");
+const { HALL_MIN_ADVANCE_MS } = require("./bookingConstants");
 
 const WARSAW = "Europe/Warsaw";
 
@@ -119,7 +120,7 @@ async function loadOverlappingReservations(db, hallId, blockStartMs, blockEndMs,
   return rows;
 }
 
-async function checkHallAvailability(db, hallDoc, input, excludeReservationId) {
+async function checkHallAvailability(db, hallDoc, input, excludeReservationId, internalOptions = {}) {
   const hall = hallDoc.data ? { id: hallDoc.id, ...hallDoc.data() } : hallDoc;
   const bufferMinutes = Number(hall.bufferMinutes) ?? 60;
   const hallKind = hall.hallKind || (hall.capacity <= 40 ? "small" : "large");
@@ -139,6 +140,9 @@ async function checkHallAvailability(db, hallDoc, input, excludeReservationId) {
   const now = Date.now();
   if (startMs < now - 60 * 1000) {
     return { ok: false, error: "Nie można rezerwować terminu z przeszłości." };
+  }
+  if (!internalOptions.skipMinAdvance && startMs < now + HALL_MIN_ADVANCE_MS) {
+    return { ok: false, error: "Wybierz termin co najmniej 2 godziny od teraz." };
   }
 
   const overlapping = await loadOverlappingReservations(db, hall.id, blockStartMs, blockEndMs, excludeReservationId);

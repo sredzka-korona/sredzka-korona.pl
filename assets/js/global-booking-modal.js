@@ -127,6 +127,62 @@
     return `${y}-${m}-${d}`;
   }
 
+  function todayYmdWarsaw() {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Warsaw",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const year = parts.find((p) => p.type === "year")?.value || "1970";
+    const month = parts.find((p) => p.type === "month")?.value || "01";
+    const day = parts.find((p) => p.type === "day")?.value || "01";
+    return `${year}-${month}-${day}`;
+  }
+
+  const EVENTS_MIN_ADVANCE_MS = 2 * 60 * 60 * 1000;
+
+  function eventsYmdHmToMsWarsaw(ymd, hm) {
+    if (!ymd || !hm || !/^\d{4}-\d{2}-\d{2}$/.test(ymd) || !/^\d{2}:\d{2}$/.test(hm)) return NaN;
+    const Y = Number(ymd.slice(0, 4));
+    const M = Number(ymd.slice(5, 7));
+    const D = Number(ymd.slice(8, 10));
+    const h = Number(hm.slice(0, 2));
+    const m = Number(hm.slice(3, 5));
+    if (![Y, M, D, h, m].every((n) => Number.isFinite(n))) return NaN;
+    let utcMs = Date.UTC(Y, M - 1, D, h, m, 0, 0);
+    const dtf = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Warsaw",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    for (let k = 0; k < 48; k += 1) {
+      const pa = dtf.formatToParts(new Date(utcMs));
+      const pv = (type) => pa.find((p) => p.type === type)?.value;
+      const y = Number(pv("year"));
+      const mo = Number(pv("month"));
+      const da = Number(pv("day"));
+      const ho = Number(pv("hour"));
+      const mi = Number(pv("minute"));
+      if (y === Y && mo === M && da === D && ho === h && mi === m) return utcMs;
+      utcMs += (h * 60 + m - (ho * 60 + mi)) * 60 * 1000;
+    }
+    return NaN;
+  }
+
+  function assertEventsStartOk(ymd, hm) {
+    const t = eventsYmdHmToMsWarsaw(ymd, hm);
+    if (!Number.isFinite(t)) return { ok: false, message: "Nieprawidłowa data lub godzina." };
+    const now = Date.now();
+    if (t < now - 60 * 1000) return { ok: false, message: "Nie można wybrać terminu z przeszłości." };
+    if (t < now + EVENTS_MIN_ADVANCE_MS) return { ok: false, message: "Wybierz termin co najmniej 2 godziny od teraz." };
+    return { ok: true };
+  }
+
   function hmToMinutes(value) {
     const match = String(value || "").match(/^(\d{2}):(\d{2})$/);
     if (!match) return null;
@@ -454,7 +510,7 @@
     state.events = {
       loading: false,
       halls: [],
-      reservationDate: todayYmdLocal(),
+      reservationDate: todayYmdWarsaw(),
       startTime: "12:00",
       durationHours: 4,
       durationUnspecified: false,
@@ -574,7 +630,7 @@
       state.events = {
         loading: false,
         halls: Array.isArray(draft.events?.halls) ? draft.events.halls : [],
-        reservationDate: cleanString(draft.events?.reservationDate, 10) || todayYmdLocal(),
+        reservationDate: cleanString(draft.events?.reservationDate, 10) || todayYmdWarsaw(),
         startTime: cleanString(draft.events?.startTime, 5) || "12:00",
         durationHours: Number(draft.events?.durationHours || 4),
         durationUnspecified: Boolean(draft.events?.durationUnspecified),
@@ -868,7 +924,7 @@
       eventsDetails: "Szczegóły wydarzenia",
       personal: "Dane osobowe",
       summary: "Podsumowanie",
-      success: "Potwierdzenie wysyłki",
+      success: "Złożono zapytanie",
     };
     return map[state.step] || "System Rezerwacji";
   }
@@ -1124,10 +1180,11 @@
       .join("");
     return `
       <section>
+        <p class="gb-hint" style="margin:0 0 0.75rem;">Termin musi być co najmniej <strong>2 godziny</strong> od teraz (czas Polski).</p>
         <div class="gb-grid-3">
           <label class="gb-field">
             <span>Data rezerwacji</span>
-            <input type="date" id="gb-events-date" min="${escapeHtml(todayYmdLocal())}" value="${escapeHtml(state.events.reservationDate)}" required />
+            <input type="date" id="gb-events-date" min="${escapeHtml(todayYmdWarsaw())}" value="${escapeHtml(state.events.reservationDate)}" required />
           </label>
           <label class="gb-field gb-field--time-like">
             <span>Godzina rezerwacji</span>
@@ -1391,6 +1448,7 @@
   function renderSummaryStep() {
     const submitLabel = state.selectedService === "events" ? "Poproś o ofertę" : "Rezerwuj";
     const showSubmitButton = antiBotVerified();
+    const decisionDaysLabel = state.selectedService === "events" ? "7 dni" : "3 dni";
 
     return `
       <section>
@@ -1410,7 +1468,7 @@
 
         <label class="gb-check">
           <input type="checkbox" id="gb-terms" ${state.termsAccepted ? "checked" : ""} />
-          <span>Akceptuję <a class="gb-link" href="${escapeHtml(SERVICE_META[state.selectedService]?.confirmPath || "#")}" target="_blank" rel="noopener">regulamin rezerwacji</a>, oraz fakt, że moja rezerwacja zostanie rozpatrzona w ciągu 3 dni.</span>
+          <span>Akceptuję <a class="gb-link" href="${escapeHtml(SERVICE_META[state.selectedService]?.confirmPath || "#")}" target="_blank" rel="noopener">regulamin rezerwacji</a>, oraz fakt, że moja rezerwacja zostanie rozpatrzona w ciągu ${decisionDaysLabel}.</span>
         </label>
 
         <div class="gb-actions">
@@ -1432,6 +1490,7 @@
     const left = state.countdownUntil ? Math.max(0, state.countdownUntil - Date.now()) : EMAIL_CONFIRM_MS;
     const supportNotice =
       '<p class="gb-hint" style="margin-top:0.75rem;">Jeśli nie widzisz wiadomości e-mail, sprawdź folder SPAM. W razie problemów skontaktuj się z nami mailowo lub telefonicznie.</p>';
+    const decisionDaysLabel = state.selectedService === "events" ? "7 dni" : "3 dni";
     return `
       <section>
         <h3>Rezerwacja została zapisana</h3>
@@ -1439,7 +1498,7 @@
           state.requiresEmailConfirmation
             ? `<div class="gb-success-card">
                 <p class="gb-hint">Wysłaliśmy link potwierdzający na Twój adres e-mail. Kliknij go, aby aktywować zgłoszenie.</p>
-                <p class="gb-hint" style="margin-top:0.75rem;">Po potwierdzeniu maila rezerwacja zostanie wysłana. Rezerwacja może nie zostać przyjęta. Decyzję wyślemy mailowo w ciągu <strong>3 dni</strong>.</p>
+                <p class="gb-hint" style="margin-top:0.75rem;">Po potwierdzeniu maila rezerwacja zostanie wysłana. Rezerwacja może nie zostać przyjęta. Decyzję wyślemy mailowo w ciągu <strong>${decisionDaysLabel}</strong>.</p>
                 ${supportNotice}
                 <div class="gb-countdown-footer">
                   <p class="gb-countdown"><strong>Czas na potwierdzenie:</strong> <span id="gb-countdown-value">${escapeHtml(formatCountdown(left))}</span></p>
@@ -1447,7 +1506,7 @@
               </div>`
             : `<div class="gb-success-card">
                 <p class="gb-hint">Zgłoszenie trafiło już do kolejki oczekującej. Mail potwierdzający nie był wymagany dla tego zgłoszenia.</p>
-                <p class="gb-hint" style="margin-top:0.5rem;">Decyzję o przyjęciu lub odrzuceniu otrzymasz e-mailowo w ciągu <strong>3 dni</strong>. Rezerwacja może nie zostać przyjęta.</p>
+                <p class="gb-hint" style="margin-top:0.5rem;">Decyzję o przyjęciu lub odrzuceniu otrzymasz e-mailowo w ciągu <strong>${decisionDaysLabel}</strong>. Rezerwacja może nie zostać przyjęta.</p>
                 ${supportNotice}
               </div>`
         }
@@ -1902,7 +1961,7 @@
         renewSession({ persist: false });
         const dateValue = String(dateInput?.value || "");
         const timeValue = String(timeInput?.value || "");
-        const today = todayYmdLocal();
+        const today = todayYmdWarsaw();
 
         state.events.reservationDate = dateValue;
         state.events.startTime = timeValue;
@@ -1922,6 +1981,11 @@
         }
         if (!timeValue || hmToMinutes(timeValue) == null) {
           setError("Podaj poprawną godzinę rezerwacji.");
+          return;
+        }
+        const startOk = assertEventsStartOk(dateValue, timeValue);
+        if (!startOk.ok) {
+          setError(startOk.message);
           return;
         }
         if (!state.events.durationUnspecified && (!Number.isFinite(state.events.durationHours) || state.events.durationHours <= 0)) {
@@ -2257,6 +2321,14 @@
     if (!state.termsAccepted) {
       setError("Zaakceptuj regulamin, aby kontynuować.");
       return;
+    }
+
+    if (state.selectedService === "events") {
+      const evOk = assertEventsStartOk(state.events.reservationDate, state.events.startTime);
+      if (!evOk.ok) {
+        setError(evOk.message);
+        return;
+      }
     }
 
     if (config.turnstileSiteKey && !state.turnstileFailed && !antiBotVerified()) {

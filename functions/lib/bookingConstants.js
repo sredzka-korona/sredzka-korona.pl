@@ -10,6 +10,8 @@ const HOTEL_PENDING_MS = 3 * 24 * 60 * 60 * 1000;
 const RESTAURANT_PENDING_MS = 3 * 24 * 60 * 60 * 1000;
 /** Oczekiwanie na decyzję admina — sale */
 const HALL_PENDING_MS = 7 * 24 * 60 * 60 * 1000;
+/** Minimalne wyprzedzenie startu rezerwacji sali (zgłoszenie przyjęcia) — od „teraz” (strefa sali: Europe/Warsaw) */
+const HALL_MIN_ADVANCE_MS = 2 * 60 * 60 * 1000;
 /** Przycisk „Przedłuż o 7 dni” gdy pozostało ≤ tego czasu */
 const HALL_EXTEND_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -21,4 +23,5 @@ module.exports = {
   RESTAURANT_PENDING_MS,
   HALL_PENDING_MS,
   HALL_EXTEND_THRESHOLD_MS,
+  HALL_MIN_ADVANCE_MS,
 };

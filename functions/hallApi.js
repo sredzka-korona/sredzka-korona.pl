@@ -633,13 +633,19 @@ const hallApi = onRequest(
         }
         const hall = { id: hallSnap.id, ...hallSnap.data() };
 
-        const chk = await checkHallAvailability(db, hall, {
-          reservationDate: resData.reservationDate,
-          startTime: resData.startTime,
-          durationHours: resData.durationHours,
-          guestsCount: resData.guestsCount,
-          exclusive: resData.exclusive,
-        });
+        const chk = await checkHallAvailability(
+          db,
+          hall,
+          {
+            reservationDate: resData.reservationDate,
+            startTime: resData.startTime,
+            durationHours: resData.durationHours,
+            guestsCount: resData.guestsCount,
+            exclusive: resData.exclusive,
+          },
+          undefined,
+          { skipMinAdvance: true }
+        );
         if (!chk.ok) {
           json(res, { error: chk.error || "Termin przestał być dostępny." }, 409);
           return;
@@ -964,7 +970,8 @@ const hallApi = onRequest(
           db,
           hall,
           { reservationDate, startTime, durationHours, guestsCount, exclusive },
-          id
+          id,
+          { skipMinAdvance: true }
         );
         if (!chk.ok) {
           json(res, { error: chk.error || "Konflikt terminu." }, 409);
@@ -1071,13 +1078,19 @@ const hallApi = onRequest(
           gc = 1;
           excl = true;
         }
-        const chk = await checkHallAvailability(db, hall, {
-          reservationDate,
-          startTime,
-          durationHours,
-          guestsCount: gc,
-          exclusive: excl,
-        });
+        const chk = await checkHallAvailability(
+          db,
+          hall,
+          {
+            reservationDate,
+            startTime,
+            durationHours,
+            guestsCount: gc,
+            exclusive: excl,
+          },
+          undefined,
+          { skipMinAdvance: true }
+        );
         if (!chk.ok) {
           json(res, { error: chk.error }, 409);
           return;

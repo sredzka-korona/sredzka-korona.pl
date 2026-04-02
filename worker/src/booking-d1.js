@@ -541,6 +541,43 @@ function ymdHmToMs(ymd, hm) {
   return Date.UTC(y, m - 1, d, hh, mm, 0, 0);
 }
 
+/** Jak ymdHmToMs, ale dla czasu lokalnego Europe/Warsaw (zgodnie z modułem sal w Firebase). */
+const HALL_MIN_ADVANCE_MS = 2 * 60 * 60 * 1000;
+
+function ymdHmToMsWarsaw(ymd, hm) {
+  if (!isYmd(ymd) || !isHm(hm)) return NaN;
+  const Y = Number(ymd.slice(0, 4));
+  const M = Number(ymd.slice(5, 7));
+  const D = Number(ymd.slice(8, 10));
+  const h = Number(hm.slice(0, 2));
+  const m = Number(hm.slice(3, 5));
+  if (![Y, M, D, h, m].every((n) => Number.isFinite(n))) return NaN;
+  let utcMs = Date.UTC(Y, M - 1, D, h, m, 0, 0);
+  const dtf = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Warsaw",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  for (let k = 0; k < 48; k += 1) {
+    const parts = dtf.formatToParts(new Date(utcMs));
+    const pv = (type) => parts.find((p) => p.type === type)?.value;
+    const y = Number(pv("year"));
+    const mo = Number(pv("month"));
+    const da = Number(pv("day"));
+    const ho = Number(pv("hour"));
+    const mi = Number(pv("minute"));
+    if (y === Y && mo === M && da === D && ho === h && mi === m) {
+      return utcMs;
+    }
+    utcMs += (h * 60 + m - (ho * 60 + mi)) * 60 * 1000;
+  }
+  return NaN;
+}
+
 function todayYmdInWarsaw() {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Warsaw",
@@ -832,6 +869,18 @@ async function ensureSchema(env) {
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (service, key)
       )`,
+      `CREATE TABLE IF NOT EXISTS booking_mail_audit (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        service TEXT NOT NULL,
+        event_key TEXT NOT NULL,
+        reservation_id TEXT,
+        recipient TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        status TEXT NOT NULL,
+        error TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_mail_audit_created_at ON booking_mail_audit(created_at DESC)`,
       `CREATE TABLE IF NOT EXISTS hotel_rooms (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -1793,7 +1842,7 @@ function hallFullBlock(hall, guestsCount, exclusive) {
   return Boolean(exclusive) || Number(guestsCount || 0) >= thr;
 }
 
-async function hallAvailability(env, payload, excludeId = null) {
+async function hallAvailability(env, payload, excludeId = null, options = {}) {
   const halls = await venueHalls(env);
   const hall = halls.find((h) => h.id === cleanString(payload.hallId, 80) && h.active);
   if (!hall) throw new Error("Sala niedostępna.");
@@ -1804,8 +1853,15 @@ async function hallAvailability(env, payload, excludeId = null) {
   if (!isYmd(reservationDate) || !isHm(startTime) || !Number.isFinite(durationHours) || durationHours <= 0) {
     throw new Error("Nieprawidłowa data lub godzina.");
   }
-  const startMs = ymdHmToMs(reservationDate, startTime);
+  const startMs = ymdHmToMsWarsaw(reservationDate, startTime);
   const endMs = startMs + durationHours * 3600000;
+  const nowHall = nowMs();
+  if (!Number.isFinite(startMs) || startMs < nowHall - 60 * 1000) {
+    throw new Error("Nie można rezerwować terminu z przeszłości.");
+  }
+  if (!options.skipMinAdvance && startMs < nowHall + HALL_MIN_ADVANCE_MS) {
+    throw new Error("Wybierz termin co najmniej 2 godziny od teraz.");
+  }
   const [openH, openM] = String(settings.hallOpenTime || "00:00").split(":").map((x) => Number(x));
   const [closeH, closeM] = String(settings.hallCloseTime || "00:00").split(":").map((x) => Number(x));
   const startMinutes = toInt(startTime.slice(0, 2), 0) * 60 + toInt(startTime.slice(3, 5), 0);
@@ -1882,14 +1938,16 @@ async function createHallReservation(env, payload, options = {}) {
     if (!isYmd(reservationDate) || !isHm(startTime) || !Number.isFinite(durationHours) || durationHours <= 0) {
       throw new Error("Nieprawidłowa data lub godzina.");
     }
-    const startMs = ymdHmToMs(reservationDate, startTime);
+    const startMs = ymdHmToMsWarsaw(reservationDate, startTime);
     const endMs = startMs + durationHours * 3600000;
     const guestsCount = Math.max(0, toInt(payload.guestsCount, hall.hallKind === "small" ? 1 : 10));
     const exclusive = hall.hallKind === "small" ? true : Boolean(payload.exclusive);
     const fullBlock = hallFullBlock(hall, guestsCount, exclusive);
     avail = { ok: true, hall, startMs, endMs, guestsCount, exclusive, fullBlock };
   } else {
-    avail = await hallAvailability(env, payload, options.excludeId || null);
+    avail = await hallAvailability(env, payload, options.excludeId || null, {
+      skipMinAdvance: Boolean(options.skipMinAdvance),
+    });
     if (!avail.ok) {
       throw new Error("Termin niedostępny.");
     }
@@ -2989,10 +3047,55 @@ async function buildMailVarsForService(env, request, service, row, token = "") {
   return buildHallMailVars(env, request, row, token);
 }
 
+async function logMailAudit(env, { service, eventKey, row, to, subject, status, error = "" }) {
+  try {
+    await env.DB.prepare(
+      `INSERT INTO booking_mail_audit
+        (service, event_key, reservation_id, recipient, subject, status, error, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(
+        cleanString(service, 40),
+        cleanString(eventKey, 80),
+        cleanString(row?.id, 120) || null,
+        cleanString(to, 320),
+        cleanString(subject, 500),
+        cleanString(status, 40),
+        cleanString(error, 4000),
+        nowMs()
+      )
+      .run();
+  } catch (auditError) {
+    console.error("Mail audit log error:", auditError);
+  }
+}
+
 async function sendTemplatedBookingMail(env, request, { service, eventKey, row, token, to, extraVars }) {
-  if (!row) return { skipped: true };
+  if (!row) {
+    await logMailAudit(env, {
+      service,
+      eventKey,
+      row,
+      to: cleanString(to, 320),
+      subject: "",
+      status: "skipped",
+      error: "missing_row",
+    });
+    return { skipped: true };
+  }
   const destination = cleanString(to || row.email, 320).toLowerCase();
-  if (!destination || !destination.includes("@")) return { skipped: true };
+  if (!destination || !destination.includes("@")) {
+    await logMailAudit(env, {
+      service,
+      eventKey,
+      row,
+      to: destination,
+      subject: "",
+      status: "skipped",
+      error: "invalid_destination",
+    });
+    return { skipped: true };
+  }
   const template = await resolveTemplateForEvent(env, service, eventKey);
   const vars = {
     ...(await buildMailVarsForService(env, request, service, row, token || "")),
@@ -3039,7 +3142,29 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
           ? "Potwierdź zgłoszenie"
           : "Potwierdź adres e-mail",
   });
-  return sendMailViaSmtp(env, { to: destination, subject, html: email.html, text: email.text });
+  try {
+    const result = await sendMailViaSmtp(env, { to: destination, subject, html: email.html, text: email.text });
+    await logMailAudit(env, {
+      service,
+      eventKey,
+      row,
+      to: destination,
+      subject,
+      status: "sent",
+    });
+    return result;
+  } catch (error) {
+    await logMailAudit(env, {
+      service,
+      eventKey,
+      row,
+      to: destination,
+      subject,
+      status: "failed",
+      error: error?.message || String(error || "unknown_error"),
+    });
+    throw error;
+  }
 }
 
 async function notifyPendingAdmins(env, request, service, row) {
@@ -3487,7 +3612,8 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
           guestsCount: row.guests_count,
           exclusive: Boolean(row.exclusive),
         },
-        row.id
+        row.id,
+        { skipMinAdvance: true }
       );
       if (!chk.ok) return { status: 409, data: { error: "Termin niedostępny." } };
       await env.DB.prepare(
@@ -4186,6 +4312,7 @@ async function handleHallAdmin(env, op, request) {
         status,
         withConfirmationToken: false,
         skipAvailabilityCheck: status === "manual_block",
+        skipMinAdvance: true,
       });
       return { status: 200, data: { ok: true, reservationId: out.id, humanNumber: out.humanNumber } };
     } catch (error) {
@@ -4233,7 +4360,7 @@ async function handleHallAdmin(env, op, request) {
         customerNote: cleanString(body.customerNote ?? row.customer_note, 2000),
         adminNote: cleanString(body.adminNote ?? row.admin_note, 2000),
       };
-      const avail = await hallAvailability(env, payload, id);
+      const avail = await hallAvailability(env, payload, id, { skipMinAdvance: true });
       if (!avail.ok) return { status: 409, data: { error: "Termin niedostępny." } };
       const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
       await env.DB.prepare(

@@ -76,18 +76,62 @@
       .replace(/"/g, "&quot;");
   }
 
-  function todayYmdLocal() {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, "0");
-    const d = String(now.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+  /** Data kalendarzowa zgodna z backendem (Europe/Warsaw). */
+  function todayYmdWarsaw() {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Warsaw",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const year = parts.find((p) => p.type === "year")?.value || "1970";
+    const month = parts.find((p) => p.type === "month")?.value || "01";
+    const day = parts.find((p) => p.type === "day")?.value || "01";
+    return `${year}-${month}-${day}`;
   }
 
-  function isPastCalendarDate(ymd) {
-    const t = String(ymd || "").trim();
-    if (!t) return true;
-    return t < todayYmdLocal();
+  const HALL_MIN_ADVANCE_MS = 2 * 60 * 60 * 1000;
+
+  function ymdHmToMsWarsaw(ymd, hm) {
+    if (!ymd || !hm || !/^\d{4}-\d{2}-\d{2}$/.test(ymd) || !/^\d{2}:\d{2}$/.test(hm)) return NaN;
+    const Y = Number(ymd.slice(0, 4));
+    const M = Number(ymd.slice(5, 7));
+    const D = Number(ymd.slice(8, 10));
+    const h = Number(hm.slice(0, 2));
+    const m = Number(hm.slice(3, 5));
+    if (![Y, M, D, h, m].every((n) => Number.isFinite(n))) return NaN;
+    let utcMs = Date.UTC(Y, M - 1, D, h, m, 0, 0);
+    const dtf = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Warsaw",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    for (let k = 0; k < 48; k += 1) {
+      const pa = dtf.formatToParts(new Date(utcMs));
+      const pv = (type) => pa.find((p) => p.type === type)?.value;
+      const y = Number(pv("year"));
+      const mo = Number(pv("month"));
+      const da = Number(pv("day"));
+      const ho = Number(pv("hour"));
+      const mi = Number(pv("minute"));
+      if (y === Y && mo === M && da === D && ho === h && mi === m) return utcMs;
+      utcMs += (h * 60 + m - (ho * 60 + mi)) * 60 * 1000;
+    }
+    return NaN;
+  }
+
+  /** Czy start jest co najmniej 2 h po „teraz” (i nie w przeszłości). */
+  function hallReservationStartOk(ymd, hm) {
+    const t = ymdHmToMsWarsaw(ymd, hm);
+    if (!Number.isFinite(t)) return { ok: false, message: "Nieprawidłowa data lub godzina." };
+    const now = Date.now();
+    if (t < now - 60 * 1000) return { ok: false, message: "Nie można wybrać terminu z przeszłości." };
+    if (t < now + HALL_MIN_ADVANCE_MS) return { ok: false, message: "Wybierz termin co najmniej 2 godziny od teraz." };
+    return { ok: true };
   }
 
   function checkSession() {
@@ -103,7 +147,7 @@
     state.hallId = "";
     state.hallKind = "";
     state.hallCapacity = 120;
-    state.reservationDate = todayYmdLocal();
+    state.reservationDate = todayYmdWarsaw();
     state.startTime = "12:00";
     state.durationHours = 2;
     state.guestsCount = 10;
@@ -289,14 +333,14 @@
           <button type="button" class="hb-btn" id="hb-next-1" disabled>Dalej</button>
         </div>`;
     } else if (state.step === 2) {
-      if (isPastCalendarDate(state.reservationDate)) {
-        state.reservationDate = todayYmdLocal();
+      if (state.reservationDate < todayYmdWarsaw()) {
+        state.reservationDate = todayYmdWarsaw();
       }
       inner = `
         <h3 style="margin-top:0">Termin</h3>
-        <p class="hb-hint">Między rezerwacjami obowiązuje przerwa organizacyjna (bufor) — uwzględniamy ją przy sprawdzaniu dostępności.</p>
+        <p class="hb-hint">Między rezerwacjami obowiązuje przerwa organizacyjna (bufor) — uwzględniamy ją przy sprawdzaniu dostępności. Rezerwacja możliwa co najmniej <strong>2 godziny</strong> do przodu.</p>
         <div class="hb-field">
-          <label>Data<input type="date" id="hb-date" min="${escapeHtml(todayYmdLocal())}" value="${escapeHtml(state.reservationDate)}" /></label>
+          <label>Data<input type="date" id="hb-date" min="${escapeHtml(todayYmdWarsaw())}" value="${escapeHtml(state.reservationDate)}" /></label>
         </div>
         <div class="hb-grid">
           <div class="hb-field"><label>Godzina startu<select id="hb-start">${timeOptions()
@@ -434,13 +478,20 @@
       const validate = async () => {
         const err = document.getElementById("hb-e2");
         const next = document.getElementById("hb-next-2");
-        const today = todayYmdLocal();
+        const today = todayYmdWarsaw();
         state.reservationDate = document.getElementById("hb-date")?.value || "";
         state.startTime = document.getElementById("hb-start")?.value || "";
         state.durationHours = Number(document.getElementById("hb-dur")?.value || 2);
         if (!state.reservationDate || state.reservationDate < today) {
           err.hidden = false;
           err.textContent = "Wybierz datę nie z przeszłości.";
+          next.disabled = true;
+          return;
+        }
+        const startChk = hallReservationStartOk(state.reservationDate, state.startTime);
+        if (!startChk.ok) {
+          err.hidden = false;
+          err.textContent = startChk.message;
           next.disabled = true;
           return;
         }
@@ -475,9 +526,15 @@
       document.getElementById("hb-next-2")?.addEventListener("click", async () => {
         const err = document.getElementById("hb-e2");
         state.reservationDate = document.getElementById("hb-date")?.value || "";
-        if (isPastCalendarDate(state.reservationDate)) {
+        if (state.reservationDate < todayYmdWarsaw()) {
           err.hidden = false;
           err.textContent = "Wybierz datę nie z przeszłości.";
+          return;
+        }
+        const startChkNext = hallReservationStartOk(state.reservationDate, state.startTime);
+        if (!startChkNext.ok) {
+          err.hidden = false;
+          err.textContent = startChkNext.message;
           return;
         }
         await refreshAvailability();
@@ -560,10 +617,11 @@
         await validate(true);
         const next = document.getElementById("hb-next-3");
         if (next.disabled) return;
-        if (isPastCalendarDate(state.reservationDate)) {
+        const startChk3 = hallReservationStartOk(state.reservationDate, state.startTime);
+        if (!startChk3.ok) {
           const err = document.getElementById("hb-e3");
           err.hidden = false;
-          err.textContent = "Data rezerwacji nie może być z przeszłości. Wróć do kroku „Termin”.";
+          err.textContent = `${startChk3.message} Wróć do kroku „Termin”.`;
           return;
         }
         state.step = 4;
@@ -612,9 +670,10 @@
           return;
         }
         err.hidden = true;
-        if (isPastCalendarDate(state.reservationDate)) {
+        const startChk5 = hallReservationStartOk(state.reservationDate, state.startTime);
+        if (!startChk5.ok) {
           err.hidden = false;
-          err.textContent = "Data rezerwacji nie może być z przeszłości. Wróć do kroku „Termin”.";
+          err.textContent = `${startChk5.message} Wróć do kroku „Termin”.`;
           return;
         }
         try {
