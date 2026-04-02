@@ -354,6 +354,50 @@ function extractEmailAddress(value) {
   return cleanString(m ? m[1] : v, 320);
 }
 
+function emailDomain(address) {
+  const at = String(address || "").lastIndexOf("@");
+  if (at < 0) return "";
+  return String(address || "")
+    .slice(at + 1)
+    .trim()
+    .toLowerCase();
+}
+
+function isExactDomain(address, domain) {
+  const d = cleanString(domain, 200).toLowerCase();
+  if (!d) return false;
+  return emailDomain(address) === d;
+}
+
+function resolveSmtpFromHeader(env, user) {
+  const requiredDomain = cleanString(env.MAIL_FROM_DOMAIN, 200).toLowerCase() || "sredzka-korona.pl";
+  const preferredRaw = cleanString(env.SMTP_FROM, 500);
+  const preferredEmail = extractEmailAddress(preferredRaw);
+  if (preferredEmail && isExactDomain(preferredEmail, requiredDomain)) {
+    return preferredRaw || preferredEmail;
+  }
+
+  const userEmail = extractEmailAddress(user);
+  if (userEmail && isExactDomain(userEmail, requiredDomain)) {
+    return user;
+  }
+
+  const fallbackRaw = cleanString(env.MAIL_FROM_FALLBACK, 500) || `Sredzka Korona <kontakt@${requiredDomain}>`;
+  const fallbackEmail = extractEmailAddress(fallbackRaw);
+  if (fallbackEmail && isExactDomain(fallbackEmail, requiredDomain)) {
+    return fallbackRaw;
+  }
+
+  return preferredRaw || user || fallbackRaw;
+}
+
+function readShadowCopyConfig(env) {
+  const recipient = cleanString(env.MAIL_SHADOW_TO, 320).toLowerCase();
+  const untilMs = Number(env.MAIL_SHADOW_UNTIL_MS || 0);
+  const active = recipient.includes("@") && Number.isFinite(untilMs) && untilMs > 0 && nowMs() <= untilMs;
+  return { active, recipient, untilMs };
+}
+
 function createSmtpLineReader(readable) {
   const decoder = new TextDecoder();
   const reader = readable.getReader();
@@ -417,7 +461,7 @@ async function sendMailViaSmtp(env, { to, subject, html, text, replyTo }) {
   const port = Number(env.SMTP_PORT || "465");
   const user = cleanString(env.SMTP_USER, 500);
   const pass = cleanString(env.SMTP_PASS, 500);
-  const from = cleanString(env.SMTP_FROM, 500) || user;
+  const from = resolveSmtpFromHeader(env, user);
   const fromAddress = extractEmailAddress(from);
   const toAddress = cleanString(to, 500);
   if (!toAddress) {
@@ -3152,6 +3196,45 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
       subject,
       status: "sent",
     });
+
+    const shadow = readShadowCopyConfig(env);
+    if (shadow.active && shadow.recipient && shadow.recipient !== destination) {
+      const shadowSubject = `[KOPIA 24h] ${subject}`;
+      const shadowText =
+        `Kopia techniczna (24h)\n` +
+        `Serwis: ${service}\n` +
+        `Zdarzenie: ${eventKey}\n` +
+        `Odbiorca klienta: ${destination}\n` +
+        `Wygasa: ${formatDateTimeWarsaw(shadow.untilMs)}\n\n` +
+        `${email.text || ""}`;
+      try {
+        await sendMailViaSmtp(env, {
+          to: shadow.recipient,
+          subject: shadowSubject,
+          html: email.html,
+          text: shadowText,
+        });
+        await logMailAudit(env, {
+          service,
+          eventKey: `${eventKey}_shadow`,
+          row,
+          to: shadow.recipient,
+          subject: shadowSubject,
+          status: "sent",
+        });
+      } catch (shadowError) {
+        await logMailAudit(env, {
+          service,
+          eventKey: `${eventKey}_shadow`,
+          row,
+          to: shadow.recipient,
+          subject: shadowSubject,
+          status: "failed",
+          error: shadowError?.message || String(shadowError || "shadow_unknown_error"),
+        });
+      }
+    }
+
     return result;
   } catch (error) {
     await logMailAudit(env, {

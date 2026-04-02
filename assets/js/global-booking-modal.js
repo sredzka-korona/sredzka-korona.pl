@@ -59,6 +59,8 @@
     pendingEmailSent: false,
     termsAccepted: false,
     requiresEmailConfirmation: true,
+    /** „7 dni” dla Przyjęć, „3 dni” dla hotelu/restauracji — ustawiane przy wyborze kafelka usługi */
+    decisionDaysLabel: "3 dni",
     personal: {
       firstName: "",
       lastName: "",
@@ -486,6 +488,7 @@
     state.pendingEmailSent = false;
     state.termsAccepted = false;
     state.requiresEmailConfirmation = true;
+    state.decisionDaysLabel = "3 dni";
 
     state.hotel = {
       dateFrom: "",
@@ -545,6 +548,7 @@
       pendingEmailSent: Boolean(state.pendingEmailSent),
       termsAccepted: Boolean(state.termsAccepted),
       requiresEmailConfirmation: state.requiresEmailConfirmation !== false,
+      decisionDaysLabel: state.decisionDaysLabel === "7 dni" ? "7 dni" : "3 dni",
       personal: state.personal,
       hotel: state.hotel,
       restaurant: state.restaurant,
@@ -588,6 +592,8 @@
       state.pendingEmailSent = Boolean(draft.pendingEmailSent);
       state.termsAccepted = Boolean(draft.termsAccepted);
       state.requiresEmailConfirmation = draft.requiresEmailConfirmation !== false;
+      state.decisionDaysLabel =
+        draft.selectedService === "events" || draft.decisionDaysLabel === "7 dni" ? "7 dni" : "3 dni";
       state.humanCheck = Boolean(draft.humanCheck);
       state.turnstileToken = "";
       state.turnstileWidgetId = null;
@@ -1448,7 +1454,8 @@
   function renderSummaryStep() {
     const submitLabel = state.selectedService === "events" ? "Poproś o ofertę" : "Rezerwuj";
     const showSubmitButton = antiBotVerified();
-    const decisionDaysLabel = state.selectedService === "events" ? "7 dni" : "3 dni";
+    const decisionDaysLabel =
+      state.decisionDaysLabel === "7 dni" || state.selectedService === "events" ? "7 dni" : "3 dni";
 
     return `
       <section>
@@ -1490,7 +1497,8 @@
     const left = state.countdownUntil ? Math.max(0, state.countdownUntil - Date.now()) : EMAIL_CONFIRM_MS;
     const supportNotice =
       '<p class="gb-hint" style="margin-top:0.75rem;">Jeśli nie widzisz wiadomości e-mail, sprawdź folder SPAM. W razie problemów skontaktuj się z nami mailowo lub telefonicznie.</p>';
-    const decisionDaysLabel = state.selectedService === "events" ? "7 dni" : "3 dni";
+    const decisionDaysLabel =
+      state.decisionDaysLabel === "7 dni" || state.selectedService === "events" ? "7 dni" : "3 dni";
     return `
       <section>
         <h3>Rezerwacja została zapisana</h3>
@@ -1721,6 +1729,7 @@
           if (!service || state.bookingFlags[service] === false) return;
           setError("");
           state.selectedService = service;
+          state.decisionDaysLabel = service === "events" ? "7 dni" : "3 dni";
           const flow = getFlow();
           state.step = flow[1] || "summary";
           render();
