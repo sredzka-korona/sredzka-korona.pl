@@ -526,11 +526,11 @@ async function sendMailViaSmtp(env, { to, subject, html, text, replyTo }) {
       .filter(Boolean)
       .join("\r\n");
     await writer.write(new TextEncoder().encode(`${headers}\r\n`));
-    await smtpExpect(readLine, [250], "wiadomość nie została przyjęta");
+    const accepted = await smtpExpect(readLine, [250], "wiadomość nie została przyjęta");
 
     await smtpWrite(writer, "QUIT");
     await smtpExpect(readLine, [221], "QUIT odrzucone");
-    return { ok: true };
+    return { ok: true, smtpAccepted: (accepted?.lines || []).join(" | ") };
   } finally {
     try {
       writer.releaseLock();
@@ -539,6 +539,31 @@ async function sendMailViaSmtp(env, { to, subject, html, text, replyTo }) {
       await socket.close();
     } catch {}
   }
+}
+
+function isSmtpAuthFailure(error) {
+  const msg = String(error?.message || error || "").toLowerCase();
+  return msg.includes("authentication failed") || msg.includes("logowanie smtp nieudane") || msg.includes(" 535 ");
+}
+
+async function sleepMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function sendMailViaSmtpWithRetry(env, payload, options = {}) {
+  const retries = Number(options.retries ?? 1);
+  let lastError = null;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await sendMailViaSmtp(env, payload);
+    } catch (error) {
+      lastError = error;
+      const canRetry = attempt < retries && isSmtpAuthFailure(error);
+      if (!canRetry) throw error;
+      await sleepMs(400);
+    }
+  }
+  throw lastError || new Error("SMTP retry failed");
 }
 
 function nowMs() {
@@ -3187,7 +3212,11 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
           : "Potwierdź adres e-mail",
   });
   try {
-    const result = await sendMailViaSmtp(env, { to: destination, subject, html: email.html, text: email.text });
+    const result = await sendMailViaSmtpWithRetry(
+      env,
+      { to: destination, subject, html: email.html, text: email.text },
+      { retries: 1 }
+    );
     await logMailAudit(env, {
       service,
       eventKey,
@@ -3195,6 +3224,7 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
       to: destination,
       subject,
       status: "sent",
+      error: cleanString(result?.smtpAccepted, 4000),
     });
 
     const shadow = readShadowCopyConfig(env);
@@ -3208,12 +3238,16 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
         `Wygasa: ${formatDateTimeWarsaw(shadow.untilMs)}\n\n` +
         `${email.text || ""}`;
       try {
-        await sendMailViaSmtp(env, {
-          to: shadow.recipient,
-          subject: shadowSubject,
-          html: email.html,
-          text: shadowText,
-        });
+        const shadowResult = await sendMailViaSmtpWithRetry(
+          env,
+          {
+            to: shadow.recipient,
+            subject: shadowSubject,
+            html: email.html,
+            text: shadowText,
+          },
+          { retries: 1 }
+        );
         await logMailAudit(env, {
           service,
           eventKey: `${eventKey}_shadow`,
@@ -3221,6 +3255,7 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
           to: shadow.recipient,
           subject: shadowSubject,
           status: "sent",
+          error: cleanString(shadowResult?.smtpAccepted, 4000),
         });
       } catch (shadowError) {
         await logMailAudit(env, {

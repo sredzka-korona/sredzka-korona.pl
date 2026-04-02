@@ -869,9 +869,10 @@ body.gb-modal-open {
 }
 
 #gb-modal .gb-check {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  justify-items: start;
   gap: 0.55rem;
   margin-top: 0.75rem;
   color: rgba(255, 241, 216, 0.92);
@@ -881,11 +882,19 @@ body.gb-modal-open {
 }
 
 #gb-modal .gb-check input {
-  margin-top: 0.15em;
+  margin: 0.22em 0 0;
   width: auto;
   inline-size: auto;
-  /* Optycznie wyrównuje checkbox do pierwszej linii etykiety. */
+  grid-column: 1;
+  grid-row: 1;
   align-self: start;
+}
+
+#gb-modal .gb-check > span {
+  grid-column: 2;
+  grid-row: 1;
+  display: block;
+  min-width: 0;
 }
 
 #gb-modal .gb-actions {
