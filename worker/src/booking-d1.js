@@ -3184,12 +3184,6 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
         .run();
       try {
         const pendingRow = await getHotelReservation(env, row.id);
-        await sendTemplatedBookingMail(env, request, {
-          service: "hotel",
-          eventKey: "pending_client",
-          row: pendingRow,
-          to: pendingRow?.email,
-        });
         await notifyPendingAdmins(env, request, "hotel", pendingRow);
       } catch (mailError) {
         console.error("Hotel pending mail error:", mailError);
@@ -3350,12 +3344,6 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
         .run();
       try {
         const pendingRow = await getRestaurantReservationRow(env, row.id);
-        await sendTemplatedBookingMail(env, request, {
-          service: "restaurant",
-          eventKey: "pending_client",
-          row: pendingRow,
-          to: pendingRow?.email,
-        });
         await notifyPendingAdmins(env, request, "restaurant", pendingRow);
       } catch (mailError) {
         console.error("Restaurant pending mail error:", mailError);
@@ -3510,12 +3498,6 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
         .run();
       try {
         const pendingRow = await getHallReservationRow(env, row.id);
-        await sendTemplatedBookingMail(env, request, {
-          service: "hall",
-          eventKey: "pending_client",
-          row: pendingRow,
-          to: pendingRow?.email,
-        });
         await notifyPendingAdmins(env, request, "hall", pendingRow);
       } catch (mailError) {
         console.error("Hall pending mail error:", mailError);
