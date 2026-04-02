@@ -822,14 +822,26 @@ const restaurantApi = onRequest(
           reservationCloseTime,
           timeSlotMinutes,
         } = body;
+        const openTime = String(reservationOpenTime || "12:00").trim();
+        const closeTime = String(reservationCloseTime || "22:00").trim();
+        const openMinutes = parseTimeToMinutes(openTime);
+        const closeMinutes = parseTimeToMinutes(closeTime);
+        if (openMinutes == null || closeMinutes == null) {
+          json(res, { error: "Godziny muszą być podane w formacie HH:MM." }, 400);
+          return;
+        }
+        if (openMinutes > closeMinutes) {
+          json(res, { error: "Godzina otwarcia nie może być później niż godzina zamknięcia." }, 400);
+          return;
+        }
         const activeTables = await loadBookableTables(db);
         const tc = activeTables.length;
         await db.collection("restaurantSettings").doc("default").set(
           {
             tableCount: tc,
             maxGuestsPerTable: Math.max(1, Math.min(50, Number(maxGuestsPerTable || 4))),
-            reservationOpenTime: String(reservationOpenTime || "12:00").trim(),
-            reservationCloseTime: String(reservationCloseTime || "22:00").trim(),
+            reservationOpenTime: openTime,
+            reservationCloseTime: closeTime,
             timeSlotMinutes: [15, 30, 60].includes(Number(timeSlotMinutes)) ? Number(timeSlotMinutes) : 30,
             updatedAt: FieldValue.serverTimestamp(),
             updatedBy: adminUser.email,
@@ -1356,10 +1368,11 @@ function filterBookableForPublic(list) {
 }
 
 function buildTimeSlots(openStr, closeStr, stepMin) {
-  const [oh, om] = openStr.split(":").map((x) => Number(x));
-  const [ch, cm] = closeStr.split(":").map((x) => Number(x));
-  let m0 = oh * 60 + (om || 0);
-  const m1 = ch * 60 + (cm || 0);
+  const m0 = parseTimeToMinutes(openStr);
+  const m1 = parseTimeToMinutes(closeStr);
+  if (m0 == null || m1 == null || m0 >= m1) {
+    return [];
+  }
   const out = [];
   for (let m = m0; m < m1; m += stepMin) {
     const h = Math.floor(m / 60);
@@ -1367,6 +1380,14 @@ function buildTimeSlots(openStr, closeStr, stepMin) {
     out.push(`${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`);
   }
   return out;
+}
+
+function parseTimeToMinutes(value) {
+  const match = String(value || "").trim().match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!match) {
+    return null;
+  }
+  return Number(match[1]) * 60 + Number(match[2]);
 }
 
 async function verifyManualTablesFree(db, tableIds, startMs, endMs, excludeReservationId) {

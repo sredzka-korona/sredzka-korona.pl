@@ -1475,6 +1475,16 @@
   }
 
   function bindCommonHandlers() {
+    if (state.step !== "service" && state.step !== "success" && isSessionExpired()) {
+      document.getElementById("gb-restart")?.addEventListener("click", async () => {
+        clearDraftState();
+        resetStateForOpen();
+        await loadBookingFlags();
+        render();
+      });
+      return;
+    }
+
     if (state.step === "service") {
       document.querySelectorAll("[data-service-select]").forEach((button) => {
         button.addEventListener("click", async () => {
@@ -1848,6 +1858,7 @@
     }
 
     document.getElementById("gb-restart")?.addEventListener("click", async () => {
+      clearDraftState();
       resetStateForOpen();
       await loadBookingFlags();
       render();

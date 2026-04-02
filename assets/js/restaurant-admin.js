@@ -65,6 +65,12 @@
     return `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
   }
 
+  function parseTimeToMinutes(value) {
+    const match = String(value || "").trim().match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+    if (!match) return null;
+    return Number(match[1]) * 60 + Number(match[2]);
+  }
+
   let restSubTab = "reservations";
   let restResFilter = "active";
   let settingsData = {};
@@ -416,13 +422,27 @@
         ev.preventDefault();
         const fd = new FormData(ev.target);
         const warn = document.querySelector("#rest-settings-warn");
+        const openTime = String(fd.get("reservationOpenTime") || "").trim();
+        const closeTime = String(fd.get("reservationCloseTime") || "").trim();
+        const openMinutes = parseTimeToMinutes(openTime);
+        const closeMinutes = parseTimeToMinutes(closeTime);
+        if (openMinutes == null || closeMinutes == null) {
+          if (warn) warn.textContent = "Podaj godziny w formacie HH:MM.";
+          alert("Podaj godziny w formacie HH:MM.");
+          return;
+        }
+        if (openMinutes > closeMinutes) {
+          if (warn) warn.textContent = "Godzina otwarcia nie może być później niż godzina zamknięcia.";
+          alert("Godzina otwarcia nie może być później niż godzina zamknięcia.");
+          return;
+        }
         try {
           const out = await restaurantApi("admin-settings-save", {
             method: "PUT",
             body: {
               maxGuestsPerTable: fd.get("maxGuestsPerTable"),
-              reservationOpenTime: fd.get("reservationOpenTime"),
-              reservationCloseTime: fd.get("reservationCloseTime"),
+              reservationOpenTime: openTime,
+              reservationCloseTime: closeTime,
               timeSlotMinutes: fd.get("timeSlotMinutes"),
             },
           });
