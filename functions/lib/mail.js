@@ -714,6 +714,132 @@ Szacunkowa kwota: {{totalPrice}} PLN</p>
   },
 };
 
+const ULTRA_LEGACY_HOTEL_DEFAULT_TEMPLATES = {
+  confirm_email: {
+    subject: "{{hotelName}} — potwierdź rezerwację ({{reservationNumber}})",
+    bodyHtml:
+      '<p>Witaj {{fullName}},</p><p>Kliknij link, aby potwierdzić rezerwację:</p><p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p><p>Numer: {{reservationNumber}}<br>Termin: {{dateFrom}} — {{dateTo}}</p>',
+  },
+  pending_client: {
+    subject: "{{hotelName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
+    bodyHtml: "<p>Witaj {{fullName}},</p><p>Twoja rezerwacja ma status oczekujący.</p><p>Numer: {{reservationNumber}}</p>",
+  },
+  pending_admin: {
+    subject: "[{{hotelName}}] Nowa rezerwacja oczekująca {{reservationNumber}}",
+    bodyHtml:
+      "<p>Nowa rezerwacja oczekuje na decyzję.</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{dateFrom}} — {{dateTo}}</p>",
+  },
+  confirmed_client: {
+    subject: "{{hotelName}} — rezerwacja potwierdzona ({{reservationNumber}})",
+    bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została potwierdzona.</p>",
+  },
+  cancelled_client: {
+    subject: "{{hotelName}} — rezerwacja anulowana ({{reservationNumber}})",
+    bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została anulowana.</p>",
+  },
+  changed_client: {
+    subject: "{{hotelName}} — zmiana w rezerwacji {{reservationNumber}}",
+    bodyHtml:
+      "<p>Witaj {{fullName}},</p><p>Wprowadziliśmy zmiany w rezerwacji <strong>{{reservationNumber}}</strong>.</p><p>Termin pobytu: {{dateFrom}} — {{dateTo}} ({{nights}} nocy).<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>{{customerNote}}</p><p>W razie pytań odpowiedz na tę wiadomość lub skontaktuj się z recepcją.</p>",
+  },
+};
+
+const ULTRA_LEGACY_RESTAURANT_DEFAULT_TEMPLATES = {
+  restaurant_confirm_email: {
+    subject: "{{restaurantName}} — potwierdź rezerwację stolika ({{reservationNumber}})",
+    bodyHtml:
+      '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie rezerwacji stolika do {{restaurantName}}.</p><p>Aby przekazac zgloszenie do obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz rezerwacje</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>',
+  },
+  restaurant_pending_client: {
+    subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
+    bodyHtml:
+      "<p>Dzien dobry {{fullName}},</p><p>Adres e-mail zostal potwierdzony, a zgloszenie <strong>{{reservationNumber}}</strong> oczekuje teraz na akceptacje restauracji.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
+  },
+  restaurant_pending_admin: {
+    subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
+    bodyHtml:
+      "<p>Nowa rezerwacja stolika oczekuje na decyzje obslugi.</p><p>Dotyczy: {{reservationSubject}}<br>Decyzja do: {{decisionDeadline}}</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>{{tablesList}} · Gosci: {{guestsCount}} · Laczenie: {{joinTables}}</p><p>Uwagi klienta: {{customerNote}}</p>",
+  },
+  restaurant_confirmed_client: {
+    subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
+    bodyHtml:
+      "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje stolika o numerze <strong>{{reservationNumber}}</strong>.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}</p><p>{{tablesList}}</p><p>W przypadku spoznienia lub potrzeby zmiany godziny prosimy o wczesniejszy kontakt z restauracja.</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
+  },
+  restaurant_cancelled_client: {
+    subject: "{{restaurantName}} — rezerwacja anulowana ({{reservationNumber}})",
+    bodyHtml:
+      "<p>Dzien dobry {{fullName}},</p><p>Rezerwacja stolika <strong>{{reservationNumber}}</strong> zostala anulowana.</p><p>Termin: {{date}} · {{timeFrom}}–{{timeTo}}</p><p>Jesli chcesz zarezerwowac inny termin, zapraszamy do ponownego kontaktu.</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
+  },
+  restaurant_changed_client: {
+    subject: "{{restaurantName}} — zmiana rezerwacji stolika {{reservationNumber}}",
+    bodyHtml:
+      "<p>Dzien dobry {{fullName}},</p><p>Zaktualizowalismy rezerwacje <strong>{{reservationNumber}}</strong>.</p><p>Data: {{date}}<br>Godziny: {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Stoliki: {{tablesList}}<br>Liczba gosci: {{guestsCount}}</p><p>Uwagi do rezerwacji: {{customerNote}}</p><p>W razie pytan odpowiedz na te wiadomosc.</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
+  },
+  rest_confirm_email: {
+    subject: "{{restaurantName}} — potwierdź rezerwację stolika ({{reservationNumber}})",
+    bodyHtml:
+      '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie rezerwacji stolika do {{restaurantName}}.</p><p>Aby przekazac zgloszenie do obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz rezerwacje</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>',
+  },
+  rest_pending_client: {
+    subject: "{{restaurantName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
+    bodyHtml:
+      "<p>Dzien dobry {{fullName}},</p><p>Adres e-mail zostal potwierdzony, a zgloszenie <strong>{{reservationNumber}}</strong> oczekuje teraz na akceptacje restauracji.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
+  },
+  rest_pending_admin: {
+    subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
+    bodyHtml:
+      "<p>Nowa rezerwacja stolika oczekuje na decyzje obslugi.</p><p>Dotyczy: {{reservationSubject}}<br>Decyzja do: {{decisionDeadline}}</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>{{tablesList}} · Gosci: {{guestsCount}} · Laczenie: {{joinTables}}</p><p>Uwagi klienta: {{customerNote}}</p>",
+  },
+  rest_confirmed_client: {
+    subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
+    bodyHtml:
+      "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje stolika o numerze <strong>{{reservationNumber}}</strong>.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
+  },
+  rest_cancelled_client: {
+    subject: "{{restaurantName}} — rezerwacja anulowana ({{reservationNumber}})",
+    bodyHtml:
+      "<p>Dzien dobry {{fullName}},</p><p>Rezerwacja stolika <strong>{{reservationNumber}}</strong> zostala anulowana.</p><p>Termin: {{date}} · {{timeFrom}}–{{timeTo}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
+  },
+  rest_changed_client: {
+    subject: "{{restaurantName}} — zmiana rezerwacji stolika {{reservationNumber}}",
+    bodyHtml:
+      "<p>Dzien dobry {{fullName}},</p><p>Zaktualizowalismy rezerwacje <strong>{{reservationNumber}}</strong>.</p><p>Data: {{date}} · {{timeFrom}}–{{timeTo}}<br>Gosci: {{guestsCount}}</p><p>{{tablesList}}</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
+  },
+};
+
+const ULTRA_LEGACY_HALL_DEFAULT_TEMPLATES = {
+  hall_confirm_email: {
+    subject: "{{venueName}} — potwierdź zgłoszenie rezerwacji sali ({{reservationNumber}})",
+    bodyHtml:
+      '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za przeslanie zgloszenia rezerwacji sali do {{venueName}}.</p><p>To jest zgloszenie rezerwacyjne, a wycena zostanie ustalona indywidualnie po kontakcie z obiektem.</p><p>Aby potwierdzic zgloszenie, kliknij w link:</p><p><a href="{{confirmationLink}}">Potwierdz zgloszenie</a></p><p>Numer: <strong>{{reservationNumber}}</strong><br>Sala: {{hallName}}<br>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Gosci: {{guestsCount}} · {{eventType}}<br>Wylacznosc: {{exclusive}}</p><p>Pozdrawiamy,<br>{{venueName}}</p>',
+  },
+  hall_pending_client: {
+    subject: "{{venueName}} — zgłoszenie oczekuje na decyzję obiektu ({{reservationNumber}})",
+    bodyHtml:
+      "<p>Dzien dobry {{fullName}},</p><p>Zgloszenie zostalo potwierdzone linkiem e-mail i oczekuje teraz na decyzje obiektu.</p><p>Wycena zostanie podana telefonicznie lub mailowo po kontakcie z obsluga.</p><p>Numer: {{reservationNumber}} · {{hallName}}<br>{{date}} · {{timeFrom}}–{{timeTo}}</p><p>Pozdrawiamy,<br>{{venueName}}</p>",
+  },
+  hall_pending_admin: {
+    subject: "[{{venueName}}] Nowe zgłoszenie sali {{reservationNumber}}",
+    bodyHtml:
+      "<p>Nowe zgloszenie rezerwacji sali oczekuje na decyzje obslugi.</p><p>Dotyczy: {{reservationSubject}}<br>Decyzja do: {{decisionDeadline}}</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>Numer: {{reservationNumber}}</p><p>Sala: {{hallName}} · {{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>Gosci: {{guestsCount}} · Wylacznosc: {{exclusive}} · 100+: {{fullBlockLabel}}</p><p>Rodzaj imprezy: {{eventType}}</p><p>Uwagi klienta: {{customerNote}}</p>",
+  },
+  hall_confirmed_client: {
+    subject: "{{venueName}} — rezerwacja sali potwierdzona ({{reservationNumber}})",
+    bodyHtml:
+      "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje sali <strong>{{hallName}}</strong> o numerze <strong>{{reservationNumber}}</strong>.</p><p>Termin: {{date}} · {{timeFrom}}–{{timeTo}}</p><p>Szczegoly i wycena - zgodnie z ustaleniami z obsluga obiektu.</p><p>Pozdrawiamy,<br>{{venueName}}</p>",
+  },
+  hall_cancelled_client: {
+    subject: "{{venueName}} — rezerwacja sali anulowana ({{reservationNumber}})",
+    bodyHtml:
+      "<p>Dzien dobry {{fullName}},</p><p>Rezerwacja sali <strong>{{reservationNumber}}</strong> zostala anulowana.</p><p>Termin: {{date}} · {{hallName}}</p><p>Jesli chcesz ustalic inny termin, skontaktuj sie z obiektem.</p><p>Pozdrawiamy,<br>{{venueName}}</p>",
+  },
+  hall_changed_client: {
+    subject: "{{venueName}} — zmiana rezerwacji sali {{reservationNumber}}",
+    bodyHtml:
+      "<p>Dzien dobry {{fullName}},</p><p>Wprowadzilismy zmiany w rezerwacji sali <strong>{{reservationNumber}}</strong>.</p><p>Sala: {{hallName}}<br>Data: {{date}}<br>Godziny: {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Gosci: {{guestsCount}}<br>Impreza: {{eventType}}</p><p>Uwagi do rezerwacji: {{customerNote}}</p><p>W razie pytan odpowiedz na te wiadomosc lub skontaktuj sie z obiektem.</p><p>Pozdrawiamy,<br>{{venueName}}</p>",
+  },
+};
+
 const LEGACY_RESTAURANT_DEFAULT_TEMPLATES = {
   restaurant_confirm_email: {
     subject: "{{restaurantName}} — potwierdź rezerwację stolika ({{reservationNumber}})",
@@ -955,61 +1081,59 @@ const RESTAURANT_DEFAULT_TEMPLATES = {
 };
 const HALL_DEFAULT_TEMPLATES = buildHallDefaultTemplates();
 
-async function getMailTemplate(db, key) {
-  const snap = await db.collection("hotelMailTemplates").doc(key).get();
+function matchesAnyTemplateShape(current, candidates) {
+  return (Array.isArray(candidates) ? candidates : []).filter(Boolean).some((candidate) => isSameTemplateShape(current, candidate));
+}
+
+async function resolveTemplateDoc(db, collectionName, key, defaults, legacyCandidates = []) {
+  const snap = await db.collection(collectionName).doc(key).get();
   if (!snap.exists) {
-    return DEFAULT_TEMPLATES[key] || { subject: "", bodyHtml: "" };
+    return defaults[key] || { subject: "", bodyHtml: "" };
   }
   const d = snap.data();
   const current = {
     subject: d.subject || "",
     bodyHtml: d.bodyHtml || "",
   };
-  if (isSameTemplateShape(current, LEGACY_DEFAULT_TEMPLATES[key])) {
-    return DEFAULT_TEMPLATES[key] || current;
+  const upgraded = defaults[key] || current;
+  if (matchesAnyTemplateShape(current, legacyCandidates)) {
+    if (!isSameTemplateShape(current, upgraded)) {
+      await db.collection(collectionName).doc(key).set(
+        {
+          subject: upgraded.subject || "",
+          bodyHtml: upgraded.bodyHtml || "",
+          migratedAt: new Date(),
+        },
+        { merge: true }
+      );
+    }
+    return upgraded;
   }
   return {
-    subject: current.subject || DEFAULT_TEMPLATES[key]?.subject || "",
-    bodyHtml: current.bodyHtml || DEFAULT_TEMPLATES[key]?.bodyHtml || "",
+    subject: current.subject || defaults[key]?.subject || "",
+    bodyHtml: current.bodyHtml || defaults[key]?.bodyHtml || "",
   };
+}
+
+async function getMailTemplate(db, key) {
+  return resolveTemplateDoc(db, "hotelMailTemplates", key, DEFAULT_TEMPLATES, [
+    LEGACY_DEFAULT_TEMPLATES[key],
+    ULTRA_LEGACY_HOTEL_DEFAULT_TEMPLATES[key],
+  ]);
 }
 
 async function getRestaurantMailTemplate(db, key) {
-  const snap = await db.collection("restaurantMailTemplates").doc(key).get();
-  if (!snap.exists) {
-    return RESTAURANT_DEFAULT_TEMPLATES[key] || { subject: "", bodyHtml: "" };
-  }
-  const d = snap.data();
-  const current = {
-    subject: d.subject || "",
-    bodyHtml: d.bodyHtml || "",
-  };
-  if (isSameTemplateShape(current, LEGACY_RESTAURANT_DEFAULT_TEMPLATES[key])) {
-    return RESTAURANT_DEFAULT_TEMPLATES[key] || current;
-  }
-  return {
-    subject: current.subject || RESTAURANT_DEFAULT_TEMPLATES[key]?.subject || "",
-    bodyHtml: current.bodyHtml || RESTAURANT_DEFAULT_TEMPLATES[key]?.bodyHtml || "",
-  };
+  return resolveTemplateDoc(db, "restaurantMailTemplates", key, RESTAURANT_DEFAULT_TEMPLATES, [
+    LEGACY_RESTAURANT_DEFAULT_TEMPLATES[key],
+    ULTRA_LEGACY_RESTAURANT_DEFAULT_TEMPLATES[key],
+  ]);
 }
 
 async function getHallMailTemplate(db, key) {
-  const snap = await db.collection("venueMailTemplates").doc(key).get();
-  if (!snap.exists) {
-    return HALL_DEFAULT_TEMPLATES[key] || { subject: "", bodyHtml: "" };
-  }
-  const d = snap.data();
-  const current = {
-    subject: d.subject || "",
-    bodyHtml: d.bodyHtml || "",
-  };
-  if (isSameTemplateShape(current, LEGACY_HALL_DEFAULT_TEMPLATES[key])) {
-    return HALL_DEFAULT_TEMPLATES[key] || current;
-  }
-  return {
-    subject: current.subject || HALL_DEFAULT_TEMPLATES[key]?.subject || "",
-    bodyHtml: current.bodyHtml || HALL_DEFAULT_TEMPLATES[key]?.bodyHtml || "",
-  };
+  return resolveTemplateDoc(db, "venueMailTemplates", key, HALL_DEFAULT_TEMPLATES, [
+    LEGACY_HALL_DEFAULT_TEMPLATES[key],
+    ULTRA_LEGACY_HALL_DEFAULT_TEMPLATES[key],
+  ]);
 }
 
 function createTransportFromEnv() {

@@ -65,14 +65,19 @@ body.gb-modal-open {
 }
 
 #gb-modal .gb-header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  padding: 1.4rem 1.35rem 0.95rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 0;
+  padding: 1.4rem 4rem 0.95rem;
   position: relative;
   z-index: 1;
   text-align: center;
+}
+
+#gb-modal .gb-header > div {
+  width: 100%;
+  min-width: 0;
 }
 
 #gb-modal .gb-kicker {
@@ -81,13 +86,18 @@ body.gb-modal-open {
 
 #gb-modal .gb-title {
   margin: 0;
-  font-size: clamp(1.8rem, 3.2vw, 2.6rem);
+  width: 100%;
+  max-width: 100%;
+  font-size: clamp(1.2rem, 3vw, 2.15rem);
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.035em;
   text-transform: uppercase;
   color: #f4f8fd;
-  line-height: 1.08;
-  max-width: calc(100% - 4.5rem);
+  line-height: 1;
+  white-space: nowrap;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #gb-modal .gb-close {
@@ -155,6 +165,12 @@ body.gb-modal-open {
 
 #gb-modal .gb-body.gb-body--summary {
   padding-bottom: 0.8rem;
+}
+
+#gb-modal .gb-body > section {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 #gb-modal h3 {
@@ -782,11 +798,12 @@ body.gb-modal-open {
   justify-content: space-between;
   align-items: center;
   gap: 0.6rem;
-  margin-top: 1rem;
+  margin-top: auto;
+  padding-top: 1rem;
 }
 
 #gb-modal .gb-body.gb-body--summary .gb-actions {
-  margin-top: 0.75rem;
+  padding-top: 0.75rem;
 }
 
 #gb-modal .gb-body.gb-body--summary .gb-error {
@@ -996,12 +1013,13 @@ body.gb-modal-open {
   #gb-modal .gb-header {
     padding-top: 1rem;
     padding-bottom: 0.8rem;
+    padding-left: 3rem;
+    padding-right: 3rem;
   }
 
   #gb-modal .gb-title {
-    max-width: calc(100% - 3.5rem);
-    font-size: clamp(1.45rem, 7vw, 2rem);
-    letter-spacing: 0.04em;
+    font-size: clamp(1rem, 5vw, 1.7rem);
+    letter-spacing: 0.025em;
   }
 
   #gb-modal .gb-close {
@@ -1093,6 +1111,11 @@ body.gb-modal-open {
   #gb-modal .gb-progress {
     padding-left: 0.8rem;
     padding-right: 0.8rem;
+  }
+
+  #gb-modal .gb-header {
+    padding-left: 2.7rem;
+    padding-right: 2.7rem;
   }
 
   #gb-modal .gb-phone-row {

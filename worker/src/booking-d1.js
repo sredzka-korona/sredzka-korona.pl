@@ -44,6 +44,21 @@ function renderTemplate(template, vars) {
   });
 }
 
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeRenderedReservationSubject(subject, vars, row) {
+  const rendered = String(subject || "");
+  const formattedNumber = cleanString(vars?.reservationNumber, 200);
+  if (!formattedNumber) return rendered;
+  if (rendered.includes(formattedNumber)) return rendered;
+  const rawNumber = cleanString(row?.human_number, 80);
+  if (!rawNumber || rawNumber === formattedNumber) return rendered;
+  const rawPattern = new RegExp(`(^|[^\\d])(${escapeRegExp(rawNumber)})(?=[^\\d]|$)`);
+  return rendered.replace(rawPattern, (_, prefix) => `${prefix}${formattedNumber}`);
+}
+
 function decodeHtmlEntities(value) {
   return String(value ?? "")
     .replace(/&nbsp;/gi, " ")
@@ -2069,6 +2084,43 @@ function legacyDefaultTemplateMap(service) {
   };
 }
 
+function ultraLegacyDefaultTemplateMap(service) {
+  if (service !== "hotel") return {};
+  return {
+    confirm_email: {
+      subject: "{{hotelName}} — potwierdź rezerwację ({{reservationNumber}})",
+      bodyHtml:
+        '<p>Witaj {{fullName}},</p><p>Kliknij link, aby potwierdzić rezerwację:</p><p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p><p>Numer: {{reservationNumber}}<br>Termin: {{dateFrom}} — {{dateTo}}</p>',
+    },
+    pending_client: {
+      subject: "{{hotelName}} — rezerwacja oczekuje na akceptację ({{reservationNumber}})",
+      bodyHtml: "<p>Witaj {{fullName}},</p><p>Twoja rezerwacja ma status oczekujący.</p><p>Numer: {{reservationNumber}}</p>",
+    },
+    pending_admin: {
+      subject: "[{{hotelName}}] Nowa rezerwacja oczekująca {{reservationNumber}}",
+      bodyHtml:
+        "<p>Nowa rezerwacja oczekuje na decyzję.</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{dateFrom}} — {{dateTo}}</p>",
+    },
+    confirmed_client: {
+      subject: "{{hotelName}} — rezerwacja potwierdzona ({{reservationNumber}})",
+      bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została potwierdzona.</p>",
+    },
+    cancelled_client: {
+      subject: "{{hotelName}} — rezerwacja anulowana ({{reservationNumber}})",
+      bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została anulowana.</p>",
+    },
+    changed_client: {
+      subject: "{{hotelName}} — zmiana w rezerwacji {{reservationNumber}}",
+      bodyHtml:
+        "<p>Witaj {{fullName}},</p><p>Wprowadziliśmy zmiany w rezerwacji <strong>{{reservationNumber}}</strong>.</p><p>Termin pobytu: {{dateFrom}} — {{dateTo}} ({{nights}} nocy).<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>{{customerNote}}</p><p>W razie pytań odpowiedz na tę wiadomość lub skontaktuj się z recepcją.</p>",
+    },
+  };
+}
+
+function matchesAnyTemplateShape(current, candidates) {
+  return (Array.isArray(candidates) ? candidates : []).filter(Boolean).some((candidate) => isSameTemplateShape(current, candidate));
+}
+
 function buildHotelDefaultTemplates() {
   return {
     confirm_email: {
@@ -2519,6 +2571,7 @@ const EVENT_TEMPLATE_KEYS = {
 async function loadTemplates(env, service) {
   const defaults = defaultTemplateMap(service);
   const legacyDefaults = legacyDefaultTemplateMap(service);
+  const ultraLegacyDefaults = ultraLegacyDefaultTemplateMap(service);
   const rows = await env.DB.prepare(
     "SELECT key, subject, body_html AS bodyHtml FROM booking_mail_templates WHERE service = ? ORDER BY key ASC"
   )
@@ -2549,7 +2602,7 @@ async function loadTemplates(env, service) {
         .run();
       continue;
     }
-    if (isSameTemplateShape(existing, legacyDefaults[key])) {
+    if (matchesAnyTemplateShape(existing, [legacyDefaults[key], ultraLegacyDefaults[key]])) {
       out[key] = template;
       await env.DB.prepare(
         "INSERT INTO booking_mail_templates (service, key, subject, body_html, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(service, key) DO UPDATE SET subject = excluded.subject, body_html = excluded.body_html, updated_at = excluded.updated_at"
@@ -2935,7 +2988,7 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
     ...(await buildMailVarsForService(env, request, service, row, token || "")),
     ...(extraVars && typeof extraVars === "object" ? extraVars : {}),
   };
-  const subject = renderTemplate(template.subject, vars);
+  const subject = normalizeRenderedReservationSubject(renderTemplate(template.subject, vars), vars, row);
   let html = renderTemplate(template.bodyHtml, vars);
   const cancelReason = cleanString(vars.cancelReason, 2000);
   if (eventKey === "cancelled_client" && cancelReason) {
