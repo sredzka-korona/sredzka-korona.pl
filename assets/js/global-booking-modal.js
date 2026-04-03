@@ -642,6 +642,7 @@
     state.restaurant = {
       loading: false,
       calendarLoading: false,
+      detailsNextPending: false,
       calendarDays: [],
       calendarMonth: todayYmdLocal().slice(0, 7),
       publicSettings: null,
@@ -699,7 +700,7 @@
       decisionDaysLabel: state.decisionDaysLabel === "7 dni" ? "7 dni" : "3 dni",
       personal: state.personal,
       hotel: state.hotel,
-      restaurant: state.restaurant,
+      restaurant: { ...state.restaurant, detailsNextPending: false },
       events: state.events,
       humanCheck: Boolean(state.humanCheck),
     };
@@ -769,6 +770,7 @@
       state.restaurant = {
         loading: false,
         calendarLoading: false,
+        detailsNextPending: false,
         calendarDays: Array.isArray(draft.restaurant?.calendarDays) ? draft.restaurant.calendarDays : [],
         calendarMonth: cleanString(draft.restaurant?.calendarMonth, 7) || todayYmdLocal().slice(0, 7),
         publicSettings: draft.restaurant?.publicSettings && typeof draft.restaurant.publicSettings === "object" ? draft.restaurant.publicSettings : null,
@@ -1305,25 +1307,37 @@
     const slots = Array.isArray(selectedDay?.slots) ? selectedDay.slots : [];
 
     return `
-      <section>
-        <h3>Termin</h3>
-        <p class="gb-hint">Pokazujemy tylko dni, w których znajdziemy wolny termin dla <strong>${escapeHtml(String(state.restaurant.tablesCount))}</strong> stolików.</p>
-        ${renderAvailabilityCalendar("restaurant", state.restaurant.calendarMonth, state.restaurant.reservationDate, state.restaurant.calendarDays, state.restaurant.calendarLoading)}
-        <label class="gb-field" style="margin-top:0.85rem;">
-          <span>Godzina rezerwacji</span>
-          <select id="gb-rest-time" ${slots.length ? "" : "disabled"}>
-            ${
-              slots.length
-                ? slots
-                    .map(
-                      (slot) =>
-                        `<option value="${escapeHtml(slot)}" ${state.restaurant.startTime === slot ? "selected" : ""}>${escapeHtml(slot)}</option>`
-                    )
-                    .join("")
-                : '<option value="">Brak dostępnych godzin</option>'
-            }
-          </select>
-        </label>
+      <section class="gb-rest-datetime-step">
+        <h3 class="gb-sr-only">Termin</h3>
+        <div class="gb-rest-datetime-controls gb-grid-2">
+          <label class="gb-field gb-field--time-like">
+            <span>Godzina rezerwacji</span>
+            <select id="gb-rest-time" ${slots.length ? "" : "disabled"}>
+              ${
+                slots.length
+                  ? slots
+                      .map(
+                        (slot) =>
+                          `<option value="${escapeHtml(slot)}" ${state.restaurant.startTime === slot ? "selected" : ""}>${escapeHtml(slot)}</option>`
+                      )
+                      .join("")
+                  : '<option value="">Brak dostępnych godzin</option>'
+              }
+            </select>
+          </label>
+          <label class="gb-field">
+            <span>Preferowane miejsce</span>
+            <select id="gb-rest-place">
+              <option value="no_preference" ${state.restaurant.placePreference === "no_preference" ? "selected" : ""}>Brak preferencji</option>
+              <option value="inside" ${state.restaurant.placePreference === "inside" ? "selected" : ""}>W lokalu</option>
+              <option value="terrace" ${state.restaurant.placePreference === "terrace" ? "selected" : ""}>Na tarasie</option>
+            </select>
+          </label>
+        </div>
+        <p class="gb-inline-note gb-rest-place-disclaimer">Nie gwarantujemy stolika w wybranym miejscu (w lokalu ani na tarasie).</p>
+        <div class="gb-rest-datetime-calendar-wrap">
+          ${renderAvailabilityCalendar("restaurant", state.restaurant.calendarMonth, state.restaurant.reservationDate, state.restaurant.calendarDays, state.restaurant.calendarLoading)}
+        </div>
         <div class="gb-actions">
           <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wróć</button>
           <button type="button" class="gb-btn gb-btn-primary" id="gb-next">Dalej</button>
@@ -1337,51 +1351,63 @@
     const maxGuestsPerTable = Number(state.restaurant.publicSettings?.maxGuestsPerTable || 4);
     const maxTables = Math.max(1, Number(state.restaurant.publicSettings?.tableCount || 30));
     const maxGuests = Math.max(1, maxGuestsPerTable * Number(state.restaurant.tablesCount || 1));
+    const locked = Boolean(state.restaurant.detailsNextPending);
+    const dis = locked ? " disabled" : "";
     return `
-      <section>
+      <section aria-busy="${locked ? "true" : "false"}">
         <h3>Szczegóły</h3>
         <p class="gb-hint">Najpierw określ liczbę stolików i gości. Na tej podstawie pokażemy tylko realnie dostępne dni.</p>
-        <div class="gb-grid-3">
-          <label class="gb-field">
-            <span>Liczba stołów</span>
-            <input type="number" id="gb-rest-tables" min="1" max="${escapeHtml(String(maxTables))}" value="${escapeHtml(String(state.restaurant.tablesCount))}" required />
-          </label>
-          <label class="gb-field">
-            <span>Liczba gości</span>
-            <input type="number" id="gb-rest-guests" min="1" max="${escapeHtml(String(maxGuests))}" value="${escapeHtml(String(state.restaurant.guestsCount))}" required />
-          </label>
-          <label class="gb-field">
-            <span>Miejsce</span>
-            <select id="gb-rest-place">
-              <option value="no_preference" ${state.restaurant.placePreference === "no_preference" ? "selected" : ""}>Brak preferencji</option>
-              <option value="inside" ${state.restaurant.placePreference === "inside" ? "selected" : ""}>W lokalu</option>
-              <option value="terrace" ${state.restaurant.placePreference === "terrace" ? "selected" : ""}>Na tarasie</option>
-            </select>
-          </label>
+        <div class="gb-rest-details-wrap${locked ? " gb-rest-details-wrap--loading" : ""}">
+          <div class="gb-rest-details-fields">
+            <div class="gb-grid-3">
+              <label class="gb-field">
+                <span>Liczba stołów</span>
+                <input type="number" id="gb-rest-tables" min="1" max="${escapeHtml(String(maxTables))}" value="${escapeHtml(String(state.restaurant.tablesCount))}" required${dis} />
+              </label>
+              <label class="gb-field">
+                <span>Liczba gości</span>
+                <input type="number" id="gb-rest-guests" min="1" max="${escapeHtml(String(maxGuests))}" value="${escapeHtml(String(state.restaurant.guestsCount))}" required${dis} />
+              </label>
+              <label class="gb-field gb-field--time-like">
+                <span>Czas rezerwacji</span>
+                <select id="gb-rest-duration"${dis}>
+                  ${[1, 1.5, 2, 2.5, 3, 4, 5, 6]
+                    .map(
+                      (h) =>
+                        `<option value="${escapeHtml(String(h))}" ${Number(state.restaurant.durationHours) === Number(h) ? "selected" : ""}>${escapeHtml(String(h))} h</option>`
+                    )
+                    .join("")}
+                </select>
+              </label>
+            </div>
+            <div class="gb-rest-step1-foot">
+              <div class="gb-rest-step1-notes">
+                <p class="gb-inline-note">Maksymalna ilość gości przy jednym stole: <strong id="gb-rest-max">${escapeHtml(String(maxGuestsPerTable))}</strong>.</p>
+              </div>
+              <label class="gb-check gb-check--rest-join">
+                <input type="checkbox" id="gb-rest-join" ${state.restaurant.joinTables ? "checked" : ""}${dis} />
+                <span>Prośba o połączenie stołów</span>
+              </label>
+            </div>
+            <label class="gb-field" style="margin-top:0.7rem;">
+              <span>Dodatkowe informacje</span>
+              <textarea id="gb-rest-note" maxlength="2000"${dis}>${escapeHtml(state.restaurant.customerNote)}</textarea>
+            </label>
+          </div>
+          ${
+            locked
+              ? `<div class="gb-rest-details-overlay" role="status" aria-live="polite">
+            <div class="gb-loading-state gb-loading-state--overlay">
+              <span class="gb-loading-spinner" aria-hidden="true"></span>
+              <p class="gb-loading-text">Ładowanie dostępnych terminów…</p>
+            </div>
+          </div>`
+              : ""
+          }
         </div>
-        <label class="gb-field" style="margin-top:0.7rem;">
-          <span>Czas rezerwacji</span>
-          <select id="gb-rest-duration">
-            ${[1, 1.5, 2, 2.5, 3, 4, 5, 6]
-              .map(
-                (h) =>
-                  `<option value="${escapeHtml(String(h))}" ${Number(state.restaurant.durationHours) === Number(h) ? "selected" : ""}>${escapeHtml(String(h))} h</option>`
-              )
-              .join("")}
-          </select>
-        </label>
-        <p class="gb-inline-note">Maksymalna ilość gości przy jednym stole: <strong id="gb-rest-max">${escapeHtml(String(maxGuestsPerTable))}</strong>.</p>
-        <label class="gb-check">
-          <input type="checkbox" id="gb-rest-join" ${state.restaurant.joinTables ? "checked" : ""} />
-          <span>Prośba o połączenie stołów</span>
-        </label>
-        <label class="gb-field" style="margin-top:0.7rem;">
-          <span>Dodatkowe informacje</span>
-          <textarea id="gb-rest-note" maxlength="2000">${escapeHtml(state.restaurant.customerNote)}</textarea>
-        </label>
         <div class="gb-actions">
-          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wróć</button>
-          <button type="button" class="gb-btn gb-btn-primary" id="gb-next">Dalej</button>
+          <button type="button" class="gb-btn gb-btn-secondary" id="gb-back"${dis}>Wróć</button>
+          <button type="button" class="gb-btn gb-btn-primary" id="gb-next"${dis}>Dalej</button>
         </div>
         <p class="gb-error" id="gb-error">${escapeHtml(state.error)}</p>
       </section>
@@ -1823,6 +1849,8 @@
       body.innerHTML = renderSuccessStep();
     }
     body.classList.toggle("gb-body--summary", state.step === "summary");
+    body.classList.toggle("gb-body--restaurant-datetime", state.step === "restaurantDateTime");
+    document.querySelector("#gb-modal .gb-shell")?.classList.toggle("gb-shell--rest-datetime", state.step === "restaurantDateTime");
 
     renderProgress();
     bindCommonHandlers();
@@ -1859,14 +1887,17 @@
     }
     if (state.step === "restaurantDateTime") {
       state.restaurant.startTime = String(document.getElementById("gb-rest-time")?.value || state.restaurant.startTime || "");
+      const placePreference = String(document.getElementById("gb-rest-place")?.value || state.restaurant.placePreference || "no_preference");
+      state.restaurant.placePreference = RESTAURANT_PLACE_OPTIONS.includes(placePreference) ? placePreference : "no_preference";
       return;
     }
     if (state.step === "restaurantDetails") {
+      if (state.restaurant.detailsNextPending) {
+        return;
+      }
       state.restaurant.tablesCount = clamp(toInt(document.getElementById("gb-rest-tables")?.value || state.restaurant.tablesCount || 1, 1), 1, 30);
       state.restaurant.guestsCount = clamp(toInt(document.getElementById("gb-rest-guests")?.value || state.restaurant.guestsCount || 1, 1), 1, 300);
       state.restaurant.durationHours = Number(document.getElementById("gb-rest-duration")?.value || state.restaurant.durationHours || 2);
-      const placePreference = String(document.getElementById("gb-rest-place")?.value || state.restaurant.placePreference || "no_preference");
-      state.restaurant.placePreference = RESTAURANT_PLACE_OPTIONS.includes(placePreference) ? placePreference : "no_preference";
       state.restaurant.joinTables = Boolean(document.getElementById("gb-rest-join")?.checked);
       state.restaurant.customerNote = String(document.getElementById("gb-rest-note")?.value || state.restaurant.customerNote || "").trim();
       return;
@@ -2123,9 +2154,14 @@
 
     if (state.step === "restaurantDateTime") {
       const timeInput = document.getElementById("gb-rest-time");
+      const placeInput = document.getElementById("gb-rest-place");
 
       timeInput?.addEventListener("change", () => {
         state.restaurant.startTime = String(timeInput.value || "");
+      });
+      placeInput?.addEventListener("change", () => {
+        const placePreference = String(placeInput.value || "no_preference");
+        state.restaurant.placePreference = RESTAURANT_PLACE_OPTIONS.includes(placePreference) ? placePreference : "no_preference";
       });
 
       document.getElementById("gb-next")?.addEventListener("click", async () => {
@@ -2135,6 +2171,10 @@
           ? selectedCalendarDay(state.restaurant.calendarDays, dateValue).slots
           : [];
         const selectedTime = String(timeInput?.value || "");
+        const placePreferenceRaw = String(placeInput?.value || "no_preference");
+        state.restaurant.placePreference = RESTAURANT_PLACE_OPTIONS.includes(placePreferenceRaw)
+          ? placePreferenceRaw
+          : "no_preference";
 
         state.restaurant.startTime = selectedTime;
 
@@ -2181,7 +2221,6 @@
       const tablesInput = document.getElementById("gb-rest-tables");
       const guestsInput = document.getElementById("gb-rest-guests");
       const durationInput = document.getElementById("gb-rest-duration");
-      const placeInput = document.getElementById("gb-rest-place");
       const joinInput = document.getElementById("gb-rest-join");
       const noteInput = document.getElementById("gb-rest-note");
 
@@ -2213,8 +2252,6 @@
         state.restaurant.tablesCount = tablesCount;
         state.restaurant.guestsCount = guestsCount;
         state.restaurant.durationHours = Number(durationInput?.value || 2);
-        const placePreference = String(placeInput?.value || "no_preference");
-        state.restaurant.placePreference = RESTAURANT_PLACE_OPTIONS.includes(placePreference) ? placePreference : "no_preference";
         state.restaurant.joinTables = Boolean(joinInput?.checked);
         state.restaurant.customerNote = String(noteInput?.value || "").trim();
 
@@ -2224,10 +2261,18 @@
         }
 
         setError("");
-        await loadRestaurantCalendar({
-          reservationDate: state.restaurant.reservationDate,
-        });
+        state.restaurant.detailsNextPending = true;
+        render();
+        try {
+          await loadRestaurantCalendar({
+            reservationDate: state.restaurant.reservationDate,
+            render: false,
+          });
+        } finally {
+          state.restaurant.detailsNextPending = false;
+        }
         if (!state.restaurant.calendarDays.some((day) => day?.available)) {
+          render();
           return;
         }
         state.step = "restaurantDateTime";

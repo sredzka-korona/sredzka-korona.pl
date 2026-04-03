@@ -174,6 +174,22 @@ body.gb-modal-open {
   flex-direction: column;
 }
 
+#gb-modal .gb-body.gb-body--restaurant-datetime > section {
+  min-height: 0;
+}
+
+#gb-modal .gb-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 #gb-modal h3 {
   margin: 0 0 0.45rem;
   font-size: 1.22rem;
@@ -215,6 +231,200 @@ body.gb-modal-open {
   width: 100%;
   max-width: 100%;
   min-width: 0;
+}
+
+#gb-modal .gb-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+#gb-modal .gb-rest-step1-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem 1.25rem;
+  flex-wrap: wrap;
+  margin-top: 0.65rem;
+}
+
+#gb-modal .gb-rest-step1-notes {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+#gb-modal .gb-rest-step1-foot .gb-inline-note:first-child {
+  margin-top: 0;
+}
+
+#gb-modal .gb-rest-step1-foot .gb-inline-note + .gb-inline-note {
+  margin-top: 0.35rem;
+}
+
+#gb-modal .gb-check--rest-join {
+  margin-top: 0;
+  flex: 0 0 auto;
+  max-width: min(100%, 16rem);
+}
+
+#gb-modal .gb-rest-details-wrap {
+  position: relative;
+}
+
+#gb-modal .gb-rest-details-wrap--loading .gb-rest-details-fields {
+  opacity: 0.55;
+  filter: grayscale(0.15);
+  transition: opacity 0.2s ease;
+}
+
+#gb-modal .gb-rest-details-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  border-radius: 14px;
+  background: rgba(18, 12, 8, 0.52);
+  backdrop-filter: blur(2px);
+}
+
+#gb-modal .gb-loading-state--overlay {
+  min-height: 0;
+  gap: 0.65rem;
+  padding: 0.5rem 0.75rem;
+}
+
+#gb-modal .gb-loading-state--overlay .gb-loading-text {
+  font-size: 0.95rem;
+  max-width: 16rem;
+}
+
+/* Krok „Termin” restauracji: bez pionowego scrolla w modalu — kalendarz skaluje się w dostępnej przestrzeni */
+#gb-modal .gb-shell.gb-shell--rest-datetime {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: min(94dvh, 980px);
+}
+
+#gb-modal .gb-shell.gb-shell--rest-datetime .gb-body.gb-body--restaurant-datetime {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-top: 0.35rem;
+}
+
+#gb-modal .gb-rest-datetime-step {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+#gb-modal .gb-rest-datetime-controls {
+  flex-shrink: 0;
+}
+
+#gb-modal .gb-rest-place-disclaimer {
+  margin: 0;
+  flex-shrink: 0;
+  font-size: clamp(0.75rem, 2.8vw, 0.83rem);
+  line-height: 1.35;
+}
+
+#gb-modal .gb-rest-datetime-calendar-wrap {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#gb-modal .gb-rest-datetime-step .gb-actions {
+  flex-shrink: 0;
+  padding-top: 0.55rem;
+  margin-top: auto;
+}
+
+#gb-modal .gb-rest-datetime-step .gb-error {
+  flex-shrink: 0;
+}
+
+#gb-modal .gb-rest-datetime-calendar-wrap .gb-calendar {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: clamp(0.35rem, 1.5vw, 0.85rem);
+  box-sizing: border-box;
+}
+
+#gb-modal .gb-rest-datetime-calendar-wrap .gb-calendar-head {
+  flex-shrink: 0;
+  margin-bottom: 0.45rem;
+}
+
+#gb-modal .gb-rest-datetime-calendar-wrap .gb-calendar-weekdays {
+  flex-shrink: 0;
+  margin-bottom: 0.28rem;
+}
+
+#gb-modal .gb-rest-datetime-calendar-wrap .gb-calendar-weekdays span {
+  font-size: clamp(0.62rem, 2vw, 0.74rem);
+}
+
+#gb-modal .gb-rest-datetime-calendar-wrap .gb-calendar-grid {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  gap: clamp(0.1rem, 0.7vw, 0.4rem);
+}
+
+#gb-modal .gb-rest-datetime-calendar-wrap .gb-calendar-cell,
+#gb-modal .gb-rest-datetime-calendar-wrap .gb-calendar-cell--empty {
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  box-sizing: border-box;
+  padding: clamp(0.1rem, 0.55vw, 0.45rem) clamp(0.06rem, 0.45vw, 0.32rem);
+}
+
+#gb-modal .gb-rest-datetime-calendar-wrap .gb-calendar-cell {
+  justify-content: center;
+  gap: clamp(0.04rem, 0.35vw, 0.3rem);
+}
+
+#gb-modal .gb-rest-datetime-calendar-wrap .gb-calendar-day-number {
+  font-size: clamp(0.7rem, 2.5vw, 0.95rem);
+}
+
+#gb-modal .gb-rest-datetime-calendar-wrap .gb-calendar-day-status {
+  font-size: clamp(0.52rem, 1.85vw, 0.68rem);
+  line-height: 1.15;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+#gb-modal .gb-rest-datetime-calendar-wrap .gb-calendar-nav {
+  width: clamp(1.65rem, 4.8vw, 2.2rem);
+  height: clamp(1.65rem, 4.8vw, 2.2rem);
+}
+
+#gb-modal .gb-rest-datetime-calendar-wrap .gb-calendar-title {
+  font-size: clamp(0.8rem, 2.6vw, 0.98rem);
 }
 
 #gb-modal .gb-calendar {
@@ -1152,7 +1362,8 @@ body.gb-modal-open {
   }
 
   #gb-modal .gb-service-tiles,
-  #gb-modal .gb-grid-3 {
+  #gb-modal .gb-grid-3,
+  #gb-modal .gb-grid-4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1235,6 +1446,7 @@ body.gb-modal-open {
   #gb-modal .gb-hall-tiles,
   #gb-modal .gb-grid-2,
   #gb-modal .gb-grid-3,
+  #gb-modal .gb-grid-4,
   #gb-modal .gb-range-pair {
     grid-template-columns: 1fr;
   }
