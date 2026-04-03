@@ -98,6 +98,22 @@ CREATE TABLE IF NOT EXISTS booking_mail_templates (
   PRIMARY KEY (service, key)
 );
 
+CREATE TABLE IF NOT EXISTS booking_mail_audit (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  service TEXT NOT NULL,
+  event_key TEXT NOT NULL,
+  reservation_id TEXT,
+  recipient TEXT NOT NULL,
+  envelope_from TEXT NOT NULL DEFAULT '',
+  subject TEXT NOT NULL,
+  status TEXT NOT NULL,
+  message_id TEXT NOT NULL DEFAULT '',
+  smtp_accepted TEXT NOT NULL DEFAULT '',
+  error TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mail_audit_created_at ON booking_mail_audit(created_at DESC);
+
 CREATE TABLE IF NOT EXISTS hotel_rooms (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

@@ -530,7 +530,12 @@ async function sendMailViaSmtp(env, { to, subject, html, text, replyTo }) {
 
     await smtpWrite(writer, "QUIT");
     await smtpExpect(readLine, [221], "QUIT odrzucone");
-    return { ok: true, smtpAccepted: (accepted?.lines || []).join(" | ") };
+    return {
+      ok: true,
+      smtpAccepted: (accepted?.lines || []).join(" | "),
+      messageId,
+      envelopeFrom: fromAddress,
+    };
   } finally {
     try {
       writer.releaseLock();
@@ -944,8 +949,11 @@ async function ensureSchema(env) {
         event_key TEXT NOT NULL,
         reservation_id TEXT,
         recipient TEXT NOT NULL,
+        envelope_from TEXT NOT NULL DEFAULT '',
         subject TEXT NOT NULL,
         status TEXT NOT NULL,
+        message_id TEXT NOT NULL DEFAULT '',
+        smtp_accepted TEXT NOT NULL DEFAULT '',
         error TEXT NOT NULL DEFAULT '',
         created_at INTEGER NOT NULL
       )`,
@@ -1098,10 +1106,26 @@ async function ensureSchema(env) {
     for (const sql of stmts) {
       await env.DB.prepare(sql).run();
     }
+    await migrateMailAuditSchema(env);
     await seedDefaults(env);
     await migrateHumanYearAndTemplates(env);
   })();
   return schemaReadyPromise;
+}
+
+async function migrateMailAuditSchema(env) {
+  const cols = [
+    ["envelope_from", "TEXT NOT NULL DEFAULT ''"],
+    ["message_id", "TEXT NOT NULL DEFAULT ''"],
+    ["smtp_accepted", "TEXT NOT NULL DEFAULT ''"],
+  ];
+  for (const [name, type] of cols) {
+    try {
+      await env.DB.prepare(`ALTER TABLE booking_mail_audit ADD COLUMN ${name} ${type}`).run();
+    } catch {
+      /* kolumna już istnieje */
+    }
+  }
 }
 
 async function migrateHumanYearAndTemplates(env) {
@@ -3130,20 +3154,26 @@ async function buildMailVarsForService(env, request, service, row, token = "") {
   return buildHallMailVars(env, request, row, token);
 }
 
-async function logMailAudit(env, { service, eventKey, row, to, subject, status, error = "" }) {
+async function logMailAudit(
+  env,
+  { service, eventKey, row, to, envelopeFrom = "", subject, status, messageId = "", smtpAccepted = "", error = "" }
+) {
   try {
     await env.DB.prepare(
       `INSERT INTO booking_mail_audit
-        (service, event_key, reservation_id, recipient, subject, status, error, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        (service, event_key, reservation_id, recipient, envelope_from, subject, status, message_id, smtp_accepted, error, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         cleanString(service, 40),
         cleanString(eventKey, 80),
         cleanString(row?.id, 120) || null,
         cleanString(to, 320),
+        cleanString(envelopeFrom, 320),
         cleanString(subject, 500),
         cleanString(status, 40),
+        cleanString(messageId, 320),
+        cleanString(smtpAccepted, 4000),
         cleanString(error, 4000),
         nowMs()
       )
@@ -3237,8 +3267,10 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
       row,
       to: destination,
       subject,
-      status: "sent",
-      error: cleanString(result?.smtpAccepted, 4000),
+      envelopeFrom: result?.envelopeFrom || "",
+      status: "queued",
+      messageId: result?.messageId || "",
+      smtpAccepted: cleanString(result?.smtpAccepted, 4000),
     });
 
     const shadow = readShadowCopyConfig(env);
@@ -3268,8 +3300,10 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
           row,
           to: shadow.recipient,
           subject: shadowSubject,
-          status: "sent",
-          error: cleanString(shadowResult?.smtpAccepted, 4000),
+          envelopeFrom: shadowResult?.envelopeFrom || "",
+          status: "queued",
+          messageId: shadowResult?.messageId || "",
+          smtpAccepted: cleanString(shadowResult?.smtpAccepted, 4000),
         });
       } catch (shadowError) {
         await logMailAudit(env, {
