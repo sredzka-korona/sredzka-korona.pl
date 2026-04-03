@@ -532,6 +532,7 @@
     schedule: {
       monthCursor: getTodayIsoDate().slice(0, 7),
       selectedDate: getTodayIsoDate(),
+      allItems: [],
       items: [],
       pendingItems: [],
       tomorrowItems: [],
@@ -556,6 +557,7 @@
       description: "Centralny terminarz rezerwacji, akceptacje i szybkie operacje dzienne.",
       tiles: [
         { key: "overview", label: "Grafik", description: "Oczekujące, jutrzejsze i kalendarz wszystkich rezerwacji." },
+        { key: "registry", label: "Spis rezerwacji", description: "Pełna lista wszystkich rezerwacji od najnowszych do najstarszych." },
       ],
     },
     {
@@ -1483,6 +1485,7 @@
         key: `${service}:${row.id}`,
         service,
         id: row.id,
+        createdAtMs: Number(row.createdAtMs || 0) || null,
         status: row.status,
         statusLabel: scheduleStatusLabel(row.status, row.statusLabel || row.status),
         humanNumberLabel: row.humanNumberLabel || row.id,
@@ -1506,6 +1509,7 @@
         key: `${service}:${row.id}`,
         service,
         id: row.id,
+        createdAtMs: Number(row.createdAtMs || 0) || null,
         status: row.status,
         statusLabel: scheduleStatusLabel(row.status, row.statusLabel || row.status),
         humanNumberLabel: row.humanNumberLabel || row.id,
@@ -1528,6 +1532,7 @@
       key: `${service}:${row.id}`,
       service,
       id: row.id,
+      createdAtMs: Number(row.createdAtMs || 0) || null,
       status: row.status,
       statusLabel: scheduleStatusLabel(row.status, row.statusLabel || row.status),
       humanNumberLabel: row.humanNumberLabel || row.id,
@@ -1547,7 +1552,11 @@
   }
 
   function scheduleFindItem(service, id) {
-    return state.schedule.items.find((item) => item.service === service && item.id === id) || null;
+    return (
+      state.schedule.allItems.find((item) => item.service === service && item.id === id) ||
+      state.schedule.items.find((item) => item.service === service && item.id === id) ||
+      null
+    );
   }
 
   function scheduleItemsForDate(ymd) {
@@ -1680,6 +1689,7 @@
 
   async function loadScheduleData({ silent = false, watchPoll = false } = {}) {
     if (!onlineBookingsEnabled) {
+      state.schedule.allItems = [];
       state.schedule.items = [];
       state.schedule.pendingItems = [];
       state.schedule.tomorrowItems = [];
@@ -1693,7 +1703,7 @@
       state.schedule.isLoading = true;
       state.schedule.lastError = "";
       if (state.ui.topTab === "grafik" && state.ui.view === "section") {
-        renderSchedulePanel();
+        renderActiveAdminTile();
       }
     }
 
@@ -1708,7 +1718,7 @@
           bookingAdminApi("hall", "admin-halls-list"),
         ]);
 
-      const items = [
+      const allItems = [
         ...((hotelReservations?.reservations || [])
           .map((row) => scheduleNormalizeItem("hotel", row))
           .filter(Boolean)),
@@ -1718,13 +1728,22 @@
         ...((hallReservations?.reservations || [])
           .map((row) => scheduleNormalizeItem("hall", row))
           .filter(Boolean)),
-      ]
+      ];
+      const items = allItems
         .filter((item) => SCHEDULE_ACTIVE_STATUSES.has(item.status))
         .sort((left, right) => left.startMs - right.startMs);
 
       const tomorrow = scheduleAddDays(getTodayIsoDate(), 1);
       const tomorrowStartMs = scheduleYmdToDate(tomorrow).getTime();
       const reservationItems = items.filter((item) => item.status !== "manual_block");
+      state.schedule.allItems = allItems
+        .slice()
+        .sort(
+          (left, right) =>
+            (Number(right.createdAtMs || 0) - Number(left.createdAtMs || 0)) ||
+            (Number(right.startMs || 0) - Number(left.startMs || 0)) ||
+            String(right.humanNumberLabel || "").localeCompare(String(left.humanNumberLabel || ""), "pl", { numeric: true })
+        );
       state.schedule.items = items;
       state.schedule.pendingItems = reservationItems.filter((item) => item.status === "pending");
       state.schedule.tomorrowItems = reservationItems.filter(
@@ -1756,6 +1775,7 @@
         state.schedule.watchBaselineReady = true;
       }
     } catch (error) {
+      state.schedule.allItems = [];
       state.schedule.items = [];
       state.schedule.pendingItems = [];
       state.schedule.tomorrowItems = [];
@@ -1765,7 +1785,7 @@
     } finally {
       state.schedule.isLoading = false;
       if (state.ui.topTab === "grafik" && state.ui.view === "section") {
-        renderSchedulePanel();
+        renderActiveAdminTile();
       }
     }
   }
@@ -1851,6 +1871,41 @@
       return candidate;
     }
     return "Rezerwacja";
+  }
+
+  function scheduleIsPast(item) {
+    return Boolean(item?.endMs) && Number(item.endMs) < Date.now();
+  }
+
+  function scheduleReservationIndexMarkup(items) {
+    if (!items.length) {
+      return `<p class="empty">Brak zapisanych rezerwacji.</p>`;
+    }
+    return `
+      <div class="schedule-day-list schedule-registry-list">
+        ${items
+          .map((item) => {
+            const createdLabel = item.createdAtMs ? scheduleFormatDateTime(item.createdAtMs) : "Brak daty utworzenia";
+            return `
+              <article class="schedule-day-item schedule-registry-item${scheduleIsPast(item) ? " is-past" : ""}">
+                <button type="button" class="button secondary schedule-card-action-details" data-schedule-action="details" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Szczegóły</button>
+                <div class="schedule-day-item-head">
+                  <div class="schedule-day-item-meta">
+                    <strong>${escapeHtml(scheduleCardHeading(item))}</strong>
+                    <span class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</span>
+                    <span class="pill schedule-status-pill ${scheduleStatusPillClass(item.status)}">${escapeHtml(item.statusLabel || scheduleStatusLabel(item.status))}</span>
+                    ${scheduleIsPast(item) ? '<span class="pill schedule-registry-past-pill">Minęła</span>' : ""}
+                  </div>
+                </div>
+                <p>${escapeHtml(item.title || "Rezerwacja")}</p>
+                <p class="helper">${escapeHtml(item.subtitle || "")}</p>
+                <p class="helper">Dodano: ${escapeHtml(createdLabel)}</p>
+              </article>
+            `;
+          })
+          .join("")}
+      </div>
+    `;
   }
 
   function scheduleQuickListMarkup(items, emptyText) {
@@ -2269,6 +2324,44 @@
       });
     });
     syncScheduleCountdownTicker();
+  }
+
+  function renderReservationIndexPanel(statusMessage = "") {
+    const panel = document.querySelector("#schedule-panel");
+    if (!panel) return;
+    if (!onlineBookingsEnabled) {
+      panel.innerHTML = `
+        <p class="status">Ten widok wymaga włączenia backendu rezerwacji online.</p>
+      `;
+      return;
+    }
+
+    panel.innerHTML = `
+      <div class="schedule-shell">
+        <section class="schedule-calendar-card schedule-registry-card">
+          <div class="schedule-calendar-head">
+            <div>
+              <p class="pill">${escapeHtml(String(state.schedule.allItems.length))}</p>
+              <h3 class="schedule-calendar-title">Spis rezerwacji</h3>
+              <p class="helper">Wszystkie rezerwacje od najnowszych do najstarszych. Pozycje, które już minęły, są wyszarzone.</p>
+            </div>
+            <button type="button" class="schedule-refresh-button" data-schedule-refresh aria-label="Odśwież">${scheduleIconMarkup("refresh")}</button>
+          </div>
+          ${statusMessage ? `<p class="status">${escapeHtml(statusMessage)}</p>` : ""}
+          ${state.schedule.lastError ? `<p class="status">${escapeHtml(state.schedule.lastError)}</p>` : ""}
+          ${scheduleReservationIndexMarkup(state.schedule.allItems)}
+        </section>
+      </div>
+    `;
+
+    panel.querySelector("[data-schedule-refresh]")?.addEventListener("click", () => {
+      loadScheduleData();
+    });
+    panel.querySelectorAll("[data-schedule-action='details']").forEach((button) => {
+      button.addEventListener("click", () => {
+        openScheduleDetailsModal(button.dataset.scheduleService, button.dataset.scheduleId);
+      });
+    });
   }
 
   async function handleScheduleAction(action, service, id) {
@@ -3421,7 +3514,11 @@
     const tileKey = getActiveAdminTile(topTab);
 
     if (topTab === "grafik") {
-      renderSchedulePanel(statusMessage);
+      if (tileKey === "registry") {
+        renderReservationIndexPanel(statusMessage);
+      } else {
+        renderSchedulePanel(statusMessage);
+      }
       scheduleStartPendingWatch();
       return;
     }
@@ -3560,14 +3657,7 @@
         <section class="admin-workspace${inSectionView ? "" : " admin-workspace-home"}">
           ${
             inSectionView
-              ? activeTab.key === "grafik"
-                ? `
-              <div class="grid admin-stage admin-stage--single">
-                ${renderAdminStageMarkup(activeTab.key, activeTile)}
-                <div id="admin-modal-root" class="admin-modal-root col-12"></div>
-              </div>
-            `
-                : `
+              ? `
               <div class="admin-workspace-head">
                 <div>
                   <p class="pill">${escapeHtml(activeTab.label)}</p>

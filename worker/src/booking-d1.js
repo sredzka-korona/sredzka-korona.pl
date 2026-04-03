@@ -908,61 +908,65 @@ function addDaysYmd(ymd, days) {
 const PUBLIC_CALENDAR_DAYS = 93;
 const PUBLIC_CALENDAR_STEP_MINUTES = 30;
 
-async function existingReservationCountForYear(env, service, year) {
+async function existingReservationCountForYear(env, year) {
   const y = Number(year);
-  const table = reservationTableName(service);
   const row = await env.DB.prepare(
-    `SELECT COUNT(*) AS total
-     FROM ${table}
-     WHERE human_year = ?`
+    `SELECT
+        (SELECT COUNT(*) FROM hotel_reservations WHERE human_year = ?) +
+        (SELECT COUNT(*) FROM restaurant_reservations WHERE human_year = ?) +
+        (SELECT COUNT(*) FROM venue_reservations WHERE human_year = ?) AS total`
   )
-    .bind(y)
+    .bind(y, y, y)
     .first();
   return Number(row?.total || 0);
 }
 
-async function maxHumanSequenceForYear(env, service, year) {
+async function maxHumanSequenceForYear(env, year) {
   const y = Number(year);
-  const table = reservationTableName(service);
   const rows = await env.DB.prepare(
-    `SELECT human_number
-     FROM ${table}
-     WHERE human_year = ?`
+    `SELECT human_number, 'hotel' AS service FROM hotel_reservations WHERE human_year = ?
+     UNION ALL
+     SELECT human_number, 'restaurant' AS service FROM restaurant_reservations WHERE human_year = ?
+     UNION ALL
+     SELECT human_number, 'hall' AS service FROM venue_reservations WHERE human_year = ?`
   )
-    .bind(y)
+    .bind(y, y, y)
     .all();
   let maxSequence = 0;
   for (const row of rows.results || []) {
-    const normalized = normalizeLegacyReservationSequence(row?.human_number, service);
+    const normalized = normalizeLegacyReservationSequence(row?.human_number, row?.service);
     if (normalized > maxSequence) maxSequence = normalized;
   }
   return maxSequence;
 }
 
-async function nextHumanSequenceForYear(env, service, year) {
+async function nextHumanSequenceForYear(env, year) {
   const y = Number(year);
   if (!Number.isFinite(y) || y < 2000 || y > 2100) {
     throw new Error("Nieprawidłowy rok numeracji.");
   }
-  const normalizedService = String(service || "").trim().toLowerCase() || "hotel";
-  const key = `reservation_human_seq_${normalizedService}_${y}`;
+  const key = `reservation_human_seq_${y}`;
   const existing = await env.DB.prepare("SELECT value FROM booking_counters WHERE key = ?")
     .bind(key)
     .first();
   const existingValue = Number(existing?.value || 0);
-  const normalizedExistingValue = normalizeLegacyReservationSequence(existingValue, normalizedService);
-  if (existing && normalizedExistingValue !== existingValue) {
-    const maxHuman = await maxHumanSequenceForYear(env, normalizedService, y);
-    const repairedCounterValue = Math.max(normalizedExistingValue, maxHuman, 0);
-    await env.DB.prepare("UPDATE booking_counters SET value = ? WHERE key = ?")
-      .bind(repairedCounterValue, key)
-      .run();
+  if (existing && existingValue >= 1000) {
+    const [existingCount, maxHuman] = await Promise.all([
+      existingReservationCountForYear(env, y),
+      maxHumanSequenceForYear(env, y),
+    ]);
+    const repairedCounterValue = Math.max(existingCount, maxHuman, 0);
+    if (repairedCounterValue < 1000) {
+      await env.DB.prepare("UPDATE booking_counters SET value = ? WHERE key = ?")
+        .bind(repairedCounterValue, key)
+        .run();
+    }
   }
   let startingValue = 1;
   if (!existing) {
     const [existingCount, maxHuman] = await Promise.all([
-      existingReservationCountForYear(env, normalizedService, y),
-      maxHumanSequenceForYear(env, normalizedService, y),
+      existingReservationCountForYear(env, y),
+      maxHumanSequenceForYear(env, y),
     ]);
     startingValue = Math.max(existingCount, maxHuman, 0) + 1;
   }
@@ -1517,7 +1521,7 @@ async function createHotelReservation(env, payload, options = {}) {
   const now = nowMs();
   const id = crypto.randomUUID();
   const humanYear = yearFromMsWarsaw(now);
-  const humanNumber = await nextHumanSequenceForYear(env, "hotel", humanYear);
+  const humanNumber = await nextHumanSequenceForYear(env, humanYear);
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const roomIds = Array.isArray(payload.roomIds) ? payload.roomIds.map((x) => cleanString(x, 80)).filter(Boolean) : [];
   const dateFrom = cleanString(payload.dateFrom, 10);
@@ -2142,7 +2146,7 @@ async function createRestaurantReservation(env, payload, options = {}) {
   }
   const id = crypto.randomUUID();
   const humanYear = yearFromMsWarsaw(now);
-  const humanNumber = await nextHumanSequenceForYear(env, "restaurant", humanYear);
+  const humanNumber = await nextHumanSequenceForYear(env, humanYear);
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const token = options.withConfirmationToken ? randomToken() : "";
   const tokenHash = token ? await sha256Hex(token) : null;
@@ -2466,7 +2470,7 @@ async function createHallReservation(env, payload, options = {}) {
   }
   const id = crypto.randomUUID();
   const humanYear = yearFromMsWarsaw(now);
-  const humanNumber = await nextHumanSequenceForYear(env, "hall", humanYear);
+  const humanNumber = await nextHumanSequenceForYear(env, humanYear);
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const token = options.withConfirmationToken ? randomToken() : "";
   const tokenHash = token ? await sha256Hex(token) : null;

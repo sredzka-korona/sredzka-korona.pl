@@ -1744,6 +1744,17 @@ body.admin-modal-open {
   background: rgba(255, 255, 255, 0.88);
 }
 
+.schedule-registry-item.is-past {
+  opacity: 0.58;
+  background: rgba(243, 239, 233, 0.9);
+  border-color: rgba(131, 107, 69, 0.14);
+}
+
+.schedule-registry-past-pill {
+  background: rgba(122, 133, 152, 0.16);
+  color: rgba(92, 106, 129, 0.92);
+}
+
 .schedule-card-action-details {
   position: absolute;
   z-index: 1;
@@ -2052,6 +2063,11 @@ body.admin-modal-open {
 .schedule-details-view {
   display: grid;
   gap: 0.9rem;
+}
+
+.schedule-registry-card {
+  display: grid;
+  gap: 1rem;
 }
 
 .schedule-details-banner {
