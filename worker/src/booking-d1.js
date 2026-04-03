@@ -2287,8 +2287,8 @@ async function hallAvailabilityAtSlot(env, hall, settings, payload, excludeId = 
 }
 
 function buildHallCandidateSlots(settings, durationHours) {
-  const openMinutes = hmToMinutes(settings.hallOpenTime || "00:00");
-  const closeMinutesRaw = hmToMinutes(settings.hallCloseTime || "00:00");
+  const openMinutes = parseHmToMinutes(settings.hallOpenTime || "00:00");
+  const closeMinutesRaw = parseHmToMinutes(settings.hallCloseTime || "00:00", { allow24: true });
   const safeOpen = openMinutes == null ? 0 : openMinutes;
   let safeClose = closeMinutesRaw == null ? 0 : closeMinutesRaw;
   if (safeClose <= safeOpen) {

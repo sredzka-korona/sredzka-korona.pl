@@ -7,6 +7,8 @@
   const CONTACT_EMAIL = "kontakt@sredzka-korona.pl";
   const PAGE_VISIT_ID =
     window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  /** Podbij przy zmianach w modalu — wymusza odświeżenie cache CSS po wdrożeniu. */
+  const GB_MODAL_ASSET_VERSION = "20260403-2";
   const SERVICE_KEYS = ["hotel", "restaurant", "events"];
 
   const SERVICE_META = {
@@ -529,14 +531,22 @@
     link.rel = "stylesheet";
     link.id = "gb-modal-css";
     const cs = document.currentScript;
+    let href;
     if (cs && cs.src) {
       try {
-        link.href = new URL("../css/global-booking-modal.css", cs.src).href;
+        href = new URL("../css/global-booking-modal.css", cs.src).href;
       } catch {
-        link.href = "/assets/css/global-booking-modal.css";
+        href = "/assets/css/global-booking-modal.css";
       }
     } else {
-      link.href = "/assets/css/global-booking-modal.css";
+      href = "/assets/css/global-booking-modal.css";
+    }
+    try {
+      const u = new URL(href, window.location.href);
+      u.searchParams.set("v", GB_MODAL_ASSET_VERSION);
+      link.href = u.href;
+    } catch {
+      link.href = `${href}${href.includes("?") ? "&" : "?"}v=${encodeURIComponent(GB_MODAL_ASSET_VERSION)}`;
     }
     document.head.appendChild(link);
   }
@@ -1422,24 +1432,29 @@
           `<option value="${h}" ${!state.events.durationUnspecified && Number(state.events.durationHours) === h ? "selected" : ""}>${h} h</option>`
       )
       .join("");
+    const guestsVal = clamp(toInt(state.events.guestsCount, 60), 1, 120);
     return `
       <section>
         <p class="gb-hint" style="margin:0 0 0.75rem;">Najpierw określ liczbę gości i przewidywany czas. Na tej podstawie pokażemy tylko dni, które mogą pomieścić wydarzenie.</p>
-        <div class="gb-grid-2">
-          <label class="gb-field gb-field--time-like">
-            <span>Czas rezerwacji (h)</span>
-            <select id="gb-events-duration-setup">
-              ${durSelectHtml}
-              <option value="unspecified" ${state.events.durationUnspecified ? "selected" : ""}>Nie określaj</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="gb-range-wrap" style="margin-top:0.75rem;">
-          <span class="gb-range-label">Liczba gości (1–120)</span>
-          <div class="gb-range-pair">
-            <input type="range" id="gb-events-guests-range" min="1" max="120" value="${escapeHtml(String(clamp(toInt(state.events.guestsCount, 60), 1, 120)))}" />
-            <input type="number" id="gb-events-guests-number" min="1" max="120" value="${escapeHtml(String(clamp(toInt(state.events.guestsCount, 60), 1, 120)))}" required />
+        <div class="gb-events-guests-row" role="group" aria-labelledby="gb-events-guests-slider-label">
+          <div class="gb-events-guests-col gb-events-guests-col--dur">
+            <label class="gb-field">
+              <span>Czas rezerwacji (h)</span>
+              <select id="gb-events-duration-setup">
+                ${durSelectHtml}
+                <option value="unspecified" ${state.events.durationUnspecified ? "selected" : ""}>Nie określaj</option>
+              </select>
+            </label>
+          </div>
+          <div class="gb-events-guests-col gb-events-guests-col--range">
+            <span class="gb-range-label" id="gb-events-guests-slider-label">Liczba gości (1–120)</span>
+            <input type="range" id="gb-events-guests-range" min="1" max="120" value="${escapeHtml(String(guestsVal))}" aria-labelledby="gb-events-guests-slider-label" />
+          </div>
+          <div class="gb-events-guests-col gb-events-guests-col--num">
+            <label class="gb-field">
+              <span class="gb-events-guests-col-head" aria-hidden="true">&#8203;</span>
+              <input type="number" id="gb-events-guests-number" min="1" max="120" value="${escapeHtml(String(guestsVal))}" required aria-labelledby="gb-events-guests-slider-label" />
+            </label>
           </div>
         </div>
 

@@ -575,6 +575,18 @@ body.gb-modal-open {
   overflow: hidden;
 }
 
+/* Bez domyślnego niebieskiego pierścienia fokusu — ramka jak w stanie spoczynku */
+#gb-modal input:not([type="checkbox"]):not([type="radio"]):focus,
+#gb-modal input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+#gb-modal select:focus,
+#gb-modal select:focus-visible,
+#gb-modal textarea:focus,
+#gb-modal textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border-color: rgba(255, 229, 184, 0.32);
+}
+
 #gb-modal input[type="date"],
 #gb-modal input[type="time"],
 #gb-modal input[type="number"],
@@ -1308,6 +1320,37 @@ body.gb-modal-open {
   min-width: 0;
 }
 
+/* Przyjęcia — krok „Liczba gości”: czas (15%) | pasek (70%) | pole liczby (15%) */
+#gb-modal .gb-events-guests-row {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 14fr) minmax(0, 3fr);
+  gap: 0.5rem;
+  align-items: end;
+  width: 100%;
+  min-width: 0;
+  margin-top: 0.15rem;
+}
+
+#gb-modal .gb-events-guests-col {
+  min-width: 0;
+  display: grid;
+  gap: 0.3rem;
+  align-content: end;
+}
+
+#gb-modal .gb-events-guests-col--range input[type="range"] {
+  width: 100%;
+}
+
+#gb-modal .gb-events-guests-col--num .gb-events-guests-col-head {
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.25;
+  min-height: 1.15em;
+  color: transparent;
+  user-select: none;
+}
+
 #gb-modal .gb-inline-note {
   margin: 0.45rem 0 0;
   color: rgba(255, 239, 211, 0.8);
@@ -1449,6 +1492,11 @@ body.gb-modal-open {
   #gb-modal .gb-grid-4,
   #gb-modal .gb-range-pair {
     grid-template-columns: 1fr;
+  }
+
+  #gb-modal .gb-events-guests-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
   }
 
   #gb-modal .gb-cart-stats,
