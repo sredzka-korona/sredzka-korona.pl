@@ -543,8 +543,12 @@
       countdownTimer: null,
       isLoading: false,
       lastError: "",
+      watchTimer: null,
+      knownPendingKeys: null,
+      watchBaselineReady: false,
     },
   };
+  const SCHEDULE_PENDING_WATCH_MS = 20000;
   const ADMIN_TABS = [
     {
       key: "grafik",
@@ -1570,7 +1574,111 @@
     return api(path, requestOptions);
   }
 
-  async function loadScheduleData({ silent = false } = {}) {
+  function scheduleStopPendingWatch() {
+    if (state.schedule.watchTimer) {
+      window.clearInterval(state.schedule.watchTimer);
+      state.schedule.watchTimer = null;
+    }
+  }
+
+  function scheduleStartPendingWatch() {
+    if (!onlineBookingsEnabled) return;
+    if (state.schedule.watchTimer) {
+      loadScheduleData({ silent: true });
+      return;
+    }
+    state.schedule.knownPendingKeys = null;
+    state.schedule.watchBaselineReady = false;
+    loadScheduleData({ silent: true });
+    state.schedule.watchTimer = window.setInterval(() => {
+      if (state.ui.topTab !== "grafik" || state.ui.view !== "section") return;
+      if (state.schedule.isLoading) return;
+      loadScheduleData({ silent: true, watchPoll: true });
+    }, SCHEDULE_PENDING_WATCH_MS);
+  }
+
+  function showScheduleToast(message, service, id) {
+    let stack = document.getElementById("admin-schedule-toast-stack");
+    if (!stack) {
+      stack = document.createElement("div");
+      stack.id = "admin-schedule-toast-stack";
+      stack.className = "admin-schedule-toast-stack";
+      document.body.appendChild(stack);
+    }
+    const wrap = document.createElement("div");
+    wrap.className = "admin-schedule-toast";
+    wrap.setAttribute("role", "status");
+
+    const mainBtn = document.createElement("button");
+    mainBtn.type = "button";
+    mainBtn.className = "admin-schedule-toast__main";
+    const textSpan = document.createElement("span");
+    textSpan.className = "admin-schedule-toast__text";
+    textSpan.textContent = message;
+    const hint = document.createElement("span");
+    hint.className = "admin-schedule-toast__hint";
+    hint.textContent = "Kliknij, aby otworzyć szczegóły";
+    mainBtn.appendChild(textSpan);
+    mainBtn.appendChild(hint);
+    mainBtn.addEventListener("click", () => {
+      openScheduleDetailsModal(service, id);
+      wrap.remove();
+      if (stack && stack.childElementCount === 0) stack.remove();
+    });
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "admin-schedule-toast__close";
+    closeBtn.setAttribute("aria-label", "Zamknij");
+    closeBtn.textContent = "×";
+    closeBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      wrap.remove();
+      if (stack && stack.childElementCount === 0) stack.remove();
+    });
+
+    wrap.appendChild(mainBtn);
+    wrap.appendChild(closeBtn);
+    stack.appendChild(wrap);
+
+    const maxToasts = 4;
+    while (stack.children.length > maxToasts) {
+      stack.removeChild(stack.firstChild);
+    }
+
+    window.setTimeout(() => {
+      wrap.classList.add("is-out");
+      window.setTimeout(() => {
+        wrap.remove();
+        if (stack && stack.childElementCount === 0) stack.remove();
+      }, 280);
+    }, 12000);
+  }
+
+  function scheduleNotifyNewPending(item) {
+    if (!item) return;
+    const num = String(item.humanNumberLabel || item.id || "").trim() || "—";
+    const dayLabel = scheduleFormatCompactDate(item.dateFrom);
+    const text = `Zamówienie nr ${num} na dzień ${dayLabel} zostało złożone.`;
+    if (typeof window.Notification === "function" && window.Notification.permission === "granted") {
+      try {
+        const n = new window.Notification("Nowa rezerwacja", {
+          body: text,
+          tag: `booking-pending-${item.service}-${item.id}`,
+        });
+        n.onclick = () => {
+          window.focus();
+          n.close();
+          openScheduleDetailsModal(item.service, item.id);
+        };
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    showScheduleToast(text, item.service, item.id);
+  }
+
+  async function loadScheduleData({ silent = false, watchPoll = false } = {}) {
     if (!onlineBookingsEnabled) {
       state.schedule.items = [];
       state.schedule.pendingItems = [];
@@ -1630,6 +1738,23 @@
       state.schedule.tableOptions = Array.isArray(restaurantTables?.tables) ? restaurantTables.tables : [];
       state.schedule.hallOptions = Array.isArray(hallList?.halls) ? hallList.halls : [];
       state.schedule.lastError = "";
+
+      const pendingList = state.schedule.pendingItems;
+      const newSet = new Set(pendingList.map((entry) => `${entry.service}:${entry.id}`));
+      const prevKnown = state.schedule.knownPendingKeys;
+      const shouldDiff = Boolean(watchPoll && prevKnown && state.schedule.watchBaselineReady);
+      if (shouldDiff) {
+        pendingList.forEach((entry) => {
+          const key = `${entry.service}:${entry.id}`;
+          if (!prevKnown.has(key)) {
+            scheduleNotifyNewPending(entry);
+          }
+        });
+      }
+      state.schedule.knownPendingKeys = newSet;
+      if (!watchPoll || !prevKnown) {
+        state.schedule.watchBaselineReady = true;
+      }
     } catch (error) {
       state.schedule.items = [];
       state.schedule.pendingItems = [];
@@ -2003,10 +2128,6 @@
         <p class="status">Ten widok wymaga włączenia backendu rezerwacji online.</p>
       `;
       return;
-    }
-
-    if (!state.schedule.items.length && !state.schedule.isLoading && !state.schedule.lastError) {
-      loadScheduleData();
     }
 
     const selectedDate = state.schedule.selectedDate || getTodayIsoDate();
@@ -3301,6 +3422,7 @@
 
     if (topTab === "grafik") {
       renderSchedulePanel(statusMessage);
+      scheduleStartPendingWatch();
       return;
     }
 
@@ -3403,6 +3525,9 @@
   }
 
   function renderDashboard() {
+    if (!(state.ui.topTab === "grafik" && state.ui.view === "section")) {
+      scheduleStopPendingWatch();
+    }
     const activeTab = getAdminTabConfig();
     const activeTile = getActiveAdminTile(activeTab.key);
     const inSectionView = state.ui.view === "section";

@@ -122,10 +122,27 @@
       .replace(/\s(href|src)\s*=\s*(['"])\s*javascript:[\s\S]*?\2/gi, ' $1="#"');
   }
 
-  function buildMailPreviewMarkup({ subject, bodyHtml, serviceLabel, footerLabel, actionLabel = "" }) {
+  function hallMailHeaderContext(key) {
+    const k = String(key || "").replace(/^hall_/i, "");
+    const map = {
+      confirm_email: "Potwierdzenie rezerwacji sali",
+      pending_admin: "Rezerwacja sali — powiadomienie dla obsługi",
+      confirmed_client: "Potwierdzenie rezerwacji sali",
+      cancelled_client: "Odwołanie rezerwacji sali",
+      changed_client: "Zmiana rezerwacji sali",
+      expired_pending_client: "Wygaśnięcie rezerwacji sali",
+      expired_pending_admin: "Wygaśnięcie rezerwacji — informacja dla obsługi",
+      expired_email_client: "Wygasłe potwierdzenie — rezerwacja sali",
+      extended_pending_client: "Przedłużenie terminu rezerwacji sali",
+    };
+    return map[k] || "Wiadomość o rezerwacji";
+  }
+
+  function buildMailPreviewMarkup({ inboxSubject, headerContext, headerNumber, bodyHtml, footerLabel, actionLabel = "" }) {
     return `
       <div class="mail-preview-shell">
         <div class="mail-preview-note">Podgląd na przykładowych danych. Branding i układ odpowiadają faktycznie wysyłanej wiadomości.</div>
+        <div class="mail-preview-inbox-subject">Temat w skrzynce: <strong>${escapeHtml(inboxSubject || "—")}</strong></div>
         <div class="mail-preview-frame">
           <div class="mail-preview-canvas">
             <div class="mail-preview-brand" aria-label="Średzka Korona">
@@ -133,9 +150,12 @@
               <img src="/ikony/logo-korona.png" alt="Korona" width="42" height="42" />
               <span>KORONA</span>
             </div>
-            <div class="mail-preview-service">${escapeHtml(serviceLabel)}</div>
             <div class="mail-preview-card">
-              <div class="mail-preview-subject">${escapeHtml(subject || "Temat wiadomości")}</div>
+              <div class="mail-preview-header-stack">
+                <div class="mail-preview-header-brand">Średzka Korona</div>
+                <div class="mail-preview-header-context">${escapeHtml(headerContext || "")}</div>
+                <div class="mail-preview-header-number">nr ${escapeHtml(headerNumber || "")}</div>
+              </div>
               ${actionLabel ? `<a class="mail-preview-button" href="#" onclick="return false;">${escapeHtml(actionLabel)}</a>` : ""}
               <div class="mail-preview-body">${bodyHtml || "<p>Brak treści wiadomości.</p>"}</div>
             </div>
@@ -164,9 +184,10 @@
       renderTemplatePreviewString(bodyField.value, HALL_TEMPLATE_PREVIEW_VARS)
     );
     previewHost.innerHTML = buildMailPreviewMarkup({
-      subject: renderedSubject,
+      inboxSubject: renderedSubject,
+      headerContext: hallMailHeaderContext(key),
+      headerNumber: HALL_TEMPLATE_PREVIEW_VARS.reservationNumber,
       bodyHtml: renderedBody,
-      serviceLabel: "Przyjęcia",
       footerLabel: "Przyjęcia Średzka Korona",
       actionLabel: hallPreviewActionLabel(key),
     });

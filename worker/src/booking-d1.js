@@ -82,6 +82,39 @@ function enhanceFragmentHtml(html) {
     });
 }
 
+function actionButtonHtml(href, label) {
+  const safeHref = escapeHtml(href || "");
+  const safeLabel = escapeHtml(label || "Potwierdz");
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:14px auto 18px auto;">
+    <tr>
+      <td style="border-radius:999px;background:#7b5a24;text-align:center;">
+        <a href="${safeHref}" style="display:inline-block;padding:14px 30px;font-size:17px;line-height:1.2;font-weight:700;color:#ffffff;text-decoration:none;">${safeLabel}</a>
+      </td>
+    </tr>
+  </table>`;
+}
+
+function normalizeLinkForCompare(value) {
+  return decodeHtmlEntities(String(value || "")).trim();
+}
+
+function injectInlineActionButton(html, actionUrl) {
+  const target = normalizeLinkForCompare(actionUrl);
+  if (!target) return String(html || "");
+  const source = String(html || "");
+  let replaced = false;
+  const out = source.replace(/<p\b[^>]*>\s*<a\b([^>]*)>([\s\S]*?)<\/a>\s*<\/p>/gi, (match, attrs, labelHtml) => {
+    const hrefMatch = String(attrs || "").match(/\bhref\s*=\s*(["'])(.*?)\1/i);
+    if (!hrefMatch) return match;
+    const href = normalizeLinkForCompare(hrefMatch[2]);
+    if (href !== target) return match;
+    replaced = true;
+    const label = decodeHtmlEntities(String(labelHtml || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()) || "Potwierdz";
+    return actionButtonHtml(target, label);
+  });
+  return replaced ? out : source;
+}
+
 function htmlToText(html) {
   if (!html) return "";
   return decodeHtmlEntities(
@@ -111,10 +144,61 @@ function htmlToText(html) {
     .trim();
 }
 
+function normalizeMailHeaderKey(service, key) {
+  let k = cleanString(key, 160);
+  if (service === "restaurant") {
+    k = k.replace(/^restaurant_/i, "").replace(/^rest_/i, "");
+  } else if (service === "hall") {
+    k = k.replace(/^hall_/i, "");
+  }
+  return k;
+}
+
+function mailHeaderSecondLine(service, eventKey) {
+  const k = normalizeMailHeaderKey(service, eventKey);
+  const hotel = {
+    confirm_email: "Potwierdzenie rezerwacji noclegu",
+    pending_admin: "Rezerwacja noclegu — powiadomienie dla obsługi",
+    confirmed_client: "Potwierdzenie rezerwacji noclegu",
+    cancelled_client: "Odwołanie rezerwacji noclegu",
+    changed_client: "Zmiana rezerwacji noclegu",
+    expired_pending_client: "Wygaśnięcie rezerwacji noclegu",
+    expired_pending_admin: "Wygaśnięcie rezerwacji — informacja dla obsługi",
+    expired_email_client: "Wygasłe potwierdzenie — rezerwacja noclegu",
+    cancelled_admin: "Odwołanie rezerwacji — informacja dla obsługi",
+  };
+  const restaurant = {
+    confirm_email: "Potwierdzenie rezerwacji stolika",
+    pending_admin: "Rezerwacja stolika — powiadomienie dla obsługi",
+    confirmed_client: "Potwierdzenie rezerwacji stolika",
+    cancelled_client: "Odwołanie rezerwacji stolika",
+    changed_client: "Zmiana rezerwacji stolika",
+    expired_pending_client: "Wygaśnięcie rezerwacji stolika",
+    expired_pending_admin: "Wygaśnięcie rezerwacji — informacja dla obsługi",
+    expired_email_client: "Wygasłe potwierdzenie — rezerwacja stolika",
+  };
+  const hall = {
+    confirm_email: "Potwierdzenie rezerwacji sali",
+    pending_admin: "Rezerwacja sali — powiadomienie dla obsługi",
+    confirmed_client: "Potwierdzenie rezerwacji sali",
+    cancelled_client: "Odwołanie rezerwacji sali",
+    changed_client: "Zmiana rezerwacji sali",
+    expired_pending_client: "Wygaśnięcie rezerwacji sali",
+    expired_pending_admin: "Wygaśnięcie rezerwacji — informacja dla obsługi",
+    expired_email_client: "Wygasłe potwierdzenie — rezerwacja sali",
+    extended_pending_client: "Przedłużenie terminu rezerwacji sali",
+  };
+  const map = service === "hotel" ? hotel : service === "restaurant" ? restaurant : hall;
+  return map[k] || "Wiadomość o rezerwacji";
+}
+
 function buildBrandedEmail({
   subject,
   htmlFragment,
   brandName = "Średzka Korona",
+  headerBrandLine = "Średzka Korona",
+  headerContextLine = "",
+  headerNumberLine = "",
   serviceLabel = "",
   siteUrl = "",
   serviceUrl = "",
@@ -123,7 +207,9 @@ function buildBrandedEmail({
   actionLabel = "",
 }) {
   const safeBrandName = escapeHtml(brandName);
-  const safeSubject = escapeHtml(subject || brandName);
+  const safeHeaderBrand = escapeHtml(headerBrandLine || "Średzka Korona");
+  const safeContext = escapeHtml(headerContextLine || "");
+  const safeNumber = escapeHtml(headerNumberLine || "");
   const safeServiceLabel = escapeHtml(serviceLabel);
   const safePreheader = escapeHtml(preheader || subject || brandName);
   const cleanSiteUrl = String(siteUrl || "").replace(/\/$/, "");
@@ -159,14 +245,21 @@ function buildBrandedEmail({
               </td>
             </tr>
             <tr>
-              <td align="center" style="padding:0 18px 18px 18px;font-size:12px;line-height:1.5;letter-spacing:0.18em;text-transform:uppercase;color:#8b7a67;">
-                ${safeServiceLabel || "Hotel • Restauracja • Przyjęcia"}
-              </td>
-            </tr>
-            <tr>
-              <td style="background:#ffffff;border:1px solid #e8dcc8;border-radius:22px;padding:34px 32px;box-shadow:0 10px 30px rgba(52,33,14,0.08);">
-                <div style="font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.2;color:#1f1712;font-weight:700;margin:0 0 22px 0;text-align:center;">
-                  ${safeSubject}
+              <td style="background:#ffffff;border-radius:22px;padding:34px 32px;box-shadow:0 10px 30px rgba(52,33,14,0.08);">
+                <div style="text-align:center;margin:0 0 22px 0;">
+                  <div style="font-family:Georgia,'Times New Roman',serif;font-size:26px;line-height:1.25;color:#1f1712;font-weight:700;">
+                    ${safeHeaderBrand}
+                  </div>
+                  ${
+                    safeContext
+                      ? `<div style="font-size:17px;line-height:1.4;color:#4a3d32;font-weight:600;margin-top:12px;">${safeContext}</div>`
+                      : ""
+                  }
+                  ${
+                    safeNumber
+                      ? `<div style="font-size:15px;line-height:1.45;color:#7a6754;margin-top:10px;letter-spacing:0.02em;">${safeNumber}</div>`
+                      : ""
+                  }
                 </div>
                 ${
                   actionHref
@@ -506,10 +599,7 @@ async function sendMailViaSmtp(env, { to, subject, html, text, replyTo }) {
     await smtpExpect(readLine, [354], "DATA odrzucone");
 
     const htmlNormalized = normalizeCrlf(html || "");
-    const textNormalized = normalizeCrlf(text || htmlToText(htmlNormalized));
     const html64 = base64Lines(htmlNormalized);
-    const text64 = base64Lines(textNormalized);
-    const boundary = `=_${crypto.randomUUID()}`;
     const messageId = `<${crypto.randomUUID()}@${cleanString(env.SMTP_EHLO_HOST, 200) || "sredzka-korona.pl"}>`;
     const headers = [
       `From: ${formatAddressHeader(from)}`,
@@ -518,22 +608,13 @@ async function sendMailViaSmtp(env, { to, subject, html, text, replyTo }) {
       `Date: ${new Date().toUTCString()}`,
       `Message-ID: ${messageId}`,
       "MIME-Version: 1.0",
-      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      "Content-Type: text/html; charset=UTF-8",
+      "Content-Transfer-Encoding: base64",
       "Auto-Submitted: auto-generated",
       "X-Auto-Response-Suppress: All",
       replyTo ? `Reply-To: ${toMimeHeader(replyTo)}` : null,
       "",
-      `--${boundary}`,
-      "Content-Type: text/plain; charset=UTF-8",
-      "Content-Transfer-Encoding: base64",
-      "",
-      text64,
-      `--${boundary}`,
-      "Content-Type: text/html; charset=UTF-8",
-      "Content-Transfer-Encoding: base64",
-      "",
       html64,
-      `--${boundary}--`,
       ".",
     ]
       .filter(Boolean)
@@ -796,68 +877,61 @@ function addOneDayYmd(ymd) {
   return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
 }
 
-async function legacyHumanSequenceTotalForYear(env, year) {
-  const y = Number(year);
-  if (!Number.isFinite(y) || y < 2000 || y > 2100) {
-    throw new Error("Nieprawidłowy rok numeracji.");
+function addDaysYmd(ymd, days) {
+  let out = String(ymd || "");
+  const total = Math.max(0, toInt(days, 0));
+  for (let index = 0; index < total; index += 1) {
+    out = addOneDayYmd(out);
   }
-  const keys = [`hotel_human_seq_${y}`, `restaurant_human_seq_${y}`, `hall_human_seq_${y}`];
-  const placeholders = keys.map(() => "?").join(", ");
-  const rows = await env.DB.prepare(
-    `SELECT value FROM booking_counters WHERE key IN (${placeholders})`
-  )
-    .bind(...keys)
-    .all();
-  return (rows.results || []).reduce((sum, row) => sum + Number(row?.value || 0), 0);
+  return out;
 }
 
-async function existingReservationCountForYear(env, year) {
+const PUBLIC_CALENDAR_DAYS = 93;
+const PUBLIC_CALENDAR_STEP_MINUTES = 30;
+
+async function existingReservationCountForYear(env, service, year) {
   const y = Number(year);
+  const table = reservationTableName(service);
   const row = await env.DB.prepare(
-    `SELECT
-        (SELECT COUNT(*) FROM hotel_reservations WHERE human_year = ?) +
-        (SELECT COUNT(*) FROM restaurant_reservations WHERE human_year = ?) +
-        (SELECT COUNT(*) FROM venue_reservations WHERE human_year = ?) AS total`
+    `SELECT COUNT(*) AS total
+     FROM ${table}
+     WHERE human_year = ?`
   )
-    .bind(y, y, y)
+    .bind(y)
     .first();
   return Number(row?.total || 0);
 }
 
-async function maxHumanSequenceForYear(env, year) {
+async function maxHumanSequenceForYear(env, service, year) {
   const y = Number(year);
+  const table = reservationTableName(service);
   const row = await env.DB.prepare(
-    `SELECT MAX(value) AS max_value
-     FROM (
-       SELECT MAX(human_number) AS value FROM hotel_reservations WHERE human_year = ?
-       UNION ALL
-       SELECT MAX(human_number) AS value FROM restaurant_reservations WHERE human_year = ?
-       UNION ALL
-       SELECT MAX(human_number) AS value FROM venue_reservations WHERE human_year = ?
-     )`
+    `SELECT MAX(human_number) AS max_value
+     FROM ${table}
+     WHERE human_year = ?`
   )
-    .bind(y, y, y)
+    .bind(y)
     .first();
   return Number(row?.max_value || 0);
 }
 
-async function nextHumanSequenceForYear(env, year) {
+async function nextHumanSequenceForYear(env, service, year) {
   const y = Number(year);
   if (!Number.isFinite(y) || y < 2000 || y > 2100) {
     throw new Error("Nieprawidłowy rok numeracji.");
   }
-  const key = `reservation_human_seq_${y}`;
+  const normalizedService = String(service || "").trim().toLowerCase() || "hotel";
+  const key = `reservation_human_seq_${normalizedService}_${y}`;
   const existing = await env.DB.prepare("SELECT value FROM booking_counters WHERE key = ?")
     .bind(key)
     .first();
   let startingValue = 1;
   if (!existing) {
-    const [legacyTotal, existingCount, maxHuman] = await Promise.all([
-      legacyHumanSequenceTotalForYear(env, y),
-      existingReservationCountForYear(env, y),
-      maxHumanSequenceForYear(env, y),
+    const [existingCount, maxHuman] = await Promise.all([
+      existingReservationCountForYear(env, normalizedService, y),
+      maxHumanSequenceForYear(env, normalizedService, y),
     ]);
-    startingValue = Math.max(legacyTotal, existingCount, maxHuman, 0) + 1;
+    startingValue = Math.max(existingCount, maxHuman, 0) + 1;
   }
   const row = await env.DB.prepare(
     `INSERT INTO booking_counters (key, value) VALUES (?, ?)
@@ -1410,7 +1484,7 @@ async function createHotelReservation(env, payload, options = {}) {
   const now = nowMs();
   const id = crypto.randomUUID();
   const humanYear = yearFromMsWarsaw(now);
-  const humanNumber = await nextHumanSequenceForYear(env, humanYear);
+  const humanNumber = await nextHumanSequenceForYear(env, "hotel", humanYear);
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const roomIds = Array.isArray(payload.roomIds) ? payload.roomIds.map((x) => cleanString(x, 80)).filter(Boolean) : [];
   const dateFrom = cleanString(payload.dateFrom, 10);
@@ -1740,7 +1814,7 @@ async function restaurantTables(env, includeHidden = false) {
 
 async function restaurantBlockingRows(env, startMs, endMs, excludeId = null) {
   const rows = await env.DB.prepare(
-    `SELECT id, assigned_table_ids_json AS assignedTableIdsJson
+    `SELECT id, start_ms AS startMs, end_ms AS endMs, assigned_table_ids_json AS assignedTableIdsJson
      FROM restaurant_reservations
      WHERE status IN ('email_verification_pending','pending','confirmed','manual_block')
        AND start_ms < ?
@@ -1751,6 +1825,8 @@ async function restaurantBlockingRows(env, startMs, endMs, excludeId = null) {
     .all();
   return (rows.results || []).map((r) => ({
     id: r.id,
+    startMs: Number(r.startMs || 0),
+    endMs: Number(r.endMs || 0),
     tableIds: parseJson(r.assignedTableIdsJson, []),
   }));
 }
@@ -1766,8 +1842,29 @@ async function restaurantAvailableTableIds(env, startMs, endMs, tablesNeeded, ex
   return free.slice(0, Math.max(0, Number(tablesNeeded || 1)));
 }
 
-async function assertRestaurantAvailability(env, payload, excludeId = null) {
-  const settings = await loadRestaurantSettings(env);
+function restaurantWindowWithinDay(dayWindow, startTime, durationHours) {
+  const startMinutes = toInt(startTime.slice(0, 2), 0) * 60 + toInt(startTime.slice(3, 5), 0);
+  const endMinutes = startMinutes + Math.round(Number(durationHours || 0) * 60);
+  if (startMinutes < dayWindow.openMinutes || endMinutes > dayWindow.closeMinutes) {
+    throw new Error(`Rezerwacje tylko w godzinach ${dayWindow.openLabel}-${dayWindow.closeLabel}.`);
+  }
+  return { startMinutes, endMinutes };
+}
+
+function restaurantFreeTableCount(blockingRows, startMs, endMs, allTableIds) {
+  const blocked = new Set();
+  for (const row of blockingRows || []) {
+    if (!(startMs < Number(row.endMs || 0) && endMs > Number(row.startMs || 0))) {
+      continue;
+    }
+    for (const tableId of row.tableIds || []) {
+      blocked.add(tableId);
+    }
+  }
+  return Math.max(0, allTableIds.length - blocked.size);
+}
+
+async function restaurantAvailabilityForSlot(env, settings, allTables, payload, excludeId = null) {
   const reservationDate = cleanString(payload.reservationDate, 10);
   const startTime = cleanString(payload.startTime, 5);
   const durationHours = Number(payload.durationHours || 2);
@@ -1782,13 +1879,9 @@ async function assertRestaurantAvailability(env, payload, excludeId = null) {
   if (dayWindow.closed) {
     throw new Error("Restauracja jest nieczynna w wybranym dniu.");
   }
+  restaurantWindowWithinDay(dayWindow, startTime, durationHours);
   const startMs = ymdHmToMs(reservationDate, startTime);
   const endMs = startMs + durationHours * 3600000;
-  const startMinutes = toInt(startTime.slice(0, 2), 0) * 60 + toInt(startTime.slice(3, 5), 0);
-  const endMinutes = startMinutes + Math.round(durationHours * 60);
-  if (startMinutes < dayWindow.openMinutes || endMinutes > dayWindow.closeMinutes) {
-    throw new Error(`Rezerwacje tylko w godzinach ${dayWindow.openLabel}-${dayWindow.closeLabel}.`);
-  }
   const availableIds = await restaurantAvailableTableIds(env, startMs, endMs, tablesCount, excludeId);
   const ok = availableIds.length >= tablesCount;
   return {
@@ -1802,7 +1895,136 @@ async function assertRestaurantAvailability(env, payload, excludeId = null) {
     durationHours,
     tablesCount,
     dayWindow,
+    totalTableCount: allTables.length,
   };
+}
+
+async function restaurantAvailableSlotsForDate(env, options) {
+  const settings = options?.settings || (await loadRestaurantSettings(env));
+  const allTables = Array.isArray(options?.tables) ? options.tables : await restaurantTables(env, false);
+  const reservationDate = cleanString(options?.reservationDate, 10);
+  const durationHours = Number(options?.durationHours || 2);
+  const tablesCount = Math.max(1, toInt(options?.tablesCount, 1));
+  const excludeId = cleanString(options?.excludeId, 80) || null;
+  if (!isYmd(reservationDate)) {
+    throw new Error("Nieprawidłowa data.");
+  }
+  if (!Number.isFinite(durationHours) || durationHours <= 0) {
+    throw new Error("Nieprawidłowy czas trwania.");
+  }
+  const dayWindow = await resolveRestaurantWindowForDate(env, settings, reservationDate);
+  if (dayWindow.closed) {
+    return {
+      reservationDate,
+      closed: true,
+      available: false,
+      slots: [],
+      firstTime: "",
+      reservationOpenTime: "",
+      reservationCloseTime: "",
+    };
+  }
+  if (!allTables.length || tablesCount > allTables.length) {
+    return {
+      reservationDate,
+      closed: false,
+      available: false,
+      slots: [],
+      firstTime: "",
+      reservationOpenTime: dayWindow.openLabel,
+      reservationCloseTime: dayWindow.closeLabel,
+    };
+  }
+  const rawSlots = buildTimeSlotsFromMinutes(dayWindow.openMinutes, dayWindow.closeMinutes, settings.timeSlotMinutes).filter((slot) => {
+    try {
+      restaurantWindowWithinDay(dayWindow, slot, durationHours);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  if (!rawSlots.length) {
+    return {
+      reservationDate,
+      closed: false,
+      available: false,
+      slots: [],
+      firstTime: "",
+      reservationOpenTime: dayWindow.openLabel,
+      reservationCloseTime: dayWindow.closeLabel,
+    };
+  }
+  const queryStartMs = ymdHmToMs(reservationDate, rawSlots[0]);
+  const queryEndMs = ymdHmToMs(reservationDate, rawSlots[rawSlots.length - 1]) + durationHours * 3600000;
+  const blockingRows = await restaurantBlockingRows(env, queryStartMs, queryEndMs, excludeId);
+  const allTableIds = allTables.map((table) => table.id);
+  const slots = rawSlots.filter((slot) => {
+    const startMs = ymdHmToMs(reservationDate, slot);
+    const endMs = startMs + durationHours * 3600000;
+    return restaurantFreeTableCount(blockingRows, startMs, endMs, allTableIds) >= tablesCount;
+  });
+  return {
+    reservationDate,
+    closed: false,
+    available: slots.length > 0,
+    slots,
+    firstTime: slots[0] || "",
+    reservationOpenTime: dayWindow.openLabel,
+    reservationCloseTime: dayWindow.closeLabel,
+  };
+}
+
+async function restaurantCalendarAvailability(env, payload = {}) {
+  const settings = await loadRestaurantSettings(env);
+  const tables = await restaurantTables(env, false);
+  const requestedDate = cleanString(payload.reservationDate, 10);
+  const startDateRaw = cleanString(payload.startDate, 10);
+  const today = todayYmdInWarsaw();
+  const startDate = isYmd(startDateRaw) && startDateRaw >= today ? startDateRaw : today;
+  const durationHours = Number(payload.durationHours || 2);
+  const tablesCount = Math.max(1, toInt(payload.tablesCount, 1));
+  const days = [];
+  let firstAvailableDate = "";
+  let firstAvailableTime = "";
+  for (let offset = 0; offset < PUBLIC_CALENDAR_DAYS; offset += 1) {
+    const currentDate = addDaysYmd(startDate, offset);
+    const day = await restaurantAvailableSlotsForDate(env, {
+      settings,
+      tables,
+      reservationDate: currentDate,
+      durationHours,
+      tablesCount,
+    });
+    days.push(day);
+    if (!firstAvailableDate && day.available) {
+      firstAvailableDate = day.reservationDate;
+      firstAvailableTime = day.firstTime || "";
+    }
+  }
+  const requestedAvailable = days.find((day) => day.reservationDate === requestedDate && day.available);
+  const selectedDay =
+    requestedAvailable ||
+    days.find((day) => day.reservationDate === firstAvailableDate) ||
+    days.find((day) => day.reservationDate === requestedDate) ||
+    days[0] ||
+    null;
+  return {
+    maxGuestsPerTable: Number(settings.maxGuestsPerTable || 4),
+    tableCount: tables.length,
+    timeSlotMinutes: Number(settings.timeSlotMinutes || 30),
+    restaurantName: "Średzka Korona — Restauracja",
+    selectedDate: selectedDay?.reservationDate || requestedDate || startDate,
+    selectedSlots: Array.isArray(selectedDay?.slots) ? selectedDay.slots : [],
+    firstAvailableDate,
+    firstAvailableTime,
+    days,
+  };
+}
+
+async function assertRestaurantAvailability(env, payload, excludeId = null) {
+  const settings = await loadRestaurantSettings(env);
+  const allTables = await restaurantTables(env, false);
+  return restaurantAvailabilityForSlot(env, settings, allTables, payload, excludeId);
 }
 
 function mapRestaurantReservation(row, tableMap) {
@@ -1887,7 +2109,7 @@ async function createRestaurantReservation(env, payload, options = {}) {
   }
   const id = crypto.randomUUID();
   const humanYear = yearFromMsWarsaw(now);
-  const humanNumber = await nextHumanSequenceForYear(env, humanYear);
+  const humanNumber = await nextHumanSequenceForYear(env, "restaurant", humanYear);
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const token = options.withConfirmationToken ? randomToken() : "";
   const tokenHash = token ? await sha256Hex(token) : null;
@@ -1962,30 +2184,11 @@ function hallFullBlock(hall, guestsCount, exclusive) {
   return Boolean(exclusive) || Number(guestsCount || 0) >= thr;
 }
 
-async function hallAvailability(env, payload, excludeId = null, options = {}) {
-  const halls = await venueHalls(env);
-  const hall = halls.find((h) => h.id === cleanString(payload.hallId, 80) && h.active);
-  if (!hall) throw new Error("Sala niedostępna.");
-  const settings = await venueSettings(env);
-  const reservationDate = cleanString(payload.reservationDate, 10);
-  const startTime = cleanString(payload.startTime, 5);
-  const durationHours = Number(payload.durationHours || 2);
-  if (!isYmd(reservationDate) || !isHm(startTime) || !Number.isFinite(durationHours) || durationHours <= 0) {
-    throw new Error("Nieprawidłowa data lub godzina.");
-  }
-  const startMs = ymdHmToMsWarsaw(reservationDate, startTime);
-  const endMs = startMs + durationHours * 3600000;
-  const nowHall = nowMs();
-  if (!Number.isFinite(startMs) || startMs < nowHall - 60 * 1000) {
-    throw new Error("Nie można rezerwować terminu z przeszłości.");
-  }
-  if (!options.skipMinAdvance && startMs < nowHall + HALL_MIN_ADVANCE_MS) {
-    throw new Error("Wybierz termin co najmniej 2 godziny od teraz.");
-  }
+function hallTimeWindow(settings, startTime, durationHours) {
   const [openH, openM] = String(settings.hallOpenTime || "00:00").split(":").map((x) => Number(x));
   const [closeH, closeM] = String(settings.hallCloseTime || "00:00").split(":").map((x) => Number(x));
   const startMinutes = toInt(startTime.slice(0, 2), 0) * 60 + toInt(startTime.slice(3, 5), 0);
-  const endMinutes = startMinutes + Math.round(durationHours * 60);
+  const endMinutes = startMinutes + Math.round(Number(durationHours || 0) * 60);
   const openMinutes = openH * 60 + openM;
   let closeMinutes = closeH * 60 + closeM;
   if (closeMinutes <= openMinutes) {
@@ -1994,12 +2197,10 @@ async function hallAvailability(env, payload, excludeId = null, options = {}) {
   if (startMinutes < openMinutes || endMinutes > closeMinutes) {
     throw new Error(`Rezerwacje tylko w godzinach ${settings.hallOpenTime}-${settings.hallCloseTime}.`);
   }
+  return { openMinutes, closeMinutes, startMinutes, endMinutes };
+}
 
-  const guestsCount = Math.max(0, toInt(payload.guestsCount, hall.hallKind === "small" ? 1 : 10));
-  const exclusive = hall.hallKind === "small" ? true : Boolean(payload.exclusive);
-  const fullBlock = hallFullBlock(hall, guestsCount, exclusive);
-  const bufferMs = Math.max(0, toInt(hall.bufferMinutes, 60)) * 60000;
-
+async function hallReservationRows(env, hallId, excludeId = null) {
   const rows = await env.DB.prepare(
     `SELECT id, guests_count AS guestsCount, exclusive, full_block AS fullBlock, start_ms AS startMs, end_ms AS endMs
      FROM venue_reservations
@@ -2007,10 +2208,27 @@ async function hallAvailability(env, payload, excludeId = null, options = {}) {
        AND status IN ('email_verification_pending','pending','confirmed','manual_block')
        ${excludeId ? "AND id != ?" : ""}`
   )
-    .bind(...(excludeId ? [hall.id, excludeId] : [hall.id]))
+    .bind(...(excludeId ? [hallId, excludeId] : [hallId]))
     .all();
+  return (rows.results || []).map((row) => ({
+    id: row.id,
+    guestsCount: Number(row.guestsCount || 0),
+    exclusive: Boolean(row.exclusive),
+    fullBlock: Boolean(row.fullBlock),
+    startMs: Number(row.startMs || 0),
+    endMs: Number(row.endMs || 0),
+  }));
+}
+
+function hallAvailabilityFromRows(hall, rows, payload) {
+  const startMs = Number(payload.startMs || 0);
+  const endMs = Number(payload.endMs || 0);
+  const guestsCount = Math.max(0, toInt(payload.guestsCount, hall.hallKind === "small" ? 1 : 10));
+  const exclusive = hall.hallKind === "small" ? true : Boolean(payload.exclusive);
+  const fullBlock = hallFullBlock(hall, guestsCount, exclusive);
+  const bufferMs = Math.max(0, toInt(hall.bufferMinutes, 60)) * 60000;
   let usedGuests = 0;
-  for (const row of rows.results || []) {
+  for (const row of rows || []) {
     const existingStart = Number(row.startMs || 0) - bufferMs;
     const existingEnd = Number(row.endMs || 0) + bufferMs;
     const overlap = startMs < existingEnd && endMs > existingStart;
@@ -2025,7 +2243,7 @@ async function hallAvailability(env, payload, excludeId = null, options = {}) {
     usedGuests += Number(row.guestsCount || 0);
   }
   if (hall.hallKind === "small") {
-    const max = Math.min(40, hall.capacity);
+    const max = Math.min(40, Number(hall.capacity || 40));
     return {
       ok: guestsCount > 0 && guestsCount <= max,
       available: guestsCount > 0 && guestsCount <= max,
@@ -2041,6 +2259,147 @@ async function hallAvailability(env, payload, excludeId = null, options = {}) {
   const maxGuests = Math.max(0, Number(hall.capacity || 0) - usedGuests);
   const available = fullBlock ? maxGuests > 0 : guestsCount <= maxGuests && maxGuests > 0;
   return { ok: available, available, maxGuests, hall, startMs, endMs, guestsCount, exclusive, fullBlock };
+}
+
+async function hallAvailabilityAtSlot(env, hall, settings, payload, excludeId = null, options = {}) {
+  const reservationDate = cleanString(payload.reservationDate, 10);
+  const startTime = cleanString(payload.startTime, 5);
+  const durationHours = Number(payload.durationHours || 2);
+  if (!isYmd(reservationDate) || !isHm(startTime) || !Number.isFinite(durationHours) || durationHours <= 0) {
+    throw new Error("Nieprawidłowa data lub godzina.");
+  }
+  const startMs = ymdHmToMsWarsaw(reservationDate, startTime);
+  const endMs = startMs + durationHours * 3600000;
+  const nowHall = nowMs();
+  if (!Number.isFinite(startMs) || startMs < nowHall - 60 * 1000) {
+    throw new Error("Nie można rezerwować terminu z przeszłości.");
+  }
+  if (!options.skipMinAdvance && startMs < nowHall + HALL_MIN_ADVANCE_MS) {
+    throw new Error("Wybierz termin co najmniej 2 godziny od teraz.");
+  }
+  hallTimeWindow(settings, startTime, durationHours);
+  const rows = Array.isArray(options.rows) ? options.rows : await hallReservationRows(env, hall.id, excludeId);
+  return hallAvailabilityFromRows(hall, rows, {
+    ...payload,
+    startMs,
+    endMs,
+  });
+}
+
+function buildHallCandidateSlots(settings, durationHours) {
+  const openMinutes = hmToMinutes(settings.hallOpenTime || "00:00");
+  const closeMinutesRaw = hmToMinutes(settings.hallCloseTime || "00:00");
+  const safeOpen = openMinutes == null ? 0 : openMinutes;
+  let safeClose = closeMinutesRaw == null ? 0 : closeMinutesRaw;
+  if (safeClose <= safeOpen) {
+    safeClose += 24 * 60;
+  }
+  const durationMinutes = Math.max(PUBLIC_CALENDAR_STEP_MINUTES, Math.round(Number(durationHours || 0) * 60));
+  const latestStart = Math.min(1440, safeClose - durationMinutes);
+  const slots = [];
+  for (let minutes = safeOpen; minutes <= latestStart; minutes += PUBLIC_CALENDAR_STEP_MINUTES) {
+    slots.push(normalizeHmLabel(minutes));
+  }
+  return slots;
+}
+
+async function hallCalendarAvailability(env, payload = {}) {
+  const halls = (await venueHalls(env)).filter((hall) => hall.active);
+  const settings = await venueSettings(env);
+  const requestedDate = cleanString(payload.reservationDate, 10);
+  const startDateRaw = cleanString(payload.startDate, 10);
+  const today = todayYmdInWarsaw();
+  const startDate = isYmd(startDateRaw) && startDateRaw >= today ? startDateRaw : today;
+  const durationHours = Number(payload.durationHours || 4);
+  const guestsCount = Math.max(1, toInt(payload.guestsCount, 10));
+  const rowsByHallId = new Map();
+  await Promise.all(
+    halls.map(async (hall) => {
+      rowsByHallId.set(hall.id, await hallReservationRows(env, hall.id, null));
+    })
+  );
+  const slotsTemplate = buildHallCandidateSlots(settings, durationHours);
+  const days = [];
+  let firstAvailableDate = "";
+  let firstAvailableTime = "";
+  for (let offset = 0; offset < PUBLIC_CALENDAR_DAYS; offset += 1) {
+    const reservationDate = addDaysYmd(startDate, offset);
+    const availableSlots = [];
+    for (const slot of slotsTemplate) {
+      const startCheck = eventsYmdHmToMsWarsaw(reservationDate, slot);
+      if (!Number.isFinite(startCheck)) {
+        continue;
+      }
+      if (startCheck < nowMs() + HALL_MIN_ADVANCE_MS) {
+        continue;
+      }
+      let slotAvailable = false;
+      for (const hall of halls) {
+        try {
+          const availability = await hallAvailabilityAtSlot(
+            env,
+            hall,
+            settings,
+            {
+              reservationDate,
+              startTime: slot,
+              durationHours,
+              guestsCount,
+              exclusive: false,
+            },
+            null,
+            {
+              skipMinAdvance: true,
+              rows: rowsByHallId.get(hall.id) || [],
+            }
+          );
+          if (availability.available) {
+            slotAvailable = true;
+            break;
+          }
+        } catch {
+          /* invalid slot for this day */
+        }
+      }
+      if (slotAvailable) {
+        availableSlots.push(slot);
+      }
+    }
+    const day = {
+      reservationDate,
+      closed: false,
+      available: availableSlots.length > 0,
+      slots: availableSlots,
+      firstTime: availableSlots[0] || "",
+    };
+    days.push(day);
+    if (!firstAvailableDate && day.available) {
+      firstAvailableDate = reservationDate;
+      firstAvailableTime = day.firstTime || "";
+    }
+  }
+  const requestedAvailable = days.find((day) => day.reservationDate === requestedDate && day.available);
+  const selectedDay =
+    requestedAvailable ||
+    days.find((day) => day.reservationDate === firstAvailableDate) ||
+    days.find((day) => day.reservationDate === requestedDate) ||
+    days[0] ||
+    null;
+  return {
+    selectedDate: selectedDay?.reservationDate || requestedDate || startDate,
+    selectedSlots: Array.isArray(selectedDay?.slots) ? selectedDay.slots : [],
+    firstAvailableDate,
+    firstAvailableTime,
+    days,
+  };
+}
+
+async function hallAvailability(env, payload, excludeId = null, options = {}) {
+  const halls = await venueHalls(env);
+  const hall = halls.find((h) => h.id === cleanString(payload.hallId, 80) && h.active);
+  if (!hall) throw new Error("Sala niedostępna.");
+  const settings = await venueSettings(env);
+  return hallAvailabilityAtSlot(env, hall, settings, payload, excludeId, options);
 }
 
 async function createHallReservation(env, payload, options = {}) {
@@ -2074,7 +2433,7 @@ async function createHallReservation(env, payload, options = {}) {
   }
   const id = crypto.randomUUID();
   const humanYear = yearFromMsWarsaw(now);
-  const humanNumber = await nextHumanSequenceForYear(env, humanYear);
+  const humanNumber = await nextHumanSequenceForYear(env, "hall", humanYear);
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const token = options.withConfirmationToken ? randomToken() : "";
   const tokenHash = token ? await sha256Hex(token) : null;
@@ -2323,7 +2682,7 @@ function matchesAnyTemplateShape(current, candidates) {
 function buildHotelDefaultTemplates() {
   return {
     confirm_email: {
-      subject: "{{hotelName}} — potwierdzenie adresu e-mail ({{reservationNumber}})",
+      subject: "Potwierdzenie adresu e-mail ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>dziękujemy za wybór <strong>{{hotelName}}</strong>. Otrzymaliśmy zgłoszenie rezerwacji i przygotowaliśmy jego kompletne podsumowanie.</p>
 <p>Aby przekazać rezerwację do dalszej obsługi recepcji, potwierdź adres e-mail. Link pozostaje aktywny przez <strong>2 godziny</strong>.</p>
@@ -2338,7 +2697,7 @@ ${noteCard("<strong>Ważne:</strong> potwierdzenie adresu e-mail nie jest jeszcz
 <p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>`,
     },
     pending_admin: {
-      subject: "[{{hotelName}}] Nowa rezerwacja do decyzji: {{reservationNumber}}",
+      subject: "Nowa rezerwacja do decyzji ({{reservationNumber}})",
       bodyHtml: `<p>Do panelu wpłynęła nowa rezerwacja wymagająca decyzji recepcji.</p>
 ${infoCard("Dane rezerwacji", [
   ["Numer rezerwacji", "{{reservationNumber}}"],
@@ -2355,7 +2714,7 @@ ${infoCard("Dane rezerwacji", [
 ])}`,
     },
     confirmed_client: {
-      subject: "{{hotelName}} — rezerwacja potwierdzona ({{reservationNumber}})",
+      subject: "Rezerwacja pobytu potwierdzona ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>z przyjemnością potwierdzamy rezerwację pobytu w <strong>{{hotelName}}</strong>.</p>
 ${infoCard("Potwierdzony pobyt", [
@@ -2369,7 +2728,7 @@ ${noteCard("Jeżeli chcesz doprecyzować godzinę przyjazdu, potrzeby dotyczące
 <p>Dziękujemy za zaufanie i do zobaczenia w {{hotelName}}.</p>`,
     },
     cancelled_client: {
-      subject: "{{hotelName}} — anulowanie rezerwacji ({{reservationNumber}})",
+      subject: "Anulowanie rezerwacji pobytu ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>informujemy, że rezerwacja została anulowana.</p>
 ${infoCard("Anulowane zgłoszenie", [
@@ -2380,7 +2739,7 @@ ${infoCard("Anulowane zgłoszenie", [
 ${noteCard("Jeżeli chcesz zarezerwować nowy termin lub potrzebujesz pomocy w ponownym przygotowaniu pobytu, skontaktuj się z recepcją odpowiadając na tę wiadomość.")}`,
     },
     changed_client: {
-      subject: "{{hotelName}} — zaktualizowano rezerwację ({{reservationNumber}})",
+      subject: "Zaktualizowano rezerwację pobytu ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>wprowadziliśmy zmiany w Twojej rezerwacji. Aktualne dane pobytu znajdują się poniżej.</p>
 ${infoCard("Aktualne podsumowanie rezerwacji", [
@@ -2394,7 +2753,7 @@ ${infoCard("Aktualne podsumowanie rezerwacji", [
 ${noteCard("Jeżeli któraś z powyższych informacji wymaga doprecyzowania, odpowiedz na tę wiadomość. Zespół recepcji wróci do Ciebie możliwie szybko.")}`,
     },
     expired_pending_client: {
-      subject: "{{hotelName}} — zgłoszenie wygasło ({{reservationNumber}})",
+      subject: "Zgłoszenie wygasło ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>rezerwacja nie została potwierdzona w wymaganym czasie i wygasła automatycznie.</p>
 ${infoCard("Wygasłe zgłoszenie", [
@@ -2405,7 +2764,7 @@ ${infoCard("Wygasłe zgłoszenie", [
 ${noteCard("Termin wrócił do puli dostępności. Jeżeli nadal planujesz pobyt, prześlij nowe zgłoszenie lub skontaktuj się bezpośrednio z recepcją.")}`,
     },
     expired_pending_admin: {
-      subject: "[{{hotelName}}] Wygasła rezerwacja oczekująca {{reservationNumber}}",
+      subject: "Wygasła rezerwacja oczekująca ({{reservationNumber}})",
       bodyHtml: `<p>Rezerwacja oczekująca wygasła automatycznie z powodu braku decyzji w wymaganym terminie.</p>
 ${infoCard("Dane wygasłego zgłoszenia", [
   ["Numer rezerwacji", "{{reservationNumber}}"],
@@ -2416,7 +2775,7 @@ ${infoCard("Dane wygasłego zgłoszenia", [
 ])}`,
     },
     expired_email_client: {
-      subject: "{{hotelName}} — link potwierdzający wygasł",
+      subject: "Link potwierdzający wygasł",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>nie otrzymaliśmy potwierdzenia adresu e-mail w ciągu 2 godzin, dlatego zgłoszenie zostało anulowane automatycznie.</p>
 ${infoCard("Szczegóły zgłoszenia", [
@@ -2427,7 +2786,7 @@ ${infoCard("Szczegóły zgłoszenia", [
 ${noteCard("Termin nie został zablokowany i może być już dostępny dla innych gości. Jeśli nadal chcesz zarezerwować pobyt, prześlij formularz ponownie.")}`,
     },
     cancelled_admin: {
-      subject: "[{{hotelName}}] Anulowano rezerwację {{reservationNumber}}",
+      subject: "Anulowano rezerwację ({{reservationNumber}})",
       bodyHtml: `<p>Rezerwacja została anulowana.</p>
 ${infoCard("Podsumowanie anulowania", [
   ["Numer rezerwacji", "{{reservationNumber}}"],
@@ -2442,7 +2801,7 @@ ${infoCard("Podsumowanie anulowania", [
 function buildRestaurantDefaultTemplates() {
   const base = {
     restaurant_confirm_email: {
-      subject: "{{restaurantName}} — potwierdzenie rezerwacji stolika ({{reservationNumber}})",
+      subject: "Potwierdzenie rezerwacji stolika ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>dziękujemy za wybór <strong>{{restaurantName}}</strong>. Otrzymaliśmy zgłoszenie rezerwacji stolika i przygotowaliśmy jego podsumowanie.</p>
 <p>Aby przekazać rezerwację do obsługi sali, potwierdź adres e-mail. Link pozostaje ważny przez <strong>2 godziny</strong>.</p>
@@ -2457,7 +2816,7 @@ ${noteCard("Rezerwacja stolika nie wymaga przedpłaty. <strong>Płatność odbyw
 <p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>`,
     },
     restaurant_pending_admin: {
-      subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
+      subject: "Nowa rezerwacja stolika ({{reservationNumber}})",
       bodyHtml: `<p>Do obsługi wpłynęła nowa rezerwacja stolika wymagająca decyzji.</p>
 ${infoCard("Szczegóły rezerwacji", [
   ["Numer rezerwacji", "{{reservationNumber}}"],
@@ -2475,7 +2834,7 @@ ${infoCard("Szczegóły rezerwacji", [
 ])}`,
     },
     restaurant_confirmed_client: {
-      subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
+      subject: "Rezerwacja stolika potwierdzona ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>z przyjemnością potwierdzamy Twoją rezerwację stolika.</p>
 ${infoCard("Potwierdzone spotkanie", [
@@ -2488,7 +2847,7 @@ ${infoCard("Potwierdzone spotkanie", [
 ${noteCard("Rezerwacja nie wymaga przedpłaty. <strong>Płatność następuje na miejscu</strong> według zamówienia i aktualnej karty menu. W przypadku spóźnienia lub zmiany liczby gości prosimy o wcześniejszy kontakt.")}`,
     },
     restaurant_cancelled_client: {
-      subject: "{{restaurantName}} — rezerwacja anulowana ({{reservationNumber}})",
+      subject: "Rezerwacja stolika anulowana ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>informujemy, że rezerwacja stolika została anulowana.</p>
 ${infoCard("Anulowana rezerwacja", [
@@ -2500,7 +2859,7 @@ ${infoCard("Anulowana rezerwacja", [
 ${noteCard("Jeśli chcesz zarezerwować inny termin, będzie nam bardzo miło ponownie Cię ugościć. Wystarczy odpowiedzieć na tę wiadomość lub wysłać nowe zgłoszenie.")}`,
     },
     restaurant_changed_client: {
-      subject: "{{restaurantName}} — zaktualizowano rezerwację stolika ({{reservationNumber}})",
+      subject: "Zaktualizowano rezerwację stolika ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>wprowadziliśmy zmiany w Twojej rezerwacji. Aktualne szczegóły wizyty znajdują się poniżej.</p>
 ${infoCard("Aktualne podsumowanie", [
@@ -2514,7 +2873,7 @@ ${infoCard("Aktualne podsumowanie", [
 ${noteCard("<strong>Płatność odbywa się na miejscu</strong>, zgodnie z zamówieniem złożonym podczas wizyty. Jeżeli potrzebujesz doprecyzować szczegóły rezerwacji, odpowiedz na tę wiadomość.")}`,
     },
     restaurant_expired_pending_client: {
-      subject: "{{restaurantName}} — rezerwacja wygasła ({{reservationNumber}})",
+      subject: "Rezerwacja stolika wygasła ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>rezerwacja wygasła, ponieważ nie została potwierdzona w wymaganym czasie.</p>
 ${infoCard("Wygasłe zgłoszenie", [
@@ -2526,7 +2885,7 @@ ${infoCard("Wygasłe zgłoszenie", [
 ${noteCard("Stolik wrócił do puli dostępności. Jeżeli chcesz zarezerwować wizytę ponownie, prześlij nowe zgłoszenie.")}`,
     },
     restaurant_expired_pending_admin: {
-      subject: "[{{restaurantName}}] Wygasła rezerwacja {{reservationNumber}}",
+      subject: "Wygasła rezerwacja stolika ({{reservationNumber}})",
       bodyHtml: `<p>Rezerwacja stolika wygasła automatycznie.</p>
 ${infoCard("Dane wygasłego zgłoszenia", [
   ["Numer rezerwacji", "{{reservationNumber}}"],
@@ -2537,7 +2896,7 @@ ${infoCard("Dane wygasłego zgłoszenia", [
 ])}`,
     },
     restaurant_expired_email_client: {
-      subject: "{{restaurantName}} — link potwierdzający wygasł",
+      subject: "Link potwierdzający wygasł",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>nie otrzymaliśmy potwierdzenia adresu e-mail w ciągu 2 godzin, dlatego zgłoszenie zostało anulowane.</p>
 ${infoCard("Szczegóły zgłoszenia", [
@@ -2562,7 +2921,7 @@ ${noteCard("Stolik nie został zablokowany. Jeśli nadal chcesz dokonać rezerwa
 function buildHallDefaultTemplates() {
   return {
     hall_confirm_email: {
-      subject: "{{venueName}} — potwierdzenie zgłoszenia rezerwacji sali ({{reservationNumber}})",
+      subject: "Potwierdzenie zgłoszenia rezerwacji sali ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>dziękujemy za zainteresowanie organizacją wydarzenia w <strong>{{venueName}}</strong>. Otrzymaliśmy zgłoszenie i przygotowaliśmy jego podsumowanie.</p>
 <p>Aby przekazać zgłoszenie do opiekuna rezerwacji, potwierdź adres e-mail. Link pozostaje aktywny przez <strong>2 godziny</strong>.</p>
@@ -2578,7 +2937,7 @@ ${infoCard("Podsumowanie zgłoszenia", [
 ${noteCard("<strong>Wycena przygotowywana jest indywidualnie</strong> po kontakcie z obsługą obiektu. Szczegóły płatności i harmonogram ustalane są na etapie oferty.")}`,
     },
     hall_pending_admin: {
-      subject: "[{{venueName}}] Nowe zgłoszenie sali {{reservationNumber}}",
+      subject: "Nowe zgłoszenie sali ({{reservationNumber}})",
       bodyHtml: `<p>Do obsługi wpłynęło nowe zgłoszenie rezerwacji sali.</p>
 ${infoCard("Szczegóły zgłoszenia", [
   ["Numer zgłoszenia", "{{reservationNumber}}"],
@@ -2598,7 +2957,7 @@ ${infoCard("Szczegóły zgłoszenia", [
 ])}`,
     },
     hall_confirmed_client: {
-      subject: "{{venueName}} — rezerwacja sali potwierdzona ({{reservationNumber}})",
+      subject: "Rezerwacja sali potwierdzona ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>z przyjemnością potwierdzamy przyjęcie rezerwacji sali.</p>
 ${infoCard("Potwierdzone wydarzenie", [
@@ -2612,7 +2971,7 @@ ${infoCard("Potwierdzone wydarzenie", [
 ${noteCard("Szczegóły organizacyjne, oferta cenowa oraz harmonogram płatności obowiązują zgodnie z indywidualnymi ustaleniami z obsługą obiektu.")}`,
     },
     hall_cancelled_client: {
-      subject: "{{venueName}} — rezerwacja sali anulowana ({{reservationNumber}})",
+      subject: "Rezerwacja sali anulowana ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>informujemy, że zgłoszenie rezerwacji sali zostało anulowane.</p>
 ${infoCard("Anulowane zgłoszenie", [
@@ -2625,7 +2984,7 @@ ${infoCard("Anulowane zgłoszenie", [
 ${noteCard("Jeżeli chcesz omówić nowy termin lub przygotować świeżą ofertę dla wydarzenia, odpowiedz na tę wiadomość.")}`,
     },
     hall_changed_client: {
-      subject: "{{venueName}} — zaktualizowano rezerwację sali ({{reservationNumber}})",
+      subject: "Zaktualizowano rezerwację sali ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>wprowadziliśmy zmiany w Twoim zgłoszeniu. Aktualne dane wydarzenia znajdują się poniżej.</p>
 ${infoCard("Aktualne podsumowanie", [
@@ -2640,7 +2999,7 @@ ${infoCard("Aktualne podsumowanie", [
 ${noteCard("Wycena i warunki płatności obowiązują zgodnie z indywidualnymi ustaleniami z obsługą obiektu. W razie pytań odpowiedz na tę wiadomość.")}`,
     },
     hall_expired_pending_client: {
-      subject: "{{venueName}} — zgłoszenie wygasło ({{reservationNumber}})",
+      subject: "Zgłoszenie wygasło ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>zgłoszenie wygasło, ponieważ obiekt nie potwierdził rezerwacji w wymaganym czasie.</p>
 ${infoCard("Wygasłe zgłoszenie", [
@@ -2652,7 +3011,7 @@ ${infoCard("Wygasłe zgłoszenie", [
 ${noteCard("Jeżeli nadal planujesz wydarzenie w tym terminie lub chcesz zaproponować inny termin, skontaktuj się z obiektem.")}`,
     },
     hall_expired_pending_admin: {
-      subject: "[{{venueName}}] Wygasła rezerwacja sali {{reservationNumber}}",
+      subject: "Wygasła rezerwacja sali ({{reservationNumber}})",
       bodyHtml: `<p>Zgłoszenie rezerwacji sali wygasło automatycznie.</p>
 ${infoCard("Dane wygasłego zgłoszenia", [
   ["Numer zgłoszenia", "{{reservationNumber}}"],
@@ -2664,7 +3023,7 @@ ${infoCard("Dane wygasłego zgłoszenia", [
 ])}`,
     },
     hall_expired_email_client: {
-      subject: "{{venueName}} — link potwierdzający wygasł",
+      subject: "Link potwierdzający wygasł",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>nie otrzymaliśmy potwierdzenia adresu e-mail w ciągu 2 godzin, dlatego zgłoszenie zostało anulowane automatycznie.</p>
 ${infoCard("Szczegóły zgłoszenia", [
@@ -2676,7 +3035,7 @@ ${infoCard("Szczegóły zgłoszenia", [
 ${noteCard("Termin nie został zablokowany. Jeśli nadal chcesz zorganizować wydarzenie w obiekcie, wyślij formularz ponownie.")}`,
     },
     hall_extended_pending_client: {
-      subject: "{{venueName}} — przedłużono termin oczekiwania ({{reservationNumber}})",
+      subject: "Przedłużono termin oczekiwania ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>termin oczekiwania na decyzję dotyczącą zgłoszenia został przedłużony.</p>
 ${infoCard("Status zgłoszenia", [
@@ -3254,6 +3613,9 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
   const subject = normalizeRenderedReservationSubject(renderTemplate(template.subject, vars), vars, row);
   const templateBodyRaw = String(template.bodyHtml || "");
   let html = renderTemplate(templateBodyRaw, vars);
+  if (eventKey === "confirm_email" && vars.confirmationLink) {
+    html = injectInlineActionButton(html, vars.confirmationLink);
+  }
   const cancelReason = cleanString(vars.cancelReason, 2000);
   if (eventKey === "cancelled_client" && cancelReason) {
     const hasCancelReasonPlaceholder = /\{\{\s*cancelReason\s*\}\}/u.test(templateBodyRaw);
@@ -3268,10 +3630,14 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
       : service === "restaurant"
         ? vars.restaurantName || "Średzka Korona"
         : vars.venueName || "Średzka Korona";
+  const reservationNo = cleanString(vars.reservationNumber, 120);
   const email = buildBrandedEmail({
     subject,
     htmlFragment: html,
     brandName,
+    headerBrandLine: "Średzka Korona",
+    headerContextLine: mailHeaderSecondLine(service, eventKey),
+    headerNumberLine: reservationNo ? `nr ${reservationNo}` : "",
     serviceLabel: serviceLabel(service),
     siteUrl,
     serviceUrl: `${siteUrl}${serviceLandingPath(service)}`,
@@ -3279,12 +3645,7 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
       service === "restaurant"
         ? `Rezerwacja stolika ${vars.reservationNumber || ""}`.trim()
         : `Rezerwacja ${vars.reservationNumber || ""}`.trim(),
-    actionUrl:
-      eventKey === "confirm_email"
-        ? vars.confirmationLink || ""
-        : eventKey === "pending_admin"
-          ? vars.adminActionLink || ""
-          : "",
+    actionUrl: eventKey === "pending_admin" ? vars.adminActionLink || "" : "",
     actionLabel:
       eventKey === "pending_admin"
         ? "Otwórz i potwierdź"
@@ -3559,6 +3920,15 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
       },
     };
   }
+  if (op === "public-calendar" && request.method === "POST") {
+    const body = await readBody(request);
+    try {
+      const calendar = await restaurantCalendarAvailability(env, body);
+      return { status: 200, data: calendar };
+    } catch (error) {
+      return { status: 400, data: { error: error.message || "Nie udało się pobrać kalendarza restauracji." } };
+    }
+  }
   if (op === "public-availability" && request.method === "POST") {
     const body = await readBody(request);
     try {
@@ -3703,6 +4073,15 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
         sortOrder: h.sortOrder,
       }));
     return { status: 200, data: { halls } };
+  }
+  if (op === "public-calendar" && request.method === "POST") {
+    const body = await readBody(request);
+    try {
+      const calendar = await hallCalendarAvailability(env, body);
+      return { status: 200, data: calendar };
+    } catch (error) {
+      return { status: 400, data: { error: error.message || "Nie udało się pobrać kalendarza sal." } };
+    }
   }
   if (op === "public-availability" && request.method === "POST") {
     const body = await readBody(request);

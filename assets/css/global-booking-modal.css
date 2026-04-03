@@ -217,6 +217,104 @@ body.gb-modal-open {
   min-width: 0;
 }
 
+#gb-modal .gb-calendar {
+  border: 1px solid rgba(255, 229, 184, 0.2);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.85rem;
+}
+
+#gb-modal .gb-calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+}
+
+#gb-modal .gb-calendar-title {
+  font-size: 0.98rem;
+  text-transform: capitalize;
+}
+
+#gb-modal .gb-calendar-nav {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 229, 184, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--gb-text);
+  cursor: pointer;
+}
+
+#gb-modal .gb-calendar-nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+#gb-modal .gb-calendar-weekdays,
+#gb-modal .gb-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+#gb-modal .gb-calendar-weekdays {
+  margin-bottom: 0.45rem;
+}
+
+#gb-modal .gb-calendar-weekdays span {
+  text-align: center;
+  font-size: 0.74rem;
+  color: rgba(255, 236, 205, 0.7);
+}
+
+#gb-modal .gb-calendar-cell {
+  min-height: 4.1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 229, 184, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--gb-text);
+  padding: 0.5rem 0.35rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
+#gb-modal .gb-calendar-cell:hover:not(:disabled) {
+  border-color: rgba(255, 229, 184, 0.45);
+  background: rgba(255, 255, 255, 0.11);
+}
+
+#gb-modal .gb-calendar-cell.is-selected {
+  border-color: rgba(255, 215, 156, 0.9);
+  background: rgba(255, 215, 156, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+#gb-modal .gb-calendar-cell.is-disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+#gb-modal .gb-calendar-cell--empty {
+  min-height: 4.1rem;
+}
+
+#gb-modal .gb-calendar-day-number {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+#gb-modal .gb-calendar-day-status {
+  font-size: 0.68rem;
+  color: rgba(255, 236, 205, 0.78);
+  text-align: center;
+}
+
 #gb-modal .gb-field {
   display: grid;
   gap: 0.33rem;

@@ -2655,14 +2655,41 @@ button.icon-btn {
   filter: drop-shadow(0 6px 12px rgba(123, 90, 36, 0.2));
 }
 
-.mail-preview-service {
-  margin: 0.8rem auto 1rem;
+.mail-preview-inbox-subject {
+  margin: 0.35rem 0 0.85rem;
   text-align: center;
-  font-size: 0.74rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #6b5c4d;
+}
+
+.mail-preview-header-stack {
+  margin: 0 0 1.2rem;
+  text-align: center;
+}
+
+.mail-preview-header-brand {
+  font-family: "Cormorant Garamond", serif;
+  font-size: clamp(1.45rem, 2.5vw, 1.85rem);
+  line-height: 1.2;
+  font-weight: 700;
+  color: #1f1712;
+}
+
+.mail-preview-header-context {
+  margin-top: 0.65rem;
+  font-size: clamp(1rem, 1.8vw, 1.12rem);
+  line-height: 1.35;
+  font-weight: 600;
+  color: #4a3d32;
+}
+
+.mail-preview-header-number {
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
   line-height: 1.4;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: #8b7a67;
+  color: #7a6754;
+  letter-spacing: 0.02em;
 }
 
 .mail-preview-card {
@@ -3028,4 +3055,98 @@ button.icon-btn {
   .admin-entry-tile--featured {
     min-height: 0;
   }
+}
+
+/* Grafik: powiadomienia o nowych rezerwacjach oczekujących (polling) */
+.admin-schedule-toast-stack {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  max-width: min(420px, calc(100vw - 2rem));
+  pointer-events: none;
+}
+
+.admin-schedule-toast-stack .admin-schedule-toast {
+  pointer-events: auto;
+}
+
+.admin-schedule-toast {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
+  padding: 0.45rem 0.45rem 0.45rem 0.65rem;
+  border-radius: 14px;
+  border: 1px solid rgba(200, 170, 120, 0.45);
+  background: rgba(255, 252, 247, 0.96);
+  box-shadow:
+    0 10px 28px rgba(45, 32, 18, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+.admin-schedule-toast.is-out {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.admin-schedule-toast__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 0.4rem 0.35rem;
+  margin: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: #2c2118;
+}
+
+.admin-schedule-toast__main:hover,
+.admin-schedule-toast__main:focus-visible {
+  background: rgba(200, 170, 120, 0.12);
+  outline: none;
+}
+
+.admin-schedule-toast__text {
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.admin-schedule-toast__hint {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.admin-schedule-toast__close {
+  flex: 0 0 auto;
+  width: 2.25rem;
+  min-height: 2.25rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.admin-schedule-toast__close:hover,
+.admin-schedule-toast__close:focus-visible {
+  background: rgba(160, 60, 50, 0.1);
+  color: #5c2e28;
+  outline: none;
 }

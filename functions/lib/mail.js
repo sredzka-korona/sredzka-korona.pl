@@ -73,10 +73,64 @@ function htmlToText(html) {
     .trim();
 }
 
+function normalizeMailHeaderKey(service, key) {
+  let k = String(key || "").trim();
+  if (service === "restaurant") {
+    k = k.replace(/^restaurant_/i, "").replace(/^rest_/i, "");
+  } else if (service === "hall") {
+    k = k.replace(/^hall_/i, "");
+  }
+  return k;
+}
+
+function mailHeaderSecondLine(service, eventKey) {
+  const k = normalizeMailHeaderKey(service, eventKey);
+  const hotel = {
+    confirm_email: "Potwierdzenie rezerwacji noclegu",
+    pending_admin: "Rezerwacja noclegu — powiadomienie dla obsługi",
+    confirmed_client: "Potwierdzenie rezerwacji noclegu",
+    cancelled_client: "Odwołanie rezerwacji noclegu",
+    changed_client: "Zmiana rezerwacji noclegu",
+    expired_pending_client: "Wygaśnięcie rezerwacji noclegu",
+    expired_pending_admin: "Wygaśnięcie rezerwacji — informacja dla obsługi",
+    expired_email_client: "Wygasłe potwierdzenie — rezerwacja noclegu",
+    cancelled_admin: "Odwołanie rezerwacji — informacja dla obsługi",
+  };
+  const restaurant = {
+    confirm_email: "Potwierdzenie rezerwacji stolika",
+    pending_admin: "Rezerwacja stolika — powiadomienie dla obsługi",
+    confirmed_client: "Potwierdzenie rezerwacji stolika",
+    cancelled_client: "Odwołanie rezerwacji stolika",
+    changed_client: "Zmiana rezerwacji stolika",
+    expired_pending_client: "Wygaśnięcie rezerwacji stolika",
+    expired_pending_admin: "Wygaśnięcie rezerwacji — informacja dla obsługi",
+    expired_email_client: "Wygasłe potwierdzenie — rezerwacja stolika",
+  };
+  const hall = {
+    confirm_email: "Potwierdzenie rezerwacji sali",
+    pending_admin: "Rezerwacja sali — powiadomienie dla obsługi",
+    confirmed_client: "Potwierdzenie rezerwacji sali",
+    cancelled_client: "Odwołanie rezerwacji sali",
+    changed_client: "Zmiana rezerwacji sali",
+    expired_pending_client: "Wygaśnięcie rezerwacji sali",
+    expired_pending_admin: "Wygaśnięcie rezerwacji — informacja dla obsługi",
+    expired_email_client: "Wygasłe potwierdzenie — rezerwacja sali",
+    extended_pending_client: "Przedłużenie terminu rezerwacji sali",
+  };
+  const map = service === "hotel" ? hotel : service === "restaurant" ? restaurant : hall;
+  return map[k] || "Wiadomość o rezerwacji";
+}
+
 function buildBrandedEmail({
   subject,
   htmlFragment,
   brandName = "Średzka Korona",
+  headerBrandLine = "Średzka Korona",
+  headerContextLine = "",
+  headerNumberLine = "",
+  mailHeaderService = "",
+  mailHeaderKey = "",
+  reservationNumber = "",
   serviceLabel = "",
   siteUrl = "",
   serviceUrl = "",
@@ -84,8 +138,19 @@ function buildBrandedEmail({
   actionUrl = "",
   actionLabel = "",
 }) {
+  let line2 = headerContextLine;
+  let line3 = headerNumberLine;
+  if (mailHeaderService && mailHeaderKey) {
+    line2 = mailHeaderSecondLine(mailHeaderService, mailHeaderKey);
+  }
+  const rn = String(reservationNumber || "").trim();
+  if (rn && !line3) {
+    line3 = `nr ${rn}`;
+  }
   const safeBrandName = escapeHtml(brandName);
-  const safeSubject = escapeHtml(subject || brandName);
+  const safeHeaderBrand = escapeHtml(headerBrandLine || "Średzka Korona");
+  const safeContext = escapeHtml(line2 || "");
+  const safeNumber = escapeHtml(line3 || "");
   const safeServiceLabel = escapeHtml(serviceLabel);
   const safePreheader = escapeHtml(preheader || subject || brandName);
   const safeSiteUrl = String(siteUrl || "").replace(/\/$/, "");
@@ -121,14 +186,21 @@ function buildBrandedEmail({
               </td>
             </tr>
             <tr>
-              <td align="center" style="padding:0 18px 18px 18px;font-size:12px;line-height:1.5;letter-spacing:0.18em;text-transform:uppercase;color:#8b7a67;">
-                ${safeServiceLabel || "Hotel • Restauracja • Przyjęcia"}
-              </td>
-            </tr>
-            <tr>
               <td style="background:#ffffff;border:1px solid #e8dcc8;border-radius:22px;padding:34px 32px;box-shadow:0 10px 30px rgba(52,33,14,0.08);">
-                <div style="font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.2;color:#1f1712;font-weight:700;margin:0 0 22px 0;text-align:center;">
-                  ${safeSubject}
+                <div style="text-align:center;margin:0 0 22px 0;">
+                  <div style="font-family:Georgia,'Times New Roman',serif;font-size:26px;line-height:1.25;color:#1f1712;font-weight:700;">
+                    ${safeHeaderBrand}
+                  </div>
+                  ${
+                    safeContext
+                      ? `<div style="font-size:17px;line-height:1.4;color:#4a3d32;font-weight:600;margin-top:12px;">${safeContext}</div>`
+                      : ""
+                  }
+                  ${
+                    safeNumber
+                      ? `<div style="font-size:15px;line-height:1.45;color:#7a6754;margin-top:10px;letter-spacing:0.02em;">${safeNumber}</div>`
+                      : ""
+                  }
                 </div>
                 ${
                   actionHref
@@ -1078,6 +1150,7 @@ module.exports = {
   renderTemplate,
   htmlToText,
   buildBrandedEmail,
+  mailHeaderSecondLine,
   DEFAULT_TEMPLATES,
   RESTAURANT_DEFAULT_TEMPLATES,
   HALL_DEFAULT_TEMPLATES,
