@@ -819,6 +819,25 @@ function reservationTypeLabel(service) {
   return "PRZYJĘCIA";
 }
 
+function legacyReservationOffsets(service) {
+  if (service === "hotel") return [1000];
+  if (service === "restaurant") return [3000, 2000];
+  if (service === "hall") return [3000, 2000];
+  return [];
+}
+
+function normalizeLegacyReservationSequence(sequence, service) {
+  const numeric = Number(sequence);
+  if (!Number.isInteger(numeric) || numeric <= 0) return 0;
+  const normalizedService = cleanString(service, 40).toLowerCase();
+  for (const offset of legacyReservationOffsets(normalizedService)) {
+    if (numeric > offset && numeric < offset + 1000) {
+      return numeric - offset;
+    }
+  }
+  return numeric;
+}
+
 function reservationSubjectLabel(service, row) {
   if (service === "hotel") return "Pobyt hotelowy";
   if (service === "restaurant") return "Rezerwacja stolika";
@@ -839,14 +858,14 @@ function yearFromMsWarsaw(ms) {
   );
 }
 
-function extractReservationSequenceAndYear(rawValue) {
+function extractReservationSequenceAndYear(rawValue, service = "") {
   const raw = cleanString(rawValue, 120);
   if (!raw) return { sequence: null, year: null };
 
   const modern = raw.match(/^(\d+)\/(\d{4})\/(?:HOTEL|RESTAURACJA|PRZYJ(?:Ę|E)CIA)$/u);
   if (modern) {
     return {
-      sequence: Number(modern[1]),
+      sequence: normalizeLegacyReservationSequence(Number(modern[1]), service),
       year: Number(modern[2]),
     };
   }
@@ -854,14 +873,14 @@ function extractReservationSequenceAndYear(rawValue) {
   const legacy = raw.match(/^[A-Z]{2}-(\d{4})-(\d+)$/u);
   if (legacy) {
     return {
-      sequence: Number(legacy[2]),
+      sequence: normalizeLegacyReservationSequence(Number(legacy[2]), service),
       year: Number(legacy[1]),
     };
   }
 
   if (/^\d+$/u.test(raw)) {
     return {
-      sequence: Number(raw),
+      sequence: normalizeLegacyReservationSequence(Number(raw), service),
       year: null,
     };
   }
@@ -905,14 +924,19 @@ async function existingReservationCountForYear(env, service, year) {
 async function maxHumanSequenceForYear(env, service, year) {
   const y = Number(year);
   const table = reservationTableName(service);
-  const row = await env.DB.prepare(
-    `SELECT MAX(human_number) AS max_value
+  const rows = await env.DB.prepare(
+    `SELECT human_number
      FROM ${table}
      WHERE human_year = ?`
   )
     .bind(y)
-    .first();
-  return Number(row?.max_value || 0);
+    .all();
+  let maxSequence = 0;
+  for (const row of rows.results || []) {
+    const normalized = normalizeLegacyReservationSequence(row?.human_number, service);
+    if (normalized > maxSequence) maxSequence = normalized;
+  }
+  return maxSequence;
 }
 
 async function nextHumanSequenceForYear(env, service, year) {
@@ -925,6 +949,15 @@ async function nextHumanSequenceForYear(env, service, year) {
   const existing = await env.DB.prepare("SELECT value FROM booking_counters WHERE key = ?")
     .bind(key)
     .first();
+  const existingValue = Number(existing?.value || 0);
+  const normalizedExistingValue = normalizeLegacyReservationSequence(existingValue, normalizedService);
+  if (existing && normalizedExistingValue !== existingValue) {
+    const maxHuman = await maxHumanSequenceForYear(env, normalizedService, y);
+    const repairedCounterValue = Math.max(normalizedExistingValue, maxHuman, 0);
+    await env.DB.prepare("UPDATE booking_counters SET value = ? WHERE key = ?")
+      .bind(repairedCounterValue, key)
+      .run();
+  }
   let startingValue = 1;
   if (!existing) {
     const [existingCount, maxHuman] = await Promise.all([
@@ -949,7 +982,7 @@ function formatHumanReservationNumber(row, service) {
   const rawText = cleanString(rawValue, 120);
   if (!rawText) return "";
 
-  const parsed = extractReservationSequenceAndYear(rawText);
+  const parsed = extractReservationSequenceAndYear(rawText, service);
   const explicitYear = Number(row.human_year ?? row.humanYear);
   const inferredYear =
     Number.isInteger(explicitYear) && explicitYear >= 2000 && explicitYear <= 2100
