@@ -369,6 +369,19 @@ function isExactDomain(address, domain) {
   return emailDomain(address) === d;
 }
 
+function isLikelyDeliverableEmail(address) {
+  const normalized = cleanString(address, 320).toLowerCase();
+  if (!normalized || !normalized.includes("@")) return false;
+  const domain = emailDomain(normalized);
+  if (!domain || domain === "local" || domain === "localhost") return false;
+  return domain.includes(".");
+}
+
+function isClientFacingMailEvent(eventKey) {
+  const key = cleanString(eventKey, 120);
+  return key === "confirm_email" || key.endsWith("_client");
+}
+
 function resolveSmtpFromHeader(env, user) {
   const requiredDomain = cleanString(env.MAIL_FROM_DOMAIN, 200).toLowerCase() || "sredzka-korona.pl";
   const preferredRaw = cleanString(env.SMTP_FROM, 500);
@@ -3209,6 +3222,30 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
     });
     return { skipped: true };
   }
+  if (row.status === "manual_block" && isClientFacingMailEvent(eventKey)) {
+    await logMailAudit(env, {
+      service,
+      eventKey,
+      row,
+      to: destination,
+      subject: "",
+      status: "skipped",
+      error: "manual_block_no_client_mail",
+    });
+    return { skipped: true };
+  }
+  if (!isLikelyDeliverableEmail(destination)) {
+    await logMailAudit(env, {
+      service,
+      eventKey,
+      row,
+      to: destination,
+      subject: "",
+      status: "skipped",
+      error: "non_routable_destination",
+    });
+    return { skipped: true };
+  }
   const template = await resolveTemplateForEvent(env, service, eventKey);
   const vars = {
     ...(await buildMailVarsForService(env, request, service, row, token || "")),
@@ -3891,7 +3928,7 @@ async function handleHotelAdmin(env, op, request) {
           dateFrom,
           dateTo,
           fullName: "Blokada terminu",
-          email: "noreply@local",
+          email: "",
           phonePrefix: "+48",
           phoneNational: "000000000",
           customerNote: cleanString(body.note, 2000),
@@ -4245,7 +4282,7 @@ async function handleRestaurantAdmin(env, op, request) {
       guestsCount: 1,
       joinTables: false,
       fullName: "Blokada stolików",
-      email: "noreply@local",
+      email: "",
       phonePrefix: "+48",
       phoneNational: "000000000",
       customerNote: cleanString(body.note, 2000),
