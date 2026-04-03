@@ -1744,7 +1744,8 @@ body.admin-modal-open {
   background: rgba(255, 255, 255, 0.88);
 }
 
-.schedule-registry-item.is-past {
+.schedule-registry-item.is-past,
+.schedule-registry-item.is-cancelled {
   opacity: 0.58;
   background: rgba(243, 239, 233, 0.9);
   border-color: rgba(131, 107, 69, 0.14);
@@ -2070,6 +2071,45 @@ body.admin-modal-open {
   gap: 1rem;
 }
 
+.schedule-registry-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.schedule-registry-column {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.schedule-registry-column-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.schedule-registry-column-title {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.schedule-registry-column-empty {
+  margin: 0;
+}
+
+@media (max-width: 1024px) {
+  .schedule-registry-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
 .schedule-details-banner {
   display: grid;
   gap: 0.28rem;
@@ -2190,6 +2230,15 @@ body.admin-modal-open {
   grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;
   align-items: center;
   gap: 0;
+}
+
+/* Spis rezerwacji: tylko licznik + odśwież — unikamy siatki 2.5rem | 1fr | 2.5rem z widoku kalendarza. */
+.schedule-calendar-head.schedule-registry-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .schedule-calendar-head-spacer {

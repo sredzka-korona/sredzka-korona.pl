@@ -908,52 +908,52 @@ function addDaysYmd(ymd, days) {
 const PUBLIC_CALENDAR_DAYS = 93;
 const PUBLIC_CALENDAR_STEP_MINUTES = 30;
 
-async function existingReservationCountForYear(env, year) {
+async function existingReservationCountForYear(env, service, year) {
   const y = Number(year);
+  const table = reservationTableName(service);
   const row = await env.DB.prepare(
-    `SELECT
-        (SELECT COUNT(*) FROM hotel_reservations WHERE human_year = ?) +
-        (SELECT COUNT(*) FROM restaurant_reservations WHERE human_year = ?) +
-        (SELECT COUNT(*) FROM venue_reservations WHERE human_year = ?) AS total`
+    `SELECT COUNT(*) AS total
+     FROM ${table}
+     WHERE human_year = ?`
   )
-    .bind(y, y, y)
+    .bind(y)
     .first();
   return Number(row?.total || 0);
 }
 
-async function maxHumanSequenceForYear(env, year) {
+async function maxHumanSequenceForYear(env, service, year) {
   const y = Number(year);
+  const table = reservationTableName(service);
   const rows = await env.DB.prepare(
-    `SELECT human_number, 'hotel' AS service FROM hotel_reservations WHERE human_year = ?
-     UNION ALL
-     SELECT human_number, 'restaurant' AS service FROM restaurant_reservations WHERE human_year = ?
-     UNION ALL
-     SELECT human_number, 'hall' AS service FROM venue_reservations WHERE human_year = ?`
+    `SELECT human_number
+     FROM ${table}
+     WHERE human_year = ?`
   )
-    .bind(y, y, y)
+    .bind(y)
     .all();
   let maxSequence = 0;
   for (const row of rows.results || []) {
-    const normalized = normalizeLegacyReservationSequence(row?.human_number, row?.service);
+    const normalized = normalizeLegacyReservationSequence(row?.human_number, service);
     if (normalized > maxSequence) maxSequence = normalized;
   }
   return maxSequence;
 }
 
-async function nextHumanSequenceForYear(env, year) {
+async function nextHumanSequenceForYear(env, service, year) {
   const y = Number(year);
   if (!Number.isFinite(y) || y < 2000 || y > 2100) {
     throw new Error("Nieprawidłowy rok numeracji.");
   }
-  const key = `reservation_human_seq_${y}`;
+  const normalizedService = cleanString(service, 40).toLowerCase() || "hotel";
+  const key = `reservation_human_seq_${normalizedService}_${y}`;
   const existing = await env.DB.prepare("SELECT value FROM booking_counters WHERE key = ?")
     .bind(key)
     .first();
   const existingValue = Number(existing?.value || 0);
   if (existing && existingValue >= 1000) {
     const [existingCount, maxHuman] = await Promise.all([
-      existingReservationCountForYear(env, y),
-      maxHumanSequenceForYear(env, y),
+      existingReservationCountForYear(env, normalizedService, y),
+      maxHumanSequenceForYear(env, normalizedService, y),
     ]);
     const repairedCounterValue = Math.max(existingCount, maxHuman, 0);
     if (repairedCounterValue < 1000) {
@@ -965,8 +965,8 @@ async function nextHumanSequenceForYear(env, year) {
   let startingValue = 1;
   if (!existing) {
     const [existingCount, maxHuman] = await Promise.all([
-      existingReservationCountForYear(env, y),
-      maxHumanSequenceForYear(env, y),
+      existingReservationCountForYear(env, normalizedService, y),
+      maxHumanSequenceForYear(env, normalizedService, y),
     ]);
     startingValue = Math.max(existingCount, maxHuman, 0) + 1;
   }
@@ -1521,7 +1521,7 @@ async function createHotelReservation(env, payload, options = {}) {
   const now = nowMs();
   const id = crypto.randomUUID();
   const humanYear = yearFromMsWarsaw(now);
-  const humanNumber = await nextHumanSequenceForYear(env, humanYear);
+  const humanNumber = await nextHumanSequenceForYear(env, "hotel", humanYear);
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const roomIds = Array.isArray(payload.roomIds) ? payload.roomIds.map((x) => cleanString(x, 80)).filter(Boolean) : [];
   const dateFrom = cleanString(payload.dateFrom, 10);
@@ -1809,8 +1809,9 @@ function fallbackWindowFromSettings(settings) {
   };
 }
 
-async function resolveRestaurantWindowForDate(env, settings, reservationDate) {
-  const openingHours = await loadCompanyOpeningHours(env);
+async function resolveRestaurantWindowForDate(env, settings, reservationDate, preloadedOpeningHours) {
+  const openingHours =
+    preloadedOpeningHours !== undefined ? preloadedOpeningHours : await loadCompanyOpeningHours(env);
   const dynamic = resolveOpeningHoursWindowForDate(openingHours, reservationDate);
   if (dynamic) {
     return dynamic;
@@ -1949,7 +1950,12 @@ async function restaurantAvailableSlotsForDate(env, options) {
   if (!Number.isFinite(durationHours) || durationHours <= 0) {
     throw new Error("Nieprawidłowy czas trwania.");
   }
-  const dayWindow = await resolveRestaurantWindowForDate(env, settings, reservationDate);
+  const dayWindow = await resolveRestaurantWindowForDate(
+    env,
+    settings,
+    reservationDate,
+    options?.preloadedOpeningHours
+  );
   if (dayWindow.closed) {
     return {
       reservationDate,
@@ -1993,7 +1999,15 @@ async function restaurantAvailableSlotsForDate(env, options) {
   }
   const queryStartMs = ymdHmToMs(reservationDate, rawSlots[0]);
   const queryEndMs = ymdHmToMs(reservationDate, rawSlots[rawSlots.length - 1]) + durationHours * 3600000;
-  const blockingRows = await restaurantBlockingRows(env, queryStartMs, queryEndMs, excludeId);
+  let blockingRows;
+  if (options?.globalBlockingRows != null) {
+    blockingRows = options.globalBlockingRows;
+    if (excludeId) {
+      blockingRows = blockingRows.filter((r) => r.id !== excludeId);
+    }
+  } else {
+    blockingRows = await restaurantBlockingRows(env, queryStartMs, queryEndMs, excludeId);
+  }
   const allTableIds = allTables.map((table) => table.id);
   const slots = rawSlots.filter((slot) => {
     const startMs = ymdHmToMs(reservationDate, slot);
@@ -2014,25 +2028,35 @@ async function restaurantAvailableSlotsForDate(env, options) {
 async function restaurantCalendarAvailability(env, payload = {}) {
   const settings = await loadRestaurantSettings(env);
   const tables = await restaurantTables(env, false);
+  const openingHours = await loadCompanyOpeningHours(env);
   const requestedDate = cleanString(payload.reservationDate, 10);
   const startDateRaw = cleanString(payload.startDate, 10);
   const today = todayYmdInWarsaw();
   const startDate = isYmd(startDateRaw) && startDateRaw >= today ? startDateRaw : today;
   const durationHours = Number(payload.durationHours || 2);
   const tablesCount = Math.max(1, toInt(payload.tablesCount, 1));
-  const days = [];
-  let firstAvailableDate = "";
-  let firstAvailableTime = "";
+  const lastCalendarDay = addDaysYmd(startDate, PUBLIC_CALENDAR_DAYS - 1);
+  const durationMs = Math.ceil(Math.max(Number(durationHours) || 2, 1)) * 3600000;
+  const globalStartMs = ymdHmToMs(startDate, "00:00");
+  const globalEndMs = ymdHmToMs(addDaysYmd(lastCalendarDay, 1), "23:59") + durationMs;
+  const globalBlockingRows = await restaurantBlockingRows(env, globalStartMs, globalEndMs, null);
+  const slotOpts = {
+    settings,
+    tables,
+    durationHours,
+    tablesCount,
+    preloadedOpeningHours: openingHours,
+    globalBlockingRows,
+  };
+  const dayTasks = [];
   for (let offset = 0; offset < PUBLIC_CALENDAR_DAYS; offset += 1) {
     const currentDate = addDaysYmd(startDate, offset);
-    const day = await restaurantAvailableSlotsForDate(env, {
-      settings,
-      tables,
-      reservationDate: currentDate,
-      durationHours,
-      tablesCount,
-    });
-    days.push(day);
+    dayTasks.push(restaurantAvailableSlotsForDate(env, { ...slotOpts, reservationDate: currentDate }));
+  }
+  const days = await Promise.all(dayTasks);
+  let firstAvailableDate = "";
+  let firstAvailableTime = "";
+  for (const day of days) {
     if (!firstAvailableDate && day.available) {
       firstAvailableDate = day.reservationDate;
       firstAvailableTime = day.firstTime || "";
@@ -2146,7 +2170,7 @@ async function createRestaurantReservation(env, payload, options = {}) {
   }
   const id = crypto.randomUUID();
   const humanYear = yearFromMsWarsaw(now);
-  const humanNumber = await nextHumanSequenceForYear(env, humanYear);
+  const humanNumber = await nextHumanSequenceForYear(env, "restaurant", humanYear);
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const token = options.withConfirmationToken ? randomToken() : "";
   const tokenHash = token ? await sha256Hex(token) : null;
@@ -2470,7 +2494,7 @@ async function createHallReservation(env, payload, options = {}) {
   }
   const id = crypto.randomUUID();
   const humanYear = yearFromMsWarsaw(now);
-  const humanNumber = await nextHumanSequenceForYear(env, humanYear);
+  const humanNumber = await nextHumanSequenceForYear(env, "hall", humanYear);
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const token = options.withConfirmationToken ? randomToken() : "";
   const tokenHash = token ? await sha256Hex(token) : null;

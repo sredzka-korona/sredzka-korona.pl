@@ -1335,7 +1335,7 @@
               }
             </select>
           </label>
-          <label class="gb-field">
+          <label class="gb-field gb-field--time-like">
             <span>Preferowane miejsce</span>
             <select id="gb-rest-place">
               <option value="no_preference" ${state.restaurant.placePreference === "no_preference" ? "selected" : ""}>Brak preferencji</option>
@@ -1344,7 +1344,7 @@
             </select>
           </label>
         </div>
-        <p class="gb-inline-note gb-rest-place-disclaimer">Nie gwarantujemy stolika w wybranym miejscu (w lokalu ani na tarasie).</p>
+        <p class="gb-inline-note gb-rest-place-disclaimer">Nie gwarantujemy stolika w wybranym miejscu.</p>
         <div class="gb-rest-datetime-calendar-wrap">
           ${renderAvailabilityCalendar("restaurant", state.restaurant.calendarMonth, state.restaurant.reservationDate, state.restaurant.calendarDays, state.restaurant.calendarLoading)}
         </div>
@@ -1367,7 +1367,7 @@
       <section aria-busy="${locked ? "true" : "false"}">
         <h3>Szczegóły</h3>
         <p class="gb-hint">Najpierw określ liczbę stolików i gości. Na tej podstawie pokażemy tylko realnie dostępne dni.</p>
-        <div class="gb-rest-details-wrap${locked ? " gb-rest-details-wrap--loading" : ""}">
+        <div class="gb-rest-details-wrap">
           <div class="gb-rest-details-fields">
             <div class="gb-grid-3">
               <label class="gb-field">

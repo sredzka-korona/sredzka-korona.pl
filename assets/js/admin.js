@@ -557,7 +557,7 @@
       description: "Centralny terminarz rezerwacji, akceptacje i szybkie operacje dzienne.",
       tiles: [
         { key: "overview", label: "Grafik", description: "Oczekujące, jutrzejsze i kalendarz wszystkich rezerwacji." },
-        { key: "registry", label: "Spis rezerwacji", description: "Pełna lista wszystkich rezerwacji od najnowszych do najstarszych." },
+        { key: "registry", label: "Spis rezerwacji", description: "" },
       ],
     },
     {
@@ -1877,33 +1877,60 @@
     return Boolean(item?.endMs) && Number(item.endMs) < Date.now();
   }
 
-  function scheduleReservationIndexMarkup(items) {
-    if (!items.length) {
-      return `<p class="empty">Brak zapisanych rezerwacji.</p>`;
-    }
+  function scheduleIsCancelled(item) {
+    return String(item?.status || "")
+      .trim()
+      .toLowerCase() === "cancelled";
+  }
+
+  function scheduleRegistryItemMarkup(item) {
+    const createdLabel = item.createdAtMs ? scheduleFormatDateTime(item.createdAtMs) : "Brak daty utworzenia";
+    const registryToneClass = `${scheduleIsPast(item) ? " is-past" : ""}${scheduleIsCancelled(item) ? " is-cancelled" : ""}`;
     return `
-      <div class="schedule-day-list schedule-registry-list">
-        ${items
-          .map((item) => {
-            const createdLabel = item.createdAtMs ? scheduleFormatDateTime(item.createdAtMs) : "Brak daty utworzenia";
-            return `
-              <article class="schedule-day-item schedule-registry-item${scheduleIsPast(item) ? " is-past" : ""}">
-                <button type="button" class="button secondary schedule-card-action-details" data-schedule-action="details" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Szczegóły</button>
-                <div class="schedule-day-item-head">
-                  <div class="schedule-day-item-meta">
-                    <strong>${escapeHtml(scheduleCardHeading(item))}</strong>
-                    <span class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</span>
-                    <span class="pill schedule-status-pill ${scheduleStatusPillClass(item.status)}">${escapeHtml(item.statusLabel || scheduleStatusLabel(item.status))}</span>
-                    ${scheduleIsPast(item) ? '<span class="pill schedule-registry-past-pill">Minęła</span>' : ""}
-                  </div>
-                </div>
-                <p>${escapeHtml(item.title || "Rezerwacja")}</p>
-                <p class="helper">${escapeHtml(item.subtitle || "")}</p>
-                <p class="helper">Dodano: ${escapeHtml(createdLabel)}</p>
-              </article>
-            `;
-          })
-          .join("")}
+      <article class="schedule-day-item schedule-registry-item${registryToneClass}">
+        <button type="button" class="button secondary schedule-card-action-details" data-schedule-action="details" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Szczegóły</button>
+        <div class="schedule-day-item-head">
+          <div class="schedule-day-item-meta">
+            <strong>${escapeHtml(scheduleCardHeading(item))}</strong>
+            <span class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</span>
+            <span class="pill schedule-status-pill ${scheduleStatusPillClass(item.status)}">${escapeHtml(item.statusLabel || scheduleStatusLabel(item.status))}</span>
+            ${scheduleIsPast(item) ? '<span class="pill schedule-registry-past-pill">Minęła</span>' : ""}
+          </div>
+        </div>
+        <p>${escapeHtml(item.title || "Rezerwacja")}</p>
+        <p class="helper">${escapeHtml(item.subtitle || "")}</p>
+        <p class="helper">Dodano: ${escapeHtml(createdLabel)}</p>
+      </article>
+    `;
+  }
+
+  function scheduleRegistryColumnMarkup(serviceKey, columnItems) {
+    const title = scheduleServiceLabel(serviceKey);
+    const count = columnItems.length;
+    const body =
+      count > 0
+        ? `<div class="schedule-day-list schedule-registry-list">${columnItems.map((item) => scheduleRegistryItemMarkup(item)).join("")}</div>`
+        : `<p class="empty schedule-registry-column-empty">Brak rezerwacji.</p>`;
+    return `
+      <div class="schedule-registry-column" data-schedule-registry-service="${escapeAttribute(serviceKey)}">
+        <div class="schedule-registry-column-head">
+          <h4 class="schedule-registry-column-title">${escapeHtml(title)}</h4>
+          <span class="pill">${escapeHtml(String(count))}</span>
+        </div>
+        ${body}
+      </div>
+    `;
+  }
+
+  function scheduleReservationIndexMarkup(items) {
+    const hotelItems = items.filter((item) => item.service === "hotel");
+    const restaurantItems = items.filter((item) => item.service === "restaurant");
+    const hallItems = items.filter((item) => item.service === "hall");
+    return `
+      <div class="schedule-registry-columns">
+        ${scheduleRegistryColumnMarkup("hotel", hotelItems)}
+        ${scheduleRegistryColumnMarkup("restaurant", restaurantItems)}
+        ${scheduleRegistryColumnMarkup("hall", hallItems)}
       </div>
     `;
   }
@@ -2339,12 +2366,8 @@
     panel.innerHTML = `
       <div class="schedule-shell">
         <section class="schedule-calendar-card schedule-registry-card">
-          <div class="schedule-calendar-head">
-            <div>
-              <p class="pill">${escapeHtml(String(state.schedule.allItems.length))}</p>
-              <h3 class="schedule-calendar-title">Spis rezerwacji</h3>
-              <p class="helper">Wszystkie rezerwacje od najnowszych do najstarszych. Pozycje, które już minęły, są wyszarzone.</p>
-            </div>
+          <div class="schedule-calendar-head schedule-registry-head">
+            <p class="pill">${escapeHtml(String(state.schedule.allItems.length))}</p>
             <button type="button" class="schedule-refresh-button" data-schedule-refresh aria-label="Odśwież">${scheduleIconMarkup("refresh")}</button>
           </div>
           ${statusMessage ? `<p class="status">${escapeHtml(statusMessage)}</p>` : ""}

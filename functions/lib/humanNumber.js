@@ -13,6 +13,12 @@ function currentWarsawYear() {
   return DateTime.now().setZone(WARSAW).year;
 }
 
+function reservationCollectionName(service) {
+  if (service === "hotel") return "hotelReservations";
+  if (service === "restaurant") return "restaurantReservations";
+  return "venueReservations";
+}
+
 function timestampToWarsawYear(value) {
   if (!value) return null;
   if (typeof value.toMillis === "function") {
@@ -108,33 +114,25 @@ async function allocateSharedReservationNumber(db, service, year = currentWarsaw
   if (!Number.isInteger(numericYear) || numericYear < 2000 || numericYear > 2100) {
     throw new Error("Nieprawidłowy rok numeracji.");
   }
-  const counterRef = db.collection("bookingCounters").doc(`year_${numericYear}`);
+  const normalizedService = String(service || "").trim().toLowerCase() || "hotel";
+  const counterRef = db.collection("bookingCounters").doc(`year_${numericYear}_${normalizedService}`);
+  const reservationsRef = db.collection(reservationCollectionName(normalizedService));
   return db.runTransaction(async (tx) => {
     const counterSnap = await tx.get(counterRef);
     let nextSeq = Number(counterSnap.data()?.nextSeq || 0);
     if (!nextSeq) {
       const { start, end } = yearBounds(numericYear);
-      const queries = [
-        db.collection("hotelReservations").where("createdAt", ">=", start).where("createdAt", "<", end),
-        db.collection("restaurantReservations").where("createdAt", ">=", start).where("createdAt", "<", end),
-        db.collection("venueReservations").where("createdAt", ">=", start).where("createdAt", "<", end),
-      ];
-      const snapshots = [];
-      for (const query of queries) {
-        snapshots.push(await tx.get(query));
-      }
+      const snapshot = await tx.get(reservationsRef.where("createdAt", ">=", start).where("createdAt", "<", end));
       let totalCount = 0;
       let maxSequence = 0;
-      for (const snapshot of snapshots) {
-        totalCount += snapshot.size;
-        snapshot.forEach((doc) => {
-          const data = doc.data() || {};
-          const parsed = extractReservationSequenceAndYear(data.humanNumber);
-          if (parsed.year === numericYear && Number(parsed.sequence || 0) > maxSequence) {
-            maxSequence = Number(parsed.sequence || 0);
-          }
-        });
-      }
+      totalCount += snapshot.size;
+      snapshot.forEach((doc) => {
+        const data = doc.data() || {};
+        const parsed = extractReservationSequenceAndYear(data.humanNumber);
+        if (parsed.year === numericYear && Number(parsed.sequence || 0) > maxSequence) {
+          maxSequence = Number(parsed.sequence || 0);
+        }
+      });
       nextSeq = Math.max(totalCount, maxSequence, 0) + 1;
     }
     tx.set(

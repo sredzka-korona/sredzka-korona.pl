@@ -29,6 +29,9 @@ body.gb-modal-open {
   -webkit-backdrop-filter: blur(8px);
   box-sizing: border-box;
   overflow-x: hidden;
+  /* Wspólna ramka jak pola formularza (wszystkie kroki modala) */
+  --gb-field-frame-radius: 12px;
+  --gb-field-frame-border: 1px solid rgba(255, 229, 184, 0.32);
 }
 
 #gb-modal.gb-open {
@@ -274,12 +277,6 @@ body.gb-modal-open {
   position: relative;
 }
 
-#gb-modal .gb-rest-details-wrap--loading .gb-rest-details-fields {
-  opacity: 0.55;
-  filter: grayscale(0.15);
-  transition: opacity 0.2s ease;
-}
-
 #gb-modal .gb-rest-details-overlay {
   position: absolute;
   inset: 0;
@@ -287,9 +284,7 @@ body.gb-modal-open {
   display: grid;
   place-items: center;
   padding: 1rem;
-  border-radius: 14px;
-  background: rgba(18, 12, 8, 0.52);
-  backdrop-filter: blur(2px);
+  pointer-events: none;
 }
 
 #gb-modal .gb-loading-state--overlay {
@@ -428,8 +423,8 @@ body.gb-modal-open {
 }
 
 #gb-modal .gb-calendar {
-  border: 1px solid rgba(255, 229, 184, 0.2);
-  border-radius: 18px;
+  border: var(--gb-field-frame-border);
+  border-radius: var(--gb-field-frame-radius);
   background: rgba(255, 255, 255, 0.06);
   padding: 0.85rem;
 }
@@ -481,8 +476,8 @@ body.gb-modal-open {
 
 #gb-modal .gb-calendar-cell {
   min-height: 4.1rem;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 229, 184, 0.18);
+  border-radius: var(--gb-field-frame-radius);
+  border: var(--gb-field-frame-border);
   background: rgba(255, 255, 255, 0.05);
   color: var(--gb-text);
   padding: 0.5rem 0.35rem;
@@ -558,8 +553,8 @@ body.gb-modal-open {
 #gb-modal input,
 #gb-modal select,
 #gb-modal textarea {
-  border-radius: 12px;
-  border: 1px solid rgba(255, 229, 184, 0.32);
+  border-radius: var(--gb-field-frame-radius);
+  border: var(--gb-field-frame-border);
   background: rgba(255, 251, 241, 0.92);
   color: #2a1f14;
   padding: 0.6rem 0.72rem;
@@ -616,8 +611,20 @@ body.gb-modal-open {
   margin: 0;
 }
 
+/* Natywny wygląd selecta na WebKit/Blink obcina zaokrąglenia — jak input[type=number] */
 #gb-modal select {
-  appearance: auto;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 2.35rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%232a1f14' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 0.55rem auto;
+}
+
+#gb-modal select:disabled {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236b5d4f' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
 }
 
 #gb-modal textarea {
@@ -666,8 +673,8 @@ body.gb-modal-open {
 
 #gb-modal .gb-service-tile,
 #gb-modal .gb-hall-tile {
-  border: 1px solid rgba(255, 229, 184, 0.35);
-  border-radius: 16px;
+  border: var(--gb-field-frame-border);
+  border-radius: var(--gb-field-frame-radius);
   background: var(--gb-card-bg);
   color: #fff9ef;
   min-height: 136px;
@@ -726,8 +733,8 @@ body.gb-modal-open {
 }
 
 #gb-modal .gb-room-card {
-  border: 1px solid rgba(255, 227, 183, 0.32);
-  border-radius: 15px;
+  border: var(--gb-field-frame-border);
+  border-radius: var(--gb-field-frame-radius);
   background: rgba(255, 245, 226, 0.1);
   padding: 0.95rem;
   display: flex;
@@ -837,8 +844,8 @@ body.gb-modal-open {
 
 #gb-modal .gb-cart,
 #gb-modal .gb-summary-box {
-  border-radius: 14px;
-  border: 1px solid rgba(255, 225, 179, 0.28);
+  border-radius: var(--gb-field-frame-radius);
+  border: var(--gb-field-frame-border);
   background: rgba(255, 245, 225, 0.1);
   padding: 0.8rem;
   margin-top: 0.85rem;
@@ -870,8 +877,8 @@ body.gb-modal-open {
   display: grid;
   gap: 0.16rem;
   padding: 0.72rem 0.8rem;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 225, 179, 0.16);
+  border-radius: var(--gb-field-frame-radius);
+  border: var(--gb-field-frame-border);
   background: rgba(255, 251, 241, 0.06);
 }
 
@@ -1034,8 +1041,8 @@ body.gb-modal-open {
 }
 
 #gb-modal .gb-success-card {
-  border-radius: 14px;
-  border: 1px solid rgba(255, 225, 179, 0.28);
+  border-radius: var(--gb-field-frame-radius);
+  border: var(--gb-field-frame-border);
   background: rgba(255, 245, 225, 0.1);
   padding: 0.9rem;
   margin-top: 0.3rem;
@@ -1058,8 +1065,8 @@ body.gb-modal-open {
   display: grid;
   gap: 0.18rem;
   padding: 0.72rem 0.8rem;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 225, 179, 0.16);
+  border-radius: var(--gb-field-frame-radius);
+  border: var(--gb-field-frame-border);
   background: rgba(255, 251, 241, 0.06);
 }
 
@@ -1294,7 +1301,7 @@ body.gb-modal-open {
 }
 
 #gb-modal .gb-session-expired {
-  border-radius: 14px;
+  border-radius: var(--gb-field-frame-radius);
   border: 1px solid rgba(255, 205, 205, 0.45);
   padding: 1rem;
   background: rgba(178, 54, 54, 0.16);
