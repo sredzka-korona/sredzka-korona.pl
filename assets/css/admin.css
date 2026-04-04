@@ -2104,6 +2104,31 @@ body.admin-modal-open {
   margin: 0;
 }
 
+.schedule-registry-list {
+  grid-auto-rows: 13.5rem;
+}
+
+.schedule-registry-list .schedule-registry-item {
+  display: flex;
+  flex-direction: column;
+  height: 13.5rem;
+  min-height: 13.5rem;
+  overflow: hidden;
+}
+
+.schedule-registry-list .schedule-registry-item > p:nth-of-type(1),
+.schedule-registry-list .schedule-registry-item > p:nth-of-type(2) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.schedule-registry-list .schedule-registry-item > p:nth-of-type(3) {
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
 @media (max-width: 1024px) {
   .schedule-registry-columns {
     grid-template-columns: 1fr;
@@ -2129,23 +2154,54 @@ body.admin-modal-open {
   color: var(--muted);
 }
 
-.schedule-details-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.75rem;
-}
-
-.schedule-detail-card {
-  display: grid;
-  gap: 0.32rem;
-  padding: 0.88rem 0.95rem;
+.schedule-details-sheet {
   border-radius: 16px;
-  border: 1px solid rgba(131, 107, 69, 0.18);
-  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(131, 107, 69, 0.2);
+  background: rgba(255, 255, 255, 0.92);
+  overflow: hidden;
+  max-width: 100%;
 }
 
-.schedule-detail-card.is-wide {
-  grid-column: 1 / -1;
+.schedule-detail-row {
+  display: grid;
+  grid-template-columns: minmax(7.25rem, 10.25rem) minmax(0, 1fr);
+  gap: 0.35rem 0.85rem;
+  padding: 0.52rem 0.88rem;
+  border-bottom: 1px solid rgba(131, 107, 69, 0.12);
+  align-items: first baseline;
+}
+
+.schedule-detail-row:last-child {
+  border-bottom: none;
+}
+
+.schedule-detail-row--countdown {
+  background: rgba(243, 246, 255, 0.55);
+}
+
+.schedule-detail-row__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.35;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.schedule-detail-row__value {
+  font-size: 0.96rem;
+  font-weight: 650;
+  line-height: 1.45;
+  color: var(--text);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.schedule-detail-row__value strong {
+  font-weight: 750;
 }
 
 .schedule-detail-label {
@@ -2154,11 +2210,6 @@ body.admin-modal-open {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
-}
-
-.schedule-detail-value {
-  font-size: 1.02rem;
-  line-height: 1.35;
 }
 
 .schedule-note-card {
@@ -3050,8 +3101,10 @@ button.icon-btn {
     width: min(100%, 420px);
   }
 
-  .schedule-details-grid {
+  .schedule-detail-row {
     grid-template-columns: 1fr;
+    gap: 0.2rem;
+    padding: 0.48rem 0.78rem;
   }
 
   .schedule-create-services {

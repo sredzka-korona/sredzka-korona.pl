@@ -539,7 +539,6 @@
         { key: "block", label: "Blokada stolików" },
         { key: "tables", label: "Stoliki" },
         { key: "settings", label: "Ustawienia" },
-        { key: "templates", label: "Szablony mailingowe" },
       ].filter((tab) => !allowedTabs || allowedTabs.includes(tab.key));
       if (!availableTabs.length) {
         container.innerHTML = `<section class="panel col-12"><p class="status">Brak dostepnych widokow tego modulu.</p></section>`;

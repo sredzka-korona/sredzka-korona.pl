@@ -568,7 +568,6 @@
         { key: "rooms", label: "Pokoje", description: "Konfiguracja pokoi, cen i parametrów rezerwacyjnych." },
         { key: "gallery", label: "Galeria", description: "Wspólna galeria pokoi z podziałem na albumy 1/2/3/4-osobowe." },
         { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Hotel na stronie głównej (pozycja i zoom)." },
-        { key: "templates", label: "Szablony maili", description: "Wiadomości wysyłane dla rezerwacji hotelowych." },
         { key: "settings", label: "Ustawienia rezerwacji", description: "Włączenie i przerwy w przyjmowaniu rezerwacji." },
       ],
     },
@@ -583,7 +582,6 @@
         { key: "hours", label: "Godziny otwarcia", description: "Dni i godziny widoczne na stronie restauracji." },
         { key: "tables", label: "Stoliki", description: "Konfiguracja stolików i godzin systemu rezerwacji." },
         { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Restauracja na stronie głównej (pozycja i zoom)." },
-        { key: "templates", label: "Szablony", description: "Wiadomości wysyłane dla rezerwacji restauracji." },
         { key: "settings", label: "Ustawienia rezerwacji", description: "Włączenie i przerwy w przyjmowaniu rezerwacji." },
       ],
     },
@@ -596,7 +594,6 @@
         { key: "gallery", label: "Galeria", description: "Galerie sal i albumy wydarzeń." },
         { key: "menu", label: "Menu okolicznościowe", description: "Sekcje, pozycje i kolejność menu." },
         { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Przyjęcia na stronie głównej (pozycja i zoom)." },
-        { key: "templates", label: "Szablony", description: "Wiadomości wysyłane dla rezerwacji przyjęć." },
         { key: "settings", label: "Ustawienia rezerwacji", description: "Włączenie rezerwacji i blokady terminów sal." },
       ],
     },
@@ -1399,19 +1396,6 @@
     )}</strong></p>`;
   }
 
-  function scheduleCountdownCardMarkup(item, label = "Pozostały czas") {
-    const deadlineMs = scheduleItemDeadlineMs(item);
-    if (!deadlineMs) return "";
-    return `
-      <article class="schedule-detail-card">
-        <span class="schedule-detail-label">${escapeHtml(label)}</span>
-        <strong class="schedule-detail-value" data-schedule-countdown-deadline="${escapeAttribute(String(deadlineMs))}">${escapeHtml(
-          scheduleCountdownText(deadlineMs)
-        )}</strong>
-      </article>
-    `;
-  }
-
   function refreshScheduleCountdownNodes() {
     document.querySelectorAll("[data-schedule-countdown-deadline]").forEach((node) => {
       const deadlineMs = Number(node.getAttribute("data-schedule-countdown-deadline") || 0);
@@ -1845,13 +1829,33 @@
     return escapeHtml(String(note || "")).replace(/\n/g, "<br>");
   }
 
-  function scheduleDetailCardMarkup(label, value, wide = false) {
+  function scheduleDetailSheetRowMarkup(label, value) {
+    const raw = value === undefined || value === null ? "" : String(value);
+    const display = raw.trim() === "" ? "—" : raw;
     return `
-      <article class="schedule-detail-card${wide ? " is-wide" : ""}">
-        <span class="schedule-detail-label">${escapeHtml(label)}</span>
-        <strong class="schedule-detail-value">${escapeHtml(value || "—")}</strong>
-      </article>
+      <div class="schedule-detail-row">
+        <span class="schedule-detail-row__label">${escapeHtml(label)}</span>
+        <span class="schedule-detail-row__value">${escapeHtml(display)}</span>
+      </div>
     `;
+  }
+
+  function scheduleDetailSheetCountdownRowMarkup(item, label = "Pozostały czas") {
+    const deadlineMs = scheduleItemDeadlineMs(item);
+    if (!deadlineMs) return "";
+    const text = scheduleCountdownText(deadlineMs);
+    return `
+      <div class="schedule-detail-row schedule-detail-row--countdown">
+        <span class="schedule-detail-row__label">${escapeHtml(label)}</span>
+        <span class="schedule-detail-row__value">
+          <strong data-schedule-countdown-deadline="${escapeAttribute(String(deadlineMs))}">${escapeHtml(text)}</strong>
+        </span>
+      </div>
+    `;
+  }
+
+  function scheduleDetailsSheetWrap(rowsHtml) {
+    return `<div class="schedule-details-sheet">${rowsHtml}</div>`;
   }
 
   function scheduleBooleanLabel(value) {
@@ -1903,7 +1907,6 @@
         <div class="schedule-day-item-head">
           <div class="schedule-day-item-meta">
             <strong>${escapeHtml(scheduleCardHeading(item))}</strong>
-            <span class="pill ${scheduleServicePillClass(item.service)}">${escapeHtml(scheduleServiceLabel(item.service))}</span>
             <span class="pill schedule-status-pill ${scheduleStatusPillClass(item.status)}">${escapeHtml(item.statusLabel || scheduleStatusLabel(item.status))}</span>
             ${scheduleIsPast(item) ? '<span class="pill schedule-registry-past-pill">Minęła</span>' : ""}
           </div>
@@ -2513,26 +2516,25 @@
 
   function scheduleReservationDetailsMarkup(item) {
     const isBlock = item.status === "manual_block";
-    const cards = [];
+    const rows = [];
     const notes = [];
 
     if (isBlock) {
-      cards.push(scheduleDetailCardMarkup("Obszar", scheduleServiceLabel(item.service)));
+      rows.push(scheduleDetailSheetRowMarkup("Obszar", scheduleServiceLabel(item.service)));
       if (item.service === "hotel") {
-        cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatCompactDate(item.raw.dateFrom)} - ${scheduleFormatCompactDate(item.raw.dateTo)}`));
-        cards.push(scheduleDetailCardMarkup("Pokoje", scheduleRoomLabels(item.raw.roomIds || item.resourceIds || []) || "Wskazane pokoje", true));
+        rows.push(scheduleDetailSheetRowMarkup("Termin", `${scheduleFormatCompactDate(item.raw.dateFrom)} - ${scheduleFormatCompactDate(item.raw.dateTo)}`));
+        rows.push(scheduleDetailSheetRowMarkup("Pokoje", scheduleRoomLabels(item.raw.roomIds || item.resourceIds || []) || "Wskazane pokoje"));
       } else if (item.service === "restaurant") {
-        cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
-        cards.push(
-          scheduleDetailCardMarkup(
+        rows.push(scheduleDetailSheetRowMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
+        rows.push(
+          scheduleDetailSheetRowMarkup(
             "Przydzielone stoliki",
-            item.raw.assignedTablesLabel || scheduleTableLabels(item.raw.assignedTableIds || item.resourceIds || []) || "Wskazane stoliki",
-            true
+            item.raw.assignedTablesLabel || scheduleTableLabels(item.raw.assignedTableIds || item.resourceIds || []) || "Wskazane stoliki"
           )
         );
       } else {
-        cards.push(scheduleDetailCardMarkup("Sala", item.raw.hallName || "Wybrana sala"));
-        cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
+        rows.push(scheduleDetailSheetRowMarkup("Sala", item.raw.hallName || "Wybrana sala"));
+        rows.push(scheduleDetailSheetRowMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
       }
       notes.push(
         scheduleNoteCardMarkup(
@@ -2546,62 +2548,69 @@
             <strong>Blokada terminu</strong>
             <p>Ta pozycja nie odwołuje istniejących rezerwacji. Ogranicza tylko kolejne rezerwacje w wybranym zakresie.</p>
           </div>
-          <div class="schedule-details-grid">${cards.join("")}</div>
+          ${scheduleDetailsSheetWrap(rows.join(""))}
           ${notes.join("")}
         </div>
       `;
     }
 
-    cards.push(scheduleDetailCardMarkup("Status", item.statusLabel || scheduleStatusLabel(item.status)));
-    cards.push(scheduleCountdownCardMarkup(item));
+    rows.push(scheduleDetailSheetRowMarkup("Status", item.statusLabel || scheduleStatusLabel(item.status)));
+    rows.push(scheduleDetailSheetCountdownRowMarkup(item));
     if (item.service === "hotel") {
-      cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatCompactDate(item.raw.dateFrom)} - ${scheduleFormatCompactDate(item.raw.dateTo)}`));
-      cards.push(scheduleDetailCardMarkup("Pokoje", scheduleRoomLabels(item.raw.roomIds || item.resourceIds || []) || "—", true));
+      rows.push(scheduleDetailSheetRowMarkup("Termin", `${scheduleFormatCompactDate(item.raw.dateFrom)} - ${scheduleFormatCompactDate(item.raw.dateTo)}`));
+      rows.push(scheduleDetailSheetRowMarkup("Pokoje", scheduleRoomLabels(item.raw.roomIds || item.resourceIds || []) || "—"));
       const totalPrice = Number(item.raw.totalPrice);
       if (Number.isFinite(totalPrice) && totalPrice > 0) {
-        cards.push(scheduleDetailCardMarkup("Kwota orientacyjna", `${totalPrice.toFixed(2)} PLN`));
+        rows.push(scheduleDetailSheetRowMarkup("Kwota orientacyjna", `${totalPrice.toFixed(2)} PLN`));
       }
-      cards.push(scheduleDetailCardMarkup("Klient", item.raw.customerName || "—"));
-      cards.push(scheduleDetailCardMarkup("Telefon", item.raw.phone || "—"));
-      cards.push(scheduleDetailCardMarkup("E-mail", item.raw.email || "—", true));
+      rows.push(scheduleDetailSheetRowMarkup("Klient", item.raw.customerName || "—"));
+      rows.push(scheduleDetailSheetRowMarkup("Telefon", item.raw.phone || "—"));
+      rows.push(scheduleDetailSheetRowMarkup("E-mail", item.raw.email || "—"));
     } else if (item.service === "restaurant") {
-      cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
-      cards.push(
-        scheduleDetailCardMarkup(
+      rows.push(scheduleDetailSheetRowMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
+      rows.push(
+        scheduleDetailSheetRowMarkup(
           "Przydzielone stoliki",
-          item.raw.assignedTablesLabel || scheduleTableLabels(item.raw.assignedTableIds || item.resourceIds || []) || "—",
-          true
+          item.raw.assignedTablesLabel || scheduleTableLabels(item.raw.assignedTableIds || item.resourceIds || []) || "—"
         )
       );
-      cards.push(scheduleDetailCardMarkup("Zarezerwowane stoliki (liczba)", String(item.raw.tablesCount ?? "—")));
-      cards.push(scheduleDetailCardMarkup("Goście", String(item.raw.guestsCount || "—")));
-      cards.push(scheduleDetailCardMarkup("Preferencja miejsca", scheduleRestaurantPlaceLabel(item.raw.placePreference)));
-      cards.push(scheduleDetailCardMarkup("Łączenie stolików", scheduleBooleanLabel(Boolean(item.raw.joinTables))));
-      cards.push(scheduleDetailCardMarkup("Klient", item.raw.fullName || "—"));
-      cards.push(scheduleDetailCardMarkup("Telefon", item.raw.phone || "—"));
-      cards.push(scheduleDetailCardMarkup("E-mail", item.raw.email || "—", true));
+      const tc = item.raw.tablesCount;
+      const gc = item.raw.guestsCount;
+      const tablesPart =
+        tc !== undefined && tc !== null && String(tc).trim() !== ""
+          ? `Stoliki (rezerwacja): ${tc}`
+          : "Stoliki (rezerwacja): —";
+      const guestsPart =
+        gc !== undefined && gc !== null && String(gc).trim() !== "" ? `Goście: ${gc}` : "Goście: —";
+      const placePart = `Miejsce: ${scheduleRestaurantPlaceLabel(item.raw.placePreference)}`;
+      const joinPart = `Łączenie: ${scheduleBooleanLabel(Boolean(item.raw.joinTables))}`;
+      rows.push(scheduleDetailSheetRowMarkup("Parametry rezerwacji", `${tablesPart} · ${guestsPart} · ${placePart} · ${joinPart}`));
+      rows.push(scheduleDetailSheetRowMarkup("Klient", item.raw.fullName || "—"));
+      rows.push(scheduleDetailSheetRowMarkup("Telefon", item.raw.phone || "—"));
+      rows.push(scheduleDetailSheetRowMarkup("E-mail", item.raw.email || "—"));
     } else {
-      cards.push(scheduleDetailCardMarkup("Sala", item.raw.hallName || "—"));
-      cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
-      cards.push(scheduleDetailCardMarkup("Goście", String(item.raw.guestsCount || "—")));
-      cards.push(scheduleDetailCardMarkup("Rodzaj wydarzenia", item.raw.eventType || "—", true));
+      rows.push(scheduleDetailSheetRowMarkup("Sala", item.raw.hallName || "—"));
+      rows.push(scheduleDetailSheetRowMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
+      rows.push(scheduleDetailSheetRowMarkup("Goście", String(item.raw.guestsCount ?? "—")));
+      rows.push(scheduleDetailSheetRowMarkup("Rodzaj wydarzenia", item.raw.eventType || "—"));
       const hallKind = String(item.raw.hallKindSnapshot || "").toLowerCase();
+      const exc = scheduleBooleanLabel(Boolean(item.raw.exclusive));
+      const fb = scheduleBooleanLabel(Boolean(item.raw.fullBlock));
       if (hallKind === "large") {
-        cards.push(scheduleDetailCardMarkup("Wyłączność sali", scheduleBooleanLabel(Boolean(item.raw.exclusive))));
-        cards.push(scheduleDetailCardMarkup("Pełna blokada sali", scheduleBooleanLabel(Boolean(item.raw.fullBlock))));
+        rows.push(scheduleDetailSheetRowMarkup("Warunki sali", `Wyłączność: ${exc} · Pełna blokada: ${fb}`));
       } else {
-        cards.push(scheduleDetailCardMarkup("Wyłączność sali", scheduleBooleanLabel(Boolean(item.raw.exclusive))));
+        rows.push(scheduleDetailSheetRowMarkup("Wyłączność sali", exc));
       }
-      cards.push(scheduleDetailCardMarkup("Klient", item.raw.fullName || "—"));
-      cards.push(scheduleDetailCardMarkup("Telefon", item.raw.phone || "—"));
-      cards.push(scheduleDetailCardMarkup("E-mail", item.raw.email || "—", true));
+      rows.push(scheduleDetailSheetRowMarkup("Klient", item.raw.fullName || "—"));
+      rows.push(scheduleDetailSheetRowMarkup("Telefon", item.raw.phone || "—"));
+      rows.push(scheduleDetailSheetRowMarkup("E-mail", item.raw.email || "—"));
     }
 
     notes.push(scheduleNoteCardMarkup("Uwagi klienta", item.raw.customerNote || ""));
     notes.push(scheduleNoteCardMarkup("Notatka administratora", item.raw.adminNote || ""));
     return `
       <div class="schedule-details-view">
-        <div class="schedule-details-grid">${cards.join("")}</div>
+        ${scheduleDetailsSheetWrap(rows.filter(Boolean).join(""))}
         ${notes.join("")}
       </div>
     `;
