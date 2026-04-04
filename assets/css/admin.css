@@ -2131,7 +2131,7 @@ body.admin-modal-open {
 
 .schedule-details-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 0.75rem;
 }
 
@@ -2149,9 +2149,9 @@ body.admin-modal-open {
 }
 
 .schedule-detail-label {
-  font-size: 0.74rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
 }

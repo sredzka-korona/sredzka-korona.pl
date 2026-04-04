@@ -1854,6 +1854,17 @@
     `;
   }
 
+  function scheduleBooleanLabel(value) {
+    return value ? "Tak" : "Nie";
+  }
+
+  function scheduleRestaurantPlaceLabel(pref) {
+    const p = String(pref || "");
+    if (p === "inside") return "W lokalu";
+    if (p === "terrace") return "Na tarasie";
+    return "Bez preferencji";
+  }
+
   function scheduleNoteCardMarkup(label, value) {
     if (!String(value || "").trim()) return "";
     return `
@@ -2514,7 +2525,7 @@
         cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
         cards.push(
           scheduleDetailCardMarkup(
-            "Stoliki",
+            "Przydzielone stoliki",
             item.raw.assignedTablesLabel || scheduleTableLabels(item.raw.assignedTableIds || item.resourceIds || []) || "Wskazane stoliki",
             true
           )
@@ -2546,6 +2557,10 @@
     if (item.service === "hotel") {
       cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatCompactDate(item.raw.dateFrom)} - ${scheduleFormatCompactDate(item.raw.dateTo)}`));
       cards.push(scheduleDetailCardMarkup("Pokoje", scheduleRoomLabels(item.raw.roomIds || item.resourceIds || []) || "—", true));
+      const totalPrice = Number(item.raw.totalPrice);
+      if (Number.isFinite(totalPrice) && totalPrice > 0) {
+        cards.push(scheduleDetailCardMarkup("Kwota orientacyjna", `${totalPrice.toFixed(2)} PLN`));
+      }
       cards.push(scheduleDetailCardMarkup("Klient", item.raw.customerName || "—"));
       cards.push(scheduleDetailCardMarkup("Telefon", item.raw.phone || "—"));
       cards.push(scheduleDetailCardMarkup("E-mail", item.raw.email || "—", true));
@@ -2553,12 +2568,15 @@
       cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
       cards.push(
         scheduleDetailCardMarkup(
-          "Stoliki",
+          "Przydzielone stoliki",
           item.raw.assignedTablesLabel || scheduleTableLabels(item.raw.assignedTableIds || item.resourceIds || []) || "—",
           true
         )
       );
+      cards.push(scheduleDetailCardMarkup("Zarezerwowane stoliki (liczba)", String(item.raw.tablesCount ?? "—")));
       cards.push(scheduleDetailCardMarkup("Goście", String(item.raw.guestsCount || "—")));
+      cards.push(scheduleDetailCardMarkup("Preferencja miejsca", scheduleRestaurantPlaceLabel(item.raw.placePreference)));
+      cards.push(scheduleDetailCardMarkup("Łączenie stolików", scheduleBooleanLabel(Boolean(item.raw.joinTables))));
       cards.push(scheduleDetailCardMarkup("Klient", item.raw.fullName || "—"));
       cards.push(scheduleDetailCardMarkup("Telefon", item.raw.phone || "—"));
       cards.push(scheduleDetailCardMarkup("E-mail", item.raw.email || "—", true));
@@ -2567,6 +2585,13 @@
       cards.push(scheduleDetailCardMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
       cards.push(scheduleDetailCardMarkup("Goście", String(item.raw.guestsCount || "—")));
       cards.push(scheduleDetailCardMarkup("Rodzaj wydarzenia", item.raw.eventType || "—", true));
+      const hallKind = String(item.raw.hallKindSnapshot || "").toLowerCase();
+      if (hallKind === "large") {
+        cards.push(scheduleDetailCardMarkup("Wyłączność sali", scheduleBooleanLabel(Boolean(item.raw.exclusive))));
+        cards.push(scheduleDetailCardMarkup("Pełna blokada sali", scheduleBooleanLabel(Boolean(item.raw.fullBlock))));
+      } else {
+        cards.push(scheduleDetailCardMarkup("Wyłączność sali", scheduleBooleanLabel(Boolean(item.raw.exclusive))));
+      }
       cards.push(scheduleDetailCardMarkup("Klient", item.raw.fullName || "—"));
       cards.push(scheduleDetailCardMarkup("Telefon", item.raw.phone || "—"));
       cards.push(scheduleDetailCardMarkup("E-mail", item.raw.email || "—", true));
@@ -2761,6 +2786,11 @@
           <label class="field"><span>Liczba stolików</span><input type="number" min="1" max="${escapeAttribute(String(Math.max(1, restaurantTableLimit)))}" name="tablesCount" value="${escapeAttribute(String(raw.tablesCount || 1))}" required /></label>
           <label class="field"><span>Liczba gości</span><input type="number" min="1" name="guestsCount" value="${escapeAttribute(String(raw.guestsCount || 1))}" required /></label>
           <label class="field"><span>Łączone stoliki</span><select name="joinTables"><option value="0" ${raw.joinTables ? "" : "selected"}>Nie</option><option value="1" ${raw.joinTables ? "selected" : ""}>Tak</option></select></label>
+          <label class="field"><span>Preferencja miejsca</span><select name="placePreference">
+            <option value="no_preference" ${String(raw.placePreference || "no_preference") === "no_preference" ? "selected" : ""}>Bez preferencji</option>
+            <option value="inside" ${String(raw.placePreference || "") === "inside" ? "selected" : ""}>W lokalu</option>
+            <option value="terrace" ${String(raw.placePreference || "") === "terrace" ? "selected" : ""}>Na tarasie</option>
+          </select></label>
           <label class="field"><span>Imię i nazwisko</span><input name="fullName" value="${escapeAttribute(raw.fullName || "")}" required /></label>
           <label class="field"><span>E-mail</span><input name="email" type="email" value="${escapeAttribute(raw.email || "")}" required /></label>
           <label class="field"><span>Prefiks</span><input name="phonePrefix" value="${escapeAttribute(raw.phonePrefix || "+48")}" required /></label>
@@ -2844,6 +2874,7 @@
             }
             body.guestsCount = Number(formData.get("guestsCount") || 1);
             body.joinTables = formData.get("joinTables") === "1";
+            body.placePreference = String(formData.get("placePreference") || "no_preference");
             body.fullName = formData.get("fullName");
             body.email = formData.get("email");
             body.phonePrefix = formData.get("phonePrefix");
@@ -2968,6 +2999,11 @@
                 <label class="field"><span>Liczba stolików</span><input type="number" min="1" max="${escapeAttribute(String(Math.max(1, restaurantTableLimit)))}" name="tablesCount" value="1" required /></label>
                 <label class="field"><span>Liczba gości</span><input type="number" min="1" name="guestsCount" value="2" required /></label>
                 <label class="field"><span>Łączone stoliki</span><select name="joinTables"><option value="0">Nie</option><option value="1">Tak</option></select></label>
+                <label class="field"><span>Preferencja miejsca</span><select name="placePreference">
+                  <option value="no_preference">Bez preferencji</option>
+                  <option value="inside">W lokalu</option>
+                  <option value="terrace">Na tarasie</option>
+                </select></label>
                 <label class="field"><span>Imię i nazwisko</span><input name="fullName" required /></label>
                 <label class="field"><span>E-mail</span><input name="email" type="email" /></label>
                 <label class="field"><span>Prefiks</span><input name="phonePrefix" value="+48" /></label>
@@ -3142,6 +3178,7 @@
                   tablesCount,
                   guestsCount: Number(formData.get("guestsCount") || 1),
                   joinTables: formData.get("joinTables") === "1",
+                  placePreference: String(formData.get("placePreference") || "no_preference"),
                   fullName: formData.get("fullName"),
                   email: String(formData.get("email") || "").trim(),
                   phonePrefix: String(formData.get("phoneNational") || "").trim()

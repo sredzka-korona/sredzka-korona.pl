@@ -14,15 +14,22 @@ export default {
 
     try {
       if (url.pathname === "/api/public/bootstrap" && request.method === "GET") {
-        return jsonResponse(await getPublicBootstrap(env, url), 200, request, env);
+        assertBrowserLikePublicRequest(request, url);
+        return jsonResponse(await getPublicBootstrap(env, url), 200, request, env, {
+          "Cache-Control": "public, max-age=120, s-maxage=300, stale-while-revalidate=600",
+        });
       }
 
       if (url.pathname === "/api/public/calendar" && request.method === "GET") {
+        assertBrowserLikePublicRequest(request, url);
         const from = url.searchParams.get("from");
-        return jsonResponse(await getCalendarBlocks(env, from, url), 200, request, env);
+        return jsonResponse(await getCalendarBlocks(env, from, url), 200, request, env, {
+          "Cache-Control": "public, max-age=60, s-maxage=120, stale-while-revalidate=300",
+        });
       }
 
       if (url.pathname === "/api/public/contact" && request.method === "POST") {
+        assertBrowserLikePublicRequest(request, url);
         const payload = await request.json();
         await handleContactSubmission(payload, request, env);
         return jsonResponse({ ok: true }, 201, request, env);
@@ -226,6 +233,7 @@ export default {
         url.pathname.match(/^\/api\/public\/legacy-bookings\/(hotel|restaurant|hall)$/) &&
         ["GET", "POST"].includes(request.method)
       ) {
+        assertBrowserLikePublicRequest(request, url);
         const service = url.pathname.split("/").pop();
         const op = String(url.searchParams.get("op") || "").trim();
         if (!isAllowedPublicLegacyBookingOp(op)) {
@@ -1188,6 +1196,24 @@ function corsHeaders(request, env) {
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     Vary: "Origin",
   };
+}
+
+function assertBrowserLikePublicRequest(request, url) {
+  const hasOrigin = Boolean(request.headers.get("Origin"));
+  const hasReferer = Boolean(request.headers.get("Referer"));
+  const secFetchSite = String(request.headers.get("Sec-Fetch-Site") || "").trim().toLowerCase();
+  const secFetchMode = String(request.headers.get("Sec-Fetch-Mode") || "").trim().toLowerCase();
+  const hasBrowserHints =
+    hasOrigin ||
+    hasReferer ||
+    ["same-origin", "same-site", "cross-site", "none"].includes(secFetchSite) ||
+    ["cors", "navigate", "same-origin", "no-cors"].includes(secFetchMode);
+  if (hasBrowserHints) {
+    return;
+  }
+  throw Object.assign(new Error(`Publiczny endpoint ${url.pathname} wymaga naglowkow przegladarki.`), {
+    status: 403,
+  });
 }
 
 function getLegacyBookingApiBase(service, env) {

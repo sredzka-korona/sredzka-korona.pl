@@ -1274,16 +1274,50 @@
             : window.location.hostname && !window.location.hostname.endsWith("github.io")
               ? "https://api." + window.location.hostname.replace(/^www\./, "")
               : "";
+        const BOOTSTRAP_CACHE_KEY = "sredzka-korona:bootstrap-cache:v1";
+        const BOOTSTRAP_TTL_MS = 2 * 60 * 1000;
+
+        function readBootstrapCache() {
+          try {
+            const raw = window.sessionStorage.getItem(BOOTSTRAP_CACHE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed?.payload || Date.now() - Number(parsed.ts || 0) >= BOOTSTRAP_TTL_MS) {
+              return null;
+            }
+            return parsed.payload;
+          } catch {
+            return null;
+          }
+        }
+
+        function writeBootstrapCache(payload) {
+          try {
+            window.sessionStorage.setItem(
+              BOOTSTRAP_CACHE_KEY,
+              JSON.stringify({ ts: Date.now(), payload })
+            );
+          } catch {}
+        }
+
+        async function loadBootstrapPayload() {
+          const cached = readBootstrapCache();
+          if (cached) return cached;
+          const response = await fetch(fallbackApiBase + "/api/public/bootstrap");
+          if (!response.ok) {
+            throw new Error("Bootstrap unavailable");
+          }
+          const payload = await response.json();
+          writeBootstrapCache(payload);
+          return payload;
+        }
 
         try {
           if (!(isLocalPreview && !fallbackApiBase)) {
-            const response = await fetch(fallbackApiBase + "/api/public/bootstrap");
-            if (response.ok) {
-              const payload = await response.json();
-              if (payload.content?.home?.sectionBlocks?.restaurant) {
-                window.location.replace("../index.html");
-                return;
-              }
+            const payload = await loadBootstrapPayload();
+            if (payload.content?.home?.sectionBlocks?.restaurant) {
+              window.location.replace("../index.html");
+              return;
             }
           }
         } catch (e) {}
@@ -1518,11 +1552,7 @@
               ];
               return;
             }
-            const response = await fetch(fallbackApiBase + "/api/public/bootstrap");
-            if (!response.ok) {
-              throw new Error("Bootstrap unavailable");
-            }
-            const payload = await response.json();
+            const payload = await loadBootstrapPayload();
             if (payload.content?.restaurant) {
               if (payload.content.restaurant.orderButtonText) {
                 restaurantOrderButtonText = payload.content.restaurant.orderButtonText;

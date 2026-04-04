@@ -1157,6 +1157,7 @@ async function ensureSchema(env) {
         tables_count INTEGER NOT NULL,
         guests_count INTEGER NOT NULL,
         join_tables INTEGER NOT NULL DEFAULT 0,
+        place_preference TEXT NOT NULL DEFAULT 'no_preference',
         assigned_table_ids_json TEXT NOT NULL DEFAULT '[]',
         customer_note TEXT NOT NULL DEFAULT '',
         admin_note TEXT NOT NULL DEFAULT '',
@@ -1231,6 +1232,7 @@ async function ensureSchema(env) {
       await env.DB.prepare(sql).run();
     }
     await migrateMailAuditSchema(env);
+    await migrateRestaurantPlacePreference(env);
     await seedDefaults(env);
     await migrateHumanYearAndTemplates(env);
   })();
@@ -1249,6 +1251,16 @@ async function migrateMailAuditSchema(env) {
     } catch {
       /* kolumna już istnieje */
     }
+  }
+}
+
+async function migrateRestaurantPlacePreference(env) {
+  try {
+    await env.DB
+      .prepare(`ALTER TABLE restaurant_reservations ADD COLUMN place_preference TEXT NOT NULL DEFAULT 'no_preference'`)
+      .run();
+  } catch {
+    /* kolumna już istnieje */
   }
 }
 
@@ -2088,6 +2100,20 @@ async function assertRestaurantAvailability(env, payload, excludeId = null) {
   return restaurantAvailabilityForSlot(env, settings, allTables, payload, excludeId);
 }
 
+const RESTAURANT_PLACE_PREFS = new Set(["no_preference", "inside", "terrace"]);
+
+function normalizeRestaurantPlacePreference(value) {
+  const v = cleanString(value, 30);
+  return RESTAURANT_PLACE_PREFS.has(v) ? v : "no_preference";
+}
+
+function restaurantPlacePreferenceLabel(pref) {
+  const p = normalizeRestaurantPlacePreference(pref);
+  if (p === "inside") return "W lokalu";
+  if (p === "terrace") return "Na tarasie";
+  return "Bez preferencji";
+}
+
 function mapRestaurantReservation(row, tableMap) {
   const ids = parseJson(row.assigned_table_ids_json, []);
   const labels = ids
@@ -2118,6 +2144,7 @@ function mapRestaurantReservation(row, tableMap) {
     assignedTablesLabel: labels,
     guestsCount: Number(row.guests_count || 0),
     joinTables: Boolean(row.join_tables),
+    placePreference: normalizeRestaurantPlacePreference(row.place_preference),
     customerNote: row.customer_note || "",
     adminNote: row.admin_note || "",
     pendingExpiresAt: row.pending_expires_at || null,
@@ -2178,13 +2205,14 @@ async function createRestaurantReservation(env, payload, options = {}) {
   const assigned = Array.isArray(options.assignedTableIds) ? options.assignedTableIds : [];
   const emailExp = status === "email_verification_pending" ? now + EMAIL_LINK_MS : null;
   const pendingExp = status === "pending" ? now + RESTAURANT_PENDING_MS : null;
+  const placePreference = normalizeRestaurantPlacePreference(payload.placePreference);
   await env.DB.prepare(
     `INSERT INTO restaurant_reservations (
       id, human_number, human_year, status, full_name, email, phone_prefix, phone_national, phone_e164,
-      reservation_date, start_time, duration_hours, start_ms, end_ms, tables_count, guests_count, join_tables,
+      reservation_date, start_time, duration_hours, start_ms, end_ms, tables_count, guests_count, join_tables, place_preference,
       assigned_table_ids_json, customer_note, admin_note, cleanup_buffer_minutes,
       confirmation_token_hash, email_verification_expires_at, pending_expires_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       id,
@@ -2204,6 +2232,7 @@ async function createRestaurantReservation(env, payload, options = {}) {
       tablesCount,
       guestsCount,
       payload.joinTables ? 1 : 0,
+      placePreference,
       toJson(assigned),
       cleanString(payload.customerNote, 2000),
       cleanString(payload.adminNote, 2000),
@@ -2634,7 +2663,7 @@ function legacyDefaultTemplateMap(service) {
       restaurant_pending_admin: {
         subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
         bodyHtml:
-          "<p>Nowa rezerwacja stolika oczekuje na decyzje obslugi.</p><p>Dotyczy: {{reservationSubject}}<br>Decyzja do: {{decisionDeadline}}</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>{{tablesList}} · Gosci: {{guestsCount}} · Laczenie: {{joinTables}}</p><p>Uwagi klienta: {{customerNote}}</p>",
+          "<p>Nowa rezerwacja stolika oczekuje na decyzje obslugi.</p><p>Dotyczy: {{reservationSubject}}<br>Decyzja do: {{decisionDeadline}}</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>{{tablesList}} · Gosci: {{guestsCount}} · Laczenie: {{joinTables}} · Miejsce: {{placePreference}}</p><p>Uwagi klienta: {{customerNote}}</p>",
       },
       restaurant_confirmed_client: {
         subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
@@ -2654,7 +2683,7 @@ function legacyDefaultTemplateMap(service) {
       rest_pending_admin: {
         subject: "[{{restaurantName}}] Nowa rezerwacja stolika {{reservationNumber}}",
         bodyHtml:
-          "<p>Nowa rezerwacja stolika oczekuje na decyzje obslugi.</p><p>Dotyczy: {{reservationSubject}}<br>Decyzja do: {{decisionDeadline}}</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>{{tablesList}} · Gosci: {{guestsCount}} · Laczenie: {{joinTables}}</p><p>Uwagi klienta: {{customerNote}}</p>",
+          "<p>Nowa rezerwacja stolika oczekuje na decyzje obslugi.</p><p>Dotyczy: {{reservationSubject}}<br>Decyzja do: {{decisionDeadline}}</p><p>{{fullName}} · {{email}} · {{phone}}</p><p>{{date}} · {{timeFrom}}–{{timeTo}} ({{durationHours}} h)</p><p>{{tablesList}} · Gosci: {{guestsCount}} · Laczenie: {{joinTables}} · Miejsce: {{placePreference}}</p><p>Uwagi klienta: {{customerNote}}</p>",
       },
       rest_confirmed_client: {
         subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
@@ -2669,7 +2698,7 @@ function legacyDefaultTemplateMap(service) {
       restaurant_changed_client: {
         subject: "{{restaurantName}} — zmiana rezerwacji stolika {{reservationNumber}}",
         bodyHtml:
-          "<p>Dzien dobry {{fullName}},</p><p>Zaktualizowalismy rezerwacje <strong>{{reservationNumber}}</strong>.</p><p>Data: {{date}}<br>Godziny: {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Stoliki: {{tablesList}}<br>Liczba gosci: {{guestsCount}}</p><p>Uwagi do rezerwacji: {{customerNote}}</p><p>W razie pytan odpowiedz na te wiadomosc.</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
+          "<p>Dzien dobry {{fullName}},</p><p>Zaktualizowalismy rezerwacje <strong>{{reservationNumber}}</strong>.</p><p>Data: {{date}}<br>Godziny: {{timeFrom}}–{{timeTo}} ({{durationHours}} h)<br>Stoliki: {{tablesList}}<br>Liczba gosci: {{guestsCount}}<br>Laczenie stolikow: {{joinTables}}<br>Preferencja miejsca: {{placePreference}}</p><p>Uwagi do rezerwacji: {{customerNote}}</p><p>W razie pytan odpowiedz na te wiadomosc.</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
       },
       rest_changed_client: {
         subject: "{{restaurantName}} — zmiana rezerwacji stolika {{reservationNumber}}",
@@ -2871,6 +2900,8 @@ ${infoCard("Podsumowanie rezerwacji stolika", [
   ["Data", "{{date}}"],
   ["Godzina", "{{timeFrom}} — {{timeTo}}"],
   ["Liczba gości", "{{guestsCount}}"],
+  ["Łączenie stolików", "{{joinTables}}"],
+  ["Preferencja miejsca", "{{placePreference}}"],
   ["Przydział stolików", "{{tablesList}}"],
 ])}
 ${noteCard("Rezerwacja stolika nie wymaga przedpłaty. <strong>Płatność odbywa się na miejscu</strong>, zgodnie z aktualnym menu i zamówieniem złożonym podczas wizyty.")}
@@ -2891,6 +2922,7 @@ ${infoCard("Szczegóły rezerwacji", [
   ["Liczba gości", "{{guestsCount}}"],
   ["Przydział stolików", "{{tablesList}}"],
   ["Łączenie stolików", "{{joinTables}}"],
+  ["Preferencja miejsca", "{{placePreference}}"],
   ["Uwagi klienta", "{{customerNote}}"],
 ])}`,
     },
@@ -2903,6 +2935,8 @@ ${infoCard("Potwierdzone spotkanie", [
   ["Data", "{{date}}"],
   ["Godzina", "{{timeFrom}} — {{timeTo}}"],
   ["Liczba gości", "{{guestsCount}}"],
+  ["Łączenie stolików", "{{joinTables}}"],
+  ["Preferencja miejsca", "{{placePreference}}"],
   ["Przydział stolików", "{{tablesList}}"],
 ])}
 ${noteCard("Rezerwacja nie wymaga przedpłaty. <strong>Płatność następuje na miejscu</strong> według zamówienia i aktualnej karty menu. W przypadku spóźnienia lub zmiany liczby gości prosimy o wcześniejszy kontakt.")}`,
@@ -3421,7 +3455,8 @@ function buildAdminActionDetailRows(service, vars) {
       ["Godzina", [vars.timeFrom, vars.timeTo].filter(Boolean).join(" — ")],
       ["Liczba gości", vars.guestsCount || ""],
       ["Przydział stolików", vars.tablesList || ""],
-      ["Łączenie stolików", vars.joinTables || ""]
+      ["Łączenie stolików", vars.joinTables || ""],
+      ["Preferencja miejsca", vars.placePreference || ""]
     );
   } else {
     rows.push(
@@ -3430,7 +3465,8 @@ function buildAdminActionDetailRows(service, vars) {
       ["Godziny", [vars.timeFrom, vars.timeTo].filter(Boolean).join(" — ")],
       ["Liczba gości", vars.guestsCount || ""],
       ["Rodzaj wydarzenia", vars.eventType || ""],
-      ["Wyłączność", vars.exclusive || ""]
+      ["Wyłączność", vars.exclusive || ""],
+      ["Pełna blokada sali", vars.fullBlockLabel || ""]
     );
   }
   rows.push(["Uwagi klienta", vars.customerNote || ""]);
@@ -3548,6 +3584,7 @@ async function buildRestaurantMailVars(env, request, row, token = "") {
     tablesList: tableLabels,
     guestsCount: String(row.guests_count || ""),
     joinTables: Number(row.join_tables) ? "tak" : "nie",
+    placePreference: restaurantPlacePreferenceLabel(row.place_preference),
     customerNote: row.customer_note || "",
     adminNote: row.admin_note || "",
     decisionDeadline: formatDateTimeWarsaw(Number(row.pending_expires_at || 0)),
@@ -3573,6 +3610,7 @@ async function buildHallMailVars(env, request, row, token = "") {
     guestsCount: String(row.guests_count || ""),
     eventType: row.event_type || "",
     exclusive: Number(row.exclusive) ? "tak" : "nie",
+    fullBlockLabel: Number(row.full_block) ? "tak" : "nie",
     customerNote: row.customer_note || "",
     adminNote: row.admin_note || "",
     decisionDeadline: formatDateTimeWarsaw(Number(row.pending_expires_at || 0)),
@@ -4753,6 +4791,7 @@ async function handleRestaurantAdmin(env, op, request) {
       body.tablesCount != null ||
       body.guestsCount != null ||
       body.joinTables != null ||
+      body.placePreference != null ||
       body.fullName != null ||
       body.email != null ||
       body.phonePrefix != null ||
@@ -4772,6 +4811,10 @@ async function handleRestaurantAdmin(env, op, request) {
         tablesCount: Math.max(1, toInt(body.tablesCount ?? row.tables_count, 1)),
         guestsCount: Math.max(1, toInt(body.guestsCount ?? row.guests_count, 1)),
         joinTables: body.joinTables != null ? Boolean(body.joinTables) : Boolean(row.join_tables),
+        placePreference:
+          body.placePreference != null
+            ? normalizeRestaurantPlacePreference(body.placePreference)
+            : normalizeRestaurantPlacePreference(row.place_preference),
         fullName: cleanString(body.fullName ?? row.full_name, 120),
         email: cleanString(body.email ?? row.email, 180),
         phonePrefix: cleanString(body.phonePrefix ?? row.phone_prefix, 8),
@@ -4787,7 +4830,7 @@ async function handleRestaurantAdmin(env, op, request) {
         `UPDATE restaurant_reservations SET
           full_name=?, email=?, phone_prefix=?, phone_national=?, phone_e164=?,
           reservation_date=?, start_time=?, duration_hours=?, start_ms=?, end_ms=?,
-          tables_count=?, guests_count=?, join_tables=?,
+          tables_count=?, guests_count=?, join_tables=?, place_preference=?,
           assigned_table_ids_json=?, customer_note=?, admin_note=?, updated_at=?
          WHERE id=?`
       )
@@ -4805,6 +4848,7 @@ async function handleRestaurantAdmin(env, op, request) {
           chk.tablesCount,
           payload.guestsCount,
           payload.joinTables ? 1 : 0,
+          payload.placePreference,
           toJson(assigned),
           payload.customerNote,
           payload.adminNote,

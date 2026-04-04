@@ -765,6 +765,43 @@
             : window.location.hostname && !window.location.hostname.endsWith("github.io")
               ? "https://api." + window.location.hostname.replace(/^www\./, "")
               : "";
+        const BOOTSTRAP_CACHE_KEY = "sredzka-korona:bootstrap-cache:v1";
+        const BOOTSTRAP_TTL_MS = 2 * 60 * 1000;
+
+        function readBootstrapCache() {
+          try {
+            const raw = window.sessionStorage.getItem(BOOTSTRAP_CACHE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed?.payload || Date.now() - Number(parsed.ts || 0) >= BOOTSTRAP_TTL_MS) {
+              return null;
+            }
+            return parsed.payload;
+          } catch {
+            return null;
+          }
+        }
+
+        function writeBootstrapCache(payload) {
+          try {
+            window.sessionStorage.setItem(
+              BOOTSTRAP_CACHE_KEY,
+              JSON.stringify({ ts: Date.now(), payload })
+            );
+          } catch {}
+        }
+
+        async function loadBootstrapPayload(base) {
+          const cached = readBootstrapCache();
+          if (cached) return cached;
+          const response = await fetch(base + "/api/public/bootstrap");
+          if (!response.ok) {
+            throw new Error("bootstrap unavailable");
+          }
+          const payload = await response.json();
+          writeBootstrapCache(payload);
+          return payload;
+        }
         const docsTarget = document.querySelector("#documents-list");
         const pageDocumentsTarget = document.querySelector("#documents-page-dynamic-list");
         const staticDocumentCards = Array.from(document.querySelectorAll("[data-static-document]"));
@@ -989,11 +1026,7 @@
             if (isLocalPreview && !config.apiBase) {
               throw new Error("local-preview");
             }
-            const response = await fetch((config.apiBase || fallbackApiBase) + "/api/public/bootstrap");
-            if (!response.ok) {
-              throw new Error("bootstrap unavailable");
-            }
-            const payload = await response.json();
+            const payload = await loadBootstrapPayload(config.apiBase || fallbackApiBase);
             renderPageDocuments(payload.content?.documentsPage?.documents || fallbackContent.documentsPage?.documents || []);
             renderDocuments(payload.documents || fallbackDocs);
           } catch (error) {

@@ -5,7 +5,10 @@
 (function () {
   const DEFAULTS = { restaurant: false, hotel: false, events: false };
   const HEALTH_TTL_MS = 5 * 60 * 1000;
+  const BOOTSTRAP_TTL_MS = 2 * 60 * 1000;
+  const BOOTSTRAP_CACHE_KEY = "sredzka-korona:bootstrap-cache:v1";
   let healthCache = { ts: 0, values: null };
+  let bootstrapCache = { ts: 0, payload: null };
 
   function publicApiBase() {
     const cfg = window.SREDZKA_CONFIG || {};
@@ -95,6 +98,70 @@
     return true;
   }
 
+  function sessionStorageSafe() {
+    try {
+      return window.sessionStorage;
+    } catch {
+      return null;
+    }
+  }
+
+  function readBootstrapCache() {
+    const now = Date.now();
+    if (bootstrapCache.payload && now - bootstrapCache.ts < BOOTSTRAP_TTL_MS) {
+      return bootstrapCache.payload;
+    }
+    const storage = sessionStorageSafe();
+    if (!storage) return null;
+    try {
+      const raw = storage.getItem(BOOTSTRAP_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || now - Number(parsed.ts || 0) >= BOOTSTRAP_TTL_MS || !parsed.payload) {
+        return null;
+      }
+      bootstrapCache = {
+        ts: Number(parsed.ts || 0),
+        payload: parsed.payload,
+      };
+      return parsed.payload;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeBootstrapCache(payload) {
+    const now = Date.now();
+    bootstrapCache = { ts: now, payload };
+    const storage = sessionStorageSafe();
+    if (!storage) return;
+    try {
+      storage.setItem(
+        BOOTSTRAP_CACHE_KEY,
+        JSON.stringify({
+          ts: now,
+          payload,
+        })
+      );
+    } catch {
+      /* ignore storage errors */
+    }
+  }
+
+  async function loadBootstrapPayload(base) {
+    const cached = readBootstrapCache();
+    if (cached) {
+      return cached;
+    }
+    const r = await fetch(base + "/api/public/bootstrap");
+    if (!r.ok) {
+      throw new Error("bootstrap unavailable");
+    }
+    const payload = await r.json();
+    writeBootstrapCache(payload);
+    return payload;
+  }
+
   function bookingFnBase(moduleKey) {
     const cfg = window.SREDZKA_CONFIG || {};
     const map = {
@@ -152,11 +219,7 @@
       return { ...DEFAULTS };
     }
     try {
-      const r = await fetch(base + "/api/public/bootstrap");
-      if (!r.ok) {
-        return { ...DEFAULTS };
-      }
-      const payload = await r.json();
+      const payload = await loadBootstrapPayload(base);
       const b = payload.content?.booking || {};
       const health = await loadHealthFlags();
       return {
