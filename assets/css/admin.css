@@ -738,6 +738,11 @@ a {
   align-items: center;
 }
 
+.repeater-item > .inline-actions {
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
 .documents-page-list-row {
   display: flex;
   flex-wrap: wrap;
@@ -755,6 +760,13 @@ a {
 .documents-page-list-row .documents-page-list-title {
   font-size: 1.05rem;
   font-weight: 650;
+}
+
+.documents-page-list-row .documents-page-list-head .helper {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  color: rgba(60, 50, 40, 0.6);
 }
 
 .documents-page-detail > .repeater-head {

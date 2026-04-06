@@ -253,7 +253,6 @@
             </div>
             <div class="mail-preview-footer">
               <div>Wiadomość transakcyjna dotycząca rezerwacji w obiekcie Średzka Korona.</div>
-              <div class="mail-preview-footer-link">${escapeHtml(footerLabel)}</div>
               <div>Jeśli masz pytania, odpowiedz na tę wiadomość.</div>
             </div>
           </div>
@@ -996,10 +995,20 @@
     async function saveTemplate(key) {
       const subj = document.querySelector(`[data-tpl-key="${key}"][data-field="subject"]`);
       const body = document.querySelector(`[data-tpl-key="${key}"][data-field="bodyHtml"]`);
+      const originalBodyHtml = templatesData[key]?.bodyHtml || "";
+      const newBodyHtml = body?.value || "";
+      const originalVars = [...originalBodyHtml.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g)].map((m) => m[1]);
+      const missing = originalVars.filter((v) => !newBodyHtml.includes(`{{${v}}}`));
+      if (missing.length) {
+        alert(
+          `Nie można zapisać — w treści brakuje zmiennych:\n${missing.map((v) => `{{${v}}}`).join(", ")}\n\nPrzywróć je i spróbuj ponownie.`
+        );
+        return;
+      }
       try {
         await hotelApi("admin-mail-template-save", {
           method: "PUT",
-          body: { key, subject: subj?.value || "", bodyHtml: body?.value || "" },
+          body: { key, subject: subj?.value || "", bodyHtml: newBodyHtml },
         });
         alert("Zapisano.");
         await loadTemplates();

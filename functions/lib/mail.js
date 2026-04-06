@@ -221,13 +221,6 @@ function buildBrandedEmail({
             <tr>
               <td style="padding:18px 10px 0 10px;text-align:center;font-size:13px;line-height:1.7;color:#7c6a58;">
                 <div>Wiadomość transakcyjna dotycząca rezerwacji w obiekcie ${safeBrandName}.</div>
-                <div style="padding-top:6px;">
-                  ${
-                    footerHref
-                      ? `<a href="${escapeHtml(footerHref)}" style="color:#7b5a24;text-decoration:none;font-weight:700;">${footerLabel}</a>`
-                      : safeBrandName
-                  }
-                </div>
                 <div style="padding-top:6px;">Jeśli masz pytania, odpowiedz na tę wiadomość.</div>
               </td>
             </tr>

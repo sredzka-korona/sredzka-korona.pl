@@ -602,6 +602,23 @@
       ],
     },
     {
+      key: "powiadomienia",
+      label: "Powiadomienia",
+      description: "Komunikaty na stronie glownej — widoczne dla gosci w ustalonym czasie.",
+      tiles: [
+        {
+          key: "notifications",
+          label: "Powiadomienia",
+          description: "Lista, tworzenie, edycja i usuwanie komunikatow przyklejonych do dolu strony glownej.",
+        },
+        {
+          key: "maile",
+          label: "Maile",
+          description: "Szablony wiadomosci e-mail wysylanych do gosci i obslugi dla hotelu, restauracji i przyjec.",
+        },
+      ],
+    },
+    {
       key: "dokumenty",
       label: "Dokumenty",
       description: "Dokumenty podstrony i pliki do pobrania.",
@@ -615,18 +632,6 @@
       description: "Dane kontaktowe widoczne na stronie.",
       tiles: [
         { key: "contact", label: "Dane kontaktowe", description: "Telefon, e-mail, adres i podstawowe dane firmy." },
-      ],
-    },
-    {
-      key: "powiadomienia",
-      label: "Powiadomienia",
-      description: "Komunikaty na stronie glownej — widoczne dla gosci w ustalonym czasie.",
-      tiles: [
-        {
-          key: "notifications",
-          label: "Powiadomienia",
-          description: "Lista, tworzenie, edycja i usuwanie komunikatow przyklejonych do dolu strony glownej.",
-        },
       ],
     },
   ];
@@ -3584,6 +3589,10 @@
       return `<section class="panel col-12" id="contact-panel"></section>`;
     }
     if (tabKey === "powiadomienia") {
+      const tileKey = getActiveAdminTile("powiadomienia");
+      if (tileKey === "maile") {
+        return `<section class="panel col-12" id="maile-panel"></section>`;
+      }
       return `<section class="panel col-12" id="notifications-panel"></section>`;
     }
     return `<section class="panel col-12"><p class="status">Brak skonfigurowanego widoku.</p></section>`;
@@ -3631,6 +3640,7 @@
         event.preventDefault();
         event.stopPropagation();
         const key = String(button.dataset.adminSectionVisibility || "").trim();
+        console.log("Toggle clicked, key:", key);
         if (!key) return;
         persistSectionVisibilityToggle(key);
       });
@@ -3812,7 +3822,11 @@
     }
 
     if (topTab === "powiadomienia") {
-      renderNotificationsPanel(statusMessage);
+      if (tileKey === "maile") {
+        renderMailTemplatesPanel(statusMessage);
+      } else {
+        renderNotificationsPanel(statusMessage);
+      }
       return;
     }
   }
@@ -7205,70 +7219,68 @@
     if (!panel) return;
     const documentsPage = normalizeDocumentsPage(state.content.documentsPage);
     const mediaEnabled = state.capabilities?.mediaStorageEnabled === true;
-    const docListEditIndex = state.ui.documentsPageEditIndex;
-    const docListHelper =
-      docListEditIndex === null
-        ? "Te sekcje sa wyswietlane na /dokumenty. Na liscie widzisz tylko tytuly — wejdz w dokument, aby edytowac tresc, lub zmien kolejnosc."
-        : "Edytujesz jeden dokument. Przycisk „Zapisz dokumenty podstrony” zapisuje cala podstrone /dokumenty.";
+
     panel.innerHTML = `
       <p class="pill">Dokumenty</p>
       <h2>Dokumenty strony i pliki</h2>
       <div class="stack">
+        <!-- Sekcja dokumentów tekstowych na podstronie -->
         <div class="repeater-item">
           <div class="repeater-head">
             <div>
-              <h3>Dokumenty na podstronie</h3>
-              <p class="helper">${escapeHtml(docListHelper)}</p>
+              <h3>Dokumenty wyświetlane na stronie /dokumenty</h3>
+              <p class="helper">Dokumenty tekstowe widoczne dla użytkowników na podstronie. Możesz dodać tytuł, podtytuł i sekcje z treścią.</p>
             </div>
-            ${
-              docListEditIndex === null
-                ? '<button class="button secondary" type="button" id="add-documents-page-document">Dodaj dokument</button>'
-                : ""
-            }
+            <button class="button" type="button" id="add-documents-page-document">+ Nowy dokument</button>
           </div>
           <div id="documents-page-list" class="repeater-list"></div>
-          <div class="inline-actions">
-            <button class="button" type="button" id="save-documents-page">Zapisz dokumenty podstrony</button>
+          <div class="inline-actions" id="documents-page-actions" style="display: none;">
+            <button class="button" type="button" id="save-documents-page">Zapisz zmiany</button>
           </div>
         </div>
-        ${mediaEnabled ? "" : '<p class="status">Upload plikow jest obecnie niedostepny.</p>'}
-        <form id="document-form" class="repeater-item">
-          <div class="field-grid">
-            <label class="field"><span>Tytul</span><input name="title" required ${mediaEnabled ? "" : "disabled"} /></label>
-            <label class="field"><span>Plik</span><input name="file" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required ${mediaEnabled ? "" : "disabled"} /></label>
-            <label class="field-full"><span>Opis</span><textarea name="description" ${mediaEnabled ? "" : "disabled"}></textarea></label>
+
+        <!-- Sekcja plików do pobrania -->
+        <div class="repeater-item">
+          <div class="repeater-head">
+            <div>
+              <h3>Pliki do pobrania</h3>
+              <p class="helper">Pliki PDF, DOC, DOCX dostępne do pobrania przez użytkowników.</p>
+            </div>
+            <button class="button" type="button" id="open-upload-modal" ${mediaEnabled ? "" : "disabled"}>+ Wgraj plik</button>
           </div>
-          <button class="button" type="submit" ${mediaEnabled ? "" : "disabled"}>Wgraj dokument</button>
-          <p class="status">${escapeHtml(statusMessage)}</p>
-        </form>
-        ${
-          state.documents.length
-            ? state.documents
-                .map(
-                  (documentEntry) => `
-                    <article class="list-item">
-                      <div class="list-head">
-                        <strong>${escapeHtml(documentEntry.title)}</strong>
-                        <span class="pill">${escapeHtml(documentEntry.fileType || "")}</span>
-                      </div>
-                      <p>${escapeHtml(documentEntry.description || "")}</p>
-                      <div class="inline-actions">
-                        <a class="button secondary" href="${escapeAttribute(documentEntry.downloadUrl)}" target="_blank" rel="noreferrer">Sprawdz plik</a>
-                        <button class="button danger" type="button" data-delete-document="${documentEntry.id}" ${mediaEnabled ? "" : "disabled"}>Usun</button>
-                      </div>
-                    </article>`
-                )
-                .join("")
-            : `<p class="empty">Brak dokumentow.</p>`
-        }
+          ${mediaEnabled ? "" : '<p class="status">Upload plików jest obecnie niedostępny.</p>'}
+          <div id="documents-files-list" class="repeater-list">
+            ${
+              state.documents.length
+                ? state.documents
+                    .map(
+                      (documentEntry) => `
+                        <article class="list-item">
+                          <div class="list-head">
+                            <strong>${escapeHtml(documentEntry.title)}</strong>
+                            <span class="pill">${escapeHtml(documentEntry.fileType || "")}</span>
+                          </div>
+                          <p>${escapeHtml(documentEntry.description || "")}</p>
+                          <div class="inline-actions">
+                            <a class="button secondary" href="${escapeAttribute(documentEntry.downloadUrl)}" target="_blank" rel="noreferrer">Pobierz plik</a>
+                            <button class="button danger" type="button" data-delete-document="${documentEntry.id}" ${mediaEnabled ? "" : "disabled"}>Usuń</button>
+                          </div>
+                        </article>`
+                    )
+                    .join("")
+                : `<p class="empty">Brak plików.</p>`
+            }
+          </div>
+        </div>
       </div>
+      <div id="documents-modal-root"></div>
     `;
 
     state.content.documentsPage = documentsPage;
     renderDocumentsPageList();
-    panel.querySelector("#add-documents-page-document")?.addEventListener("click", addDocumentsPageDocument);
-    panel.querySelector("#save-documents-page").addEventListener("click", saveDocumentsPage);
-    document.querySelector("#document-form").addEventListener("submit", uploadDocument);
+    panel.querySelector("#add-documents-page-document")?.addEventListener("click", openCreateDocumentModal);
+    panel.querySelector("#save-documents-page")?.addEventListener("click", saveDocumentsPage);
+    panel.querySelector("#open-upload-modal")?.addEventListener("click", openUploadFileModal);
     panel.querySelectorAll("[data-delete-document]").forEach((button) => {
       button.addEventListener("click", () => deleteDocument(button.dataset.deleteDocument));
     });
@@ -7276,259 +7288,440 @@
 
   function renderDocumentsPageList() {
     const target = document.querySelector("#documents-page-list");
-    if (!target) {
+    const actions = document.querySelector("#documents-page-actions");
+    if (!target) return;
+
+    const documents = state.content.documentsPage?.documents || [];
+
+    if (documents.length === 0) {
+      target.innerHTML = `<p class="empty">Brak dokumentów. Kliknij "+ Nowy dokument", aby dodać pierwszy dokument.</p>`;
+      if (actions) actions.style.display = "none";
       return;
     }
-    const documents = state.content.documentsPage?.documents || [];
-    const editIndex = state.ui.documentsPageEditIndex;
 
-    if (editIndex !== null) {
-      if (!documents[editIndex]) {
-        state.ui.documentsPageEditIndex = null;
-        renderDocumentsPageList();
-        return;
-      }
-      const documentEntry = documents[editIndex];
-      const documentIndex = editIndex;
-      target.innerHTML = `
-        <div class="repeater-item documents-page-detail" data-documents-page-detail-host data-documents-page-detail-index="${documentIndex}">
-          <div class="repeater-head">
-            <button class="button secondary" type="button" id="documents-page-back-to-list">Wroc do listy</button>
-          </div>
-          <div class="field-grid">
-            <label class="field-full"><span>Tytul dokumentu</span><input data-doc-page-title value="${escapeAttribute(documentEntry.title || "")}" /></label>
-            <label class="field-full"><span>Podtytul (opcjonalnie)</span><input data-doc-page-subtitle value="${escapeAttribute(documentEntry.subtitle || "")}" /></label>
-          </div>
-          <div class="repeater-list">
-            ${(documentEntry.sections || [])
-              .map(
-                (section, sectionIndex) => `
-                  <div class="repeater-item">
-                    <div class="repeater-head">
-                      <strong>Punkt ${sectionIndex + 1}</strong>
-                      <div class="inline-actions">
-                        <button class="button secondary" type="button" data-move-section-up="${documentIndex}" data-section-index="${sectionIndex}" ${sectionIndex === 0 ? "disabled" : ""}>↑</button>
-                        <button class="button secondary" type="button" data-move-section-down="${documentIndex}" data-section-index="${sectionIndex}" ${sectionIndex === documentEntry.sections.length - 1 ? "disabled" : ""}>↓</button>
-                        <button class="button danger" type="button" data-remove-section="${documentIndex}" data-section-index="${sectionIndex}">Usun</button>
-                      </div>
-                    </div>
-                    <div class="field-grid">
-                      <label class="field-full"><span>Naglowek punktu</span><input data-doc-page-section-title data-section-index="${sectionIndex}" value="${escapeAttribute(section.title || "")}" /></label>
-                      <label class="field-full"><span>Tresc punktu</span><textarea data-doc-page-section-text data-section-index="${sectionIndex}">${escapeHtml(section.text || "")}</textarea></label>
-                    </div>
-                  </div>
-                `
-              )
-              .join("")}
+    target.innerHTML = documents
+      .map((documentEntry, documentIndex) => {
+        const rawTitle = String(documentEntry.title || "").trim();
+        const displayTitle = rawTitle || `Dokument ${documentIndex + 1} (bez tytułu)`;
+        const sectionCount = (documentEntry.sections || []).length;
+        return `
+        <article class="list-item documents-page-list-row">
+          <div class="list-head documents-page-list-head">
+            <strong class="documents-page-list-title">${escapeHtml(displayTitle)}</strong>
+            <span class="helper">${sectionCount} ${sectionCount === 1 ? "sekcja" : sectionCount < 5 ? "sekcje" : "sekcji"}</span>
           </div>
           <div class="inline-actions">
-            <button class="button secondary" type="button" data-add-section="${documentIndex}">Dodaj punkt</button>
+            <button class="button" type="button" data-edit-doc-page="${documentIndex}">Edytuj</button>
+            <button class="button secondary" type="button" data-move-document-up="${documentIndex}" ${documentIndex === 0 ? "disabled" : ""}>↑</button>
+            <button class="button secondary" type="button" data-move-document-down="${documentIndex}" ${documentIndex === documents.length - 1 ? "disabled" : ""}>↓</button>
+            <button class="button danger" type="button" data-remove-document="${documentIndex}">Usuń</button>
           </div>
-        </div>
-      `;
-    } else {
-      target.innerHTML = documents
-        .map((documentEntry, documentIndex) => {
-          const rawTitle = String(documentEntry.title || "").trim();
-          const displayTitle = rawTitle || `Dokument ${documentIndex + 1} (bez tytulu)`;
-          return `
-          <article class="list-item documents-page-list-row">
-            <div class="list-head documents-page-list-head">
-              <strong class="documents-page-list-title">${escapeHtml(displayTitle)}</strong>
-            </div>
-            <div class="inline-actions">
-              <button class="button" type="button" data-open-doc-page="${documentIndex}">Edytuj</button>
-              <button class="button secondary" type="button" data-move-document-up="${documentIndex}" ${documentIndex === 0 ? "disabled" : ""}>↑</button>
-              <button class="button secondary" type="button" data-move-document-down="${documentIndex}" ${documentIndex === documents.length - 1 ? "disabled" : ""}>↓</button>
-              <button class="button danger" type="button" data-remove-document="${documentIndex}">Usun</button>
-            </div>
-          </article>`;
-        })
-        .join("");
-    }
+        </article>`;
+      })
+      .join("");
 
-    target.querySelector("#documents-page-back-to-list")?.addEventListener("click", () => {
-      const host = target.querySelector("[data-documents-page-detail-host]");
-      if (host) {
-        applyDocumentsPageDetailFormToState(host);
-      }
-      state.ui.documentsPageEditIndex = null;
-      renderDocumentsPanel();
-      refreshSaveDockVisibility();
-    });
+    if (actions) actions.style.display = "flex";
 
-    target.querySelectorAll("[data-open-doc-page]").forEach((button) => {
-      button.addEventListener("click", () => {
-        state.ui.documentsPageEditIndex = Number(button.dataset.openDocPage);
-        renderDocumentsPanel();
-        refreshSaveDockVisibility();
-      });
+    target.querySelectorAll("[data-edit-doc-page]").forEach((button) => {
+      button.addEventListener("click", () => openEditDocumentModal(Number(button.dataset.editDocPage)));
     });
 
     target.querySelectorAll("[data-remove-document]").forEach((button) => {
       button.addEventListener("click", () => removeDocumentsPageDocument(Number(button.dataset.removeDocument)));
     });
+
     target.querySelectorAll("[data-move-document-up]").forEach((button) => {
       button.addEventListener("click", () => moveDocumentsPageDocument(Number(button.dataset.moveDocumentUp), -1));
     });
+
     target.querySelectorAll("[data-move-document-down]").forEach((button) => {
       button.addEventListener("click", () => moveDocumentsPageDocument(Number(button.dataset.moveDocumentDown), 1));
     });
-    target.querySelectorAll("[data-add-section]").forEach((button) => {
-      button.addEventListener("click", () => addDocumentsPageSection(Number(button.dataset.addSection)));
-    });
-    target.querySelectorAll("[data-remove-section]").forEach((button) => {
-      button.addEventListener("click", () =>
-        removeDocumentsPageSection(Number(button.dataset.removeSection), Number(button.dataset.sectionIndex))
-      );
-    });
-    target.querySelectorAll("[data-move-section-up]").forEach((button) => {
-      button.addEventListener("click", () =>
-        moveDocumentsPageSection(Number(button.dataset.moveSectionUp), Number(button.dataset.sectionIndex), -1)
-      );
-    });
-    target.querySelectorAll("[data-move-section-down]").forEach((button) => {
-      button.addEventListener("click", () =>
-        moveDocumentsPageSection(Number(button.dataset.moveSectionDown), Number(button.dataset.sectionIndex), 1)
-      );
-    });
-  }
-
-  function applyDocumentsPageDetailFormToState(host) {
-    if (!host) return;
-    const documentIndex = Number(host.dataset.documentsPageDetailIndex);
-    if (!Number.isFinite(documentIndex) || documentIndex < 0) return;
-    const docs = structuredClone(state.content.documentsPage?.documents || []);
-    if (!docs[documentIndex]) return;
-    const title = host.querySelector("[data-doc-page-title]")?.value.trim() ?? "";
-    const subtitle = host.querySelector("[data-doc-page-subtitle]")?.value.trim() ?? "";
-    const sectionTitleInputs = Array.from(host.querySelectorAll("[data-doc-page-section-title]"));
-    const sections = sectionTitleInputs
-      .map((sectionTitleInput) => {
-        const sectionIndex = sectionTitleInput.getAttribute("data-section-index");
-        const text =
-          host
-            .querySelector(`[data-doc-page-section-text][data-section-index="${sectionIndex}"]`)
-            ?.value.trim() || "";
-        return {
-          title: sectionTitleInput.value.trim(),
-          text,
-        };
-      })
-      .filter((section) => section.title || section.text);
-    docs[documentIndex] = { title, subtitle, sections };
-    state.content.documentsPage = { documents: docs };
   }
 
   function collectDocumentsPageFromPanel() {
-    const host = document.querySelector("[data-documents-page-detail-host]");
-    if (host) {
-      applyDocumentsPageDetailFormToState(host);
-    }
     return normalizeDocumentsPage(state.content.documentsPage);
   }
 
-  function addDocumentsPageDocument() {
-    state.content.documentsPage = collectDocumentsPageFromPanel();
-    state.content.documentsPage.documents.push({ title: "", subtitle: "", sections: [] });
-    state.ui.documentsPageEditIndex = state.content.documentsPage.documents.length - 1;
-    renderDocumentsPanel();
-    refreshSaveDockVisibility();
-  }
-
   function removeDocumentsPageDocument(index) {
-    state.content.documentsPage = collectDocumentsPageFromPanel();
-    state.content.documentsPage.documents.splice(index, 1);
-    const editIx = state.ui.documentsPageEditIndex;
-    if (editIx !== null) {
-      if (editIx === index) {
-        state.ui.documentsPageEditIndex = null;
-      } else if (editIx > index) {
-        state.ui.documentsPageEditIndex = editIx - 1;
-      }
-    }
+    const docs = state.content.documentsPage?.documents || [];
+    docs.splice(index, 1);
+    state.content.documentsPage = { documents: docs };
     renderDocumentsPanel();
     refreshSaveDockVisibility();
   }
 
   function moveDocumentsPageDocument(index, direction) {
-    state.content.documentsPage = collectDocumentsPageFromPanel();
-    const documents = state.content.documentsPage.documents;
+    const docs = state.content.documentsPage?.documents || [];
     const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= documents.length) {
-      return;
+    if (nextIndex < 0 || nextIndex >= docs.length) return;
+    [docs[index], docs[nextIndex]] = [docs[nextIndex], docs[index]];
+    state.content.documentsPage = { documents: docs };
+    renderDocumentsPanel();
+    refreshSaveDockVisibility();
+  }
+
+  // === MODALE DOKUMENTÓW ===
+
+  function openCreateDocumentModal() {
+    const modalRoot = document.querySelector("#documents-modal-root");
+    if (!modalRoot) return;
+
+    modalRoot.innerHTML = `
+      <div class="admin-modal-overlay" data-doc-modal-overlay>
+        <section class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="doc-create-title">
+          <div class="admin-modal-head">
+            <div>
+              <p class="pill">Nowy dokument</p>
+              <h3 id="doc-create-title">Utwórz nowy dokument</h3>
+              <p class="helper">Dodaj dokument tekstowy, który będzie wyświetlany na podstronie /dokumenty.</p>
+            </div>
+            <button class="button icon-button secondary" type="button" data-doc-modal-close aria-label="Zamknij">×</button>
+          </div>
+          <div class="admin-modal-body">
+            <div class="field-grid">
+              <label class="field-full"><span>Tytuł dokumentu *</span><input id="doc-modal-title" required placeholder="np. Regulamin hotelu" /></label>
+              <label class="field-full"><span>Podtytuł (opcjonalnie)</span><input id="doc-modal-subtitle" placeholder="np. Obowiązuje od 01.01.2024" /></label>
+            </div>
+            <div class="repeater-list" id="doc-modal-sections"></div>
+            <div class="inline-actions">
+              <button class="button secondary" type="button" id="doc-modal-add-section">+ Dodaj sekcję</button>
+            </div>
+          </div>
+          <div class="admin-modal-footer">
+            <button class="button secondary" type="button" data-doc-modal-close>Anuluj</button>
+            <button class="button" type="button" id="doc-modal-create">Utwórz dokument</button>
+          </div>
+        </section>
+      </div>
+    `;
+
+    document.body.classList.add("admin-modal-open");
+
+    const sections = [];
+
+    function renderSections() {
+      const sectionsContainer = modalRoot.querySelector("#doc-modal-sections");
+      if (!sectionsContainer) return;
+
+      if (sections.length === 0) {
+        sectionsContainer.innerHTML = `<p class="helper">Dodaj przynajmniej jedną sekcję z treścią dokumentu.</p>`;
+        return;
+      }
+
+      sectionsContainer.innerHTML = sections
+        .map((section, index) => `
+          <div class="repeater-item">
+            <div class="repeater-head">
+              <strong>Sekcja ${index + 1}</strong>
+              <div class="inline-actions">
+                <button class="button secondary" type="button" data-move-section="${index}" data-direction="-1" ${index === 0 ? "disabled" : ""}>↑</button>
+                <button class="button secondary" type="button" data-move-section="${index}" data-direction="1" ${index === sections.length - 1 ? "disabled" : ""}>↓</button>
+                <button class="button danger" type="button" data-remove-section="${index}">Usuń</button>
+              </div>
+            </div>
+            <div class="field-grid">
+              <label class="field-full"><span>Nagłówek sekcji</span><input data-section-title="${index}" value="${escapeAttribute(section.title)}" placeholder="np. §1 Postanowienia ogólne" /></label>
+              <label class="field-full"><span>Treść sekcji</span><textarea data-section-text="${index}" rows="4" placeholder="Treść sekcji...">${escapeHtml(section.text)}</textarea></label>
+            </div>
+          </div>
+        `)
+        .join("");
+
+      sectionsContainer.querySelectorAll("[data-remove-section]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          sections.splice(Number(btn.dataset.removeSection), 1);
+          renderSections();
+        });
+      });
+
+      sectionsContainer.querySelectorAll("[data-move-section]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const index = Number(btn.dataset.moveSection);
+          const direction = Number(btn.dataset.direction);
+          const newIndex = index + direction;
+          if (newIndex >= 0 && newIndex < sections.length) {
+            [sections[index], sections[newIndex]] = [sections[newIndex], sections[index]];
+            renderSections();
+          }
+        });
+      });
     }
-    [documents[index], documents[nextIndex]] = [documents[nextIndex], documents[index]];
-    renderDocumentsPanel();
-    refreshSaveDockVisibility();
+
+    modalRoot.querySelector("#doc-modal-add-section")?.addEventListener("click", () => {
+      sections.push({ title: "", text: "" });
+      renderSections();
+    });
+
+    modalRoot.querySelector("#doc-modal-create")?.addEventListener("click", () => {
+      const title = modalRoot.querySelector("#doc-modal-title")?.value.trim();
+      const subtitle = modalRoot.querySelector("#doc-modal-subtitle")?.value.trim() || "";
+
+      if (!title) {
+        alert("Podaj tytuł dokumentu.");
+        return;
+      }
+
+      // Zbierz sekcje z formularza
+      const sectionItems = modalRoot.querySelectorAll("#doc-modal-sections .repeater-item");
+      const finalSections = [];
+      sectionItems.forEach((item, index) => {
+        const sectionTitle = item.querySelector(`[data-section-title="${index}"]`)?.value.trim() || "";
+        const sectionText = item.querySelector(`[data-section-text="${index}"]`)?.value.trim() || "";
+        if (sectionTitle || sectionText) {
+          finalSections.push({ title: sectionTitle, text: sectionText });
+        }
+      });
+
+      // Dodaj dokument do stanu
+      const docs = state.content.documentsPage?.documents || [];
+      docs.push({ title, subtitle, sections: finalSections });
+      state.content.documentsPage = { documents: docs };
+
+      closeDocumentsModal();
+      renderDocumentsPanel();
+      refreshSaveDockVisibility();
+    });
+
+    modalRoot.querySelectorAll("[data-doc-modal-close]").forEach((btn) => {
+      btn.addEventListener("click", closeDocumentsModal);
+    });
+
+    modalRoot.querySelector("[data-doc-modal-overlay]")?.addEventListener("click", (e) => {
+      if (e.target === e.currentTarget) closeDocumentsModal();
+    });
+
+    renderSections();
   }
 
-  function addDocumentsPageSection(documentIndex) {
-    state.content.documentsPage = collectDocumentsPageFromPanel();
-    const entry = state.content.documentsPage.documents[documentIndex];
-    if (!entry) return;
-    entry.sections.push({ title: "", text: "" });
-    renderDocumentsPanel();
-    refreshSaveDockVisibility();
-  }
+  function openEditDocumentModal(documentIndex) {
+    const docs = state.content.documentsPage?.documents || [];
+    const doc = docs[documentIndex];
+    if (!doc) return;
 
-  function removeDocumentsPageSection(documentIndex, sectionIndex) {
-    state.content.documentsPage = collectDocumentsPageFromPanel();
-    const entry = state.content.documentsPage.documents[documentIndex];
-    if (!entry) return;
-    entry.sections.splice(sectionIndex, 1);
-    renderDocumentsPanel();
-    refreshSaveDockVisibility();
-  }
+    const modalRoot = document.querySelector("#documents-modal-root");
+    if (!modalRoot) return;
 
-  function moveDocumentsPageSection(documentIndex, sectionIndex, direction) {
-    state.content.documentsPage = collectDocumentsPageFromPanel();
-    const entry = state.content.documentsPage.documents[documentIndex];
-    if (!entry) return;
-    const nextIndex = sectionIndex + direction;
-    if (nextIndex < 0 || nextIndex >= entry.sections.length) {
-      return;
+    modalRoot.innerHTML = `
+      <div class="admin-modal-overlay" data-doc-modal-overlay>
+        <section class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="doc-edit-title">
+          <div class="admin-modal-head">
+            <div>
+              <p class="pill">Edycja dokumentu</p>
+              <h3 id="doc-edit-title">Edytuj dokument</h3>
+              <p class="helper">Zmień treść dokumentu wyświetlanego na podstronie.</p>
+            </div>
+            <button class="button icon-button secondary" type="button" data-doc-modal-close aria-label="Zamknij">×</button>
+          </div>
+          <div class="admin-modal-body">
+            <div class="field-grid">
+              <label class="field-full"><span>Tytuł dokumentu *</span><input id="doc-modal-title" required value="${escapeAttribute(doc.title || "")}" /></label>
+              <label class="field-full"><span>Podtytuł (opcjonalnie)</span><input id="doc-modal-subtitle" value="${escapeAttribute(doc.subtitle || "")}" /></label>
+            </div>
+            <div class="repeater-list" id="doc-modal-sections"></div>
+            <div class="inline-actions">
+              <button class="button secondary" type="button" id="doc-modal-add-section">+ Dodaj sekcję</button>
+            </div>
+          </div>
+          <div class="admin-modal-footer">
+            <button class="button secondary" type="button" data-doc-modal-close>Anuluj</button>
+            <button class="button" type="button" id="doc-modal-save">Zapisz zmiany</button>
+          </div>
+        </section>
+      </div>
+    `;
+
+    document.body.classList.add("admin-modal-open");
+
+    const sections = structuredClone(doc.sections || []);
+
+    function renderSections() {
+      const sectionsContainer = modalRoot.querySelector("#doc-modal-sections");
+      if (!sectionsContainer) return;
+
+      if (sections.length === 0) {
+        sectionsContainer.innerHTML = `<p class="helper">Brak sekcji. Dodaj przynajmniej jedną sekcję.</p>`;
+        return;
+      }
+
+      sectionsContainer.innerHTML = sections
+        .map((section, index) => `
+          <div class="repeater-item">
+            <div class="repeater-head">
+              <strong>Sekcja ${index + 1}</strong>
+              <div class="inline-actions">
+                <button class="button secondary" type="button" data-move-section="${index}" data-direction="-1" ${index === 0 ? "disabled" : ""}>↑</button>
+                <button class="button secondary" type="button" data-move-section="${index}" data-direction="1" ${index === sections.length - 1 ? "disabled" : ""}>↓</button>
+                <button class="button danger" type="button" data-remove-section="${index}">Usuń</button>
+              </div>
+            </div>
+            <div class="field-grid">
+              <label class="field-full"><span>Nagłówek sekcji</span><input data-section-title="${index}" value="${escapeAttribute(section.title)}" placeholder="np. §1 Postanowienia ogólne" /></label>
+              <label class="field-full"><span>Treść sekcji</span><textarea data-section-text="${index}" rows="4" placeholder="Treść sekcji...">${escapeHtml(section.text)}</textarea></label>
+            </div>
+          </div>
+        `)
+        .join("");
+
+      sectionsContainer.querySelectorAll("[data-remove-section]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          sections.splice(Number(btn.dataset.removeSection), 1);
+          renderSections();
+        });
+      });
+
+      sectionsContainer.querySelectorAll("[data-move-section]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const index = Number(btn.dataset.moveSection);
+          const direction = Number(btn.dataset.direction);
+          const newIndex = index + direction;
+          if (newIndex >= 0 && newIndex < sections.length) {
+            [sections[index], sections[newIndex]] = [sections[newIndex], sections[index]];
+            renderSections();
+          }
+        });
+      });
     }
-    [entry.sections[sectionIndex], entry.sections[nextIndex]] = [entry.sections[nextIndex], entry.sections[sectionIndex]];
-    renderDocumentsPanel();
-    refreshSaveDockVisibility();
+
+    modalRoot.querySelector("#doc-modal-add-section")?.addEventListener("click", () => {
+      sections.push({ title: "", text: "" });
+      renderSections();
+    });
+
+    modalRoot.querySelector("#doc-modal-save")?.addEventListener("click", () => {
+      const title = modalRoot.querySelector("#doc-modal-title")?.value.trim();
+      const subtitle = modalRoot.querySelector("#doc-modal-subtitle")?.value.trim() || "";
+
+      if (!title) {
+        alert("Podaj tytuł dokumentu.");
+        return;
+      }
+
+      // Zbierz sekcje z formularza
+      const sectionItems = modalRoot.querySelectorAll("#doc-modal-sections .repeater-item");
+      const finalSections = [];
+      sectionItems.forEach((item, index) => {
+        const sectionTitle = item.querySelector(`[data-section-title="${index}"]`)?.value.trim() || "";
+        const sectionText = item.querySelector(`[data-section-text="${index}"]`)?.value.trim() || "";
+        if (sectionTitle || sectionText) {
+          finalSections.push({ title: sectionTitle, text: sectionText });
+        }
+      });
+
+      // Zaktualizuj dokument w stanie
+      docs[documentIndex] = { title, subtitle, sections: finalSections };
+      state.content.documentsPage = { documents: docs };
+
+      closeDocumentsModal();
+      renderDocumentsPanel();
+      refreshSaveDockVisibility();
+    });
+
+    modalRoot.querySelectorAll("[data-doc-modal-close]").forEach((btn) => {
+      btn.addEventListener("click", closeDocumentsModal);
+    });
+
+    modalRoot.querySelector("[data-doc-modal-overlay]")?.addEventListener("click", (e) => {
+      if (e.target === e.currentTarget) closeDocumentsModal();
+    });
+
+    renderSections();
+  }
+
+  function openUploadFileModal() {
+    const modalRoot = document.querySelector("#documents-modal-root");
+    if (!modalRoot) return;
+
+    modalRoot.innerHTML = `
+      <div class="admin-modal-overlay" data-doc-modal-overlay>
+        <section class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="upload-file-title">
+          <div class="admin-modal-head">
+            <div>
+              <p class="pill">Wgraj plik</p>
+              <h3 id="upload-file-title">Wgraj plik do pobrania</h3>
+              <p class="helper">Dodaj plik PDF, DOC lub DOCX, który będzie dostępny do pobrania przez użytkowników.</p>
+            </div>
+            <button class="button icon-button secondary" type="button" data-doc-modal-close aria-label="Zamknij">×</button>
+          </div>
+          <div class="admin-modal-body">
+            <form id="upload-file-form">
+              <div class="field-grid">
+                <label class="field-full"><span>Tytuł pliku *</span><input name="title" required placeholder="np. Cennik usług 2024" /></label>
+                <label class="field-full"><span>Plik *</span><input name="file" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required /></label>
+                <label class="field-full"><span>Opis (opcjonalnie)</span><textarea name="description" rows="3" placeholder="Krótki opis zawartości pliku..."></textarea></label>
+              </div>
+              <p class="helper">Maksymalny rozmiar pliku: ok. 1.7 MB. Dozwolone formaty: PDF, DOC, DOCX.</p>
+            </form>
+          </div>
+          <div class="admin-modal-footer">
+            <button class="button secondary" type="button" data-doc-modal-close>Anuluj</button>
+            <button class="button" type="button" id="upload-file-submit">Wgraj plik</button>
+          </div>
+        </section>
+      </div>
+    `;
+
+    document.body.classList.add("admin-modal-open");
+
+    modalRoot.querySelector("#upload-file-submit")?.addEventListener("click", async () => {
+      const form = modalRoot.querySelector("#upload-file-form");
+      const formData = new FormData(form);
+      const file = formData.get("file");
+      const title = formData.get("title")?.trim();
+
+      if (!title) {
+        alert("Podaj tytuł pliku.");
+        return;
+      }
+
+      if (!(file instanceof File) || !file.size) {
+        alert("Wybierz plik do wgrania.");
+        return;
+      }
+
+      if (file.size > DOCUMENT_MAX_BYTES) {
+        alert("Plik jest zbyt duży. Maksymalny rozmiar to ok. 1.7 MB.");
+        return;
+      }
+
+      try {
+        const authHeaders = await getFirebaseAuthHeaders();
+        await fetch(state.apiBase + "/api/admin/documents", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+          headers: authHeaders,
+        }).then(async (response) => {
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || "Nie udało się dodać pliku.");
+          }
+        });
+        closeDocumentsModal();
+        await loadDashboard("Plik został wgrany.");
+      } catch (error) {
+        alert(error.message);
+      }
+    });
+
+    modalRoot.querySelectorAll("[data-doc-modal-close]").forEach((btn) => {
+      btn.addEventListener("click", closeDocumentsModal);
+    });
+
+    modalRoot.querySelector("[data-doc-modal-overlay]")?.addEventListener("click", (e) => {
+      if (e.target === e.currentTarget) closeDocumentsModal();
+    });
+  }
+
+  function closeDocumentsModal() {
+    const modalRoot = document.querySelector("#documents-modal-root");
+    if (modalRoot) modalRoot.innerHTML = "";
+    document.body.classList.remove("admin-modal-open");
   }
 
   async function saveDocumentsPage() {
     state.content.documentsPage = collectDocumentsPageFromPanel();
     await saveContent("Dokumenty podstrony zostaly zapisane.");
-  }
-
-  async function uploadDocument(event) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const file = formData.get("file");
-    if (!(file instanceof File) || !file.size) {
-      renderDocumentsPanel("Wybierz dokument do wgrania.");
-      return;
-    }
-    if (file.size > DOCUMENT_MAX_BYTES) {
-      renderDocumentsPanel("Dokument jest zbyt duzy. Maksymalny rozmiar to ok. 1.7 MB.");
-      return;
-    }
-    try {
-      const authHeaders = await getFirebaseAuthHeaders();
-      await fetch(state.apiBase + "/api/admin/documents", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-        headers: authHeaders,
-      }).then(async (response) => {
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.error || "Nie udalo sie dodac dokumentu.");
-        }
-      });
-      await loadDashboard("Dokument zostal wgrany.");
-    } catch (error) {
-      renderDocumentsPanel(error.message);
-    }
   }
 
   async function deleteDocument(documentId) {
@@ -7579,6 +7772,58 @@
     return now >= a && now <= b;
   }
 
+  let mailsSubTab = "hotel";
+
+  function renderMailTemplatesPanel(statusMessage = "") {
+    const panel = document.querySelector("#maile-panel");
+    if (!panel) return;
+
+    const services = [
+      { key: "hotel", label: "Hotel" },
+      { key: "restaurant", label: "Restauracja" },
+      { key: "hall", label: "Przyjęcia" },
+    ];
+
+    panel.innerHTML = `
+      <p class="pill">Komunikacja</p>
+      <h2>Szablony mailingowe</h2>
+      <p class="helper">Edytuj treść wiadomości wysyłanych do gości i obsługi. Nie usuwaj zmiennych w podwójnych nawiasach klamrowych — np. <code>{{fullName}}</code>, <code>{{reservationNumber}}</code>. System nie pozwoli zapisać szablonu z usuniętą zmienną.</p>
+      ${statusMessage ? `<p class="status">${escapeHtml(statusMessage)}</p>` : ""}
+      <div class="hotel-nav" id="mail-service-tabs">
+        ${services
+          .map(
+            (s) =>
+              `<button type="button" class="button ${mailsSubTab === s.key ? "" : "secondary"}" data-mail-service="${escapeAttribute(s.key)}">${escapeHtml(s.label)}</button>`
+          )
+          .join("")}
+      </div>
+      <div id="mail-service-mount"></div>
+    `;
+
+    function mountActive() {
+      const serviceMap = { hotel: "hotel", restaurant: "restaurant", hall: "hall" };
+      const service = serviceMap[mailsSubTab] || "hotel";
+      mountLegacyBookingModule(
+        "#mail-service-mount",
+        service,
+        { defaultTab: "templates", allowedTabs: ["templates"] },
+        ""
+      );
+    }
+
+    panel.querySelectorAll("[data-mail-service]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        mailsSubTab = btn.getAttribute("data-mail-service");
+        panel.querySelectorAll("[data-mail-service]").forEach((b) => {
+          b.classList.toggle("secondary", b.getAttribute("data-mail-service") !== mailsSubTab);
+        });
+        mountActive();
+      });
+    });
+
+    mountActive();
+  }
+
   function renderNotificationsPanel(statusMessage = "") {
     const panel = document.querySelector("#notifications-panel");
     if (!panel) {
@@ -7596,9 +7841,7 @@
     panel.innerHTML = `
       <p class="pill">Strona glowna</p>
       <h2>Powiadomienia</h2>
-      <p class="section-intro">
-        W wybranym okresie komunikat pojawia sie na dole strony glownej. Gosc moze zwinac panel strzalka — wtedy zostaje waska zakladka do rozsuniecia.
-      </p>
+
       <div class="stack">
         <form id="notification-form" class="repeater-item">
           <input type="hidden" id="notification-record-id" value="" />
@@ -7620,9 +7863,9 @@
               <input id="notification-ends-at" type="datetime-local" required />
             </label>
           </div>
-          <div class="inline-actions">
-            <button class="button" type="submit" id="notification-save">Zapisz powiadomienie</button>
+          <div class="inline-actions" style="margin-top:1.5rem;justify-content:flex-end;">
             <button class="button secondary" type="button" id="notification-reset">Nowe (wyczysc formularz)</button>
+            <button class="button" type="submit" id="notification-save">Zapisz powiadomienie</button>
           </div>
         </form>
         <p class="status">${escapeHtml(statusMessage)}</p>

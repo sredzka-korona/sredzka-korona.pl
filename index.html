@@ -1586,8 +1586,8 @@
       }
 
       .site-notice-panel {
-        width: min(720px, calc(100vw - 1.5rem));
-        max-height: min(40vh, 300px);
+        width: 100%;
+        max-height: min(30vh, 220px);
         overflow: auto;
         -webkit-overflow-scrolling: touch;
         background: linear-gradient(
@@ -1599,7 +1599,7 @@
         border-bottom: none;
         border-radius: var(--radius-xl) var(--radius-xl) 0 0;
         box-shadow: 0 -12px 48px rgba(40, 28, 18, 0.14);
-        padding: 0.85rem 1rem calc(0.65rem + env(safe-area-inset-bottom, 0px));
+        padding: 0.6rem 1rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
         transform: translateY(0);
         transition: transform 0.38s cubic-bezier(0.33, 1, 0.68, 1), opacity 0.28s ease;
       }
@@ -1615,25 +1615,27 @@
         align-items: center;
         justify-content: space-between;
         gap: 0.75rem;
-        margin-bottom: 0.5rem;
-        padding-bottom: 0.45rem;
+        margin-bottom: 0.35rem;
+        padding-bottom: 0.35rem;
         border-bottom: 1px solid var(--line);
       }
 
       .site-notice-kicker {
         font-family: "Cormorant Garamond", serif;
-        font-size: 1.05rem;
+        font-size: 1.15rem;
         font-weight: 600;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        color: var(--muted);
+        letter-spacing: 0.04em;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .site-notice-hide {
         flex-shrink: 0;
-        width: 40px;
-        height: 40px;
-        border-radius: 12px;
+        width: 56px;
+        height: 30px;
+        border-radius: 16px;
         border: 1px solid var(--line);
         background: rgba(255, 255, 255, 0.85);
         color: var(--text);
@@ -1655,37 +1657,32 @@
       }
 
       .site-notice-item + .site-notice-item {
-        margin-top: 0.85rem;
-        padding-top: 0.85rem;
+        margin-top: 0.5rem;
+        padding-top: 0.5rem;
         border-top: 1px solid rgba(200, 170, 120, 0.25);
       }
 
       .site-notice-item h3 {
         font-family: "Cormorant Garamond", serif;
-        font-size: 1.25rem;
+        font-size: 1.15rem;
         font-weight: 600;
-        margin: 0 0 0.35rem;
+        margin: 0;
         color: var(--text);
       }
 
       .site-notice-item p {
-        margin: 0;
-        font-size: 0.95rem;
-        line-height: 1.55;
-        color: var(--muted);
-        white-space: pre-wrap;
+        display: none;
       }
 
       .site-notice-reveal {
         position: absolute;
-        bottom: 0;
+        bottom: 8px;
         left: 50%;
         width: 56px;
         height: 30px;
         margin-left: -28px;
         border: 1px solid var(--line);
-        border-bottom: none;
-        border-radius: 16px 16px 0 0;
+        border-radius: 16px;
         background: var(--gold);
         color: #fff;
         cursor: pointer;
@@ -2293,13 +2290,13 @@
           const focusY = clampNumber(media?.focusY, 0, 100, 50);
           const zoom = clampNumber(media?.zoom, 1, 2.5, 1);
           const soonText = SECTION_SOON_LABEL[sectionKey]
-            ? `${SECTION_SOON_LABEL[sectionKey]} — wkrótce dostępne`
-            : `${String(label).toUpperCase()} — wkrótce dostępne`;
+            ? `${SECTION_SOON_LABEL[sectionKey]} — Chwilowo niedostępne`
+            : `${String(label).toUpperCase()} — Chwilowo niedostępne`;
           const imgAttrs = imagePriority
             ? ` fetchpriority="high" decoding="async" loading="eager"`
             : ` loading="lazy" decoding="async"`;
           const goLabel = blocked
-            ? `${label} — wkrótce dostępne`
+            ? `${label} — Chwilowo niedostępne`
             : `Przejdź do: ${label} — Średzka Korona, Środa Śląska`;
           return `
                 <div
@@ -2673,13 +2670,15 @@
           const chevronUp =
             '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 15l-6-6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
+          const firstTitle = items[0]?.title || "Powiadomienie";
+
           const root = document.createElement("div");
           root.id = "site-notice-root";
           root.className = "site-notice-root" + (collapsed ? " is-collapsed" : "");
           root.innerHTML = `
             <div class="site-notice-panel" role="region" aria-label="Powiadomienia">
               <div class="site-notice-toolbar">
-                <span class="site-notice-kicker">Powiadomienie</span>
+                <span class="site-notice-kicker">${escapeHtml(firstTitle)}</span>
                 <button type="button" class="site-notice-hide" aria-label="Zwiń powiadomienie">${chevronDown}</button>
               </div>
               <div class="site-notice-items">
