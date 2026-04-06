@@ -863,6 +863,16 @@
         pointer-events: none;
       }
 
+      .main-split-overlay-stack {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        max-width: min(86vw, 22rem);
+        text-align: center;
+      }
+
       .main-split-section:nth-child(1) .main-split-overlay {
         justify-content: flex-start;
         padding-left: 10%;
@@ -905,31 +915,8 @@
         cursor: not-allowed;
       }
 
-      .main-split-section.is-blocked img {
-        filter: grayscale(0.88) brightness(0.72);
-      }
-
-      .main-split-section.is-blocked:hover {
-        z-index: 10;
-      }
-
-      .main-split-section.is-blocked:hover img {
-        transform: scale(calc(var(--split-zoom, 1) * 1.06));
-        filter: grayscale(0.82) brightness(0.78);
-      }
-
-      .main-split-section.is-blocked .main-split-overlay {
-        opacity: 1;
-        background: linear-gradient(to bottom, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.5));
-      }
-
+      /* Zablokowany kafelek domyślnie wygląda jak aktywny; wyszarzenie + komunikat przy najechaniu / na dotyku */
       .main-split-soon {
-        position: absolute;
-        left: 50%;
-        right: auto;
-        bottom: 14%;
-        width: min(78vw, 22rem);
-        transform: translateX(-50%);
         font-family: "Manrope", sans-serif;
         font-size: clamp(0.62rem, 1.65vw, 0.82rem);
         font-weight: 600;
@@ -937,24 +924,51 @@
         color: rgba(255, 255, 255, 0.98);
         text-shadow: 0 2px 14px rgba(0, 0, 0, 0.9);
         text-align: center;
-        line-height: 1.4;
+        line-height: 1.35;
+        max-width: 100%;
         opacity: 0;
         transition: opacity 0.28s ease;
         pointer-events: none;
-        z-index: 4;
       }
 
-      .main-split-section.is-blocked:hover .main-split-soon {
-        opacity: 1;
+      @media (hover: hover) {
+        .main-split-section.is-blocked:hover {
+          z-index: 10;
+        }
+
+        .main-split-section.is-blocked:hover img {
+          transform: scale(calc(var(--split-zoom, 1) * 1.06));
+          filter: grayscale(0.88) brightness(0.72);
+        }
+
+        .main-split-section.is-blocked:hover .main-split-overlay {
+          opacity: 1;
+          background: linear-gradient(to bottom, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.52));
+        }
+
+        .main-split-section.is-blocked:hover .main-split-soon {
+          opacity: 1;
+        }
       }
 
-      .main-split-section.is-blocked .main-split-label {
-        opacity: 0.92;
-        transform: translateY(0);
-      }
+      @media (hover: none) {
+        .main-split-section.is-blocked:active {
+          z-index: 10;
+        }
 
-      .main-split-section.is-blocked .main-split-soon {
-        opacity: 1;
+        .main-split-section.is-blocked:active img {
+          transform: scale(calc(var(--split-zoom, 1) * 1.06));
+          filter: grayscale(0.88) brightness(0.72);
+        }
+
+        .main-split-section.is-blocked:active .main-split-overlay {
+          opacity: 1;
+          background: linear-gradient(to bottom, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.52));
+        }
+
+        .main-split-section.is-blocked:active .main-split-soon {
+          opacity: 1;
+        }
       }
 
       @media (max-width: 1024px) {
@@ -986,9 +1000,16 @@
           transition: none;
         }
 
-        .main-split-section.is-blocked:hover img {
-          transform: none !important;
-          filter: grayscale(0.82) brightness(0.72) !important;
+        @media (hover: hover) {
+          .main-split-section.is-blocked:hover img {
+            filter: grayscale(0.88) brightness(0.72) !important;
+          }
+        }
+
+        @media (hover: none) {
+          .main-split-section.is-blocked:active img {
+            filter: grayscale(0.88) brightness(0.72) !important;
+          }
         }
 
         .main-split-section:nth-child(1) {
@@ -1036,51 +1057,61 @@
           padding: 0 !important;
         }
 
-        .main-split-label {
+        .main-split-overlay-stack {
           position: absolute;
           top: 50%;
           left: 50%;
-          display: block;
+          transform: translate(-50%, -50%);
           width: min(86vw, 22rem);
+          max-width: none;
+          gap: 0.4rem;
+        }
+
+        .main-split-label {
+          position: relative;
+          top: auto;
+          left: auto;
+          display: block;
+          width: 100%;
           max-width: none;
           font-size: clamp(1.6rem, 4.8vw, 2.4rem);
           white-space: normal;
           padding: 0.2rem 0.65rem;
           margin: 0;
           text-align: center;
-          transform: translate(-50%, -50%) !important;
+          transform: none !important;
           transition: none !important;
         }
 
-        .main-split-section:hover .main-split-label {
-          transform: translate(-50%, -50%) !important;
-        }
-
         .main-split-soon {
-          opacity: 0;
-          left: 50%;
-          right: auto;
-          top: calc(50% + 2.5rem);
-          bottom: auto;
-          width: min(78vw, 22rem);
-          transform: translateX(-50%);
           font-size: 0.7rem;
           line-height: 1.35;
         }
 
-        .main-split-section.is-blocked:hover .main-split-soon {
-          opacity: 1;
+        /* Dotyk: brak hovera — podpis pod tytułem stale widoczny; wyszarzenie nadal tylko przy :active */
+        @media (hover: hover) {
+          .main-split-section.is-blocked:hover .main-split-soon {
+            opacity: 1;
+          }
+        }
+
+        @media (hover: none) {
+          .main-split-section.is-blocked .main-split-soon {
+            opacity: 1;
+          }
         }
       }
 
       @media (max-width: 780px) {
-        .main-split-label {
+        .main-split-overlay-stack {
           width: min(80vw, 18rem);
+        }
+
+        .main-split-label {
           font-size: clamp(1.45rem, 5.8vw, 2.1rem);
         }
 
         .main-split-soon {
-          top: calc(50% + 2.2rem);
           font-size: 0.66rem;
         }
       }
@@ -1372,10 +1403,10 @@
         position: fixed;
         left: 50%;
         transform: translateX(-50%);
-        bottom: 2rem;
+        bottom: calc(2rem + var(--site-notice-stack-height, 0px));
         width: min(600px, calc(100vw - 2rem));
         max-width: none;
-        z-index: 35;
+        z-index: 1002;
         padding: 1rem 1.5rem;
       }
 
@@ -1516,7 +1547,7 @@
         .cookie-banner {
           left: 1rem;
           right: 1rem;
-          bottom: 1rem;
+          bottom: calc(1rem + var(--site-notice-stack-height, 0px));
           width: auto;
           transform: none;
         }
@@ -1537,7 +1568,7 @@
 
         .floating-contact-button {
           right: 0.9rem !important;
-          bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px)) !important;
+          bottom: calc(1.25rem + var(--bottom-floating-extra, 0px) + env(safe-area-inset-bottom, 0px)) !important;
           width: 52px;
           height: 52px;
         }
@@ -1546,7 +1577,7 @@
       .floating-contact-button {
         position: fixed;
         right: 2rem;
-        bottom: 2rem;
+        bottom: calc(2rem + var(--bottom-floating-extra, 0px) + env(safe-area-inset-bottom, 0px));
         width: 64px;
         height: 64px;
         border-radius: 50%;
@@ -1587,8 +1618,9 @@
         z-index: 1001;
         display: flex;
         flex-direction: column;
-        align-items: center;
+        align-items: stretch;
         pointer-events: none;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
       }
 
       .site-notice-root * {
@@ -1609,15 +1641,21 @@
         border-bottom: none;
         border-radius: var(--radius-xl) var(--radius-xl) 0 0;
         box-shadow: 0 -12px 48px rgba(40, 28, 18, 0.14);
-        padding: 0.6rem 1rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+        padding: 0.6rem 1rem 1.35rem;
         transform: translateY(0);
-        transition: transform 0.38s cubic-bezier(0.33, 1, 0.68, 1), opacity 0.28s ease;
+        opacity: 1;
+        transition: transform 0.38s cubic-bezier(0.33, 1, 0.68, 1), opacity 0.28s ease, max-height 0.38s cubic-bezier(0.33, 1, 0.68, 1);
       }
 
       .site-notice-root.is-collapsed .site-notice-panel {
-        transform: translateY(calc(100% + 8px));
+        max-height: 0;
+        overflow: hidden;
         opacity: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        border: none;
         pointer-events: none;
+        transform: translateY(0);
       }
 
       .site-notice-toolbar {
@@ -1639,34 +1677,6 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-      }
-
-      .site-notice-hide {
-        position: absolute;
-        top: 12px;
-        right: 12px;
-        flex-shrink: 0;
-        width: 56px;
-        height: 30px;
-        border: none;
-        border-radius: 999px;
-        background: rgba(255, 252, 247, 0.92);
-        color: var(--text);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background 0.2s ease, transform 0.2s ease;
-      }
-
-      .site-notice-hide:hover {
-        background: rgba(232, 216, 184, 0.45);
-      }
-
-      .site-notice-hide svg {
-        width: 20px;
-        height: 20px;
-        display: block;
       }
 
       .site-notice-item + .site-notice-item {
@@ -1691,51 +1701,45 @@
         font-size: 0.95rem;
       }
 
-      .site-notice-reveal {
-        position: absolute;
-        bottom: 8px;
-        left: 50%;
-        transform: translateX(-50%) translateY(8px);
+      .site-notice-toggle {
+        align-self: center;
         flex-shrink: 0;
-        width: 56px;
-        height: 30px;
-        border: none;
+        width: 3.25rem;
+        height: 1.75rem;
+        margin-top: -0.875rem;
+        margin-bottom: 0.35rem;
+        border: 1px solid rgba(160, 130, 85, 0.45);
         border-radius: 999px;
-        background: rgba(255, 252, 247, 0.92);
-        color: var(--text);
+        background: linear-gradient(145deg, #d4b896 0%, var(--gold) 45%, #b89460 100%);
+        color: #2a241c;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.28s ease, transform 0.35s cubic-bezier(0.33, 1, 0.68, 1);
+        box-shadow: 0 4px 14px rgba(120, 90, 45, 0.22);
+        transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+        z-index: 2;
       }
 
-      .site-notice-reveal svg {
+      .site-notice-toggle:hover {
+        background: linear-gradient(145deg, #e0caa8 0%, #d4b896 50%, var(--gold) 100%);
+        box-shadow: 0 6px 18px rgba(120, 90, 45, 0.28);
+      }
+
+      .site-notice-toggle:focus-visible {
+        outline: 2px solid #2a241c;
+        outline-offset: 2px;
+      }
+
+      .site-notice-toggle svg {
         width: 20px;
         height: 20px;
         display: block;
       }
 
-      .site-notice-root.is-collapsed .site-notice-reveal {
-        opacity: 1;
-        pointer-events: auto;
-        transform: translateX(-50%) translateY(0);
-      }
-
-      body.site-notice-visible:not(.site-notice-collapsed-ui) .cookie-banner {
-        bottom: calc(8rem + env(safe-area-inset-bottom, 0px));
-      }
-
-      @media (max-width: 720px) {
-        body.site-notice-visible:not(.site-notice-collapsed-ui) .floating-contact-button {
-          bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
-        }
-        
-        body.site-notice-visible:not(.site-notice-collapsed-ui) .cookie-banner {
-          bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
-        }
+      .site-notice-root.is-collapsed .site-notice-toggle {
+        margin-top: 0.25rem;
+        margin-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px));
       }
     </style>
   </head>
@@ -2330,8 +2334,10 @@
                 >
                   <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(alt)}"${imgAttrs} />
                   <div class="main-split-overlay">
-                    <span class="main-split-label">${escapeHtml(label)}</span>
-                    ${blocked ? `<span class="main-split-soon">${escapeHtml(soonText)}</span>` : ""}
+                    <div class="main-split-overlay-stack">
+                      <span class="main-split-label">${escapeHtml(label)}</span>
+                      ${blocked ? `<span class="main-split-soon">${escapeHtml(soonText)}</span>` : ""}
+                    </div>
                   </div>
                 </div>`;
         }
@@ -2504,8 +2510,10 @@
               localStorage.setItem("sredzka-cookies-choice", JSON.stringify(value));
               localStorage.setItem("sredzka-cookies-seen", "1");
               banner.remove();
+              observeBottomStackLayout();
             });
           });
+          observeBottomStackLayout();
         }
 
         function initContactForm() {
@@ -2662,11 +2670,45 @@
           });
         }
 
+        let bottomStackLayoutObserver = null;
+
+        function updateBottomFixedStackVars() {
+          const rootEl = document.documentElement;
+          const notice = document.getElementById("site-notice-root");
+          const noticeH = notice ? notice.getBoundingClientRect().height : 0;
+          rootEl.style.setProperty("--site-notice-stack-height", `${Math.ceil(noticeH)}px`);
+          const cookie = document.querySelector(".cookie-banner");
+          let fabExtra = noticeH;
+          if (cookie) {
+            fabExtra += 16 + cookie.getBoundingClientRect().height;
+          }
+          rootEl.style.setProperty("--bottom-floating-extra", `${Math.ceil(fabExtra)}px`);
+        }
+
+        function observeBottomStackLayout() {
+          bottomStackLayoutObserver?.disconnect();
+          bottomStackLayoutObserver = new ResizeObserver(() => {
+            window.requestAnimationFrame(() => updateBottomFixedStackVars());
+          });
+          const notice = document.getElementById("site-notice-root");
+          if (notice) {
+            bottomStackLayoutObserver.observe(notice);
+          }
+          const cookie = document.querySelector(".cookie-banner");
+          if (cookie) {
+            bottomStackLayoutObserver.observe(cookie);
+          }
+          window.requestAnimationFrame(() => updateBottomFixedStackVars());
+        }
+
         function mountSiteNotifications(items) {
           document.getElementById("site-notice-root")?.remove();
           document.body.classList.remove("site-notice-visible", "site-notice-collapsed-ui");
 
           if (!Array.isArray(items) || !items.length) {
+            bottomStackLayoutObserver?.disconnect();
+            bottomStackLayoutObserver = null;
+            updateBottomFixedStackVars();
             return;
           }
 
@@ -2697,7 +2739,6 @@
             <div class="site-notice-panel" role="region" aria-label="Powiadomienia">
               <div class="site-notice-toolbar">
                 <span class="site-notice-kicker">${escapeHtml(firstTitle)}</span>
-                <button type="button" class="site-notice-hide" aria-label="Zwiń powiadomienie">${chevronDown}</button>
               </div>
               <div class="site-notice-items">
                 ${items
@@ -2711,7 +2752,7 @@
                   .join("")}
               </div>
             </div>
-            <button type="button" class="site-notice-reveal" aria-label="Pokaż powiadomienie">${chevronUp}</button>
+            <button type="button" class="site-notice-toggle" aria-expanded="${collapsed ? "false" : "true"}" aria-label="${collapsed ? "Pokaż powiadomienie" : "Zwiń powiadomienie"}">${collapsed ? chevronUp : chevronDown}</button>
           `;
 
           document.body.appendChild(root);
@@ -2720,19 +2761,34 @@
             document.body.classList.add("site-notice-collapsed-ui");
           }
 
+          const toggleBtn = root.querySelector(".site-notice-toggle");
+
+          const syncToggleUi = () => {
+            const isCollapsed = root.classList.contains("is-collapsed");
+            if (!toggleBtn) {
+              return;
+            }
+            toggleBtn.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+            toggleBtn.setAttribute("aria-label", isCollapsed ? "Pokaż powiadomienie" : "Zwiń powiadomienie");
+            toggleBtn.innerHTML = isCollapsed ? chevronUp : chevronDown;
+          };
+
           const setCollapsed = (next) => {
             const isCollapsed = Boolean(next);
             root.classList.toggle("is-collapsed", isCollapsed);
             document.body.classList.toggle("site-notice-collapsed-ui", isCollapsed);
+            syncToggleUi();
             try {
               window.sessionStorage.setItem(storageKey, isCollapsed ? "1" : "");
             } catch {
               /* ignore */
             }
+            window.requestAnimationFrame(() => updateBottomFixedStackVars());
           };
 
-          root.querySelector(".site-notice-hide")?.addEventListener("click", () => setCollapsed(true));
-          root.querySelector(".site-notice-reveal")?.addEventListener("click", () => setCollapsed(false));
+          syncToggleUi();
+          toggleBtn?.addEventListener("click", () => setCollapsed(!root.classList.contains("is-collapsed")));
+          observeBottomStackLayout();
         }
 
         async function loadRemoteData() {
@@ -2780,6 +2836,7 @@
           await loadRemoteData();
           renderShell();
           window.addEventListener("resize", syncFloatingNavHeightCssVar);
+          window.addEventListener("resize", updateBottomFixedStackVars, { passive: true });
           initMainSplit();
           initScrollSpy();
           initCookieBanner();
