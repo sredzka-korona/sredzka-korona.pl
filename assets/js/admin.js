@@ -3888,9 +3888,9 @@
     const activeTile = getActiveAdminTile(activeTab.key);
     const inSectionView = state.ui.view === "section";
     const homeTabs = HOME_TAB_ORDER.map((tabKey) => ADMIN_TABS.find((tab) => tab.key === tabKey)).filter(Boolean);
-    const primaryHomeTabs = homeTabs.filter((tab) => ["hotel", "restauracja", "przyjecia"].includes(tab.key));
+    const primaryHomeTabs = homeTabs.filter((tab) => ["hotel", "restauracja", "przyjecia", "powiadomienia", "dokumenty", "kontakt"].includes(tab.key));
     const secondaryHomeTabs = homeTabs.filter((tab) =>
-      ["dokumenty", "kontakt", "powiadomienia"].includes(tab.key)
+      false
     );
     const scheduleTab = ADMIN_TABS.find((tab) => tab.key === "grafik");
 

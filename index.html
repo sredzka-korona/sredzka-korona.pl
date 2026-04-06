@@ -925,9 +925,11 @@
 
       .main-split-soon {
         position: absolute;
-        left: 8%;
-        right: 8%;
+        left: 50%;
+        right: auto;
         bottom: 14%;
+        width: min(78vw, 22rem);
+        transform: translateX(-50%);
         font-family: "Manrope", sans-serif;
         font-size: clamp(0.62rem, 1.65vw, 0.82rem);
         font-weight: 600;
@@ -936,7 +938,7 @@
         text-shadow: 0 2px 14px rgba(0, 0, 0, 0.9);
         text-align: center;
         line-height: 1.4;
-        opacity: 0;
+        opacity: 1;
         transition: opacity 0.28s ease;
         pointer-events: none;
         z-index: 4;
@@ -1574,7 +1576,7 @@
         left: 0;
         right: 0;
         bottom: 0;
-        z-index: 100;
+        z-index: 1001;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -1613,11 +1615,11 @@
       .site-notice-toolbar {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        margin-bottom: 0.35rem;
-        padding-bottom: 0.35rem;
+        justify-content: center;
+        gap: 1rem;
+        padding: 0.75rem 1rem;
         border-bottom: 1px solid var(--line);
+        position: relative;
       }
 
       .site-notice-kicker {
@@ -1632,12 +1634,15 @@
       }
 
       .site-notice-hide {
+        position: absolute;
+        top: 12px;
+        right: 12px;
         flex-shrink: 0;
         width: 56px;
         height: 30px;
-        border-radius: 16px;
-        border: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.85);
+        border: none;
+        border-radius: 999px;
+        background: rgba(255, 252, 247, 0.92);
         color: var(--text);
         cursor: pointer;
         display: flex;
@@ -1676,23 +1681,22 @@
 
       .site-notice-reveal {
         position: absolute;
-        bottom: 8px;
-        left: 50%;
+        top: 12px;
+        right: 12px;
+        flex-shrink: 0;
         width: 56px;
         height: 30px;
-        margin-left: -28px;
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        background: var(--gold);
-        color: #fff;
+        border: none;
+        border-radius: 999px;
+        background: rgba(255, 252, 247, 0.92);
+        color: var(--text);
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 -6px 22px rgba(168, 137, 90, 0.45);
         opacity: 0;
         pointer-events: none;
-        transform: translateY(6px);
+        transform: translateY(8px);
         transition: opacity 0.28s ease, transform 0.35s cubic-bezier(0.33, 1, 0.68, 1);
       }
 
