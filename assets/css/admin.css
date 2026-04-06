@@ -1554,6 +1554,12 @@ body.admin-modal-open {
   color: #4a4a4a;
 }
 
+/* Wyszarzenie kafelka gdy jest zablokowany */
+.admin-entry-tile-wrap:has(.admin-entry-visibility-toggle--off) .admin-entry-tile {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .admin-entry-tile-wrap--featured .admin-entry-visibility-toggle {
   top: 0.65rem;
   right: 0.65rem;

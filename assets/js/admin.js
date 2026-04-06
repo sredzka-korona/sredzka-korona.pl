@@ -155,7 +155,7 @@
       <div class="stack">
         <div>
           <strong>Godziny otwarcia</strong>
-          <p class="helper">${escapeHtml(intro || "Kazdy dzien ma osobne pola od i do. Puste pola oznaczaja, ze lokal jest nieczynny.")}</p>
+          <p class="helper">${escapeHtml(intro || "Każdy dzień ma osobne pola od i do. Puste pola oznaczają, że lokal jest nieczynny.")}</p>
         </div>
         <div class="stack">
           ${schedule
@@ -164,7 +164,7 @@
                 <div class="repeater-item opening-hours-day-card">
                   <div class="repeater-head">
                     <strong>${escapeHtml(entry.day)}</strong>
-                    <span class="helper">Pozostaw puste, aby oznaczyc dzien jako nieczynny.</span>
+                    <span class="helper">Pozostaw puste, aby oznaczyć dzień jako nieczynny.</span>
                   </div>
                   <div class="field-grid">
                     <label class="field">
@@ -3603,20 +3603,46 @@
     const prevBlocks = structuredClone(state.content.home.sectionBlocks || {});
     const nextBlocks = { ...prevBlocks, [blockKey]: !Boolean(prevBlocks[blockKey]) };
     state.content.home.sectionBlocks = nextBlocks;
-    const content = structuredClone(state.content);
-    if (content.hotel) {
-      delete content.hotel.roomGalleries;
+    
+    // Synchronizuj checkbox w ustawieniach jeśli istnieje
+    if (blockKey === 'events') {
+      const checkbox = document.querySelector("#section-block-events");
+      if (checkbox) {
+        checkbox.checked = nextBlocks[blockKey];
+      }
+    } else if (blockKey === 'hotel') {
+      const checkbox = document.querySelector("#section-block-hotel");
+      if (checkbox) {
+        checkbox.checked = nextBlocks[blockKey];
+      }
+    } else if (blockKey === 'restaurant') {
+      const checkbox = document.querySelector("#section-block-restaurant");
+      if (checkbox) {
+        checkbox.checked = nextBlocks[blockKey];
+      }
     }
+    
+    // Natychmiastowy render UI bez czekania na zapis
+    renderDashboard();
+    
+    // Optymalny zapis - tylko sectionBlocks
     try {
       const data = await api("/api/admin/content", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ 
+          content: {
+            ...state.content,
+            home: {
+              ...state.content.home,
+              sectionBlocks: nextBlocks
+            }
+          }
+        }),
       });
       const normalizedContent = normalizeAdminContent(data.content);
       state.content = normalizedContent;
       state.lastSavedContent = structuredClone(normalizedContent);
-      renderDashboard();
       showAdminFlash("Zapisano");
     } catch (error) {
       state.content.home.sectionBlocks = prevBlocks;
@@ -3645,6 +3671,29 @@
         persistSectionVisibilityToggle(key);
       });
     });
+    
+    // Synchronizacja checkboxów z toggle buttons
+    const sectionBlockEvents = document.querySelector("#section-block-events");
+    if (sectionBlockEvents) {
+      sectionBlockEvents.addEventListener("change", (event) => {
+        persistSectionVisibilityToggle('events');
+      });
+    }
+    
+    const sectionBlockHotel = document.querySelector("#section-block-hotel");
+    if (sectionBlockHotel) {
+      sectionBlockHotel.addEventListener("change", (event) => {
+        persistSectionVisibilityToggle('hotel');
+      });
+    }
+    
+    const sectionBlockRestaurant = document.querySelector("#section-block-restaurant");
+    if (sectionBlockRestaurant) {
+      sectionBlockRestaurant.addEventListener("change", (event) => {
+        persistSectionVisibilityToggle('restaurant');
+      });
+    }
+    
     const backButton = document.querySelector("#admin-back-button");
     if (backButton) {
       backButton.addEventListener("click", goToAdminHome);
@@ -3971,7 +4020,7 @@
           <div class="repeater-head">
             <div>
               <h3>Strona glowna</h3>
-              <p class="helper">Blokady podstron i przelaczniki rezerwacji.</p>
+              <p class="helper">Blokady podstron i przełączniki rezerwacji.</p>
             </div>
           </div>
           <div class="admin-toggle-group" style="margin-bottom: 1rem;">
@@ -4007,27 +4056,27 @@
               <input type="checkbox" id="booking-enable-restaurant" ${content.booking?.restaurant !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} />
               <span class="checkbox-copy">
                 <strong>Restauracja</strong>
-                <span>Wlacza formularz rezerwacji stolika.</span>
+                <span>Włącza formularz rezerwacji stolika.</span>
               </span>
             </label>
             <label class="checkbox-field">
               <input type="checkbox" id="booking-enable-hotel" ${content.booking?.hotel !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} />
               <span class="checkbox-copy">
                 <strong>Hotel</strong>
-                <span>Wlacza formularz rezerwacji pokoi.</span>
+                <span>Włącza formularz rezerwacji pokoi.</span>
               </span>
             </label>
             <label class="checkbox-field">
               <input type="checkbox" id="booking-enable-events" ${content.booking?.events !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} />
               <span class="checkbox-copy">
                 <strong>Przyjecia / sale</strong>
-                <span>Wlacza formularz zapytania o sale i rezerwacje.</span>
+                <span>Włącza formularz zapytania o sale i rezerwacje.</span>
               </span>
             </label>
             <p class="helper" style="margin: 0.75rem 0 0.35rem;">Okresy przerw ustawisz nizej, osobno w panelach: Hotel / Restauracja / Przyjecia.</p>
           </div>
           <div class="panel-note">
-            <strong>Uwaga:</strong> czesc pol tresci nizej pochodzi ze starszej wersji panelu. Aktualny front korzysta glownie z blokad sekcji, rezerwacji online, godzin otwarcia, menu, galerii, dokumentow, kalendarza i modala „Oferta”.
+            <strong>Uwaga:</strong> część treści poniżej pochodzi ze starszej wersji panelu. Aktualny front korzysta głównie z blokad sekcji, rezerwacji online, godzin otwarcia, menu, galerii, dokumentów, kalendarza i modala „Oferta”.
           </div>
           <div class="field-grid">
             <label class="field-full"><span>Naglowek bloku (np. modal Kontakt)</span><input id="home-about-title" value="${escapeAttribute(content.home.aboutTitle || "")}" /></label>

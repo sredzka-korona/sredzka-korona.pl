@@ -88,7 +88,7 @@ window.SREDZKA_DEFAULT_CONTENT = {
   restaurant: {
     heroTitle: "Autorska kuchnia i atmosfera wieczoru premium",
     heroText:
-      "Restauracja Sredzka Korona laczy elegancje sali, staranna obsluge i kuchnie, ktora dobrze sprawdza sie zarowno podczas codziennych kolacji, jak i okazji specjalnych.",
+      "Restauracja Średzka Korona łączy elegancję sali, staranną obsługę i kuchnię, która dobrze sprawdza się zarówno podczas codziennych kolacji, jak i okazji specjalnych.",
     orderButtonText: "Rezerwacja stolika",
     ordersInfoText:
       "Zamówienia indywidualne są tymczasowo wstrzymane. Catering zamawiany poprzez kontakt telefoniczny i mailowy.",
@@ -97,14 +97,14 @@ window.SREDZKA_DEFAULT_CONTENT = {
         title: "Przystawki",
         items: [
           "Tatar wolowy z piklami i majonezem truflowym",
-          "Krewetki z maslem czosnkowym i pieczywem rzemieslniczym",
+          "Krewetki z maślem czosnkowym i pieczywem rzemieślniczym",
           "Carpaccio z buraka z kozim serem i orzechami",
         ],
       },
       {
-        title: "Dania glowne",
+        title: "Dania główne",
         items: [
-          "Policzki wolowe z puree ziemniaczanym i demi-glace",
+          "Policzki wołowe z puree ziemniaczanym i demi-glace",
           "Sandacz na risotto cytrynowym z warzywami sezonowymi",
           "Makaron tagliatelle z borowikami i parmezanem",
         ],
@@ -198,17 +198,17 @@ window.SREDZKA_DEFAULT_CONTENT = {
             ingredients: [],
           },
           {
-            name: "Krewetki z maslem czosnkowym",
+            name: "Krewetki z maślem czosnkowym",
             description: "",
             ingredients: [],
           },
         ],
       },
       {
-        section: "Dania glowne",
+        section: "Dania główne",
         items: [
           {
-            name: "Policzki wolowe z puree",
+            name: "Policzki wołowe z puree",
             description: "",
             ingredients: [],
           },

@@ -2289,9 +2289,7 @@
           const focusX = clampNumber(media?.focusX, 0, 100, 50);
           const focusY = clampNumber(media?.focusY, 0, 100, 50);
           const zoom = clampNumber(media?.zoom, 1, 2.5, 1);
-          const soonText = SECTION_SOON_LABEL[sectionKey]
-            ? `${SECTION_SOON_LABEL[sectionKey]} — Chwilowo niedostępne`
-            : `${String(label).toUpperCase()} — Chwilowo niedostępne`;
+          const soonText = "Chwilowo niedostępne";
           const imgAttrs = imagePriority
             ? ` fetchpriority="high" decoding="async" loading="eager"`
             : ` loading="lazy" decoding="async"`;
