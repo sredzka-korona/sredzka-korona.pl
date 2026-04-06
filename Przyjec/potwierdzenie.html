@@ -119,10 +119,9 @@
               }
               out.innerHTML =
                 BRAND +
-                '<p class="confirm-kicker">Potwierdzenie adresu e-mail</p>' +
-                '<h1 class="confirm-title">Zgłoszenie zostało potwierdzone</h1>' +
-                '<p class="confirm-lead">Potwierdzili Państwo adres e-mail. Rezerwacja sali ma status <strong class="confirm-highlight">oczekujący</strong> na decyzję obiektu.</p>' +
-                '<p class="confirm-text">Obsługa skontaktuje się telefonicznie, aby przedstawić wycenę i ustalić dalsze kroki. Wycena nie jest ustalana automatycznie w systemie rezerwacji online.</p>' +
+                '<p class="confirm-kicker">Potwierdzenie rezerwacji</p>' +
+                '<p class="confirm-lead">Rezerwacja została potwierdzona, tym samym rezerwacja otrzymała status oczekującej na akceptację przez obsługę.</p>' +
+                '<div class="confirm-note"><strong>Co dalej?</strong> Obiekt ma do 7 dni na potwierdzenie rezerwacji. Otrzymają Państwo kolejną wiadomość e-mail po podjęciu decyzji.</div>' +
                 CTA;
             } catch {
               out.innerHTML =

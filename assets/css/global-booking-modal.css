@@ -248,7 +248,7 @@ body.gb-modal-open {
 #gb-modal .gb-rest-step1-foot {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 1rem 1.25rem;
   flex-wrap: wrap;
   margin-top: 0.65rem;
@@ -268,7 +268,6 @@ body.gb-modal-open {
 }
 
 #gb-modal .gb-check--rest-join {
-  margin-top: 0;
   flex: 0 0 auto;
   max-width: min(100%, 16rem);
 }
@@ -1218,6 +1217,11 @@ body.gb-modal-open {
   display: block;
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* Po ogólnej regule .gb-check (margin-top), inaczej checkbox „połącz stoły” jest niżej niż notatka obok */
+#gb-modal .gb-check.gb-check--rest-join {
+  margin-top: 0;
 }
 
 #gb-modal .gb-actions {
