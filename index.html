@@ -2329,11 +2329,6 @@
         }
 
         function renderShell() {
-          const taglineRaw = state.content?.company?.tagline;
-          const tagline = taglineRaw != null ? String(taglineRaw).trim() : "";
-          const taglineHtml = tagline
-            ? `<p class="floating-nav-tagline">${escapeHtml(tagline)}</p>`
-            : "";
           app.innerHTML = `
             <main id="main-content">
               <h1 class="visually-hidden">Sredzka Korona — hotel, restauracja, przyjęcia, Środa Śląska</h1>
@@ -2344,7 +2339,7 @@
                     <img class="brand-logo" src="./ikony/logo-korona.png" alt="Logo Średzka Korona" decoding="async" fetchpriority="high" />
                     <span class="floating-nav-brand-text">KORONA</span>
                   </a>
-                  ${taglineHtml}
+
                 </nav>
                 <div class="main-split-container">
                   ${(() => {

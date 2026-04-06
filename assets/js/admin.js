@@ -630,7 +630,7 @@
       ],
     },
   ];
-  const HOME_TAB_ORDER = ["hotel", "restauracja", "przyjecia", "dokumenty", "kontakt", "powiadomienia"];
+  const HOME_TAB_ORDER = ["hotel", "restauracja", "przyjecia", "powiadomienia", "dokumenty", "kontakt"];
   /** Klucze w content.home.sectionBlocks (true = moduł zablokowany na stronie głównej). */
   const ADMIN_ENTRY_SECTION_BLOCK_KEY = {
     hotel: "hotel",
@@ -1690,6 +1690,32 @@
         if (stack && stack.childElementCount === 0) stack.remove();
       }, 280);
     }, 12000);
+  }
+
+  function showAdminFlash(message) {
+    let stack = document.getElementById("admin-schedule-toast-stack");
+    if (!stack) {
+      stack = document.createElement("div");
+      stack.id = "admin-schedule-toast-stack";
+      stack.className = "admin-schedule-toast-stack";
+      document.body.appendChild(stack);
+    }
+    const wrap = document.createElement("div");
+    wrap.className = "admin-schedule-toast";
+    wrap.setAttribute("role", "status");
+    const textSpan = document.createElement("span");
+    textSpan.className = "admin-schedule-toast__text";
+    textSpan.style.padding = "0.4rem 0.55rem";
+    textSpan.textContent = message;
+    wrap.appendChild(textSpan);
+    stack.appendChild(wrap);
+    window.setTimeout(() => {
+      wrap.classList.add("is-out");
+      window.setTimeout(() => {
+        wrap.remove();
+        if (stack && stack.childElementCount === 0) stack.remove();
+      }, 280);
+    }, 2000);
   }
 
   function scheduleNotifyNewPending(item) {
@@ -3582,6 +3608,7 @@
       state.content = normalizedContent;
       state.lastSavedContent = structuredClone(normalizedContent);
       renderDashboard();
+      showAdminFlash("Zapisano");
     } catch (error) {
       state.content.home.sectionBlocks = prevBlocks;
       renderDashboard();
@@ -3919,7 +3946,6 @@
             <label class="field"><span>Telefon</span><input id="company-phone" value="${escapeAttribute(content.company.phone)}" /></label>
             <label class="field"><span>E-mail</span><input id="company-email" value="${escapeAttribute(content.company.email)}" /></label>
             <label class="field"><span>Adres</span><input id="company-address" value="${escapeAttribute(content.company.address)}" /></label>
-            <label class="field-full"><span>Haslo pod logo</span><input id="company-tagline" value="${escapeAttribute(content.company.tagline)}" /></label>
             <label class="field-full"><span>Naglowek hero</span><input id="company-hero-title" value="${escapeAttribute(content.company.heroTitle)}" /></label>
             <label class="field-full"><span>Tekst hero</span><textarea id="company-hero-text">${escapeHtml(content.company.heroText)}</textarea></label>
             <div class="field-full">
@@ -4328,8 +4354,6 @@
     if (companyEmail !== null) content.company.email = companyEmail;
     const companyAddress = getTrimmedValue("#company-address");
     if (companyAddress !== null) content.company.address = companyAddress;
-    const companyTagline = getTrimmedValue("#company-tagline");
-    if (companyTagline !== null) content.company.tagline = companyTagline;
     const companyHeroTitle = getTrimmedValue("#company-hero-title");
     if (companyHeroTitle !== null) content.company.heroTitle = companyHeroTitle;
     const companyHeroText = getTrimmedValue("#company-hero-text");
