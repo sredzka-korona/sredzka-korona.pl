@@ -232,12 +232,14 @@
   function updateRestaurantTemplatePreview(key) {
     if (!key) return;
     const subjectField = document.querySelector(`[data-rest-tpl-key="${key}"][data-field="subject"]`);
-    const bodyField = document.querySelector(`[data-rest-tpl-key="${key}"][data-field="bodyHtml"]`);
+    const editor = document.querySelector(`.wysiwyg-editor[data-rest-tpl-key="${key}"]`);
+    const hidden = document.querySelector(`[data-rest-tpl-key="${key}"][data-field="bodyHtml-hidden"]`);
     const previewHost = document.querySelector(`[data-rest-preview-key="${key}"]`);
-    if (!subjectField || !bodyField || !previewHost) return;
+    if (!subjectField || !previewHost) return;
+    const bodyHtml = editor?.innerHTML || hidden?.value || "";
     const renderedSubject = renderTemplatePreviewString(subjectField.value, REST_TEMPLATE_PREVIEW_VARS);
     const renderedBody = sanitizeTemplatePreviewHtml(
-      renderTemplatePreviewString(bodyField.value, REST_TEMPLATE_PREVIEW_VARS)
+      renderTemplatePreviewString(bodyHtml, REST_TEMPLATE_PREVIEW_VARS)
     );
     previewHost.innerHTML = buildMailPreviewMarkup({
       inboxSubject: renderedSubject,
@@ -258,6 +260,44 @@
       field.addEventListener("input", () => updateRestaurantTemplatePreview(key));
     });
     keys.forEach((key) => updateRestaurantTemplatePreview(key));
+  }
+
+  function bindWysiwygEditors() {
+    document.querySelectorAll(".wysiwyg-toolbar button[data-cmd]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const cmd = btn.getAttribute("data-cmd");
+        const toolbar = btn.closest(".wysiwyg-toolbar");
+        const tplKey = toolbar?.getAttribute("data-toolbar-for");
+        const editor = document.querySelector(`.wysiwyg-editor[data-rest-tpl-key="${tplKey}"]`);
+        if (!editor) return;
+        editor.focus();
+        if (cmd === "createLink") {
+          const url = prompt("Podaj adres URL:", "https://");
+          if (url) document.execCommand(cmd, false, url);
+        } else {
+          document.execCommand(cmd, false, null);
+        }
+        updateWysiwygHiddenInput(tplKey);
+        updateRestaurantTemplatePreview(tplKey);
+      });
+    });
+
+    document.querySelectorAll(".wysiwyg-editor[contenteditable]").forEach((editor) => {
+      const tplKey = editor.getAttribute("data-rest-tpl-key");
+      editor.addEventListener("input", () => {
+        updateWysiwygHiddenInput(tplKey);
+        updateRestaurantTemplatePreview(tplKey);
+      });
+    });
+  }
+
+  function updateWysiwygHiddenInput(tplKey) {
+    const editor = document.querySelector(`.wysiwyg-editor[data-rest-tpl-key="${tplKey}"]`);
+    const hidden = document.querySelector(`[data-rest-tpl-key="${tplKey}"][data-field="bodyHtml-hidden"]`);
+    if (editor && hidden) {
+      hidden.value = editor.innerHTML;
+    }
   }
 
   async function loadSettings() {
@@ -437,7 +477,18 @@
             <details class="hotel-template-card">
               <summary><span class="tpl-key">${escapeHtml(k)}</span>${REST_TEMPLATE_LABELS[k] ? `<span class="tpl-desc"> — ${escapeHtml(REST_TEMPLATE_LABELS[k])}</span>` : ""}</summary>
               <label>Temat<input type="text" data-rest-tpl-key="${escapeHtml(k)}" data-field="subject" value="${escapeHtml(templatesData[k]?.subject || "")}" /></label>
-              <label>Treść HTML<textarea data-rest-tpl-key="${escapeHtml(k)}" data-field="bodyHtml" rows="18">${escapeHtml(templatesData[k]?.bodyHtml || "")}</textarea></label>
+              <label>Treść HTML (edytuj poniżej)</label>
+              <div class="wysiwyg-toolbar" data-toolbar-for="${escapeHtml(k)}">
+                <button type="button" data-cmd="bold" title="Pogrubienie"><b>B</b></button>
+                <button type="button" data-cmd="italic" title="Kursywa"><i>I</i></button>
+                <button type="button" data-cmd="underline" title="Podkreślenie"><u>U</u></button>
+                <button type="button" data-cmd="insertUnorderedList" title="Lista punktowana">• Lista</button>
+                <button type="button" data-cmd="insertOrderedList" title="Lista numerowana">1. Lista</button>
+                <button type="button" data-cmd="createLink" title="Link">🔗 Link</button>
+                <button type="button" data-cmd="removeFormat" title="Wyczyść formatowanie">🧹 Wyczyść</button>
+              </div>
+              <div class="wysiwyg-editor" contenteditable="true" data-rest-tpl-key="${escapeHtml(k)}" data-field="bodyHtml">${templatesData[k]?.bodyHtml || ""}</div>
+              <input type="hidden" data-rest-tpl-key="${escapeHtml(k)}" data-field="bodyHtml-hidden" value="${escapeHtml(templatesData[k]?.bodyHtml || "")}" />
               <div class="mail-preview-panel">
                 <div class="mail-preview-panel-head">
                   <strong>Podgląd wiadomości</strong>
@@ -692,9 +743,9 @@
         btn.addEventListener("click", () => {
           const key = btn.getAttribute("data-key");
           const subj = document.querySelector(`[data-rest-tpl-key="${key}"][data-field="subject"]`);
-          const bodyEl = document.querySelector(`[data-rest-tpl-key="${key}"][data-field="bodyHtml"]`);
+          const bodyHidden = document.querySelector(`[data-rest-tpl-key="${key}"][data-field="bodyHtml-hidden"]`);
           const originalBodyHtml = templatesData[key]?.bodyHtml || "";
-          const newBodyHtml = bodyEl?.value || "";
+          const newBodyHtml = bodyHidden?.value || "";
           const originalVars = [...originalBodyHtml.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g)].map((m) => m[1]);
           const missing = originalVars.filter((v) => !newBodyHtml.includes(`{{${v}}}`));
           if (missing.length) {
@@ -712,6 +763,7 @@
         });
       });
       bindRestaurantTemplatePreviews();
+      bindWysiwygEditors();
 
       document.querySelector("#rest-block-all-tables")?.addEventListener("change", (ev) => {
         const on = ev.target.checked;

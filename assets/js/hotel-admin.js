@@ -267,12 +267,14 @@
   function updateHotelTemplatePreview(key) {
     if (!key) return;
     const subjectField = document.querySelector(`[data-tpl-key="${key}"][data-field="subject"]`);
-    const bodyField = document.querySelector(`[data-tpl-key="${key}"][data-field="bodyHtml"]`);
+    const editor = document.querySelector(`.wysiwyg-editor[data-tpl-key="${key}"]`);
+    const hidden = document.querySelector(`[data-tpl-key="${key}"][data-field="bodyHtml-hidden"]`);
     const previewHost = document.querySelector(`[data-hotel-preview-key="${key}"]`);
-    if (!subjectField || !bodyField || !previewHost) return;
+    if (!subjectField || !previewHost) return;
+    const bodyHtml = editor?.innerHTML || hidden?.value || "";
     const renderedSubject = renderTemplatePreviewString(subjectField.value, HOTEL_TEMPLATE_PREVIEW_VARS);
     const renderedBody = sanitizeTemplatePreviewHtml(
-      renderTemplatePreviewString(bodyField.value, HOTEL_TEMPLATE_PREVIEW_VARS)
+      renderTemplatePreviewString(bodyHtml, HOTEL_TEMPLATE_PREVIEW_VARS)
     );
     previewHost.innerHTML = buildMailPreviewMarkup({
       inboxSubject: renderedSubject,
@@ -293,6 +295,44 @@
       field.addEventListener("input", () => updateHotelTemplatePreview(key));
     });
     keys.forEach((key) => updateHotelTemplatePreview(key));
+  }
+
+  function bindWysiwygEditors() {
+    document.querySelectorAll(".wysiwyg-toolbar button[data-cmd]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const cmd = btn.getAttribute("data-cmd");
+        const toolbar = btn.closest(".wysiwyg-toolbar");
+        const tplKey = toolbar?.getAttribute("data-toolbar-for");
+        const editor = document.querySelector(`.wysiwyg-editor[data-tpl-key="${tplKey}"]`);
+        if (!editor) return;
+        editor.focus();
+        if (cmd === "createLink") {
+          const url = prompt("Podaj adres URL:", "https://");
+          if (url) document.execCommand(cmd, false, url);
+        } else {
+          document.execCommand(cmd, false, null);
+        }
+        updateWysiwygHiddenInput(tplKey);
+        updateHotelTemplatePreview(tplKey);
+      });
+    });
+
+    document.querySelectorAll(".wysiwyg-editor[contenteditable]").forEach((editor) => {
+      const tplKey = editor.getAttribute("data-tpl-key");
+      editor.addEventListener("input", () => {
+        updateWysiwygHiddenInput(tplKey);
+        updateHotelTemplatePreview(tplKey);
+      });
+    });
+  }
+
+  function updateWysiwygHiddenInput(tplKey) {
+    const editor = document.querySelector(`.wysiwyg-editor[data-tpl-key="${tplKey}"]`);
+    const hidden = document.querySelector(`[data-tpl-key="${tplKey}"][data-field="bodyHtml-hidden"]`);
+    if (editor && hidden) {
+      hidden.value = editor.innerHTML;
+    }
   }
 
   function slugifyRoomId(value) {
@@ -549,7 +589,18 @@
             <details class="hotel-template-card">
               <summary><span class="tpl-key">${escapeHtml(k)}</span>${HOTEL_TEMPLATE_LABELS[k] ? `<span class="tpl-desc"> — ${escapeHtml(HOTEL_TEMPLATE_LABELS[k])}</span>` : ""}</summary>
               <label>Temat<input type="text" data-tpl-key="${escapeHtml(k)}" data-field="subject" value="${escapeHtml(templatesData[k]?.subject || "")}" /></label>
-              <label>Treść HTML<textarea data-tpl-key="${escapeHtml(k)}" data-field="bodyHtml" rows="18">${escapeHtml(templatesData[k]?.bodyHtml || "")}</textarea></label>
+              <label>Treść HTML (edytuj poniżej)</label>
+              <div class="wysiwyg-toolbar" data-toolbar-for="${escapeHtml(k)}">
+                <button type="button" data-cmd="bold" title="Pogrubienie"><b>B</b></button>
+                <button type="button" data-cmd="italic" title="Kursywa"><i>I</i></button>
+                <button type="button" data-cmd="underline" title="Podkreślenie"><u>U</u></button>
+                <button type="button" data-cmd="insertUnorderedList" title="Lista punktowana">• Lista</button>
+                <button type="button" data-cmd="insertOrderedList" title="Lista numerowana">1. Lista</button>
+                <button type="button" data-cmd="createLink" title="Link">🔗 Link</button>
+                <button type="button" data-cmd="removeFormat" title="Wyczyść formatowanie">🧹 Wyczyść</button>
+              </div>
+              <div class="wysiwyg-editor" contenteditable="true" data-tpl-key="${escapeHtml(k)}" data-field="bodyHtml">${templatesData[k]?.bodyHtml || ""}</div>
+              <input type="hidden" data-tpl-key="${escapeHtml(k)}" data-field="bodyHtml-hidden" value="${escapeHtml(templatesData[k]?.bodyHtml || "")}" />
               <div class="mail-preview-panel">
                 <div class="mail-preview-panel-head">
                   <strong>Podgląd wiadomości</strong>
@@ -769,6 +820,7 @@
         btn.addEventListener("click", () => saveTemplate(btn.getAttribute("data-key")));
       });
       bindHotelTemplatePreviews();
+      bindWysiwygEditors();
       document.querySelector("#hotel-block-all-rooms")?.addEventListener("change", (ev) => {
         const on = ev.target.checked;
         document.querySelectorAll('#hotel-block-form input[name="roomId"]').forEach((cb) => {
@@ -995,9 +1047,9 @@
 
     async function saveTemplate(key) {
       const subj = document.querySelector(`[data-tpl-key="${key}"][data-field="subject"]`);
-      const body = document.querySelector(`[data-tpl-key="${key}"][data-field="bodyHtml"]`);
+      const bodyHidden = document.querySelector(`[data-tpl-key="${key}"][data-field="bodyHtml-hidden"]`);
       const originalBodyHtml = templatesData[key]?.bodyHtml || "";
-      const newBodyHtml = body?.value || "";
+      const newBodyHtml = bodyHidden?.value || "";
       const originalVars = [...originalBodyHtml.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g)].map((m) => m[1]);
       const missing = originalVars.filter((v) => !newBodyHtml.includes(`{{${v}}}`));
       if (missing.length) {

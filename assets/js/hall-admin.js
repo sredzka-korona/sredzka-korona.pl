@@ -175,12 +175,14 @@
   function updateHallTemplatePreview(key) {
     if (!key) return;
     const subjectField = document.querySelector(`[data-hall-tpl-key="${key}"][data-field="subject"]`);
-    const bodyField = document.querySelector(`[data-hall-tpl-key="${key}"][data-field="bodyHtml"]`);
+    const editor = document.querySelector(`.wysiwyg-editor[data-hall-tpl-key="${key}"]`);
+    const hidden = document.querySelector(`[data-hall-tpl-key="${key}"][data-field="bodyHtml-hidden"]`);
     const previewHost = document.querySelector(`[data-hall-preview-key="${key}"]`);
-    if (!subjectField || !bodyField || !previewHost) return;
+    if (!subjectField || !previewHost) return;
+    const bodyHtml = editor?.innerHTML || hidden?.value || "";
     const renderedSubject = renderTemplatePreviewString(subjectField.value, HALL_TEMPLATE_PREVIEW_VARS);
     const renderedBody = sanitizeTemplatePreviewHtml(
-      renderTemplatePreviewString(bodyField.value, HALL_TEMPLATE_PREVIEW_VARS)
+      renderTemplatePreviewString(bodyHtml, HALL_TEMPLATE_PREVIEW_VARS)
     );
     previewHost.innerHTML = buildMailPreviewMarkup({
       inboxSubject: renderedSubject,
@@ -201,6 +203,44 @@
       field.addEventListener("input", () => updateHallTemplatePreview(key));
     });
     keys.forEach((key) => updateHallTemplatePreview(key));
+  }
+
+  function bindWysiwygEditors() {
+    document.querySelectorAll(".wysiwyg-toolbar button[data-cmd]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const cmd = btn.getAttribute("data-cmd");
+        const toolbar = btn.closest(".wysiwyg-toolbar");
+        const tplKey = toolbar?.getAttribute("data-toolbar-for");
+        const editor = document.querySelector(`.wysiwyg-editor[data-hall-tpl-key="${tplKey}"]`);
+        if (!editor) return;
+        editor.focus();
+        if (cmd === "createLink") {
+          const url = prompt("Podaj adres URL:", "https://");
+          if (url) document.execCommand(cmd, false, url);
+        } else {
+          document.execCommand(cmd, false, null);
+        }
+        updateWysiwygHiddenInput(tplKey);
+        updateHallTemplatePreview(tplKey);
+      });
+    });
+
+    document.querySelectorAll(".wysiwyg-editor[contenteditable]").forEach((editor) => {
+      const tplKey = editor.getAttribute("data-hall-tpl-key");
+      editor.addEventListener("input", () => {
+        updateWysiwygHiddenInput(tplKey);
+        updateHallTemplatePreview(tplKey);
+      });
+    });
+  }
+
+  function updateWysiwygHiddenInput(tplKey) {
+    const editor = document.querySelector(`.wysiwyg-editor[data-hall-tpl-key="${tplKey}"]`);
+    const hidden = document.querySelector(`[data-hall-tpl-key="${tplKey}"][data-field="bodyHtml-hidden"]`);
+    if (editor && hidden) {
+      hidden.value = editor.innerHTML;
+    }
   }
 
   async function loadHalls() {
@@ -386,7 +426,18 @@
             <details class="hotel-template-card">
               <summary><span class="tpl-key">${escapeHtml(k)}</span>${HALL_TEMPLATE_LABELS[k] ? `<span class="tpl-desc"> — ${escapeHtml(HALL_TEMPLATE_LABELS[k])}</span>` : ""}</summary>
               <label>Temat<input type="text" data-hall-tpl-key="${escapeHtml(k)}" data-field="subject" value="${escapeHtml(templatesData[k]?.subject || "")}" /></label>
-              <label>Treść HTML<textarea data-hall-tpl-key="${escapeHtml(k)}" data-field="bodyHtml" rows="18">${escapeHtml(templatesData[k]?.bodyHtml || "")}</textarea></label>
+              <label>Treść HTML (edytuj poniżej)</label>
+              <div class="wysiwyg-toolbar" data-toolbar-for="${escapeHtml(k)}">
+                <button type="button" data-cmd="bold" title="Pogrubienie"><b>B</b></button>
+                <button type="button" data-cmd="italic" title="Kursywa"><i>I</i></button>
+                <button type="button" data-cmd="underline" title="Podkreślenie"><u>U</u></button>
+                <button type="button" data-cmd="insertUnorderedList" title="Lista punktowana">• Lista</button>
+                <button type="button" data-cmd="insertOrderedList" title="Lista numerowana">1. Lista</button>
+                <button type="button" data-cmd="createLink" title="Link">🔗 Link</button>
+                <button type="button" data-cmd="removeFormat" title="Wyczyść formatowanie">🧹 Wyczyść</button>
+              </div>
+              <div class="wysiwyg-editor" contenteditable="true" data-hall-tpl-key="${escapeHtml(k)}" data-field="bodyHtml">${templatesData[k]?.bodyHtml || ""}</div>
+              <input type="hidden" data-hall-tpl-key="${escapeHtml(k)}" data-field="bodyHtml-hidden" value="${escapeHtml(templatesData[k]?.bodyHtml || "")}" />
               <div class="mail-preview-panel">
                 <div class="mail-preview-panel-head">
                   <strong>Podgląd wiadomości</strong>
@@ -647,9 +698,9 @@
         btn.addEventListener("click", () => {
           const key = btn.getAttribute("data-key");
           const subj = document.querySelector(`[data-hall-tpl-key="${key}"][data-field="subject"]`);
-          const bodyEl = document.querySelector(`[data-hall-tpl-key="${key}"][data-field="bodyHtml"]`);
+          const bodyHidden = document.querySelector(`[data-hall-tpl-key="${key}"][data-field="bodyHtml-hidden"]`);
           const originalBodyHtml = templatesData[key]?.bodyHtml || "";
-          const newBodyHtml = bodyEl?.value || "";
+          const newBodyHtml = bodyHidden?.value || "";
           const originalVars = [...originalBodyHtml.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g)].map((m) => m[1]);
           const missing = originalVars.filter((v) => !newBodyHtml.includes(`{{${v}}}`));
           if (missing.length) {
@@ -667,6 +718,7 @@
         });
       });
       bindHallTemplatePreviews();
+      bindWysiwygEditors();
 
       countdownTimer = setInterval(() => {
         document.querySelectorAll(".hall-countdown").forEach((el) => {
