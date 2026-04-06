@@ -638,8 +638,6 @@
       <div class="hotel-subpanel">
         <h3>Szablony mailingowe</h3>
         <p class="helper">Zmienne we wszystkich szablonach: <code>{{reservationNumber}}</code> (numer w formacie np. 12/2026/HOTEL), <code>{{reservationSubject}}</code>, <code>{{decisionDeadline}}</code>, <code>{{adminActionLink}}</code>, <code>{{fullName}}</code>, <code>{{email}}</code>, <code>{{phone}}</code>, <code>{{roomsList}}</code>, <code>{{dateFrom}}</code>, <code>{{dateTo}}</code>, <code>{{nights}}</code>, <code>{{totalPrice}}</code>, <code>{{customerNote}}</code>, <code>{{adminNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{hotelName}}</code>.</p>
-        <p class="helper">Logo, przycisk akcji i elegancka oprawa wiadomości są dodawane automatycznie podczas wysyłki. W edytorze zmieniasz główną treść maila wewnątrz tego layoutu.</p>
-        <p class="helper">Pod każdym szablonem widzisz live preview z przykładowymi danymi gościa. Przycisk akcji pojawia się tylko tam, gdzie system realnie wysyła link. Przy szablonie potwierdzenia adresu e-mail możesz ustawić tekst na przycisku (gdy treść HTML nie zawiera osobnego linku <code>{{confirmationLink}}</code>, przycisk zostanie dodany na podstawie tego pola).</p>
         <div id="hotel-template-forms">
           ${keys
             .map(
@@ -1111,16 +1109,7 @@
     async function saveTemplate(key) {
       const subj = document.querySelector(`[data-tpl-key="${key}"][data-field="subject"]`);
       const bodyHidden = document.querySelector(`[data-tpl-key="${key}"][data-field="bodyHtml-hidden"]`);
-      const originalBodyHtml = templatesData[key]?.bodyHtml || "";
       const newBodyHtml = bodyHidden?.value || "";
-      const originalVars = [...originalBodyHtml.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g)].map((m) => m[1]);
-      const missing = originalVars.filter((v) => !newBodyHtml.includes(`{{${v}}}`));
-      if (missing.length) {
-        alert(
-          `Nie można zapisać — w treści brakuje zmiennych:\n${missing.map((v) => `{{${v}}}`).join(", ")}\n\nPrzywróć je i spróbuj ponownie.`
-        );
-        return;
-      }
       try {
         await hotelApi("admin-mail-template-save", {
           method: "PUT",

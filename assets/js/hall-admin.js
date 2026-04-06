@@ -759,16 +759,7 @@
           const key = btn.getAttribute("data-key");
           const subj = document.querySelector(`[data-hall-tpl-key="${key}"][data-field="subject"]`);
           const bodyHidden = document.querySelector(`[data-hall-tpl-key="${key}"][data-field="bodyHtml-hidden"]`);
-          const originalBodyHtml = templatesData[key]?.bodyHtml || "";
           const newBodyHtml = bodyHidden?.value || "";
-          const originalVars = [...originalBodyHtml.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g)].map((m) => m[1]);
-          const missing = originalVars.filter((v) => !newBodyHtml.includes(`{{${v}}}`));
-          if (missing.length) {
-            alert(
-              `Nie można zapisać — w treści brakuje zmiennych:\n${missing.map((v) => `{{${v}}}`).join(", ")}\n\nPrzywróć je i spróbuj ponownie.`
-            );
-            return;
-          }
           hallApi("admin-mail-template-save", {
             method: "PUT",
             body: {
