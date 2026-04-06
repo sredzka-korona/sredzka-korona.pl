@@ -10,6 +10,7 @@
   /** Podbij przy zmianach w modalu — wymusza odświeżenie cache CSS po wdrożeniu. */
   const GB_MODAL_ASSET_VERSION = "20260403-2";
   const SERVICE_KEYS = ["hotel", "restaurant", "events"];
+  const requestLocks = Object.create(null);
 
   const SERVICE_META = {
     hotel: {
@@ -731,6 +732,19 @@
     }
   }
 
+  async function withRequestLock(key, task) {
+    if (requestLocks[key]) {
+      return false;
+    }
+    requestLocks[key] = true;
+    try {
+      await task();
+      return true;
+    } finally {
+      requestLocks[key] = false;
+    }
+  }
+
   function restoreDraftState() {
     const storage = draftStorage();
     if (!storage) return false;
@@ -858,7 +872,7 @@
       return;
     }
     try {
-      const flags = await fetchFn();
+      const flags = await fetchFn({ refresh: true });
       state.bookingFlags = {
         hotel: flags?.hotel !== false,
         restaurant: flags?.restaurant !== false,
@@ -2115,27 +2129,29 @@
         }
 
         setError("");
-        try {
-          const availability = await api("hotel", "public-availability", {
-            method: "POST",
-            body: { dateFrom: from, dateTo: to },
-          });
-          state.hotel.dateFrom = from;
-          state.hotel.dateTo = to;
-          state.hotel.availability = availability;
-          const availableRoomIds = new Set((availability?.rooms || []).map((room) => room.id));
-          state.hotel.selectedRoomIds = state.hotel.selectedRoomIds.filter((roomId) => availableRoomIds.has(roomId));
+        await withRequestLock("hotel-public-availability", async () => {
+          try {
+            const availability = await api("hotel", "public-availability", {
+              method: "POST",
+              body: { dateFrom: from, dateTo: to },
+            });
+            state.hotel.dateFrom = from;
+            state.hotel.dateTo = to;
+            state.hotel.availability = availability;
+            const availableRoomIds = new Set((availability?.rooms || []).map((room) => room.id));
+            state.hotel.selectedRoomIds = state.hotel.selectedRoomIds.filter((roomId) => availableRoomIds.has(roomId));
 
-          if (!availability?.rooms?.length) {
-            setError("Brak wolnych pokoi w podanym terminie.");
-            return;
+            if (!availability?.rooms?.length) {
+              setError("Brak wolnych pokoi w podanym terminie.");
+              return;
+            }
+
+            state.step = "hotelRooms";
+            render();
+          } catch (error) {
+            setError(error.message || "Nie udało się sprawdzić dostępności pokoi.");
           }
-
-          state.step = "hotelRooms";
-          render();
-        } catch (error) {
-          setError(error.message || "Nie udało się sprawdzić dostępności pokoi.");
-        }
+        });
       });
       return;
     }
@@ -2206,28 +2222,30 @@
           return;
         }
 
-        try {
-          const check = await api("restaurant", "public-availability", {
-            method: "POST",
-            body: {
-              reservationDate: state.restaurant.reservationDate,
-              startTime: state.restaurant.startTime,
-              durationHours: state.restaurant.durationHours,
-              tablesCount: state.restaurant.tablesCount,
-              joinTables: state.restaurant.joinTables,
-            },
-          });
-          if (!check?.available) {
-            setError("Ten termin właśnie przestał być dostępny. Wybierz inny dzień lub godzinę.");
-            await loadRestaurantCalendar({ reservationDate: state.restaurant.reservationDate });
-            return;
+        await withRequestLock("restaurant-public-availability", async () => {
+          try {
+            const check = await api("restaurant", "public-availability", {
+              method: "POST",
+              body: {
+                reservationDate: state.restaurant.reservationDate,
+                startTime: state.restaurant.startTime,
+                durationHours: state.restaurant.durationHours,
+                tablesCount: state.restaurant.tablesCount,
+                joinTables: state.restaurant.joinTables,
+              },
+            });
+            if (!check?.available) {
+              setError("Ten termin właśnie przestał być dostępny. Wybierz inny dzień lub godzinę.");
+              await loadRestaurantCalendar({ reservationDate: state.restaurant.reservationDate });
+              return;
+            }
+            setError("");
+            state.step = "personal";
+            render();
+          } catch (error) {
+            setError(error.message || "Nie udało się sprawdzić dostępności stolików.");
           }
-          setError("");
-          state.step = "personal";
-          render();
-        } catch (error) {
-          setError(error.message || "Nie udało się sprawdzić dostępności stolików.");
-        }
+        });
       });
       return;
     }
@@ -2369,10 +2387,12 @@
 
         state.events.startTime = timeValue;
         setError("");
-        await ensureEventHallsLoaded();
-        await refreshEventHallAvailability();
-        state.step = "eventsHall";
-        render();
+        await withRequestLock("events-halls-load", async () => {
+          await ensureEventHallsLoaded();
+          await refreshEventHallAvailability();
+          state.step = "eventsHall";
+          render();
+        });
       });
       return;
     }
@@ -2428,15 +2448,17 @@
           return;
         }
 
-        const availability = await checkSelectedHallAvailability();
-        if (!availability.ok) {
-          setError(availability.error || "Sala jest niedostępna.");
-          return;
-        }
+        await withRequestLock("events-selected-hall-check", async () => {
+          const availability = await checkSelectedHallAvailability();
+          if (!availability.ok) {
+            setError(availability.error || "Sala jest niedostępna.");
+            return;
+          }
 
-        setError("");
-        state.step = "personal";
-        render();
+          setError("");
+          state.step = "personal";
+          render();
+        });
       });
       return;
     }
@@ -2771,6 +2793,10 @@
   }
 
   async function openModal() {
+    if (state.isOpen || requestLocks.openModal) {
+      return;
+    }
+    await withRequestLock("openModal", async () => {
     ensureCss();
     ensureModalMarkup();
     const restored = restoreDraftState();
@@ -2812,6 +2838,7 @@
       }
     }
     render();
+    });
   }
 
   function closeModal() {

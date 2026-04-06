@@ -738,6 +738,29 @@ a {
   align-items: center;
 }
 
+.documents-page-list-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.documents-page-list-row .documents-page-list-head {
+  margin-bottom: 0;
+  flex: 1;
+  min-width: min(100%, 220px);
+}
+
+.documents-page-list-row .documents-page-list-title {
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.documents-page-detail > .repeater-head {
+  margin-bottom: 1rem;
+}
+
 .thumb-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -1095,11 +1118,20 @@ body.admin-modal-open {
 
 .menu-editor-subcategory-group-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
   padding: 0.4rem 0.1rem 0.15rem;
   border-bottom: 1px solid rgba(200, 170, 120, 0.2);
+}
+
+.menu-editor-add-item-in-subcategory {
+  min-width: 2.25rem;
+  padding-left: 0.65rem;
+  padding-right: 0.65rem;
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 600;
 }
 
 .menu-editor-item-meta-row {
@@ -1465,6 +1497,54 @@ body.admin-modal-open {
   justify-content: center;
   justify-self: center;
   width: min(100%, calc(3 * 280px + 2 * 1.15rem));
+}
+
+.admin-entry-tile-wrap {
+  position: relative;
+  width: 100%;
+  display: block;
+}
+
+.admin-entry-tile-wrap > .admin-entry-tile {
+  width: 100%;
+}
+
+.admin-entry-tile-wrap:has(.admin-entry-visibility-toggle) .admin-entry-tile {
+  padding-right: 4.75rem;
+}
+
+.admin-entry-visibility-toggle {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  z-index: 3;
+  margin: 0;
+  padding: 0.32rem 0.62rem;
+  min-height: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.15;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(25, 36, 61, 0.12);
+}
+
+.admin-entry-visibility-toggle--on {
+  background: rgba(46, 125, 80, 0.14);
+  border-color: rgba(46, 125, 80, 0.45);
+  color: #1b5e32;
+}
+
+.admin-entry-visibility-toggle--off {
+  background: rgba(120, 120, 120, 0.12);
+  border-color: rgba(90, 90, 90, 0.35);
+  color: #4a4a4a;
+}
+
+.admin-entry-tile-wrap--featured .admin-entry-visibility-toggle {
+  top: 0.65rem;
+  right: 0.65rem;
 }
 
 .admin-entry-tile {

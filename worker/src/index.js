@@ -1,6 +1,6 @@
 import { DEFAULT_CONTENT } from "./default-content.js";
 import { parseAdminEmailAllowlist, verifyFirebaseIdToken } from "./firebase-verify.js";
-import { handleD1BookingApi, runBookingMaintenance } from "./booking-d1.js";
+import { handleD1BookingApi, runBookingMaintenance, sendContactFormAdminEmail } from "./booking-d1.js";
 
 const MAX_MEDIA_FILE_BYTES = 1_700_000;
 
@@ -16,7 +16,8 @@ export default {
       if (url.pathname === "/api/public/bootstrap" && request.method === "GET") {
         assertBrowserLikePublicRequest(request, url);
         return jsonResponse(await getPublicBootstrap(env, url), 200, request, env, {
-          "Cache-Control": "public, max-age=120, s-maxage=300, stale-while-revalidate=600",
+          // Treść z CMS (m.in. przełączniki rezerwacji) musi być świeża — bez długiego cache na edge.
+          "Cache-Control": "private, no-cache, max-age=0, must-revalidate",
         });
       }
 
@@ -70,6 +71,7 @@ export default {
           ...block,
           hallName: hallMap.get(block.hallKey) || block.hallKey,
         }));
+        const notifications = await listAllSiteNotifications(env);
         return jsonResponse(
           {
             content,
@@ -77,6 +79,7 @@ export default {
             galleryAlbums,
             calendarBlocks,
             submissions: submissions.results || [],
+            notifications,
             capabilities: {
               mediaStorageEnabled: true,
             },
@@ -85,6 +88,28 @@ export default {
           request,
           env
         );
+      }
+
+      if (url.pathname === "/api/admin/notifications" && request.method === "POST") {
+        await requireFirebaseAdmin(request, env);
+        const payload = await request.json();
+        const row = await createSiteNotification(env, payload);
+        return jsonResponse({ notification: row }, 201, request, env);
+      }
+
+      if (url.pathname.match(/^\/api\/admin\/notifications\/\d+$/) && request.method === "PUT") {
+        await requireFirebaseAdmin(request, env);
+        const id = Number(url.pathname.split("/").pop());
+        const payload = await request.json();
+        const row = await updateSiteNotification(env, id, payload);
+        return jsonResponse({ notification: row }, 200, request, env);
+      }
+
+      if (url.pathname.match(/^\/api\/admin\/notifications\/\d+$/) && request.method === "DELETE") {
+        await requireFirebaseAdmin(request, env);
+        const id = Number(url.pathname.split("/").pop());
+        await deleteSiteNotification(env, id);
+        return jsonResponse({ ok: true }, 200, request, env);
       }
 
       if (url.pathname === "/api/admin/content" && request.method === "PUT") {
@@ -116,6 +141,13 @@ export default {
         await requireFirebaseAdmin(request, env);
         const payload = await request.json();
         await reorderGalleryAlbums(payload.albumIds, env);
+        return jsonResponse({ ok: true }, 200, request, env);
+      }
+
+      if (url.pathname.match(/^\/api\/admin\/gallery\/albums\/\d+$/) && request.method === "DELETE") {
+        await requireFirebaseAdmin(request, env);
+        const albumId = Number(url.pathname.split("/")[5]);
+        await deleteGalleryAlbum(albumId, env);
         return jsonResponse({ ok: true }, 200, request, env);
       }
 
@@ -297,12 +329,171 @@ export default {
   },
 };
 
+let siteNotificationsSchemaPromise = null;
+
+async function ensureSiteNotificationsTable(env) {
+  if (siteNotificationsSchemaPromise) {
+    return siteNotificationsSchemaPromise;
+  }
+  siteNotificationsSchemaPromise = (async () => {
+    await env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS site_notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        starts_at TEXT NOT NULL,
+        ends_at TEXT NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )`
+    ).run();
+    await env.DB.prepare(
+      `CREATE INDEX IF NOT EXISTS idx_site_notifications_window ON site_notifications(starts_at, ends_at)`
+    ).run();
+  })();
+  return siteNotificationsSchemaPromise;
+}
+
+function parseNotificationIso(value, label) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    throw badRequest(`${label} jest wymagana.`);
+  }
+  const ms = Date.parse(raw);
+  if (!Number.isFinite(ms)) {
+    throw badRequest(`${label} ma nieprawidlowy format.`);
+  }
+  return new Date(ms).toISOString();
+}
+
+function sanitizeNotificationPayload(payload) {
+  const title = String(payload?.title || "").trim().slice(0, 200);
+  if (!title) {
+    throw badRequest("Tytul powiadomienia jest wymagany.");
+  }
+  const description = String(payload?.description || "").trim().slice(0, 4000);
+  const startsAt = parseNotificationIso(payload?.startsAt, "Data i godzina poczatku");
+  const endsAt = parseNotificationIso(payload?.endsAt, "Data i godzina konca");
+  if (Date.parse(endsAt) <= Date.parse(startsAt)) {
+    throw badRequest("Koniec musi byc pozniej niz poczatek.");
+  }
+  return { title, description, startsAt, endsAt };
+}
+
+function mapSiteNotificationRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    startsAt: row.starts_at ?? row.startsAt,
+    endsAt: row.ends_at ?? row.endsAt,
+    sortOrder: row.sort_order ?? row.sortOrder ?? 0,
+    createdAt: row.created_at ?? row.createdAt,
+    updatedAt: row.updated_at ?? row.updatedAt,
+  };
+}
+
+async function listActiveSiteNotifications(env) {
+  await ensureSiteNotificationsTable(env);
+  const now = nowIso();
+  const result = await env.DB.prepare(
+    `SELECT id, title, description, starts_at AS startsAt, ends_at AS endsAt
+     FROM site_notifications
+     WHERE starts_at <= ? AND ends_at >= ?
+     ORDER BY sort_order ASC, id ASC`
+  )
+    .bind(now, now)
+    .all();
+  return (result.results || []).map((row) => mapSiteNotificationRow(row));
+}
+
+async function listAllSiteNotifications(env) {
+  await ensureSiteNotificationsTable(env);
+  const result = await env.DB.prepare(
+    `SELECT id, title, description, starts_at AS startsAt, ends_at AS endsAt,
+            sort_order AS sortOrder, created_at AS createdAt, updated_at AS updatedAt
+     FROM site_notifications
+     ORDER BY sort_order ASC, id DESC`
+  ).all();
+  return (result.results || []).map((row) => mapSiteNotificationRow(row));
+}
+
+async function createSiteNotification(env, payload) {
+  const { title, description, startsAt, endsAt } = sanitizeNotificationPayload(payload);
+  const now = nowIso();
+  const maxRow = await env.DB.prepare(
+    "SELECT COALESCE(MAX(sort_order), -1) AS m FROM site_notifications"
+  ).first();
+  const sortOrder = Number(maxRow?.m ?? -1) + 1;
+  const insert = await env.DB.prepare(
+    `INSERT INTO site_notifications (title, description, starts_at, ends_at, sort_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(title, description, startsAt, endsAt, sortOrder, now, now)
+    .run();
+  let id = insert.meta?.last_row_id;
+  if (!id) {
+    const last = await env.DB.prepare("SELECT last_insert_rowid() AS id").first();
+    id = Number(last?.id);
+  }
+  const row = await env.DB.prepare(
+    `SELECT id, title, description, starts_at AS startsAt, ends_at AS endsAt,
+            sort_order AS sortOrder, created_at AS createdAt, updated_at AS updatedAt
+     FROM site_notifications WHERE id = ?`
+  )
+    .bind(id)
+    .first();
+  return mapSiteNotificationRow(row);
+}
+
+async function updateSiteNotification(env, id, payload) {
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId) || numericId <= 0) {
+    throw badRequest("Nieprawidlowy identyfikator powiadomienia.");
+  }
+  const { title, description, startsAt, endsAt } = sanitizeNotificationPayload(payload);
+  const existing = await env.DB.prepare("SELECT id FROM site_notifications WHERE id = ?")
+    .bind(numericId)
+    .first();
+  if (!existing) {
+    throw badRequest("Nie znaleziono powiadomienia.");
+  }
+  const now = nowIso();
+  await env.DB.prepare(
+    `UPDATE site_notifications
+     SET title = ?, description = ?, starts_at = ?, ends_at = ?, updated_at = ?
+     WHERE id = ?`
+  )
+    .bind(title, description, startsAt, endsAt, now, numericId)
+    .run();
+  const row = await env.DB.prepare(
+    `SELECT id, title, description, starts_at AS startsAt, ends_at AS endsAt,
+            sort_order AS sortOrder, created_at AS createdAt, updated_at AS updatedAt
+     FROM site_notifications WHERE id = ?`
+  )
+    .bind(numericId)
+    .first();
+  return mapSiteNotificationRow(row);
+}
+
+async function deleteSiteNotification(env, id) {
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId) || numericId <= 0) {
+    throw badRequest("Nieprawidlowy identyfikator powiadomienia.");
+  }
+  await env.DB.prepare("DELETE FROM site_notifications WHERE id = ?").bind(numericId).run();
+}
+
 async function getPublicBootstrap(env, url) {
   const content = await getContent(env, url);
+  const activeNotifications = await listActiveSiteNotifications(env);
   return {
     content,
     documents: await listDocuments(env, url),
     galleryAlbums: await listGalleryAlbums(env, url),
+    activeNotifications,
     capabilities: {
       mediaStorageEnabled: true,
     },
@@ -511,8 +702,18 @@ async function getCalendarBlocks(env, from, url) {
 }
 
 async function handleContactSubmission(payload, request, env) {
-  if (!payload.fullName || !payload.email || !payload.message) {
+  const fullName = String(payload.fullName || payload.name || "").trim();
+  const email = String(payload.email || "").trim();
+  const message = String(payload.message || "").trim();
+  const phone = String(payload.phone || "").trim();
+  const eventType = String(payload.eventType || payload.topic || "").trim();
+  const preferredDate = String(payload.preferredDate || "").trim();
+
+  if (!fullName || !email || !message) {
     throw badRequest("Imie, e-mail i wiadomosc sa wymagane.");
+  }
+  if (!email.includes("@")) {
+    throw badRequest("Nieprawidlowy adres e-mail.");
   }
   if (env.TURNSTILE_SECRET) {
     const ok = await verifyTurnstile(payload.turnstileToken, request, env);
@@ -523,16 +724,14 @@ async function handleContactSubmission(payload, request, env) {
   await env.DB.prepare(
     "INSERT INTO contact_submissions (full_name, email, phone, event_type, preferred_date, message, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'new', ?)"
   )
-    .bind(
-      payload.fullName.trim(),
-      payload.email.trim(),
-      (payload.phone || "").trim(),
-      (payload.eventType || "").trim(),
-      (payload.preferredDate || "").trim(),
-      payload.message.trim(),
-      nowIso()
-    )
+    .bind(fullName, email, phone, eventType, preferredDate, message, nowIso())
     .run();
+
+  try {
+    await sendContactFormAdminEmail(env, { fullName, email, phone, formKind: eventType, message });
+  } catch (error) {
+    console.error("contact form: blad wysylki e-maila", error?.message || error);
+  }
 }
 
 async function verifyTurnstile(token, request, env) {
@@ -654,6 +853,22 @@ async function deleteGalleryImage(imageId, env) {
   await env.DB.prepare("UPDATE gallery_albums SET updated_at = ? WHERE id = ?")
     .bind(nowIso(), image.albumId)
     .run();
+}
+
+async function deleteGalleryAlbum(albumId, env) {
+  const id = Number(albumId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw badRequest("Album nie istnieje.");
+  }
+  const album = await env.DB.prepare("SELECT id FROM gallery_albums WHERE id = ?").bind(id).first();
+  if (!album) {
+    throw badRequest("Album nie istnieje.");
+  }
+  await env.DB.prepare("UPDATE gallery_albums SET cover_image_id = NULL, updated_at = ? WHERE id = ?")
+    .bind(nowIso(), id)
+    .run();
+  await env.DB.prepare("DELETE FROM gallery_images WHERE album_id = ?").bind(id).run();
+  await env.DB.prepare("DELETE FROM gallery_albums WHERE id = ?").bind(id).run();
 }
 
 async function reorderGalleryAlbums(albumIds, env) {

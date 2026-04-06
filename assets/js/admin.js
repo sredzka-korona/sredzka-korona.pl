@@ -514,12 +514,14 @@
     galleryAlbums: [],
     calendarBlocks: [],
     submissions: [],
+    notifications: [],
     capabilities: {
       mediaStorageEnabled: false,
     },
     ui: {
       view: "home",
       topTab: "grafik",
+      documentsPageEditIndex: null,
       tileByTab: {
         grafik: "overview",
         hotel: "gallery",
@@ -527,6 +529,7 @@
         przyjecia: "oferta",
         dokumenty: "documents",
         kontakt: "contact",
+        powiadomienia: "notifications",
       },
     },
     schedule: {
@@ -547,6 +550,7 @@
       watchTimer: null,
       knownPendingKeys: null,
       watchBaselineReady: false,
+      lastLoadedAt: 0,
     },
   };
   const SCHEDULE_PENDING_WATCH_MS = 20000;
@@ -613,8 +617,26 @@
         { key: "contact", label: "Dane kontaktowe", description: "Telefon, e-mail, adres i podstawowe dane firmy." },
       ],
     },
+    {
+      key: "powiadomienia",
+      label: "Powiadomienia",
+      description: "Komunikaty na stronie glownej — widoczne dla gosci w ustalonym czasie.",
+      tiles: [
+        {
+          key: "notifications",
+          label: "Powiadomienia",
+          description: "Lista, tworzenie, edycja i usuwanie komunikatow przyklejonych do dolu strony glownej.",
+        },
+      ],
+    },
   ];
-  const HOME_TAB_ORDER = ["hotel", "restauracja", "przyjecia", "dokumenty", "kontakt"];
+  const HOME_TAB_ORDER = ["hotel", "restauracja", "przyjecia", "dokumenty", "kontakt", "powiadomienia"];
+  /** Klucze w content.home.sectionBlocks (true = moduł zablokowany na stronie głównej). */
+  const ADMIN_ENTRY_SECTION_BLOCK_KEY = {
+    hotel: "hotel",
+    restauracja: "restaurant",
+    przyjecia: "events",
+  };
   const INLINE_IMAGE_MAX_BYTES = 320 * 1024;
   const API_IMAGE_MAX_BYTES = 1_700_000;
   const DOCUMENT_MAX_BYTES = 1_700_000;
@@ -1216,6 +1238,8 @@
         '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 3.5h7l4 4v13H7z"></path><path d="M14 3.5v4h4"></path><path d="M9.5 12h5"></path><path d="M9.5 15.5h5"></path></svg>',
       kontakt:
         '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5.5 7.5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2z"></path><path d="M7 8.5 12 12l5-3.5"></path></svg>',
+      powiadomienia:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22z" fill="currentColor"/><path d="M18 16v-5a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
     };
     return `<span class="icon-inline icon-${escapeAttribute(tabKey)}">${icons[tabKey] || ""}</span>`;
   }
@@ -1227,28 +1251,47 @@
       .slice(0, 3);
     const metaLabel = featured ? "Najważniejszy moduł" : adminViewsCountLabel(tab.tiles.length);
     const featuredModifier = featured ? " admin-entry-tile--featured" : "";
-    return `
+    const blockKey = ADMIN_ENTRY_SECTION_BLOCK_KEY[tab.key] || "";
+    const sb = state.content?.home?.sectionBlocks || {};
+    const blocked = blockKey ? Boolean(sb[blockKey]) : false;
+    const toggleMarkup = blockKey
+      ? `
       <button
         type="button"
-        class="admin-tile admin-entry-tile admin-entry-tile--${escapeAttribute(tab.key)}${featuredModifier}"
-        data-admin-entry="${escapeAttribute(tab.key)}"
+        class="button admin-entry-visibility-toggle ${blocked ? "admin-entry-visibility-toggle--off" : "admin-entry-visibility-toggle--on"}"
+        data-admin-section-visibility="${escapeAttribute(blockKey)}"
+        aria-pressed="${blocked ? "false" : "true"}"
+        aria-label="${blocked ? "Moduł ukryty na stronie głównej — kliknij, aby włączyć podstronę" : "Moduł widoczny — kliknij, aby wyłączyć podstronę na stronie głównej"}"
+        title="${blocked ? "Włącz widoczność modułu" : "Wyłącz widoczność modułu"}"
       >
-        <span class="admin-entry-head">
-          <span class="admin-entry-icon" aria-hidden="true">${adminHomeIconMarkup(tab.key)}</span>
-          <span class="admin-entry-heading">
-            <span class="admin-entry-meta">${escapeHtml(metaLabel)}</span>
-            <span class="admin-tile-title">${escapeHtml(tab.label)}</span>
+        ${blocked ? "Włącz" : "Wyłącz"}
+      </button>`
+      : "";
+    return `
+      <div class="admin-entry-tile-wrap${featured ? " admin-entry-tile-wrap--featured" : ""}">
+        <button
+          type="button"
+          class="admin-tile admin-entry-tile admin-entry-tile--${escapeAttribute(tab.key)}${featuredModifier}"
+          data-admin-entry="${escapeAttribute(tab.key)}"
+        >
+          <span class="admin-entry-head">
+            <span class="admin-entry-icon" aria-hidden="true">${adminHomeIconMarkup(tab.key)}</span>
+            <span class="admin-entry-heading">
+              <span class="admin-entry-meta">${escapeHtml(metaLabel)}</span>
+              <span class="admin-tile-title">${escapeHtml(tab.label)}</span>
+            </span>
           </span>
-        </span>
-        <span class="admin-tile-copy">${escapeHtml(tab.description)}</span>
-        ${
-          tagItems.length
-            ? `<span class="admin-entry-tags">${tagItems
-                .map((item) => `<span>${escapeHtml(item)}</span>`)
-                .join("")}</span>`
-            : ""
-        }
-      </button>
+          <span class="admin-tile-copy">${escapeHtml(tab.description)}</span>
+          ${
+            tagItems.length
+              ? `<span class="admin-entry-tags">${tagItems
+                  .map((item) => `<span>${escapeHtml(item)}</span>`)
+                  .join("")}</span>`
+              : ""
+          }
+        </button>
+        ${toggleMarkup}
+      </div>
     `;
   }
 
@@ -1577,12 +1620,13 @@
   function scheduleStartPendingWatch() {
     if (!onlineBookingsEnabled) return;
     if (state.schedule.watchTimer) {
-      loadScheduleData({ silent: true });
       return;
     }
     state.schedule.knownPendingKeys = null;
     state.schedule.watchBaselineReady = false;
-    loadScheduleData({ silent: true });
+    if (!state.schedule.isLoading && Date.now() - Number(state.schedule.lastLoadedAt || 0) > SCHEDULE_PENDING_WATCH_MS) {
+      loadScheduleData({ silent: true });
+    }
     state.schedule.watchTimer = window.setInterval(() => {
       if (state.ui.topTab !== "grafik" || state.ui.view !== "section") return;
       if (state.schedule.isLoading) return;
@@ -1758,6 +1802,7 @@
       if (!watchPoll || !prevKnown) {
         state.schedule.watchBaselineReady = true;
       }
+      state.schedule.lastLoadedAt = Date.now();
     } catch (error) {
       state.schedule.allItems = [];
       state.schedule.items = [];
@@ -3402,6 +3447,10 @@
   function setAdminTab(tabKey) {
     dismissMenuEditorModal({ skipRender: true, closeEntirely: true });
     captureDraftIfPossible();
+    const previousTab = state.ui.topTab;
+    if (previousTab === "dokumenty" && tabKey !== "dokumenty") {
+      state.ui.documentsPageEditIndex = null;
+    }
     const tab = getAdminTabConfig(tabKey);
     state.ui.view = "section";
     state.ui.topTab = tabKey;
@@ -3412,6 +3461,10 @@
   function setAdminTile(tabKey, tileKey) {
     dismissMenuEditorModal({ skipRender: true, closeEntirely: true });
     captureDraftIfPossible();
+    const previousTab = state.ui.topTab;
+    if (previousTab === "dokumenty" && tabKey !== "dokumenty") {
+      state.ui.documentsPageEditIndex = null;
+    }
     state.ui.view = "section";
     state.ui.topTab = tabKey;
     state.ui.tileByTab[tabKey] = tileKey;
@@ -3421,6 +3474,9 @@
   function goToAdminHome() {
     dismissMenuEditorModal({ skipRender: true, closeEntirely: true });
     captureDraftIfPossible();
+    if (state.ui.topTab === "dokumenty") {
+      state.ui.documentsPageEditIndex = null;
+    }
     state.ui.view = "home";
     renderDashboard();
   }
@@ -3501,7 +3557,36 @@
     if (tabKey === "kontakt") {
       return `<section class="panel col-12" id="contact-panel"></section>`;
     }
+    if (tabKey === "powiadomienia") {
+      return `<section class="panel col-12" id="notifications-panel"></section>`;
+    }
     return `<section class="panel col-12"><p class="status">Brak skonfigurowanego widoku.</p></section>`;
+  }
+
+  async function persistSectionVisibilityToggle(blockKey) {
+    captureDraftIfPossible();
+    const prevBlocks = structuredClone(state.content.home.sectionBlocks || {});
+    const nextBlocks = { ...prevBlocks, [blockKey]: !Boolean(prevBlocks[blockKey]) };
+    state.content.home.sectionBlocks = nextBlocks;
+    const content = structuredClone(state.content);
+    if (content.hotel) {
+      delete content.hotel.roomGalleries;
+    }
+    try {
+      const data = await api("/api/admin/content", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      const normalizedContent = normalizeAdminContent(data.content);
+      state.content = normalizedContent;
+      state.lastSavedContent = structuredClone(normalizedContent);
+      renderDashboard();
+    } catch (error) {
+      state.content.home.sectionBlocks = prevBlocks;
+      renderDashboard();
+      window.alert(error?.message || "Nie udało się zapisać widoczności modułu.");
+    }
   }
 
   function bindAdminNavigation() {
@@ -3513,6 +3598,15 @@
     });
     document.querySelectorAll("[data-admin-tile]").forEach((button) => {
       button.addEventListener("click", () => setAdminTile(button.dataset.adminTabKey, button.dataset.adminTile));
+    });
+    document.querySelectorAll("[data-admin-section-visibility]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const key = String(button.dataset.adminSectionVisibility || "").trim();
+        if (!key) return;
+        persistSectionVisibilityToggle(key);
+      });
     });
     const backButton = document.querySelector("#admin-back-button");
     if (backButton) {
@@ -3687,6 +3781,12 @@
 
     if (topTab === "kontakt") {
       renderContactPanel(statusMessage);
+      return;
+    }
+
+    if (topTab === "powiadomienia") {
+      renderNotificationsPanel(statusMessage);
+      return;
     }
   }
 
@@ -3699,7 +3799,9 @@
     const inSectionView = state.ui.view === "section";
     const homeTabs = HOME_TAB_ORDER.map((tabKey) => ADMIN_TABS.find((tab) => tab.key === tabKey)).filter(Boolean);
     const primaryHomeTabs = homeTabs.filter((tab) => ["hotel", "restauracja", "przyjecia"].includes(tab.key));
-    const secondaryHomeTabs = homeTabs.filter((tab) => ["dokumenty", "kontakt"].includes(tab.key));
+    const secondaryHomeTabs = homeTabs.filter((tab) =>
+      ["dokumenty", "kontakt", "powiadomienia"].includes(tab.key)
+    );
     const scheduleTab = ADMIN_TABS.find((tab) => tab.key === "grafik");
 
     app.innerHTML = `
@@ -3888,6 +3990,7 @@
             <strong>Uwaga:</strong> czesc pol tresci nizej pochodzi ze starszej wersji panelu. Aktualny front korzysta glownie z blokad sekcji, rezerwacji online, godzin otwarcia, menu, galerii, dokumentow, kalendarza i modala „Oferta”.
           </div>
           <div class="field-grid">
+            <label class="field-full"><span>Naglowek bloku (np. modal Kontakt)</span><input id="home-about-title" value="${escapeAttribute(content.home.aboutTitle || "")}" /></label>
             <label class="field-full"><span>Opis sekcji</span><textarea id="home-about-text">${escapeHtml(content.home.aboutText)}</textarea></label>
             <label class="field-full"><span>Opis wlasciciela</span><textarea id="home-owner">${escapeHtml(content.home.owner)}</textarea></label>
           </div>
@@ -4256,6 +4359,8 @@
       }
     }
 
+    const homeAboutTitle = getTrimmedValue("#home-about-title");
+    if (homeAboutTitle !== null) content.home.aboutTitle = homeAboutTitle;
     const homeAboutText = getTrimmedValue("#home-about-text");
     if (homeAboutText !== null) content.home.aboutText = homeAboutText;
     const homeOwner = getTrimmedValue("#home-owner");
@@ -4948,6 +5053,7 @@
     const panel = document.querySelector("#contact-panel");
     if (!panel) return;
     const company = state.content.company || {};
+    const home = state.content.home || {};
 
     panel.innerHTML = `
       <p class="pill">Kontakt</p>
@@ -4960,6 +5066,10 @@
           <label class="field"><span>E-mail</span><input id="company-email" value="${escapeAttribute(company.email || "")}" /></label>
           <label class="field"><span>Adres</span><input id="company-address" value="${escapeAttribute(company.address || "")}" /></label>
           <label class="field-full"><span>Haslo pod logo</span><input id="company-tagline" value="${escapeAttribute(company.tagline || "")}" /></label>
+          <p class="helper field-full" style="margin:0;">Na stronie glownej w tym układzie nie jest obecnie wyswietlane (pole zostaje w CMS na przyszły podpis pod logo).</p>
+          <label class="field-full"><span>Naglowek sekcji właściciel (modal Kontakt)</span><input id="home-about-title" value="${escapeAttribute(home.aboutTitle || "")}" /></label>
+          <label class="field-full"><span>Tekst o firmie (pierwszy akapit)</span><textarea id="home-about-text">${escapeHtml(home.aboutText || "")}</textarea></label>
+          <label class="field-full"><span>Tekst o wlascicielu (drugi akapit)</span><textarea id="home-owner">${escapeHtml(home.owner || "")}</textarea></label>
         </div>
         <p class="status">${escapeHtml(statusMessage)}</p>
       </div>
@@ -5050,6 +5160,7 @@
                           <div class="inline-actions">
                             <button class="button secondary" type="button" data-move-album="${escapeAttribute(album.id)}" data-direction="-1" aria-label="Przesun album w gore" ${albumIndex === 0 || !mediaEnabled ? "disabled" : ""}>↑</button>
                             <button class="button secondary" type="button" data-move-album="${escapeAttribute(album.id)}" data-direction="1" aria-label="Przesun album w dol" ${albumIndex === albums.length - 1 || !mediaEnabled ? "disabled" : ""}>↓</button>
+                            <button class="button danger" type="button" data-delete-album="${escapeAttribute(album.id)}" aria-label="Usun caly album" ${mediaEnabled ? "" : "disabled"}>Usun album</button>
                           </div>
                         </div>
                         <form class="upload-room-gallery-form upload-room-gallery-form--album" data-upload-album="${escapeAttribute(album.id)}">
@@ -5119,6 +5230,9 @@
     });
     panel.querySelectorAll("[data-delete-image]").forEach((button) => {
       button.addEventListener("click", () => deleteImage(button.dataset.deleteImage));
+    });
+    panel.querySelectorAll("[data-delete-album]").forEach((button) => {
+      button.addEventListener("click", () => deleteAlbum(button.dataset.deleteAlbum));
     });
   }
 
@@ -5220,6 +5334,18 @@
   async function deleteImage(imageId) {
     await api(`/api/admin/gallery/images/${imageId}`, { method: "DELETE" });
     await loadDashboard("Zdjecie zostalo usuniete.");
+  }
+
+  async function deleteAlbum(albumId) {
+    if (!window.confirm("Usunac ten album wraz ze wszystkimi zdjeciami? Tej operacji nie da sie cofnac.")) {
+      return;
+    }
+    try {
+      await api(`/api/admin/gallery/albums/${albumId}`, { method: "DELETE" });
+      await loadDashboard("Album zostal usuniety.");
+    } catch (error) {
+      renderGalleryPanel(error.message || "Nie udalo sie usunac albumu.");
+    }
   }
 
   function getMenuEditorConfig(kind) {
@@ -5597,13 +5723,22 @@
     const section = resolvedSectionIndex === null ? null : sections[resolvedSectionIndex];
     if (!section) return;
     const currentItem = itemIndex === null ? createMenuEditorItem(kind) : section.items?.[itemIndex];
+    const draft = structuredClone(currentItem || createMenuEditorItem(kind));
+    if (itemIndex === null && typeof options.prefillSubcategory === "string") {
+      const sub = options.prefillSubcategory.trim();
+      if (sub) {
+        draft.subcategory = sub;
+      } else {
+        delete draft.subcategory;
+      }
+    }
     state.ui.menuEditorModal = {
       kind,
       type: "item",
       sectionIndex: resolvedSectionIndex,
       sourceSectionIndex: itemIndex === null ? null : resolvedSectionIndex,
       itemIndex,
-      draft: structuredClone(currentItem || createMenuEditorItem(kind)),
+      draft,
       statusMessage: options.statusMessage || "",
       returnTo: options.returnTo || null,
     };
@@ -5957,6 +6092,11 @@
                                 <p class="helper">${entry.count} ${entry.count === 1 ? "produkt" : "produkty"}${entry.isDefault ? " • domyslna (tylko admin)" : ""}</p>
                               </div>
                               <div class="inline-actions">
+                                ${
+                                  entry.isDefault
+                                    ? ""
+                                    : `<button class="button danger" type="button" data-menu-card-action data-remove-menu-subcategory="${escapeAttribute(entry.key)}" aria-label="Usun podkategorie ${escapeAttribute(entry.label)}">Usun</button>`
+                                }
                                 <button class="button secondary menu-editor-card-move" type="button" data-menu-card-action data-move-menu-subcategory-up="${escapeAttribute(entry.key)}" aria-label="Przesun podkategorie wyzej" ${canMoveUp ? "" : "disabled"}>↑</button>
                                 <button class="button secondary menu-editor-card-move" type="button" data-menu-card-action data-move-menu-subcategory-down="${escapeAttribute(entry.key)}" aria-label="Przesun podkategorie nizej" ${canMoveDown ? "" : "disabled"}>↓</button>
                               </div>
@@ -5972,6 +6112,7 @@
               : `
                 <div class="menu-editor-subcategory-group-head">
                   <strong>Podkategoria: ${escapeHtml(activeGroup.name)}</strong>
+                  <button class="button secondary menu-editor-add-item-in-subcategory" type="button" data-add-menu-item-in-subcategory aria-label="Dodaj produkt w tej podkategorii">+</button>
                 </div>
                 <div class="stack menu-editor-product-list">
                   ${
@@ -6002,7 +6143,7 @@
                       : `
                         <div class="repeater-item menu-editor-empty-state">
                           <strong>Brak produktow w tej podkategorii</strong>
-                          <p class="helper">Dodaj produkt z glownego przycisku "Dodaj" i przypisz go do tej podkategorii.</p>
+                          <p class="helper">Kliknij plus obok nazwy podkategorii albo uzyj przycisku "Dodaj" na liscie kategorii.</p>
                         </div>
                       `
                   }
@@ -6260,6 +6401,23 @@
           moveMenuEditorSubcategory(modal.kind, modal.sectionIndex, String(button.dataset.moveMenuSubcategoryDown || ""), 1);
         });
       });
+      root.querySelectorAll("[data-remove-menu-subcategory]").forEach((button) => {
+        button.addEventListener("click", () => {
+          removeMenuEditorSubcategory(modal.kind, modal.sectionIndex, String(button.dataset.removeMenuSubcategory || ""));
+        });
+      });
+      root.querySelector("[data-add-menu-item-in-subcategory]")?.addEventListener("click", () => {
+        const sub = typeof modal.activeSubcategory === "string" ? modal.activeSubcategory : "";
+        openMenuEditorItemModal(modal.kind, modal.sectionIndex, null, {
+          prefillSubcategory: sub,
+          returnTo: {
+            kind: modal.kind,
+            type: "section",
+            sectionIndex: modal.sectionIndex,
+            activeSubcategory: typeof modal.activeSubcategory === "string" ? modal.activeSubcategory : null,
+          },
+        });
+      });
       return;
     }
 
@@ -6432,6 +6590,49 @@
     refreshSaveDockVisibility();
   }
 
+  function removeMenuEditorSubcategory(kind, sectionIndex, subcategoryName) {
+    const section = getMenuSectionsByKind(kind)[sectionIndex];
+    if (!section) return;
+    const name = String(subcategoryName || "").trim();
+    if (!name) return;
+
+    const items = Array.isArray(section.items) ? section.items : [];
+    const affected = items.filter((item) => String(item?.subcategory || "").trim() === name).length;
+    if (affected > 0) {
+      const msg =
+        affected === 1
+          ? "Usunac podkategorie? Jeden produkt trafi do «Inne»."
+          : `Usunac podkategorie? ${affected} produktow trafi do «Inne».`;
+      if (!window.confirm(msg)) return;
+    } else if (!window.confirm("Usunac te podkategorie?")) {
+      return;
+    }
+
+    items.forEach((item) => {
+      if (String(item?.subcategory || "").trim() === name) {
+        delete item.subcategory;
+      }
+    });
+
+    if (Array.isArray(section.subcategories)) {
+      section.subcategories = section.subcategories.filter((s) => String(s).trim() !== name);
+      if (!section.subcategories.length) {
+        delete section.subcategories;
+      }
+    }
+
+    syncMenuEditorSectionSubcategories(section);
+    syncMenuEditorSectionSubcategoryOrder(section);
+    reorderMenuEditorSectionItemsBySubcategoryOrder(section);
+
+    openMenuEditorSectionModal(kind, sectionIndex, {
+      statusMessage: "Podkategoria zostala usunieta.",
+    });
+    setMenuEditorStatus(kind, "Podkategoria zostala usunieta.");
+    renderMenuEditorPanel(kind);
+    refreshSaveDockVisibility();
+  }
+
   function saveMenuEditorItem(kind, sectionIndex, itemIndex) {
     const modal = getMenuEditorModalState();
     const form = document.querySelector("#menu-editor-item-form");
@@ -6466,7 +6667,14 @@
       targetSection.items.push(item);
       reorderMenuEditorSectionItemsBySubcategoryOrder(targetSection);
       setMenuEditorStatus(kind, "Produkt zostal dodany.");
-      state.ui.menuEditorModal = null;
+      if (modal.returnTo?.type === "section") {
+        openMenuEditorSectionModal(kind, targetSectionIndex, {
+          activeSubcategory: typeof modal.returnTo.activeSubcategory === "string" ? modal.returnTo.activeSubcategory : null,
+          statusMessage: "Produkt zostal dodany.",
+        });
+      } else {
+        state.ui.menuEditorModal = null;
+      }
     } else {
       const sourceSectionIndex =
         typeof modal.sourceSectionIndex === "number" ? modal.sourceSectionIndex : sectionIndex;
@@ -6973,6 +7181,11 @@
     if (!panel) return;
     const documentsPage = normalizeDocumentsPage(state.content.documentsPage);
     const mediaEnabled = state.capabilities?.mediaStorageEnabled === true;
+    const docListEditIndex = state.ui.documentsPageEditIndex;
+    const docListHelper =
+      docListEditIndex === null
+        ? "Te sekcje sa wyswietlane na /dokumenty. Na liscie widzisz tylko tytuly — wejdz w dokument, aby edytowac tresc, lub zmien kolejnosc."
+        : "Edytujesz jeden dokument. Przycisk „Zapisz dokumenty podstrony” zapisuje cala podstrone /dokumenty.";
     panel.innerHTML = `
       <p class="pill">Dokumenty</p>
       <h2>Dokumenty strony i pliki</h2>
@@ -6981,9 +7194,13 @@
           <div class="repeater-head">
             <div>
               <h3>Dokumenty na podstronie</h3>
-              <p class="helper">Te sekcje sa wyswietlane na /dokumenty. Mozesz je edytowac, usuwac i ustawiac ich kolejnosc.</p>
+              <p class="helper">${escapeHtml(docListHelper)}</p>
             </div>
-            <button class="button secondary" type="button" id="add-documents-page-document">Dodaj dokument</button>
+            ${
+              docListEditIndex === null
+                ? '<button class="button secondary" type="button" id="add-documents-page-document">Dodaj dokument</button>'
+                : ""
+            }
           </div>
           <div id="documents-page-list" class="repeater-list"></div>
           <div class="inline-actions">
@@ -7025,7 +7242,7 @@
 
     state.content.documentsPage = documentsPage;
     renderDocumentsPageList();
-    panel.querySelector("#add-documents-page-document").addEventListener("click", addDocumentsPageDocument);
+    panel.querySelector("#add-documents-page-document")?.addEventListener("click", addDocumentsPageDocument);
     panel.querySelector("#save-documents-page").addEventListener("click", saveDocumentsPage);
     document.querySelector("#document-form").addEventListener("submit", uploadDocument);
     panel.querySelectorAll("[data-delete-document]").forEach((button) => {
@@ -7038,50 +7255,91 @@
     if (!target) {
       return;
     }
-    target.innerHTML = (state.content.documentsPage?.documents || [])
-      .map(
-        (documentEntry, documentIndex) => `
-          <div class="repeater-item">
-            <div class="repeater-head">
-              <strong>Dokument ${documentIndex + 1}</strong>
-              <div class="inline-actions">
-                <button class="button secondary" type="button" data-move-document-up="${documentIndex}" ${documentIndex === 0 ? "disabled" : ""}>↑</button>
-                <button class="button secondary" type="button" data-move-document-down="${documentIndex}" ${documentIndex === (state.content.documentsPage.documents.length - 1) ? "disabled" : ""}>↓</button>
-                <button class="button danger" type="button" data-remove-document="${documentIndex}">Usun</button>
-              </div>
-            </div>
-            <div class="field-grid">
-              <label class="field-full"><span>Tytul dokumentu</span><input data-doc-page-title="${documentIndex}" value="${escapeAttribute(documentEntry.title || "")}" /></label>
-              <label class="field-full"><span>Podtytul (opcjonalnie)</span><input data-doc-page-subtitle="${documentIndex}" value="${escapeAttribute(documentEntry.subtitle || "")}" /></label>
-            </div>
-            <div class="repeater-list">
-              ${(documentEntry.sections || [])
-                .map(
-                  (section, sectionIndex) => `
-                    <div class="repeater-item">
-                      <div class="repeater-head">
-                        <strong>Punkt ${sectionIndex + 1}</strong>
-                        <div class="inline-actions">
-                          <button class="button secondary" type="button" data-move-section-up="${documentIndex}" data-section-index="${sectionIndex}" ${sectionIndex === 0 ? "disabled" : ""}>↑</button>
-                          <button class="button secondary" type="button" data-move-section-down="${documentIndex}" data-section-index="${sectionIndex}" ${sectionIndex === documentEntry.sections.length - 1 ? "disabled" : ""}>↓</button>
-                          <button class="button danger" type="button" data-remove-section="${documentIndex}" data-section-index="${sectionIndex}">Usun</button>
-                        </div>
-                      </div>
-                      <div class="field-grid">
-                        <label class="field-full"><span>Naglowek punktu</span><input data-doc-page-section-title="${documentIndex}" data-section-index="${sectionIndex}" value="${escapeAttribute(section.title || "")}" /></label>
-                        <label class="field-full"><span>Tresc punktu</span><textarea data-doc-page-section-text="${documentIndex}" data-section-index="${sectionIndex}">${escapeHtml(section.text || "")}</textarea></label>
+    const documents = state.content.documentsPage?.documents || [];
+    const editIndex = state.ui.documentsPageEditIndex;
+
+    if (editIndex !== null) {
+      if (!documents[editIndex]) {
+        state.ui.documentsPageEditIndex = null;
+        renderDocumentsPageList();
+        return;
+      }
+      const documentEntry = documents[editIndex];
+      const documentIndex = editIndex;
+      target.innerHTML = `
+        <div class="repeater-item documents-page-detail" data-documents-page-detail-host data-documents-page-detail-index="${documentIndex}">
+          <div class="repeater-head">
+            <button class="button secondary" type="button" id="documents-page-back-to-list">Wroc do listy</button>
+          </div>
+          <div class="field-grid">
+            <label class="field-full"><span>Tytul dokumentu</span><input data-doc-page-title value="${escapeAttribute(documentEntry.title || "")}" /></label>
+            <label class="field-full"><span>Podtytul (opcjonalnie)</span><input data-doc-page-subtitle value="${escapeAttribute(documentEntry.subtitle || "")}" /></label>
+          </div>
+          <div class="repeater-list">
+            ${(documentEntry.sections || [])
+              .map(
+                (section, sectionIndex) => `
+                  <div class="repeater-item">
+                    <div class="repeater-head">
+                      <strong>Punkt ${sectionIndex + 1}</strong>
+                      <div class="inline-actions">
+                        <button class="button secondary" type="button" data-move-section-up="${documentIndex}" data-section-index="${sectionIndex}" ${sectionIndex === 0 ? "disabled" : ""}>↑</button>
+                        <button class="button secondary" type="button" data-move-section-down="${documentIndex}" data-section-index="${sectionIndex}" ${sectionIndex === documentEntry.sections.length - 1 ? "disabled" : ""}>↓</button>
+                        <button class="button danger" type="button" data-remove-section="${documentIndex}" data-section-index="${sectionIndex}">Usun</button>
                       </div>
                     </div>
-                  `
-                )
-                .join("")}
+                    <div class="field-grid">
+                      <label class="field-full"><span>Naglowek punktu</span><input data-doc-page-section-title data-section-index="${sectionIndex}" value="${escapeAttribute(section.title || "")}" /></label>
+                      <label class="field-full"><span>Tresc punktu</span><textarea data-doc-page-section-text data-section-index="${sectionIndex}">${escapeHtml(section.text || "")}</textarea></label>
+                    </div>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+          <div class="inline-actions">
+            <button class="button secondary" type="button" data-add-section="${documentIndex}">Dodaj punkt</button>
+          </div>
+        </div>
+      `;
+    } else {
+      target.innerHTML = documents
+        .map((documentEntry, documentIndex) => {
+          const rawTitle = String(documentEntry.title || "").trim();
+          const displayTitle = rawTitle || `Dokument ${documentIndex + 1} (bez tytulu)`;
+          return `
+          <article class="list-item documents-page-list-row">
+            <div class="list-head documents-page-list-head">
+              <strong class="documents-page-list-title">${escapeHtml(displayTitle)}</strong>
             </div>
             <div class="inline-actions">
-              <button class="button secondary" type="button" data-add-section="${documentIndex}">Dodaj punkt</button>
+              <button class="button" type="button" data-open-doc-page="${documentIndex}">Edytuj</button>
+              <button class="button secondary" type="button" data-move-document-up="${documentIndex}" ${documentIndex === 0 ? "disabled" : ""}>↑</button>
+              <button class="button secondary" type="button" data-move-document-down="${documentIndex}" ${documentIndex === documents.length - 1 ? "disabled" : ""}>↓</button>
+              <button class="button danger" type="button" data-remove-document="${documentIndex}">Usun</button>
             </div>
-          </div>`
-      )
-      .join("");
+          </article>`;
+        })
+        .join("");
+    }
+
+    target.querySelector("#documents-page-back-to-list")?.addEventListener("click", () => {
+      const host = target.querySelector("[data-documents-page-detail-host]");
+      if (host) {
+        applyDocumentsPageDetailFormToState(host);
+      }
+      state.ui.documentsPageEditIndex = null;
+      renderDocumentsPanel();
+      refreshSaveDockVisibility();
+    });
+
+    target.querySelectorAll("[data-open-doc-page]").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.ui.documentsPageEditIndex = Number(button.dataset.openDocPage);
+        renderDocumentsPanel();
+        refreshSaveDockVisibility();
+      });
+    });
 
     target.querySelectorAll("[data-remove-document]").forEach((button) => {
       button.addEventListener("click", () => removeDocumentsPageDocument(Number(button.dataset.removeDocument)));
@@ -7112,37 +7370,44 @@
     });
   }
 
-  function collectDocumentsPageFromPanel() {
-    const documents = Array.from(document.querySelectorAll("[data-doc-page-title]")).map((titleInput, documentIndex) => {
-      const subtitle = document.querySelector(`[data-doc-page-subtitle="${documentIndex}"]`)?.value.trim() || "";
-      const sectionTitleNodes = Array.from(
-        document.querySelectorAll(`[data-doc-page-section-title="${documentIndex}"]`)
-      );
-      const sections = sectionTitleNodes
-        .map((sectionTitleInput, sectionIndex) => ({
+  function applyDocumentsPageDetailFormToState(host) {
+    if (!host) return;
+    const documentIndex = Number(host.dataset.documentsPageDetailIndex);
+    if (!Number.isFinite(documentIndex) || documentIndex < 0) return;
+    const docs = structuredClone(state.content.documentsPage?.documents || []);
+    if (!docs[documentIndex]) return;
+    const title = host.querySelector("[data-doc-page-title]")?.value.trim() ?? "";
+    const subtitle = host.querySelector("[data-doc-page-subtitle]")?.value.trim() ?? "";
+    const sectionTitleInputs = Array.from(host.querySelectorAll("[data-doc-page-section-title]"));
+    const sections = sectionTitleInputs
+      .map((sectionTitleInput) => {
+        const sectionIndex = sectionTitleInput.getAttribute("data-section-index");
+        const text =
+          host
+            .querySelector(`[data-doc-page-section-text][data-section-index="${sectionIndex}"]`)
+            ?.value.trim() || "";
+        return {
           title: sectionTitleInput.value.trim(),
-          text: document
-            .querySelector(
-              `[data-doc-page-section-text="${documentIndex}"][data-section-index="${sectionIndex}"]`
-            )
-            ?.value.trim() || "",
-        }))
-        .filter((section) => section.title || section.text);
-      return {
-        title: titleInput.value.trim(),
-        subtitle,
-        sections,
-      };
-    });
+          text,
+        };
+      })
+      .filter((section) => section.title || section.text);
+    docs[documentIndex] = { title, subtitle, sections };
+    state.content.documentsPage = { documents: docs };
+  }
 
-    return {
-      documents: documents.filter((entry) => entry.title || entry.subtitle || entry.sections.length),
-    };
+  function collectDocumentsPageFromPanel() {
+    const host = document.querySelector("[data-documents-page-detail-host]");
+    if (host) {
+      applyDocumentsPageDetailFormToState(host);
+    }
+    return normalizeDocumentsPage(state.content.documentsPage);
   }
 
   function addDocumentsPageDocument() {
     state.content.documentsPage = collectDocumentsPageFromPanel();
     state.content.documentsPage.documents.push({ title: "", subtitle: "", sections: [] });
+    state.ui.documentsPageEditIndex = state.content.documentsPage.documents.length - 1;
     renderDocumentsPanel();
     refreshSaveDockVisibility();
   }
@@ -7150,6 +7415,14 @@
   function removeDocumentsPageDocument(index) {
     state.content.documentsPage = collectDocumentsPageFromPanel();
     state.content.documentsPage.documents.splice(index, 1);
+    const editIx = state.ui.documentsPageEditIndex;
+    if (editIx !== null) {
+      if (editIx === index) {
+        state.ui.documentsPageEditIndex = null;
+      } else if (editIx > index) {
+        state.ui.documentsPageEditIndex = editIx - 1;
+      }
+    }
     renderDocumentsPanel();
     refreshSaveDockVisibility();
   }
@@ -7237,6 +7510,216 @@
   async function deleteDocument(documentId) {
     await api(`/api/admin/documents/${documentId}`, { method: "DELETE" });
     await loadDashboard("Dokument zostal usuniety.");
+  }
+
+  function isoToDatetimeLocalValue(iso) {
+    if (!iso) {
+      return "";
+    }
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) {
+      return "";
+    }
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function datetimeLocalValueToIso(value) {
+    const raw = String(value || "").trim();
+    if (!raw) {
+      return "";
+    }
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) {
+      return "";
+    }
+    return d.toISOString();
+  }
+
+  function formatNotificationWindowLabel(startsAt, endsAt) {
+    const fmt = new Intl.DateTimeFormat("pl-PL", { dateStyle: "short", timeStyle: "short" });
+    try {
+      return `${fmt.format(new Date(startsAt))} – ${fmt.format(new Date(endsAt))}`;
+    } catch {
+      return "";
+    }
+  }
+
+  function isNotificationActiveNow(entry) {
+    const now = Date.now();
+    const a = Date.parse(entry?.startsAt || "");
+    const b = Date.parse(entry?.endsAt || "");
+    if (!Number.isFinite(a) || !Number.isFinite(b)) {
+      return false;
+    }
+    return now >= a && now <= b;
+  }
+
+  function renderNotificationsPanel(statusMessage = "") {
+    const panel = document.querySelector("#notifications-panel");
+    if (!panel) {
+      return;
+    }
+    const items = Array.isArray(state.notifications) ? state.notifications : [];
+    const sorted = [...items].sort((a, b) => {
+      const ao = Number(a?.sortOrder) || 0;
+      const bo = Number(b?.sortOrder) || 0;
+      if (ao !== bo) {
+        return ao - bo;
+      }
+      return Number(b?.id || 0) - Number(a?.id || 0);
+    });
+    panel.innerHTML = `
+      <p class="pill">Strona glowna</p>
+      <h2>Powiadomienia</h2>
+      <p class="section-intro">
+        W wybranym okresie komunikat pojawia sie na dole strony glownej. Gosc moze zwinac panel strzalka — wtedy zostaje waska zakladka do rozsuniecia.
+      </p>
+      <div class="stack">
+        <form id="notification-form" class="repeater-item">
+          <input type="hidden" id="notification-record-id" value="" />
+          <div class="field-grid">
+            <label class="field-full">
+              <span>Tytul</span>
+              <input id="notification-title" type="text" maxlength="200" required placeholder="np. Zmiana godzin otwarcia" />
+            </label>
+            <label class="field-full">
+              <span>Opis</span>
+              <textarea id="notification-description" rows="4" maxlength="4000" placeholder="Krotki komunikat dla gosci"></textarea>
+            </label>
+            <label class="field">
+              <span>Od (data i godzina)</span>
+              <input id="notification-starts-at" type="datetime-local" required />
+            </label>
+            <label class="field">
+              <span>Do (data i godzina)</span>
+              <input id="notification-ends-at" type="datetime-local" required />
+            </label>
+          </div>
+          <div class="inline-actions">
+            <button class="button" type="submit" id="notification-save">Zapisz powiadomienie</button>
+            <button class="button secondary" type="button" id="notification-reset">Nowe (wyczysc formularz)</button>
+          </div>
+        </form>
+        <p class="status">${escapeHtml(statusMessage)}</p>
+        ${
+          sorted.length
+            ? sorted
+                .map(
+                  (entry) => `
+              <article class="list-item" data-notification-id="${escapeAttribute(String(entry.id))}">
+                <div class="list-head">
+                  <strong>${escapeHtml(entry.title || "")}</strong>
+                  <span class="pill">${isNotificationActiveNow(entry) ? "Aktywne" : "Nieaktywne"}</span>
+                </div>
+                <p class="helper" style="margin: 0.35rem 0 0.5rem;">${escapeHtml(
+                  formatNotificationWindowLabel(entry.startsAt, entry.endsAt)
+                )}</p>
+                <p>${escapeHtml(entry.description || "")}</p>
+                <div class="inline-actions">
+                  <button class="button secondary" type="button" data-edit-notification="${escapeAttribute(
+                    String(entry.id)
+                  )}">Edytuj</button>
+                  <button class="button danger" type="button" data-delete-notification="${escapeAttribute(
+                    String(entry.id)
+                  )}">Usun</button>
+                </div>
+              </article>`
+                )
+                .join("")
+            : `<p class="empty">Brak powiadomien — dodaj pierwsze powyzej.</p>`
+        }
+      </div>
+    `;
+
+    const form = panel.querySelector("#notification-form");
+    const idInput = panel.querySelector("#notification-record-id");
+    const titleInput = panel.querySelector("#notification-title");
+    const descriptionInput = panel.querySelector("#notification-description");
+    const startsInput = panel.querySelector("#notification-starts-at");
+    const endsInput = panel.querySelector("#notification-ends-at");
+
+    const fillForm = (entry) => {
+      if (!entry) {
+        idInput.value = "";
+        titleInput.value = "";
+        descriptionInput.value = "";
+        startsInput.value = "";
+        endsInput.value = "";
+        return;
+      }
+      idInput.value = String(entry.id || "");
+      titleInput.value = entry.title || "";
+      descriptionInput.value = entry.description || "";
+      startsInput.value = isoToDatetimeLocalValue(entry.startsAt);
+      endsInput.value = isoToDatetimeLocalValue(entry.endsAt);
+    };
+
+    panel.querySelector("#notification-reset")?.addEventListener("click", () => fillForm(null));
+
+    panel.querySelectorAll("[data-edit-notification]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const id = Number(button.dataset.editNotification);
+        const entry = sorted.find((item) => Number(item.id) === id);
+        if (!entry) {
+          return;
+        }
+        fillForm(entry);
+        titleInput?.focus();
+      });
+    });
+
+    panel.querySelectorAll("[data-delete-notification]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const id = Number(button.dataset.deleteNotification);
+        if (!Number.isFinite(id) || id <= 0) {
+          return;
+        }
+        if (!window.confirm("Usunac to powiadomienie?")) {
+          return;
+        }
+        try {
+          await api(`/api/admin/notifications/${id}`, { method: "DELETE" });
+          await loadDashboard("Powiadomienie zostalo usuniete.");
+        } catch (error) {
+          renderNotificationsPanel(error.message || "Nie udalo sie usunac.");
+        }
+      });
+    });
+
+    form?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const recordId = String(idInput.value || "").trim();
+      const payload = {
+        title: String(titleInput.value || "").trim(),
+        description: String(descriptionInput.value || "").trim(),
+        startsAt: datetimeLocalValueToIso(startsInput.value),
+        endsAt: datetimeLocalValueToIso(endsInput.value),
+      };
+      if (!payload.startsAt || !payload.endsAt) {
+        renderNotificationsPanel("Uzupelnij date i godzine od oraz do.");
+        return;
+      }
+      try {
+        if (recordId) {
+          await api(`/api/admin/notifications/${recordId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          await loadDashboard("Powiadomienie zostalo zaktualizowane.");
+        } else {
+          await api("/api/admin/notifications", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          await loadDashboard("Powiadomienie zostalo dodane.");
+        }
+      } catch (error) {
+        renderNotificationsPanel(error.message || "Nie udalo sie zapisac.");
+      }
+    });
   }
 
   function renderCalendarPanel(statusMessage = "") {
@@ -7412,6 +7895,7 @@
     state.galleryAlbums = data.galleryAlbums;
     state.calendarBlocks = data.calendarBlocks;
     state.submissions = data.submissions;
+    state.notifications = Array.isArray(data.notifications) ? data.notifications : [];
     state.capabilities = data.capabilities || { mediaStorageEnabled: false };
     try {
       await loadScheduleData({ silent: true });

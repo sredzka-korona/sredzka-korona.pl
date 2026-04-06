@@ -750,7 +750,7 @@
     const fetchFn = window.SREDZKA_fetchBookingSettings;
     if (typeof fetchFn === "function") {
       try {
-        const s = await fetchFn();
+        const s = await fetchFn({ refresh: true });
         if (s && s.events === false) {
           resetState();
           modal.classList.add("hb-open");

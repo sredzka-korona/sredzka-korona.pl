@@ -4,8 +4,8 @@
  */
 (function () {
   const DEFAULTS = { restaurant: false, hotel: false, events: false };
-  const HEALTH_TTL_MS = 5 * 60 * 1000;
-  const BOOTSTRAP_TTL_MS = 2 * 60 * 1000;
+  const HEALTH_TTL_MS = 90 * 1000;
+  const BOOTSTRAP_TTL_MS = 45 * 1000;
   const BOOTSTRAP_CACHE_KEY = "sredzka-korona:bootstrap-cache:v1";
   let healthCache = { ts: 0, values: null };
   let bootstrapCache = { ts: 0, payload: null };
@@ -148,12 +148,27 @@
     }
   }
 
-  async function loadBootstrapPayload(base) {
-    const cached = readBootstrapCache();
-    if (cached) {
-      return cached;
+  function clearBootstrapCache() {
+    bootstrapCache = { ts: 0, payload: null };
+    const storage = sessionStorageSafe();
+    if (!storage) return;
+    try {
+      storage.removeItem(BOOTSTRAP_CACHE_KEY);
+    } catch {
+      /* ignore */
     }
-    const r = await fetch(base + "/api/public/bootstrap");
+  }
+
+  async function loadBootstrapPayload(base, { forceRefresh = false } = {}) {
+    if (forceRefresh) {
+      clearBootstrapCache();
+    } else {
+      const cached = readBootstrapCache();
+      if (cached) {
+        return cached;
+      }
+    }
+    const r = await fetch(base + "/api/public/bootstrap", { cache: "no-store" });
     if (!r.ok) {
       throw new Error("bootstrap unavailable");
     }
@@ -184,9 +199,9 @@
     return `https://europe-west1-${projectId}.cloudfunctions.net/${item.fnName}`;
   }
 
-  async function loadHealthFlags() {
+  async function loadHealthFlags({ forceRefresh = false } = {}) {
     const now = Date.now();
-    if (healthCache.values && now - healthCache.ts < HEALTH_TTL_MS) {
+    if (!forceRefresh && healthCache.values && now - healthCache.ts < HEALTH_TTL_MS) {
       return healthCache.values;
     }
     const out = { ...DEFAULTS };
@@ -198,7 +213,7 @@
           return;
         }
         try {
-          const r = await fetch(`${base}?op=health`, { method: "GET" });
+          const r = await fetch(`${base}?op=health`, { method: "GET", cache: "no-store" });
           out[key] = r.ok;
         } catch {
           out[key] = false;
@@ -209,7 +224,8 @@
     return out;
   }
 
-  window.SREDZKA_fetchBookingSettings = async function fetchBookingSettings() {
+  window.SREDZKA_fetchBookingSettings = async function fetchBookingSettings(options = {}) {
+    const refresh = Boolean(options && options.refresh);
     const cfg = window.SREDZKA_CONFIG || {};
     if (cfg.enableOnlineBookings !== true) {
       return { ...DEFAULTS };
@@ -219,9 +235,9 @@
       return { ...DEFAULTS };
     }
     try {
-      const payload = await loadBootstrapPayload(base);
+      const payload = await loadBootstrapPayload(base, { forceRefresh: refresh });
       const b = payload.content?.booking || {};
-      const health = await loadHealthFlags();
+      const health = await loadHealthFlags({ forceRefresh: refresh });
       return {
         restaurant:
           health.restaurant &&

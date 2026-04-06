@@ -25,6 +25,18 @@ CREATE TABLE IF NOT EXISTS contact_submissions (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS site_notifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  starts_at TEXT NOT NULL,
+  ends_at TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_site_notifications_window ON site_notifications(starts_at, ends_at);
+
 CREATE TABLE IF NOT EXISTS calendar_blocks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   hall_key TEXT NOT NULL,

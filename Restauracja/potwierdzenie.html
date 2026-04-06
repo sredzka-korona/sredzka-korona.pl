@@ -51,6 +51,10 @@
           '<div class="confirm-actions">' +
           '<a class="confirm-cta" href="../index.html">Wróć na stronę główną <span class="confirm-domain">sredzkakorona.pl</span></a>' +
           "</div>";
+        const CONFIRM_ACTION =
+          '<div class="confirm-action-stack">' +
+          '<button type="button" class="confirm-cta confirm-cta-button" id="confirm-reservation">Potwierdź adres e-mail</button>' +
+          "</div>";
 
         function restaurantApiBase() {
           const c = window.SREDZKA_CONFIG || {};
@@ -83,39 +87,62 @@
             CTA;
           return;
         }
-        fetch(base + "?op=public-reservation-confirm", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token }),
-        })
-          .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
-          .then(({ ok, d }) => {
-            if (!ok) {
+        let confirming = false;
+
+        function renderReadyState() {
+          out.innerHTML =
+            BRAND +
+            '<p class="confirm-kicker">Potwierdzenie adresu e-mail</p>' +
+            '<h1 class="confirm-title">Potwierdź zgłoszenie</h1>' +
+            '<p class="confirm-lead">Kliknij przycisk poniżej, aby potwierdzić adres e-mail i przekazać rezerwację do dalszej obsługi przez restaurację.</p>' +
+            '<div class="confirm-note"><strong>Uwaga:</strong> samo otwarcie tej strony nie potwierdza już rezerwacji.</div>' +
+            CONFIRM_ACTION +
+            CTA;
+
+          const button = document.getElementById("confirm-reservation");
+          button?.addEventListener("click", async () => {
+            if (confirming) return;
+            confirming = true;
+            button.disabled = true;
+            button.textContent = "Potwierdzanie...";
+            try {
+              const r = await fetch(base + "?op=public-reservation-confirm", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token }),
+              });
+              const d = await r.json().catch(() => ({}));
+              if (!r.ok) {
+                out.innerHTML =
+                  BRAND +
+                  '<h1 class="confirm-err-title">Nie udało się potwierdzić</h1>' +
+                  "<p class=\"confirm-err-text\">" +
+                  (d.error || "Spróbuj ponownie później albo skontaktuj się z restauracją.") +
+                  "</p>" +
+                  CTA;
+                return;
+              }
               out.innerHTML =
                 BRAND +
-                '<h1 class="confirm-err-title">Nie udało się potwierdzić</h1>' +
-                "<p class=\"confirm-err-text\">" +
-                (d.error || "Spróbuj ponownie później albo skontaktuj się z restauracją.") +
-                "</p>" +
+                '<p class="confirm-kicker">Potwierdzenie adresu e-mail</p>' +
+                '<h1 class="confirm-title">Zgłoszenie zostało potwierdzone</h1>' +
+                '<p class="confirm-lead">Potwierdzili Państwo adres e-mail. Rezerwacja ma status <strong class="confirm-highlight">oczekujący</strong> na akceptację przez restaurację.</p>' +
+                '<p class="confirm-text">W wybranym terminie stoliki zostały wstępnie zablokowane.</p>' +
+                '<div class="confirm-note"><strong>Co dalej?</strong> Restauracja ma do 3 dni na potwierdzenie rezerwacji. Otrzymają Państwo kolejną wiadomość e-mail po podjęciu decyzji.</div>' +
                 CTA;
-              return;
+            } catch {
+              out.innerHTML =
+                BRAND +
+                '<h1 class="confirm-err-title">Błąd połączenia</h1>' +
+                '<p class="confirm-err-text">Serwer nie odpowiedział. Sprawdź połączenie z internetem i spróbuj ponownie za chwilę.</p>' +
+                CTA;
+            } finally {
+              confirming = false;
             }
-            out.innerHTML =
-              BRAND +
-              '<p class="confirm-kicker">Potwierdzenie adresu e-mail</p>' +
-              '<h1 class="confirm-title">Zgłoszenie zostało potwierdzone</h1>' +
-              '<p class="confirm-lead">Potwierdzili Państwo adres e-mail. Rezerwacja ma status <strong class="confirm-highlight">oczekujący</strong> na akceptację przez restaurację.</p>' +
-              '<p class="confirm-text">W wybranym terminie stoliki zostały wstępnie zablokowane.</p>' +
-              '<div class="confirm-note"><strong>Co dalej?</strong> Restauracja ma do 3 dni na potwierdzenie rezerwacji. Otrzymają Państwo kolejną wiadomość e-mail po podjęciu decyzji.</div>' +
-              CTA;
-          })
-          .catch(() => {
-            out.innerHTML =
-              BRAND +
-              '<h1 class="confirm-err-title">Błąd połączenia</h1>' +
-              '<p class="confirm-err-text">Serwer nie odpowiedział. Sprawdź połączenie z internetem i spróbuj ponownie za chwilę.</p>' +
-              CTA;
           });
+        }
+
+        renderReadyState();
       })();
     </script>
   </body>

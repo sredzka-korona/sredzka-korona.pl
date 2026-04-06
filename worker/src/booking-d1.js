@@ -1227,6 +1227,18 @@ async function ensureSchema(env) {
       )`,
       `CREATE INDEX IF NOT EXISTS idx_venue_res_status_time
         ON venue_reservations(status, hall_id, start_ms, end_ms)`,
+      `CREATE TABLE IF NOT EXISTS site_notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        starts_at TEXT NOT NULL,
+        ends_at TEXT NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_site_notifications_window
+        ON site_notifications(starts_at, ends_at)`,
     ];
     for (const sql of stmts) {
       await env.DB.prepare(sql).run();
@@ -5179,6 +5191,43 @@ async function handleHallAdmin(env, op, request) {
     return { status: 200, data: { ok: true } };
   }
   return null;
+}
+
+/**
+ * Powiadomienie e-mail o zgłoszeniu z formularza kontaktowego (SMTP jak w rezerwacjach).
+ * Odbiorcy: ADMIN_NOTIFY_EMAIL oraz FIREBASE_ADMIN_EMAILS (unikalne adresy).
+ */
+export async function sendContactFormAdminEmail(env, { fullName, email, phone, formKind, message }) {
+  if (!hasSmtpConfig(env)) {
+    return { skipped: true };
+  }
+  const recipients = parseAdminNotifyEmails(env);
+  if (!recipients.length) {
+    console.warn("sendContactFormAdminEmail: brak odbiorcow (ADMIN_NOTIFY_EMAIL / FIREBASE_ADMIN_EMAILS)");
+    return { skipped: true, reason: "no-recipients" };
+  }
+  const kindLabel = cleanString(formKind, 80) || "Inne";
+  const subject = `Formularz kontaktowy - ${kindLabel}`;
+  const esc = (value) =>
+    String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:system-ui,Segoe UI,sans-serif;line-height:1.5;color:#222">
+<p style="margin:0 0 1em"><strong>Nowe zgłoszenie z formularza kontaktowego</strong></p>
+<p><strong>Rodzaj formularza:</strong> ${esc(kindLabel)}</p>
+<hr style="border:none;border-top:1px solid #ddd;margin:1.25em 0">
+<p style="margin:0 0 0.5em"><strong>Dane kontaktowe</strong></p>
+<p style="margin:0 0 1em">Imię i nazwisko: ${esc(fullName)}<br>Telefon: ${esc(phone || "—")}<br>E-mail: ${esc(email)}</p>
+<p style="margin:0 0 0.5em"><strong>Treść zapytania</strong></p>
+<p style="margin:0;white-space:pre-wrap">${esc(message)}</p>
+</body></html>`;
+  const replyTo = formatAddressHeader(`${cleanString(fullName, 120)} <${cleanString(email, 320)}>`);
+  for (const to of recipients) {
+    await sendMailViaSmtpWithRetry(env, { to, subject, html, replyTo });
+  }
+  return { ok: true };
 }
 
 export async function handleD1BookingApi({ service, op, request, env, isAdmin, verifyTurnstileToken }) {

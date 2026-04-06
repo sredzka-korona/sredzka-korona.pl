@@ -1048,7 +1048,7 @@
         <div class="contact-container">
           <div class="form-section">
             <h3>Formularz kontaktowy</h3>
-            <form id="contact-form" method="POST" action="https://forms.un-static.com/forms/YOUR_FORM_ID">
+            <form id="contact-form" method="post" action="#">
               <div class="form-row">
                 <div class="form-group">
                   <input type="text" id="name" name="name" required placeholder="Imię i nazwisko">
@@ -1172,11 +1172,11 @@
             <h3>Dane firmy</h3>
             <div class="info-row">
               <span class="info-label">Nazwa:</span>
-              <span class="info-value">Średzka Korona</span>
+              <span class="info-value" id="info-company-name">Średzka Korona</span>
             </div>
             <div class="info-row">
               <span class="info-label">Adres:</span>
-              <span class="info-value">ul. Wrocławska 11, 55-300 Środa Śląska</span>
+              <span class="info-value" id="info-company-address">ul. Wrocławska 11, 55-300 Środa Śląska</span>
             </div>
             <div class="info-row">
               <span class="info-label">NIP:</span>
@@ -1188,15 +1188,15 @@
             </div>
             <div class="info-row">
               <span class="info-label">Telefon:</span>
-              <span class="info-value">+48 600 700 800</span>
+              <span class="info-value" id="info-company-phone">+48 600 700 800</span>
             </div>
             <div class="info-row">
               <span class="info-label">Email:</span>
-              <span class="info-value">kontakt@sredzkakorona.pl</span>
+              <span class="info-value" id="info-company-email">kontakt@sredzkakorona.pl</span>
             </div>
-            <h3>O właścicielu</h3>
-            <p>Średzka Korona, to firma rodzinna, prowadzona przez polskiego przedsiębiorcę. Od 2 lat oferuje Państwu usługi restauracyjne i hotelowe.</p>
-            <p>Właściciel odpowiada za standard obiektu, rozwój oferty oraz kontakt z klientami biznesowymi i prywatnymi.</p>
+            <h3 id="info-owner-heading">O właścicielu</h3>
+            <p id="info-owner-paragraph-1">Średzka Korona, to firma rodzinna, prowadzona przez polskiego przedsiębiorcę. Od 2 lat oferuje Państwu usługi restauracyjne i hotelowe.</p>
+            <p id="info-owner-paragraph-2">Właściciel odpowiada za standard obiektu, rozwój oferty oraz kontakt z klientami biznesowymi i prywatnymi.</p>
             <div class="info-watermark">
               <a href="https://i-janicki.pl">Design &amp; Development by Igor Janicki</a>
             </div>
@@ -1225,6 +1225,74 @@
           : !isLocalPreview && hostname && !isGithubPages
             ? "https://api." + hostname.replace(/^www\./, "")
             : "";
+
+        const BOOTSTRAP_CACHE_KEY = "sredzka-korona:bootstrap-cache:v1";
+        const BOOTSTRAP_TTL_MS = 2 * 60 * 1000;
+
+        function readBootstrapCache() {
+          try {
+            const raw = window.sessionStorage.getItem(BOOTSTRAP_CACHE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed?.payload || Date.now() - Number(parsed.ts || 0) >= BOOTSTRAP_TTL_MS) {
+              return null;
+            }
+            return parsed.payload;
+          } catch {
+            return null;
+          }
+        }
+
+        function writeBootstrapCache(payload) {
+          try {
+            window.sessionStorage.setItem(BOOTSTRAP_CACHE_KEY, JSON.stringify({ ts: Date.now(), payload }));
+          } catch {}
+        }
+
+        async function loadBootstrapPayloadForModal() {
+          if (!apiBase) return null;
+          const cached = readBootstrapCache();
+          if (cached) return cached;
+          const response = await fetch(apiBase + "/api/public/bootstrap");
+          if (!response.ok) {
+            throw new Error("Bootstrap unavailable");
+          }
+          const payload = await response.json();
+          writeBootstrapCache(payload);
+          return payload;
+        }
+
+        function applyCompanyInfoModalFromContent(content) {
+          if (!content) return;
+          const co = content.company || {};
+          const ho = content.home || {};
+          const setOptionalText = (id, value) => {
+            const el = document.getElementById(id);
+            if (!el || value === undefined) return;
+            el.textContent = value === null ? "" : String(value);
+          };
+          setOptionalText("info-company-name", co.name);
+          setOptionalText("info-company-address", co.address);
+          setOptionalText("info-company-phone", co.phone);
+          setOptionalText("info-company-email", co.email);
+          setOptionalText("info-owner-heading", ho.aboutTitle);
+          setOptionalText("info-owner-paragraph-1", ho.aboutText);
+          setOptionalText("info-owner-paragraph-2", ho.owner);
+        }
+
+        void (async () => {
+          try {
+            if (isLocalPreview && !apiBase) {
+              return;
+            }
+            const payload = await loadBootstrapPayloadForModal();
+            if (payload?.content) {
+              applyCompanyInfoModalFromContent(payload.content);
+            }
+          } catch (e) {
+            console.warn("Nie udało się załadować treści modala informacji:", e);
+          }
+        })();
 
         // Obsługa scrollowania nav
         const handleScroll = () => {

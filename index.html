@@ -328,14 +328,18 @@
         top: 0;
         left: 0;
         right: 0;
-        height: var(--nav-height);
+        min-height: 80px;
+        height: auto;
         background: rgba(254, 252, 249, 1);
         backdrop-filter: blur(20px) saturate(180%);
         border-bottom: 1px solid rgba(200, 170, 120, 0.15);
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
+        align-content: center;
         justify-content: center;
-        padding: 0 2rem;
+        row-gap: 0.15rem;
+        padding: 0.45rem 2rem;
         z-index: 100;
         transition: box-shadow 0.3s ease, background 0.3s ease;
       }
@@ -424,6 +428,19 @@
         display: inline-block !important;
         line-height: 1;
         margin: 0;
+      }
+
+      .floating-nav-tagline {
+        flex: 1 1 100%;
+        margin: 0;
+        padding: 0 1.5rem;
+        text-align: center;
+        font-family: "Manrope", system-ui, sans-serif;
+        font-size: clamp(0.62rem, 1.5vw, 0.78rem);
+        font-weight: 500;
+        color: #6b5d4f;
+        letter-spacing: 0.06em;
+        line-height: 1.35;
       }
 
       .floating-nav > a:not(.floating-nav-brand) {
@@ -1425,7 +1442,7 @@
         }
 
         .floating-nav {
-          padding: 0 1.5rem;
+          padding: 0.45rem 1.5rem;
         }
 
       }
@@ -1550,6 +1567,158 @@
         width: 28px;
         height: 28px;
         display: block;
+      }
+
+      .site-notice-root {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        pointer-events: none;
+      }
+
+      .site-notice-root * {
+        pointer-events: auto;
+      }
+
+      .site-notice-panel {
+        width: min(720px, calc(100vw - 1.5rem));
+        max-height: min(40vh, 300px);
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 252, 248, 0.99) 0%,
+          rgba(250, 246, 240, 0.98) 100%
+        );
+        border: 1px solid var(--line);
+        border-bottom: none;
+        border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+        box-shadow: 0 -12px 48px rgba(40, 28, 18, 0.14);
+        padding: 0.85rem 1rem calc(0.65rem + env(safe-area-inset-bottom, 0px));
+        transform: translateY(0);
+        transition: transform 0.38s cubic-bezier(0.33, 1, 0.68, 1), opacity 0.28s ease;
+      }
+
+      .site-notice-root.is-collapsed .site-notice-panel {
+        transform: translateY(calc(100% + 8px));
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .site-notice-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.45rem;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .site-notice-kicker {
+        font-family: "Cormorant Garamond", serif;
+        font-size: 1.05rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .site-notice-hide {
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.85);
+        color: var(--text);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s ease, transform 0.2s ease;
+      }
+
+      .site-notice-hide:hover {
+        background: rgba(232, 216, 184, 0.45);
+      }
+
+      .site-notice-hide svg {
+        width: 20px;
+        height: 20px;
+        display: block;
+      }
+
+      .site-notice-item + .site-notice-item {
+        margin-top: 0.85rem;
+        padding-top: 0.85rem;
+        border-top: 1px solid rgba(200, 170, 120, 0.25);
+      }
+
+      .site-notice-item h3 {
+        font-family: "Cormorant Garamond", serif;
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin: 0 0 0.35rem;
+        color: var(--text);
+      }
+
+      .site-notice-item p {
+        margin: 0;
+        font-size: 0.95rem;
+        line-height: 1.55;
+        color: var(--muted);
+        white-space: pre-wrap;
+      }
+
+      .site-notice-reveal {
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        width: 56px;
+        height: 30px;
+        margin-left: -28px;
+        border: 1px solid var(--line);
+        border-bottom: none;
+        border-radius: 16px 16px 0 0;
+        background: var(--gold);
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 -6px 22px rgba(168, 137, 90, 0.45);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(6px);
+        transition: opacity 0.28s ease, transform 0.35s cubic-bezier(0.33, 1, 0.68, 1);
+      }
+
+      .site-notice-reveal svg {
+        width: 20px;
+        height: 20px;
+        display: block;
+      }
+
+      .site-notice-root.is-collapsed .site-notice-reveal {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+      }
+
+      body.site-notice-visible:not(.site-notice-collapsed-ui) .floating-contact-button {
+        bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px));
+      }
+
+      @media (max-width: 720px) {
+        body.site-notice-visible:not(.site-notice-collapsed-ui) .floating-contact-button {
+          bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+        }
       }
     </style>
   </head>
@@ -1865,7 +2034,7 @@
             : window.location.hostname && !window.location.hostname.endsWith("github.io")
               ? "https://api." + window.location.hostname.replace(/^www\./, "")
               : "";
-        const BOOTSTRAP_CACHE_KEY = "sredzka-korona:bootstrap-cache:v1";
+        const BOOTSTRAP_CACHE_KEY = "sredzka-korona:bootstrap-cache:v2";
         const BOOTSTRAP_TTL_MS = 2 * 60 * 1000;
 
         function readBootstrapCache() {
@@ -2152,7 +2321,19 @@
                 </div>`;
         }
 
+        function syncFloatingNavHeightCssVar() {
+          const nav = document.getElementById("floating-nav");
+          if (!nav) return;
+          const h = Math.ceil(nav.getBoundingClientRect().height);
+          document.documentElement.style.setProperty("--nav-height", Math.max(64, h) + "px");
+        }
+
         function renderShell() {
+          const taglineRaw = state.content?.company?.tagline;
+          const tagline = taglineRaw != null ? String(taglineRaw).trim() : "";
+          const taglineHtml = tagline
+            ? `<p class="floating-nav-tagline">${escapeHtml(tagline)}</p>`
+            : "";
           app.innerHTML = `
             <main id="main-content">
               <h1 class="visually-hidden">Sredzka Korona — hotel, restauracja, przyjęcia, Środa Śląska</h1>
@@ -2163,6 +2344,7 @@
                     <img class="brand-logo" src="./ikony/logo-korona.png" alt="Logo Średzka Korona" decoding="async" fetchpriority="high" />
                     <span class="floating-nav-brand-text">KORONA</span>
                   </a>
+                  ${taglineHtml}
                 </nav>
                 <div class="main-split-container">
                   ${(() => {
@@ -2183,6 +2365,7 @@
           `;
 
           scheduleScrollIndicatorUpdate();
+          requestAnimationFrame(() => syncFloatingNavHeightCssVar());
         }
 
         function initScrollSpy() {
@@ -2469,6 +2652,77 @@
           });
         }
 
+        function mountSiteNotifications(items) {
+          document.getElementById("site-notice-root")?.remove();
+          document.body.classList.remove("site-notice-visible", "site-notice-collapsed-ui");
+
+          if (!Array.isArray(items) || !items.length) {
+            return;
+          }
+
+          const fingerprint = [...items]
+            .map((entry) => Number(entry?.id))
+            .filter((id) => Number.isFinite(id))
+            .sort((a, b) => a - b)
+            .join("-");
+          const storageKey = `sredzka-korona:site-notice-collapsed:${fingerprint}`;
+          let collapsed = false;
+          try {
+            collapsed = window.sessionStorage.getItem(storageKey) === "1";
+          } catch {
+            collapsed = false;
+          }
+
+          const chevronDown =
+            '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          const chevronUp =
+            '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 15l-6-6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+          const root = document.createElement("div");
+          root.id = "site-notice-root";
+          root.className = "site-notice-root" + (collapsed ? " is-collapsed" : "");
+          root.innerHTML = `
+            <div class="site-notice-panel" role="region" aria-label="Powiadomienia">
+              <div class="site-notice-toolbar">
+                <span class="site-notice-kicker">Powiadomienie</span>
+                <button type="button" class="site-notice-hide" aria-label="Zwiń powiadomienie">${chevronDown}</button>
+              </div>
+              <div class="site-notice-items">
+                ${items
+                  .map(
+                    (entry) => `
+                  <div class="site-notice-item">
+                    <h3>${escapeHtml(entry.title || "")}</h3>
+                    <p>${escapeHtml(entry.description || "")}</p>
+                  </div>`
+                  )
+                  .join("")}
+              </div>
+            </div>
+            <button type="button" class="site-notice-reveal" aria-label="Pokaż powiadomienie">${chevronUp}</button>
+          `;
+
+          document.body.appendChild(root);
+          document.body.classList.add("site-notice-visible");
+          if (collapsed) {
+            document.body.classList.add("site-notice-collapsed-ui");
+          }
+
+          const setCollapsed = (next) => {
+            const isCollapsed = Boolean(next);
+            root.classList.toggle("is-collapsed", isCollapsed);
+            document.body.classList.toggle("site-notice-collapsed-ui", isCollapsed);
+            try {
+              window.sessionStorage.setItem(storageKey, isCollapsed ? "1" : "");
+            } catch {
+              /* ignore */
+            }
+          };
+
+          root.querySelector(".site-notice-hide")?.addEventListener("click", () => setCollapsed(true));
+          root.querySelector(".site-notice-reveal")?.addEventListener("click", () => setCollapsed(false));
+        }
+
         async function loadRemoteData() {
           try {
             if (isLocalPreview && !config.apiBase) {
@@ -2481,6 +2735,7 @@
             if (payload.galleryAlbums) {
               state.galleryAlbums = payload.galleryAlbums;
             }
+            mountSiteNotifications(payload.activeNotifications || []);
           } catch (error) {
             // Fallback seed content remains visible until Cloudflare API is configured.
           }
@@ -2512,8 +2767,10 @@
           initCustomScrollbar();
           await loadRemoteData();
           renderShell();
+          window.addEventListener("resize", syncFloatingNavHeightCssVar);
           initMainSplit();
           initScrollSpy();
+          initCookieBanner();
         }
 
         bootstrap();
