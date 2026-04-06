@@ -50,7 +50,7 @@
         const CTA = "";
         const CONFIRM_ACTION =
           '<div class="confirm-action-stack">' +
-          '<button type="button" class="confirm-cta confirm-cta-button" id="confirm-reservation">Potwierdź adres e-mail</button>' +
+          '<button type="button" class="confirm-cta confirm-cta-button" id="confirm-reservation">Potwierdź rezerwację</button>' +
           "</div>";
 
         function restaurantApiBase() {
@@ -89,9 +89,8 @@
         function renderReadyState() {
           out.innerHTML =
             BRAND +
-            '<p class="confirm-kicker">Potwierdzenie adresu e-mail</p>' +
-            '<h1 class="confirm-title">Potwierdź zgłoszenie</h1>' +
-            '<p class="confirm-lead">Kliknij przycisk poniżej, aby potwierdzić adres e-mail i przekazać rezerwację do dalszej obsługi przez restaurację.</p>' +
+            '<p class="confirm-kicker">Potwierdzenie rezerwacji</p>' +
+            '<p class="confirm-lead">Kliknij w przycisk, aby potwierdzić złożenie rezerwacji i przekazać ją do dalszej obsługi.</p>' +
             CONFIRM_ACTION +
             CTA;
 

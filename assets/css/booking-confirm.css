@@ -96,6 +96,11 @@ body.confirm-body {
   flex-shrink: 0;
 }
 
+/* Gdy lead jest zaraz po kickerze (bez h1), większy odstęp niż sam margin kicker → lead */
+.confirm-kicker + .confirm-lead {
+  margin-top: 1rem;
+}
+
 .confirm-kicker {
   margin: 0 0 0.5rem;
   font-family: "Cormorant Garamond", "Times New Roman", serif;
