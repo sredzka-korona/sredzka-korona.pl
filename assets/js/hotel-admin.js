@@ -231,33 +231,85 @@
   }
 
   function buildMailPreviewMarkup({ inboxSubject, headerContext, headerNumber, bodyHtml, footerLabel, actionLabel = "" }) {
+    const safeBrandName = "Średzka Korona";
+    const safeHeaderBrand = "Średzka Korona";
+    const safeContext = escapeHtml(headerContext || "");
+    const safeNumber = headerNumber ? `nr ${escapeHtml(headerNumber)}` : "";
+    const safePreheader = escapeHtml(inboxSubject || safeBrandName);
+    const logoUrl = `${window.location.origin}/ikony/logo-korona.png`;
+    const enhancedContent = enhancePreviewHtml(bodyHtml);
+    const actionTitle = escapeHtml(actionLabel || "Zobacz szczegóły");
+    const footerText = escapeHtml(footerLabel || "Strona główna");
+
     return `
       <div class="mail-preview-shell">
         <div class="mail-preview-note">Podgląd na przykładowych danych. Branding i układ odpowiadają faktycznie wysyłanej wiadomości.</div>
         <div class="mail-preview-inbox-subject">Temat w skrzynce: <strong>${escapeHtml(inboxSubject || "—")}</strong></div>
-        <div class="mail-preview-frame">
-          <div class="mail-preview-canvas">
-            <div class="mail-preview-brand" aria-label="Średzka Korona">
-              <span>ŚREDZKA</span>
-              <img src="/ikony/logo-korona.png" alt="Korona" width="42" height="42" />
-              <span>KORONA</span>
-            </div>
-            <div class="mail-preview-card">
-              <div class="mail-preview-header-stack">
-                <div class="mail-preview-header-brand">Średzka Korona</div>
-                <div class="mail-preview-header-context">${escapeHtml(headerContext || "")}</div>
-                <div class="mail-preview-header-number">nr ${escapeHtml(headerNumber || "")}</div>
-              </div>
-              ${actionLabel ? `<a class="mail-preview-button" href="#" onclick="return false;">${escapeHtml(actionLabel)}</a>` : ""}
-              <div class="mail-preview-body">${bodyHtml || "<p>Brak treści wiadomości.</p>"}</div>
-            </div>
-            <div class="mail-preview-footer">
-              <div>Wiadomość transakcyjna dotycząca rezerwacji w obiekcie Średzka Korona.</div>
-              <div>Jeśli masz pytania, odpowiedz na tę wiadomość.</div>
-            </div>
-          </div>
+        <div class="mail-preview-frame" style="background:#f6f1e8;padding:28px 12px;">
+          <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${safePreheader}</div>
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background:#f6f1e8;">
+            <tr>
+              <td align="center" style="padding:0 12px;">
+                <table cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;max-width:680px;">
+                  <tr>
+                    <td align="center" style="padding:0 0 16px 0;">
+                      <table cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                          <td style="font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1;letter-spacing:0.28em;color:#7b5a24;font-weight:700;padding-right:10px;">ŚREDZKA</td>
+                          <td style="padding:0 2px;">
+                            <img src="${logoUrl}" alt="Korona" width="42" height="42" style="display:block;width:42px;height:42px;border:0;" />
+                          </td>
+                          <td style="font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1;letter-spacing:0.28em;color:#7b5a24;font-weight:700;padding-left:10px;">KORONA</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="background:#ffffff;border:1px solid #e8dcc8;border-radius:22px;padding:34px 32px;box-shadow:0 10px 30px rgba(52,33,14,0.08);">
+                      <div style="text-align:center;margin:0 0 22px 0;">
+                        <div style="font-family:Georgia,'Times New Roman',serif;font-size:26px;line-height:1.25;color:#1f1712;font-weight:700;">
+                          ${safeHeaderBrand}
+                        </div>
+                        ${safeContext ? `<div style="font-size:17px;line-height:1.4;color:#4a3d32;font-weight:600;margin-top:12px;">${safeContext}</div>` : ""}
+                        ${safeNumber ? `<div style="font-size:15px;line-height:1.45;color:#7a6754;margin-top:10px;letter-spacing:0.02em;">${safeNumber}</div>` : ""}
+                      </div>
+                      ${actionLabel ? `<table cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 26px auto;">
+                        <tr>
+                          <td style="border-radius:999px;background:#7b5a24;">
+                            <a href="#" onclick="return false;" style="display:inline-block;padding:14px 24px;font-size:15px;line-height:1.2;font-weight:700;color:#ffffff;text-decoration:none;">${actionTitle}</a>
+                          </td>
+                        </tr>
+                      </table>` : ""}
+                      <div style="font-size:16px;line-height:1.75;color:#3e3125;">
+                        ${enhancedContent || "<p>Brak treści wiadomości.</p>"}
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:18px 10px 0 10px;text-align:center;font-size:13px;line-height:1.7;color:#7c6a58;">
+                      <div>Wiadomość transakcyjna dotycząca rezerwacji w obiekcie ${safeBrandName}.</div>
+                      <div style="padding-top:6px;">Jeśli masz pytania, odpowiedz na tę wiadomość.</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
         </div>
       </div>`;
+  }
+
+  function enhancePreviewHtml(html) {
+    return String(html || "")
+      .replace(/<a\b([^>]*)>/gi, (match, attrs) => {
+        if (/\bstyle\s*=/i.test(attrs)) return `<a${attrs}>`;
+        return `<a${attrs} style="color:#7b5a24;font-weight:700;text-decoration:none;border-bottom:1px solid #c8aa78;">`;
+      })
+      .replace(/<h([1-3])\b([^>]*)>/gi, (match, level, attrs) => {
+        if (/\bstyle\s*=/i.test(attrs)) return `<h${level}${attrs}>`;
+        const sizes = { 1: "30px", 2: "24px", 3: "20px" };
+        return `<h${level}${attrs} style="margin:0 0 18px 0;font-family:Georgia,'Times New Roman',serif;font-size:${sizes[level] || "24px"};line-height:1.2;color:#1f1712;font-weight:700;text-align:center;">`;
+      });
   }
 
   function hotelPreviewActionLabel(key) {

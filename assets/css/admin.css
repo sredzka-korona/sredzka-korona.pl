@@ -2909,12 +2909,9 @@ button.icon-btn {
 
 .mail-preview-frame {
   overflow: auto;
-  padding: 1rem;
   border: 1px solid rgba(200, 170, 120, 0.28);
   border-radius: 22px;
-  background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.6), transparent 38%),
-    linear-gradient(145deg, rgba(255, 249, 241, 0.96), rgba(241, 231, 215, 0.9));
+  background: #f6f1e8;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.72),
     0 12px 28px rgba(79, 55, 22, 0.08);
