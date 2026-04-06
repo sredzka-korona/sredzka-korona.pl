@@ -275,10 +275,15 @@
       });
   }
 
+  function isRestaurantConfirmTemplateKey(key) {
+    return key === "restaurant_confirm_email" || key === "rest_confirm_email";
+  }
+
   function restaurantPreviewActionLabel(key) {
-    return key === "restaurant_confirm_email" || key === "rest_confirm_email"
-      ? "Potwierdź adres e-mail"
-      : "";
+    if (!isRestaurantConfirmTemplateKey(key)) return "";
+    const el = document.querySelector(`[data-rest-tpl-key="${key}"][data-field="actionLabel"]`);
+    const v = el && String(el.value || "").trim();
+    return v || "Potwierdź adres e-mail";
   }
 
   function updateRestaurantTemplatePreview(key) {
@@ -521,7 +526,7 @@
         <h3>Szablony mailingowe — restauracja</h3>
         <p class="helper">Zmienne: <code>{{reservationNumber}}</code> (np. 5/2026/RESTAURACJA), <code>{{reservationSubject}}</code>, <code>{{decisionDeadline}}</code>, <code>{{adminActionLink}}</code>, <code>{{fullName}}</code>, <code>{{email}}</code>, <code>{{phone}}</code>, <code>{{date}}</code>, <code>{{timeFrom}}</code>, <code>{{timeTo}}</code>, <code>{{durationHours}}</code>, <code>{{tablesList}}</code>, <code>{{guestsCount}}</code>, <code>{{customerNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{restaurantName}}</code>.</p>
         <p class="helper">Logo, przycisk akcji i premium-layout wiadomości są dodawane automatycznie przy wysyłce. W polu poniżej edytujesz główną treść maila.</p>
-        <p class="helper">Podgląd pokazuje od razu, jak mail będzie wyglądał po podstawieniu danych rezerwacji restauracyjnej.</p>
+        <p class="helper">Podgląd pokazuje od razu, jak mail będzie wyglądał po podstawieniu danych rezerwacji restauracyjnej. Przy szablonie potwierdzenia adresu e-mail możesz ustawić tekst na przycisku (gdy treść nie zawiera linku <code>{{confirmationLink}}</code>, przycisk zostanie zbudowany z tego pola).</p>
         <div id="rest-template-forms">
           ${keys
             .map(
@@ -529,6 +534,11 @@
             <details class="hotel-template-card">
               <summary><span class="tpl-key">${escapeHtml(k)}</span>${REST_TEMPLATE_LABELS[k] ? `<span class="tpl-desc"> — ${escapeHtml(REST_TEMPLATE_LABELS[k])}</span>` : ""}</summary>
               <label>Temat<input type="text" data-rest-tpl-key="${escapeHtml(k)}" data-field="subject" value="${escapeHtml(templatesData[k]?.subject || "")}" /></label>
+              ${
+                isRestaurantConfirmTemplateKey(k)
+                  ? `<label>Tekst przycisku potwierdzenia<input type="text" data-rest-tpl-key="${escapeHtml(k)}" data-field="actionLabel" value="${escapeHtml(templatesData[k]?.actionLabel || "")}" maxlength="200" placeholder="np. Potwierdź adres e-mail" /></label>`
+                  : ""
+              }
               <label>Treść HTML (edytuj poniżej)</label>
               <div class="wysiwyg-toolbar" data-toolbar-for="${escapeHtml(k)}">
                 <button type="button" data-cmd="bold" title="Pogrubienie"><b>B</b></button>
@@ -808,7 +818,12 @@
           }
           restaurantApi("admin-mail-template-save", {
             method: "PUT",
-            body: { key, subject: subj?.value || "", bodyHtml: newBodyHtml },
+            body: {
+              key,
+              subject: subj?.value || "",
+              bodyHtml: newBodyHtml,
+              actionLabel: document.querySelector(`[data-rest-tpl-key="${key}"][data-field="actionLabel"]`)?.value ?? "",
+            },
           })
             .then(() => alert("Zapisano."))
             .catch((err) => alert(err.message));

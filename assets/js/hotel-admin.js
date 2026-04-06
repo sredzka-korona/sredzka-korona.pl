@@ -133,6 +133,7 @@
       subject: "{{hotelName}} | potwierdzenie adresu e-mail dla rezerwacji {{reservationNumber}}",
       bodyHtml:
         '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie formularza rezerwacji w obiekcie <strong>{{hotelName}}</strong>.</p><p>Aby przekazac zgloszenie do dalszej obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz adres e-mail</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}</p><p>Jesli to nie Ty wysylales zgloszenie, zignoruj te wiadomosc.</p>',
+      actionLabel: "Potwierdź adres e-mail",
     },
     pending_admin: {
       subject: "[{{hotelName}}] Rezerwacja do decyzji: {{reservationNumber}}",
@@ -313,7 +314,10 @@
   }
 
   function hotelPreviewActionLabel(key) {
-    return key === "confirm_email" ? "Potwierdź adres e-mail" : "";
+    if (key !== "confirm_email") return "";
+    const el = document.querySelector(`[data-tpl-key="${key}"][data-field="actionLabel"]`);
+    const v = el && String(el.value || "").trim();
+    return v || "Potwierdź adres e-mail";
   }
 
   function updateHotelTemplatePreview(key) {
@@ -459,6 +463,7 @@
       merged[key] = {
         subject: String(rawTemplates?.[key]?.subject || defaults.subject),
         bodyHtml: String(rawTemplates?.[key]?.bodyHtml || defaults.bodyHtml),
+        actionLabel: String(rawTemplates?.[key]?.actionLabel ?? defaults.actionLabel ?? ""),
       };
     });
     return merged;
@@ -496,6 +501,7 @@
               key,
               subject: templatesData[key].subject,
               bodyHtml: templatesData[key].bodyHtml,
+              actionLabel: templatesData[key].actionLabel || "",
             },
           }).catch(() => null)
         )
@@ -633,7 +639,7 @@
         <h3>Szablony mailingowe</h3>
         <p class="helper">Zmienne we wszystkich szablonach: <code>{{reservationNumber}}</code> (numer w formacie np. 12/2026/HOTEL), <code>{{reservationSubject}}</code>, <code>{{decisionDeadline}}</code>, <code>{{adminActionLink}}</code>, <code>{{fullName}}</code>, <code>{{email}}</code>, <code>{{phone}}</code>, <code>{{roomsList}}</code>, <code>{{dateFrom}}</code>, <code>{{dateTo}}</code>, <code>{{nights}}</code>, <code>{{totalPrice}}</code>, <code>{{customerNote}}</code>, <code>{{adminNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{hotelName}}</code>.</p>
         <p class="helper">Logo, przycisk akcji i elegancka oprawa wiadomości są dodawane automatycznie podczas wysyłki. W edytorze zmieniasz główną treść maila wewnątrz tego layoutu.</p>
-        <p class="helper">Pod każdym szablonem widzisz live preview z przykładowymi danymi gościa. Przycisk akcji pojawia się tylko tam, gdzie system realnie wysyła link.</p>
+        <p class="helper">Pod każdym szablonem widzisz live preview z przykładowymi danymi gościa. Przycisk akcji pojawia się tylko tam, gdzie system realnie wysyła link. Przy szablonie potwierdzenia adresu e-mail możesz ustawić tekst na przycisku (gdy treść HTML nie zawiera osobnego linku <code>{{confirmationLink}}</code>, przycisk zostanie dodany na podstawie tego pola).</p>
         <div id="hotel-template-forms">
           ${keys
             .map(
@@ -641,6 +647,11 @@
             <details class="hotel-template-card">
               <summary><span class="tpl-key">${escapeHtml(k)}</span>${HOTEL_TEMPLATE_LABELS[k] ? `<span class="tpl-desc"> — ${escapeHtml(HOTEL_TEMPLATE_LABELS[k])}</span>` : ""}</summary>
               <label>Temat<input type="text" data-tpl-key="${escapeHtml(k)}" data-field="subject" value="${escapeHtml(templatesData[k]?.subject || "")}" /></label>
+              ${
+                k === "confirm_email"
+                  ? `<label>Tekst przycisku potwierdzenia<input type="text" data-tpl-key="${escapeHtml(k)}" data-field="actionLabel" value="${escapeHtml(templatesData[k]?.actionLabel || "")}" maxlength="200" placeholder="np. Potwierdź adres e-mail" /></label>`
+                  : ""
+              }
               <label>Treść HTML (edytuj poniżej)</label>
               <div class="wysiwyg-toolbar" data-toolbar-for="${escapeHtml(k)}">
                 <button type="button" data-cmd="bold" title="Pogrubienie"><b>B</b></button>
@@ -1113,7 +1124,12 @@
       try {
         await hotelApi("admin-mail-template-save", {
           method: "PUT",
-          body: { key, subject: subj?.value || "", bodyHtml: newBodyHtml },
+          body: {
+            key,
+            subject: subj?.value || "",
+            bodyHtml: newBodyHtml,
+            actionLabel: document.querySelector(`[data-tpl-key="${key}"][data-field="actionLabel"]`)?.value ?? "",
+          },
         });
         alert("Zapisano.");
         await loadTemplates();

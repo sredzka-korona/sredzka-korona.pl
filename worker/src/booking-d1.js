@@ -98,7 +98,8 @@ function normalizeLinkForCompare(value) {
   return decodeHtmlEntities(String(value || "")).trim();
 }
 
-function injectInlineActionButton(html, actionUrl) {
+function injectInlineActionButton(html, actionUrl, options = {}) {
+  const preferredLabel = cleanString(options.preferredLabel, 200);
   const target = normalizeLinkForCompare(actionUrl);
   if (!target) return String(html || "");
   const source = String(html || "");
@@ -109,10 +110,15 @@ function injectInlineActionButton(html, actionUrl) {
     const href = normalizeLinkForCompare(hrefMatch[2]);
     if (href !== target) return match;
     replaced = true;
-    const label = decodeHtmlEntities(String(labelHtml || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()) || "Potwierdz";
+    const fromLink = decodeHtmlEntities(String(labelHtml || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+    const label = (preferredLabel || fromLink || "Potwierdz").trim();
     return actionButtonHtml(target, label);
   });
-  return replaced ? out : source;
+  if (replaced) return out;
+  if (preferredLabel) {
+    return `${source}\n${actionButtonHtml(target, preferredLabel)}`;
+  }
+  return source;
 }
 
 function htmlToText(html) {
@@ -1057,6 +1063,7 @@ async function ensureSchema(env) {
         key TEXT NOT NULL,
         subject TEXT NOT NULL,
         body_html TEXT NOT NULL,
+        action_label TEXT NOT NULL DEFAULT '',
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (service, key)
       )`,
@@ -1238,10 +1245,19 @@ async function ensureSchema(env) {
     }
     await migrateMailAuditSchema(env);
     await migrateRestaurantPlacePreference(env);
+    await migrateBookingMailTemplatesActionLabel(env);
     await seedDefaults(env);
     await migrateHumanYearAndTemplates(env);
   })();
   return schemaReadyPromise;
+}
+
+async function migrateBookingMailTemplatesActionLabel(env) {
+  try {
+    await env.DB.prepare(`ALTER TABLE booking_mail_templates ADD COLUMN action_label TEXT NOT NULL DEFAULT ''`).run();
+  } catch {
+    /* kolumna już istnieje */
+  }
 }
 
 async function migrateMailAuditSchema(env) {
@@ -1326,9 +1342,9 @@ async function migrateHumanYearAndTemplates(env) {
     for (const [key, val] of Object.entries(defaults)) {
       if (have.has(key)) continue;
       await env.DB.prepare(
-        "INSERT INTO booking_mail_templates (service, key, subject, body_html, updated_at) VALUES (?, ?, ?, ?, ?)"
+        "INSERT INTO booking_mail_templates (service, key, subject, body_html, action_label, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
       )
-        .bind(service, key, val.subject, val.bodyHtml, now)
+        .bind(service, key, val.subject, val.bodyHtml, cleanString(val.actionLabel, 200), now)
         .run();
     }
   }
@@ -2790,6 +2806,7 @@ ${infoCard("Podsumowanie pobytu", [
 ])}
 ${noteCard("<strong>Ważne:</strong> potwierdzenie adresu e-mail nie jest jeszcze ostatecznym potwierdzeniem pobytu. Po weryfikacji dostępności recepcja prześle kolejną wiadomość ze statusem rezerwacji.")}
 <p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>`,
+      actionLabel: "Potwierdź adres e-mail",
     },
     pending_admin: {
       subject: "Nowa rezerwacja do decyzji ({{reservationNumber}})",
@@ -2911,6 +2928,7 @@ ${infoCard("Podsumowanie rezerwacji stolika", [
 ])}
 ${noteCard("Rezerwacja stolika nie wymaga przedpłaty. <strong>Płatność odbywa się na miejscu</strong>, zgodnie z aktualnym menu i zamówieniem złożonym podczas wizyty.")}
 <p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>`,
+      actionLabel: "Potwierdź adres e-mail",
     },
     restaurant_pending_admin: {
       subject: "Nowa rezerwacja stolika ({{reservationNumber}})",
@@ -3035,6 +3053,7 @@ ${infoCard("Podsumowanie zgłoszenia", [
   ["Wyłączność", "{{exclusive}}"],
 ])}
 ${noteCard("<strong>Wycena przygotowywana jest indywidualnie</strong> po kontakcie z obsługą obiektu. Szczegóły płatności i harmonogram ustalane są na etapie oferty.")}`,
+      actionLabel: "Potwierdź zgłoszenie",
     },
     hall_pending_admin: {
       subject: "Nowe zgłoszenie sali ({{reservationNumber}})",
@@ -3185,7 +3204,7 @@ async function loadTemplates(env, service) {
   const legacyDefaults = legacyDefaultTemplateMap(service);
   const ultraLegacyDefaults = ultraLegacyDefaultTemplateMap(service);
   const rows = await env.DB.prepare(
-    "SELECT key, subject, body_html AS bodyHtml, updated_at AS updatedAt FROM booking_mail_templates WHERE service = ? ORDER BY key ASC"
+    "SELECT key, subject, body_html AS bodyHtml, action_label AS actionLabel, updated_at AS updatedAt FROM booking_mail_templates WHERE service = ? ORDER BY key ASC"
   )
     .bind(service)
     .all();
@@ -3193,9 +3212,9 @@ async function loadTemplates(env, service) {
     const now = nowMs();
     for (const [key, val] of Object.entries(defaults)) {
       await env.DB.prepare(
-        "INSERT INTO booking_mail_templates (service, key, subject, body_html, updated_at) VALUES (?, ?, ?, ?, ?)"
+        "INSERT INTO booking_mail_templates (service, key, subject, body_html, action_label, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
       )
-        .bind(service, key, val.subject, val.bodyHtml, now)
+        .bind(service, key, val.subject, val.bodyHtml, cleanString(val.actionLabel, 200), now)
         .run();
     }
     return defaults;
@@ -3206,6 +3225,7 @@ async function loadTemplates(env, service) {
       {
         subject: r.subject || "",
         bodyHtml: r.bodyHtml || "",
+        actionLabel: r.actionLabel || "",
         updatedAt: Number(r.updatedAt || 0),
       },
     ])
@@ -3218,12 +3238,13 @@ async function loadTemplates(env, service) {
       out[key] = {
         subject: template.subject || "",
         bodyHtml: template.bodyHtml || "",
+        actionLabel: cleanString(template.actionLabel, 200),
         updatedAt: now,
       };
       await env.DB.prepare(
-        "INSERT INTO booking_mail_templates (service, key, subject, body_html, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(service, key) DO UPDATE SET subject = excluded.subject, body_html = excluded.body_html, updated_at = excluded.updated_at"
+        "INSERT INTO booking_mail_templates (service, key, subject, body_html, action_label, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(service, key) DO UPDATE SET subject = excluded.subject, body_html = excluded.body_html, action_label = excluded.action_label, updated_at = excluded.updated_at"
       )
-        .bind(service, key, template.subject, template.bodyHtml, now)
+        .bind(service, key, template.subject, template.bodyHtml, cleanString(template.actionLabel, 200), now)
         .run();
       continue;
     }
@@ -3231,12 +3252,13 @@ async function loadTemplates(env, service) {
       out[key] = {
         subject: template.subject || "",
         bodyHtml: template.bodyHtml || "",
+        actionLabel: cleanString(template.actionLabel, 200),
         updatedAt: now,
       };
       await env.DB.prepare(
-        "INSERT INTO booking_mail_templates (service, key, subject, body_html, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(service, key) DO UPDATE SET subject = excluded.subject, body_html = excluded.body_html, updated_at = excluded.updated_at"
+        "INSERT INTO booking_mail_templates (service, key, subject, body_html, action_label, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(service, key) DO UPDATE SET subject = excluded.subject, body_html = excluded.body_html, action_label = excluded.action_label, updated_at = excluded.updated_at"
       )
-        .bind(service, key, template.subject, template.bodyHtml, now)
+        .bind(service, key, template.subject, template.bodyHtml, cleanString(template.actionLabel, 200), now)
         .run();
       continue;
     }
@@ -3248,11 +3270,12 @@ async function loadTemplates(env, service) {
   return out;
 }
 
-async function saveTemplate(env, service, key, subject, bodyHtml) {
+async function saveTemplate(env, service, key, subject, bodyHtml, actionLabel = "") {
+  const al = cleanString(actionLabel, 200);
   await env.DB.prepare(
-    "INSERT INTO booking_mail_templates (service, key, subject, body_html, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(service, key) DO UPDATE SET subject = excluded.subject, body_html = excluded.body_html, updated_at = excluded.updated_at"
+    "INSERT INTO booking_mail_templates (service, key, subject, body_html, action_label, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(service, key) DO UPDATE SET subject = excluded.subject, body_html = excluded.body_html, action_label = excluded.action_label, updated_at = excluded.updated_at"
   )
-    .bind(service, cleanString(key, 120), cleanString(subject, 400), String(bodyHtml || ""), nowMs())
+    .bind(service, cleanString(key, 120), cleanString(subject, 400), String(bodyHtml || ""), al, nowMs())
     .run();
 }
 
@@ -3287,13 +3310,21 @@ async function resolveTemplateForEvent(env, service, eventKey) {
     return {
       subject: ranked[0].tpl.subject || "",
       bodyHtml: ranked[0].tpl.bodyHtml || "",
+      actionLabel: cleanString(ranked[0].tpl.actionLabel, 200),
     };
   }
   const defaults = defaultTemplateMap(service);
   for (const key of candidates) {
-    if (defaults[key]) return defaults[key];
+    if (defaults[key]) {
+      const d = defaults[key];
+      return {
+        subject: d.subject || "",
+        bodyHtml: d.bodyHtml || "",
+        actionLabel: cleanString(d.actionLabel, 200),
+      };
+    }
   }
-  return { subject: `${service} - ${eventKey}`, bodyHtml: `<p>Szablon ${eventKey}</p>` };
+  return { subject: `${service} - ${eventKey}`, bodyHtml: `<p>Szablon ${eventKey}</p>`, actionLabel: "" };
 }
 
 function listStatusWhere(status) {
@@ -3718,7 +3749,7 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
   const templateBodyRaw = String(template.bodyHtml || "");
   let html = renderTemplate(templateBodyRaw, vars);
   if (eventKey === "confirm_email" && vars.confirmationLink) {
-    html = injectInlineActionButton(html, vars.confirmationLink);
+    html = injectInlineActionButton(html, vars.confirmationLink, { preferredLabel: template.actionLabel || "" });
   }
   const cancelReason = cleanString(vars.cancelReason, 2000);
   if (eventKey === "cancelled_client" && cancelReason) {
@@ -4560,7 +4591,7 @@ async function handleHotelAdmin(env, op, request) {
   }
   if (op === "admin-mail-template-save" && request.method === "PUT") {
     const body = await readBody(request);
-    await saveTemplate(env, "hotel", body.key, body.subject, body.bodyHtml);
+    await saveTemplate(env, "hotel", body.key, body.subject, body.bodyHtml, body.actionLabel);
     return { status: 200, data: { ok: true } };
   }
   return null;
@@ -4933,7 +4964,7 @@ async function handleRestaurantAdmin(env, op, request) {
   }
   if (op === "admin-mail-template-save" && request.method === "PUT") {
     const body = await readBody(request);
-    await saveTemplate(env, "restaurant", body.key, body.subject, body.bodyHtml);
+    await saveTemplate(env, "restaurant", body.key, body.subject, body.bodyHtml, body.actionLabel);
     return { status: 200, data: { ok: true } };
   }
   return null;
@@ -5180,7 +5211,7 @@ async function handleHallAdmin(env, op, request) {
   }
   if (op === "admin-mail-template-save" && request.method === "PUT") {
     const body = await readBody(request);
-    await saveTemplate(env, "hall", body.key, body.subject, body.bodyHtml);
+    await saveTemplate(env, "hall", body.key, body.subject, body.bodyHtml, body.actionLabel);
     return { status: 200, data: { ok: true } };
   }
   return null;

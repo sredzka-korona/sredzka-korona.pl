@@ -221,7 +221,10 @@
   }
 
   function hallPreviewActionLabel(key) {
-    return key === "hall_confirm_email" ? "Potwierdź zgłoszenie" : "";
+    if (key !== "hall_confirm_email") return "";
+    const el = document.querySelector(`[data-hall-tpl-key="${key}"][data-field="actionLabel"]`);
+    const v = el && String(el.value || "").trim();
+    return v || "Potwierdź zgłoszenie";
   }
 
   function updateHallTemplatePreview(key) {
@@ -470,7 +473,7 @@
         <h3>Szablony mailingowe — sale</h3>
         <p class="helper">Zmienne: <code>{{reservationNumber}}</code> (np. 7/2026/PRZYJĘCIA), <code>{{reservationSubject}}</code>, <code>{{decisionDeadline}}</code>, <code>{{adminActionLink}}</code>, <code>{{fullName}}</code>, <code>{{hallName}}</code>, <code>{{date}}</code>, <code>{{timeFrom}}</code>, <code>{{timeTo}}</code>, <code>{{durationHours}}</code>, <code>{{guestsCount}}</code>, <code>{{eventType}}</code>, <code>{{exclusive}}</code>, <code>{{customerNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{venueName}}</code>.</p>
         <p class="helper">Logo, przycisk akcji i premium-layout wiadomości są dodawane automatycznie przy wysyłce. W tym miejscu edytujesz główną treść maila.</p>
-        <p class="helper">Podgląd pokazuje ekskluzywną wersję maila dla przyjęć z przykładowym zapytaniem i pełnym brandingiem.</p>
+        <p class="helper">Podgląd pokazuje ekskluzywną wersję maila dla przyjęć z przykładowym zapytaniem i pełnym brandingiem. Przy szablonie potwierdzenia adresu e-mail możesz ustawić tekst na przycisku (gdy treść nie zawiera linku <code>{{confirmationLink}}</code>, przycisk zostanie zbudowany z tego pola).</p>
         <div id="hall-template-forms">
           ${keys
             .map(
@@ -478,6 +481,11 @@
             <details class="hotel-template-card">
               <summary><span class="tpl-key">${escapeHtml(k)}</span>${HALL_TEMPLATE_LABELS[k] ? `<span class="tpl-desc"> — ${escapeHtml(HALL_TEMPLATE_LABELS[k])}</span>` : ""}</summary>
               <label>Temat<input type="text" data-hall-tpl-key="${escapeHtml(k)}" data-field="subject" value="${escapeHtml(templatesData[k]?.subject || "")}" /></label>
+              ${
+                k === "hall_confirm_email"
+                  ? `<label>Tekst przycisku potwierdzenia<input type="text" data-hall-tpl-key="${escapeHtml(k)}" data-field="actionLabel" value="${escapeHtml(templatesData[k]?.actionLabel || "")}" maxlength="200" placeholder="np. Potwierdź zgłoszenie" /></label>`
+                  : ""
+              }
               <label>Treść HTML (edytuj poniżej)</label>
               <div class="wysiwyg-toolbar" data-toolbar-for="${escapeHtml(k)}">
                 <button type="button" data-cmd="bold" title="Pogrubienie"><b>B</b></button>
@@ -763,7 +771,12 @@
           }
           hallApi("admin-mail-template-save", {
             method: "PUT",
-            body: { key, subject: subj?.value || "", bodyHtml: newBodyHtml },
+            body: {
+              key,
+              subject: subj?.value || "",
+              bodyHtml: newBodyHtml,
+              actionLabel: document.querySelector(`[data-hall-tpl-key="${key}"][data-field="actionLabel"]`)?.value ?? "",
+            },
           })
             .then(() => alert("Zapisano."))
             .catch((err) => alert(err.message));

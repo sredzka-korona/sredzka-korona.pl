@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS booking_mail_templates (
   key TEXT NOT NULL,
   subject TEXT NOT NULL,
   body_html TEXT NOT NULL,
+  action_label TEXT NOT NULL DEFAULT '',
   updated_at INTEGER NOT NULL,
   PRIMARY KEY (service, key)
 );
