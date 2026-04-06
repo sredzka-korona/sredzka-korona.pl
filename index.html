@@ -798,6 +798,11 @@
         height: calc(100vh - var(--nav-height));
       }
 
+      body.site-notice-visible .main-split-container {
+        top: calc(var(--nav-height) + var(--site-notice-stack-height, 0px));
+        height: calc(100vh - var(--nav-height) - var(--site-notice-stack-height, 0px));
+      }
+
       .main-split-section {
         position: absolute;
         top: 0;
@@ -981,6 +986,11 @@
           height: auto;
           display: grid;
           grid-template-rows: repeat(3, minmax(0, 1fr));
+        }
+
+        body.site-notice-visible .main-split-container {
+          top: calc(var(--nav-height) + var(--site-notice-stack-height, 0px));
+          height: auto;
         }
 
         .main-split-section {
@@ -1403,7 +1413,7 @@
         position: fixed;
         left: 50%;
         transform: translateX(-50%);
-        bottom: calc(2rem + var(--site-notice-stack-height, 0px));
+        bottom: 2rem;
         width: min(600px, calc(100vw - 2rem));
         max-width: none;
         z-index: 1002;
@@ -1547,7 +1557,7 @@
         .cookie-banner {
           left: 1rem;
           right: 1rem;
-          bottom: calc(1rem + var(--site-notice-stack-height, 0px));
+          bottom: 1rem;
           width: auto;
           transform: none;
         }
@@ -1610,17 +1620,18 @@
         display: block;
       }
 
+      /* Pasek pod nagłówkiem — układ odwrócony w pionie (jak obrót 180° względem wersji dolnej); tekst bez transformacji, żeby pozostał czytelny */
       .site-notice-root {
         position: fixed;
+        top: var(--nav-height);
         left: 0;
         right: 0;
-        bottom: 0;
-        z-index: 1001;
+        bottom: auto;
+        z-index: 100;
         display: flex;
         flex-direction: column;
         align-items: stretch;
         pointer-events: none;
-        padding-bottom: env(safe-area-inset-bottom, 0px);
       }
 
       .site-notice-root * {
@@ -1634,14 +1645,14 @@
         -webkit-overflow-scrolling: touch;
         background: linear-gradient(
           180deg,
-          rgba(255, 252, 248, 0.99) 0%,
-          rgba(250, 246, 240, 0.98) 100%
+          rgba(250, 246, 240, 0.98) 0%,
+          rgba(255, 252, 248, 0.99) 100%
         );
         border: 1px solid var(--line);
-        border-bottom: none;
-        border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-        box-shadow: 0 -12px 48px rgba(40, 28, 18, 0.14);
-        padding: 0.6rem 1rem 1.35rem;
+        border-top: none;
+        border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+        box-shadow: 0 12px 40px rgba(40, 28, 18, 0.12);
+        padding: 1.1rem 1rem 0.65rem;
         transform: translateY(0);
         opacity: 1;
         transition: transform 0.38s cubic-bezier(0.33, 1, 0.68, 1), opacity 0.28s ease, max-height 0.38s cubic-bezier(0.33, 1, 0.68, 1);
@@ -1663,7 +1674,7 @@
         align-items: center;
         justify-content: center;
         gap: 1rem;
-        padding: 0.75rem 1rem;
+        padding: 0.35rem 1rem 0.75rem;
         border-bottom: 1px solid var(--line);
         position: relative;
       }
@@ -1706,8 +1717,8 @@
         flex-shrink: 0;
         width: 3.25rem;
         height: 1.75rem;
-        margin-top: -0.875rem;
-        margin-bottom: 0.35rem;
+        margin-top: 0;
+        margin-bottom: -0.875rem;
         border: 1px solid rgba(160, 130, 85, 0.45);
         border-radius: 999px;
         background: linear-gradient(145deg, #d4b896 0%, var(--gold) 45%, #b89460 100%);
@@ -1738,8 +1749,8 @@
       }
 
       .site-notice-root.is-collapsed .site-notice-toggle {
-        margin-top: 0.25rem;
-        margin-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px));
+        margin-top: 0.15rem;
+        margin-bottom: 0.35rem;
       }
     </style>
   </head>
@@ -2678,9 +2689,9 @@
           const noticeH = notice ? notice.getBoundingClientRect().height : 0;
           rootEl.style.setProperty("--site-notice-stack-height", `${Math.ceil(noticeH)}px`);
           const cookie = document.querySelector(".cookie-banner");
-          let fabExtra = noticeH;
+          let fabExtra = 0;
           if (cookie) {
-            fabExtra += 16 + cookie.getBoundingClientRect().height;
+            fabExtra = 16 + cookie.getBoundingClientRect().height;
           }
           rootEl.style.setProperty("--bottom-floating-extra", `${Math.ceil(fabExtra)}px`);
         }
@@ -2730,29 +2741,32 @@
           const chevronUp =
             '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 15l-6-6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-          const firstTitle = items[0]?.title || "Powiadomienie";
+          const firstRaw = (items[0]?.title || "").trim();
+          const firstTitle = firstRaw || "Powiadomienie";
 
           const root = document.createElement("div");
           root.id = "site-notice-root";
           root.className = "site-notice-root" + (collapsed ? " is-collapsed" : "");
           root.innerHTML = `
+            <button type="button" class="site-notice-toggle" aria-expanded="${collapsed ? "false" : "true"}" aria-label="${collapsed ? "Pokaż powiadomienie" : "Zwiń powiadomienie"}">${collapsed ? chevronDown : chevronUp}</button>
             <div class="site-notice-panel" role="region" aria-label="Powiadomienia">
               <div class="site-notice-toolbar">
                 <span class="site-notice-kicker">${escapeHtml(firstTitle)}</span>
               </div>
               <div class="site-notice-items">
                 ${items
-                  .map(
-                    (entry) => `
+                  .map((entry, index) => {
+                    const t = (entry.title || "").trim();
+                    const showH3 = t && !(index === 0 && t === firstRaw);
+                    return `
                   <div class="site-notice-item">
-                    <h3>${escapeHtml(entry.title || "")}</h3>
+                    ${showH3 ? `<h3>${escapeHtml(t)}</h3>` : ""}
                     <p>${escapeHtml(entry.description || "")}</p>
-                  </div>`
-                  )
+                  </div>`;
+                  })
                   .join("")}
               </div>
             </div>
-            <button type="button" class="site-notice-toggle" aria-expanded="${collapsed ? "false" : "true"}" aria-label="${collapsed ? "Pokaż powiadomienie" : "Zwiń powiadomienie"}">${collapsed ? chevronUp : chevronDown}</button>
           `;
 
           document.body.appendChild(root);
@@ -2770,7 +2784,7 @@
             }
             toggleBtn.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
             toggleBtn.setAttribute("aria-label", isCollapsed ? "Pokaż powiadomienie" : "Zwiń powiadomienie");
-            toggleBtn.innerHTML = isCollapsed ? chevronUp : chevronDown;
+            toggleBtn.innerHTML = isCollapsed ? chevronDown : chevronUp;
           };
 
           const setCollapsed = (next) => {
@@ -2803,9 +2817,10 @@
             if (payload.galleryAlbums) {
               state.galleryAlbums = payload.galleryAlbums;
             }
-            mountSiteNotifications(payload.activeNotifications || []);
+            return payload.activeNotifications || [];
           } catch (error) {
             // Fallback seed content remains visible until Cloudflare API is configured.
+            return [];
           }
         }
 
@@ -2833,10 +2848,15 @@
 
         async function bootstrap() {
           initCustomScrollbar();
-          await loadRemoteData();
+          const activeNotifications = await loadRemoteData();
           renderShell();
           window.addEventListener("resize", syncFloatingNavHeightCssVar);
           window.addEventListener("resize", updateBottomFixedStackVars, { passive: true });
+          syncFloatingNavHeightCssVar();
+          requestAnimationFrame(() => {
+            syncFloatingNavHeightCssVar();
+            mountSiteNotifications(activeNotifications);
+          });
           initMainSplit();
           initScrollSpy();
           initCookieBanner();
