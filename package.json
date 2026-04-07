@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "preview": "node scripts/preview.mjs",
-    "seo:generate": "node scripts/generate-seo.mjs"
+    "seo:generate": "node scripts/generate-seo.mjs",
+    "d1:clear-reservations": "cd worker && npx --yes wrangler@4 d1 execute sredzka-korona --remote --file ../scripts/d1/clear-reservations.sql"
   }
 }

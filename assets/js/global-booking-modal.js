@@ -1852,7 +1852,6 @@
     const isLarge = selectedHall?.hallKind === "large";
     return `
       <section>
-        <p class="gb-hint">Podaj rodzaj imprezy oraz dodatkowe informacje do rezerwacji.</p>
         <div class="gb-grid-2">
           <label class="gb-field">
             <span>Rodzaj imprezy</span>
