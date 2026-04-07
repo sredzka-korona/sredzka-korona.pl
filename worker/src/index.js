@@ -1407,18 +1407,64 @@ function binaryResponse(object, contentType, request, env, extraHeaders = {}) {
   return new Response(body, { headers });
 }
 
+function normalizeOriginValue(value) {
+  try {
+    const url = new URL(String(value || "").trim());
+    return url.origin.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function counterpartOrigin(origin) {
+  const safe = normalizeOriginValue(origin);
+  if (!safe) return "";
+  try {
+    const url = new URL(safe);
+    const host = url.hostname.toLowerCase();
+    if (host.startsWith("www.")) {
+      url.hostname = host.slice(4);
+      return url.origin.toLowerCase();
+    }
+    url.hostname = `www.${host}`;
+    return url.origin.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function allowedOrigins(env) {
+  const configured = String(env.ALLOWED_ORIGIN || "*")
+    .split(",")
+    .map((item) => normalizeOriginValue(item))
+    .filter(Boolean);
+  const siteOrigin = normalizeOriginValue(env.PUBLIC_SITE_URL || "");
+  const expanded = new Set(configured);
+  if (siteOrigin) {
+    expanded.add(siteOrigin);
+    const siteCounterpart = counterpartOrigin(siteOrigin);
+    if (siteCounterpart) expanded.add(siteCounterpart);
+  }
+  for (const origin of [...expanded]) {
+    const pair = counterpartOrigin(origin);
+    if (pair) expanded.add(pair);
+  }
+  return [...expanded];
+}
+
 function corsHeaders(request, env) {
-  const origin = request.headers.get("Origin");
-  const allowedRaw = String(env.ALLOWED_ORIGIN || "*")
+  const origin = normalizeOriginValue(request.headers.get("Origin"));
+  const allowAll = String(env.ALLOWED_ORIGIN || "*")
     .split(",")
     .map((item) => item.trim())
-    .filter(Boolean);
-  const allowAll = allowedRaw.includes("*") || allowedRaw.length === 0;
+    .filter(Boolean)
+    .includes("*");
+  const allowedRaw = allowedOrigins(env);
   const canUseOrigin = allowAll
     ? "*"
     : origin && allowedRaw.includes(origin)
       ? origin
-      : allowedRaw[0];
+      : allowedRaw[0] || "*";
   return {
     "Access-Control-Allow-Origin": canUseOrigin,
     "Access-Control-Allow-Credentials": "true",

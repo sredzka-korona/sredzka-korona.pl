@@ -8,7 +8,7 @@
   const PAGE_VISIT_ID =
     window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   /** Podbij przy zmianach w modalu — wymusza odświeżenie cache CSS po wdrożeniu. */
-  const GB_MODAL_ASSET_VERSION = "20260407-6";
+  const GB_MODAL_ASSET_VERSION = "20260407-7";
   const SERVICE_KEYS = ["hotel", "restaurant", "events"];
   const requestLocks = Object.create(null);
   const RESTAURANT_DURATION_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4];
@@ -229,6 +229,39 @@
     }).format(new Date(`${safe}T00:00:00Z`));
   }
 
+  function calendarYearOptions(firstLoaded, lastLoaded) {
+    if (!firstLoaded || !lastLoaded) return [];
+    const firstYear = Number(String(firstLoaded).slice(0, 4));
+    const lastYear = Number(String(lastLoaded).slice(0, 4));
+    if (!Number.isFinite(firstYear) || !Number.isFinite(lastYear) || lastYear < firstYear) return [];
+    const out = [];
+    for (let year = firstYear; year <= lastYear; year += 1) {
+      out.push(year);
+    }
+    return out;
+  }
+
+  function calendarMonthOptionsForYear(firstLoaded, lastLoaded, year) {
+    const safeYear = Number(year);
+    if (!firstLoaded || !lastLoaded || !Number.isFinite(safeYear)) return [];
+    const firstYear = Number(String(firstLoaded).slice(0, 4));
+    const lastYear = Number(String(lastLoaded).slice(0, 4));
+    if (!Number.isFinite(firstYear) || !Number.isFinite(lastYear) || safeYear < firstYear || safeYear > lastYear) {
+      return [];
+    }
+    const firstMonth = safeYear === firstYear ? Number(String(firstLoaded).slice(5, 7)) : 1;
+    const lastMonth = safeYear === lastYear ? Number(String(lastLoaded).slice(5, 7)) : 12;
+    const out = [];
+    for (let month = firstMonth; month <= lastMonth; month += 1) {
+      const cursor = `${safeYear}-${String(month).padStart(2, "0")}-01`;
+      out.push({
+        value: month,
+        label: monthLabel(cursor).replace(/\s+\d{4}$/u, ""),
+      });
+    }
+    return out;
+  }
+
   function availabilityDayMap(days) {
     const map = new Map();
     (Array.isArray(days) ? days : []).forEach((day) => {
@@ -327,6 +360,10 @@
     const totalCells = Math.ceil((offset + monthDays) / 7) * 7;
     const previousDisabled = !firstLoaded || addMonthsToCursor(currentMonth, -1) < monthCursorFromYmd(firstLoaded);
     const nextDisabled = !lastLoaded || addMonthsToCursor(currentMonth, 1) > monthCursorFromYmd(lastLoaded);
+    const currentYearValue = Number(currentMonth.slice(0, 4));
+    const currentMonthValue = Number(currentMonth.slice(5, 7));
+    const yearOptions = calendarYearOptions(firstLoaded, lastLoaded);
+    const monthOptions = calendarMonthOptionsForYear(firstLoaded, lastLoaded, currentYearValue);
     const cells = [];
     for (let index = 0; index < totalCells; index += 1) {
       const dayNumber = index - offset + 1;
@@ -374,7 +411,39 @@
       <div class="gb-calendar" data-calendar-root="${escapeHtml(prefix)}">
         <div class="gb-calendar-head">
           <button type="button" class="gb-calendar-nav" data-calendar-nav="${escapeHtml(prefix)}:-1" ${previousDisabled || loading ? "disabled" : ""}>‹</button>
-          <strong class="gb-calendar-title">${escapeHtml(monthLabel(currentMonth))}</strong>
+          <div class="gb-calendar-title-wrap">
+            <strong class="gb-calendar-title">${escapeHtml(monthLabel(currentMonth))}</strong>
+            <div class="gb-calendar-jump" data-calendar-jump-group="${escapeHtml(prefix)}">
+              <select
+                class="gb-calendar-jump-select"
+                data-calendar-jump-prefix="${escapeHtml(prefix)}"
+                data-calendar-jump-part="month"
+                aria-label="Wybierz miesiąc"
+                ${loading ? "disabled" : ""}
+              >
+                ${monthOptions
+                  .map(
+                    (option) =>
+                      `<option value="${escapeHtml(String(option.value))}" ${option.value === currentMonthValue ? "selected" : ""}>${escapeHtml(option.label)}</option>`
+                  )
+                  .join("")}
+              </select>
+              <select
+                class="gb-calendar-jump-select gb-calendar-jump-select--year"
+                data-calendar-jump-prefix="${escapeHtml(prefix)}"
+                data-calendar-jump-part="year"
+                aria-label="Wybierz rok"
+                ${loading ? "disabled" : ""}
+              >
+                ${yearOptions
+                  .map(
+                    (year) =>
+                      `<option value="${escapeHtml(String(year))}" ${year === currentYearValue ? "selected" : ""}>${escapeHtml(String(year))}</option>`
+                  )
+                  .join("")}
+              </select>
+            </div>
+          </div>
           <button type="button" class="gb-calendar-nav" data-calendar-nav="${escapeHtml(prefix)}:1" ${nextDisabled || loading ? "disabled" : ""}>›</button>
         </div>
         <div class="gb-calendar-weekdays">
@@ -1473,7 +1542,6 @@
     const guestsVal = clamp(toInt(state.events.guestsCount, 60), 1, 120);
     return `
       <section>
-        <p class="gb-hint" style="margin:0 0 0.75rem;">Godzina rozpoczęcia i czas trwania zapisują się jako informacja dla obsługi. Kalendarz w kolejnym kroku działa dziennie i pokaże tylko daty dostępne dla wybranej liczby gości.</p>
         <div class="gb-events-guests-row">
           <label class="gb-field gb-events-guests-col">
             <span>Godzina rezerwacji</span>
@@ -2083,6 +2151,28 @@
         }
         if (prefix === "events") {
           state.events.calendarMonth = addMonthsToCursor(`${state.events.calendarMonth}-01`, delta).slice(0, 7);
+          render();
+        }
+      });
+    });
+
+    document.querySelectorAll("[data-calendar-jump-prefix]").forEach((field) => {
+      field.addEventListener("change", () => {
+        const prefix = String(field.getAttribute("data-calendar-jump-prefix") || "");
+        if (!prefix) return;
+        const monthField = document.querySelector(`[data-calendar-jump-prefix="${prefix}"][data-calendar-jump-part="month"]`);
+        const yearField = document.querySelector(`[data-calendar-jump-prefix="${prefix}"][data-calendar-jump-part="year"]`);
+        const year = Number(yearField?.value || 0);
+        const month = Number(monthField?.value || 0);
+        if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) return;
+        const nextCursor = `${year}-${String(month).padStart(2, "0")}`;
+        if (prefix === "restaurant") {
+          state.restaurant.calendarMonth = nextCursor;
+          render();
+          return;
+        }
+        if (prefix === "events") {
+          state.events.calendarMonth = nextCursor;
           render();
         }
       });
