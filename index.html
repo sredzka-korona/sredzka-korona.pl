@@ -887,10 +887,6 @@
         padding-right: 10%;
       }
 
-      .main-split-section:nth-child(3) .main-split-overlay-stack {
-        transform: translateX(0.45rem);
-      }
-
       .main-split-section:hover .main-split-overlay {
         opacity: 1;
       }
@@ -913,6 +909,17 @@
 
       .main-split-section:hover .main-split-label {
         transform: translateY(0);
+      }
+
+      /* Kafelek „Przyjęcia”: delikatne przesunięcie napisu w prawo tylko na desktopie */
+      @media (min-width: 1025px) {
+        .main-split-section:nth-child(3) .main-split-label {
+          transform: translateX(0.65rem) translateY(30px);
+        }
+
+        .main-split-section:nth-child(3):hover .main-split-label {
+          transform: translateX(0.65rem) translateY(0);
+        }
       }
 
       .main-split-section.is-blocked {
@@ -1835,7 +1842,7 @@
                 text: "Komfortowe pokoje dla gosci indywidualnych, rodzin i uczestnikow wydarzen.",
               },
               {
-                title: "Przyjęcia",
+                title: "Przyjecia",
                 text: "Sale na wesela, komunie, jubileusze, spotkania firmowe i kameralne kolacje.",
               },
             ],
@@ -2139,7 +2146,7 @@
           { id: "services", label: "Uslugi" },
           { id: "hotel", label: "Hotel", indent: true },
           { id: "restaurant", label: "Restauracja", indent: true },
-          { id: "events", label: "Przyjęcia", indent: true },
+          { id: "events", label: "Przyjecia", indent: true },
           { id: "availability", label: "Kalendarz" },
           { id: "contact", label: "Kontakt" },
         ];
@@ -2250,7 +2257,7 @@
               images: content.restaurant.gallery?.images || [],
             },
             events: {
-              title: "Przyjęcia",
+              title: "Przyjecia",
               description: content.events.intro,
               coverUrl: content.events.gallery?.coverUrl || "",
               images: content.events.gallery?.images || [],
