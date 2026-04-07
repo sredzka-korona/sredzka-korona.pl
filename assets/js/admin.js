@@ -1150,11 +1150,12 @@
   };
   const SCHEDULE_STATUS_LABELS = {
     email_verification_pending: "Do potwierdzenia e-mail",
-    pending: "Do potwierdzenia",
+    pending: "Oczekujące",
     confirmed: "Potwierdzona",
     manual_block: "Blokada",
     cancelled: "Anulowana",
     rejected: "Odrzucona",
+    expired: "Wygasłe",
   };
 
   function scheduleServiceLabel(serviceKey) {
@@ -1188,6 +1189,7 @@
     if (normalized === "pending") return "schedule-status-pending";
     if (normalized === "confirmed") return "schedule-status-confirmed";
     if (normalized === "manual_block") return "schedule-status-block";
+    if (normalized === "expired") return "schedule-status-expired";
     return "";
   }
 
@@ -1974,16 +1976,25 @@
       .toLowerCase() === "cancelled";
   }
 
+  function scheduleIsExpired(item) {
+    return String(item?.status || "")
+      .trim()
+      .toLowerCase() === "expired";
+  }
+
   function scheduleCanCancel(item) {
     const status = String(item?.status || "")
       .trim()
       .toLowerCase();
+    if (scheduleIsPast(item)) return false;
     return ["pending", "confirmed", "email_verification_pending"].includes(status);
   }
 
   function scheduleRegistryItemMarkup(item) {
     const createdLabel = item.createdAtMs ? scheduleFormatDateTime(item.createdAtMs) : "Brak daty utworzenia";
-    const registryToneClass = `${scheduleIsPast(item) ? " is-past" : ""}${scheduleIsCancelled(item) ? " is-cancelled" : ""}`;
+    const registryToneClass = `${scheduleIsPast(item) ? " is-past" : ""}${scheduleIsCancelled(item) ? " is-cancelled" : ""}${
+      scheduleIsExpired(item) ? " is-expired" : ""
+    }`;
     return `
       <article class="schedule-day-item schedule-registry-item${registryToneClass}">
         <button type="button" class="button secondary schedule-card-action-details" data-schedule-action="details" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Szczegóły</button>

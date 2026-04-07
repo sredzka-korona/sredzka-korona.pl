@@ -864,6 +864,11 @@ const hallApi = onRequest(
           json(res, { error: "Nie można anulować tego statusu." }, 400);
           return;
         }
+        const reservationEndMs = cur.endDateTime?.toMillis?.() || Number(cur.endMs || 0);
+        if (reservationEndMs && reservationEndMs <= Date.now()) {
+          json(res, { error: "Nie można odwołać rezerwacji, która już minęła." }, 400);
+          return;
+        }
         await ref.update({
           status: "cancelled",
           pendingExpiresAt: FieldValue.delete(),

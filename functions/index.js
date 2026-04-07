@@ -845,6 +845,11 @@ exports.hotelApi = onRequest(
           json(res, { error: "Nie można anulować tego statusu." }, 400);
           return;
         }
+        const reservationEndMs = Date.parse(`${String(before.dateTo || "").slice(0, 10)}T00:00:00`);
+        if (Number.isFinite(reservationEndMs) && reservationEndMs <= Date.now()) {
+          json(res, { error: "Nie można odwołać rezerwacji, która już minęła." }, 400);
+          return;
+        }
         await releaseNightsForReservation(db, id);
         await db.collection("hotelReservations").doc(id).update({
           status: "cancelled",

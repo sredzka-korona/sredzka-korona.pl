@@ -1235,6 +1235,11 @@ const restaurantApi = onRequest(
           json(res, { error: "Nie można anulować tego statusu." }, 400);
           return;
         }
+        const reservationEndMs = before.endDateTime?.toMillis?.() || Number(before.endMs || 0);
+        if (reservationEndMs && reservationEndMs <= Date.now()) {
+          json(res, { error: "Nie można odwołać rezerwacji, która już minęła." }, 400);
+          return;
+        }
         await releaseLocksForReservation(db, id);
         await db.collection("restaurantReservations").doc(id).update({
           status: "cancelled",

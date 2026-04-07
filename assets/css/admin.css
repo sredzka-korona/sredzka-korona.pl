@@ -1843,7 +1843,8 @@ body.admin-modal-open {
 }
 
 .schedule-registry-item.is-past,
-.schedule-registry-item.is-cancelled {
+.schedule-registry-item.is-cancelled,
+.schedule-registry-item.is-expired {
   opacity: 0.58;
   background: rgba(243, 239, 233, 0.9);
   border-color: rgba(131, 107, 69, 0.14);
@@ -2078,6 +2079,11 @@ body.admin-modal-open {
 .schedule-status-block {
   background: rgba(101, 117, 187, 0.2);
   color: #2d3f83;
+}
+
+.schedule-status-expired {
+  background: rgba(122, 133, 152, 0.18);
+  color: rgba(72, 82, 98, 0.95);
 }
 
 .schedule-modal {

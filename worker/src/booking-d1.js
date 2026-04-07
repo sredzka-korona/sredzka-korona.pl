@@ -2967,6 +2967,7 @@ ${infoCard("Podsumowanie pobytu", [
   ["Liczba noclegów", "{{nights}}"],
   ["Wybrane pokoje", "{{roomsList}}"],
   ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
+  ["Dodatkowy opis do rezerwacji", "{{customerNote}}"],
 ])}
 ${noteCard("<strong>Ważne:</strong> potwierdzenie adresu e-mail nie jest jeszcze ostatecznym potwierdzeniem pobytu. Po weryfikacji dostępności recepcja prześle kolejną wiadomość ze statusem rezerwacji.")}
 <p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>`,
@@ -2999,6 +3000,7 @@ ${infoCard("Potwierdzony pobyt", [
   ["Liczba noclegów", "{{nights}}"],
   ["Pokoje", "{{roomsList}}"],
   ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
+  ["Dodatkowy opis do rezerwacji", "{{customerNote}}"],
 ])}
 ${noteCard("Jeżeli chcesz doprecyzować godzinę przyjazdu, potrzeby dotyczące pobytu lub inne szczegóły organizacyjne, odpowiedz na tę wiadomość.")}
 <p>Dziękujemy za zaufanie i do zobaczenia w {{hotelName}}.</p>`,
@@ -4732,6 +4734,12 @@ async function handleHotelAdmin(env, op, request) {
     const cancelReason = cleanString(body.cancelReason, 2000);
     const existing = await getHotelReservation(env, id);
     if (!existing) return { status: 404, data: { error: "Brak rezerwacji." } };
+    if (existing.status !== "manual_block") {
+      const reservationEndMs = Date.parse(`${cleanString(existing.date_to, 10)}T00:00:00`);
+      if (Number.isFinite(reservationEndMs) && reservationEndMs <= nowMs()) {
+        return { status: 400, data: { error: "Nie można odwołać rezerwacji, która już minęła." } };
+      }
+    }
     if (existing.status !== "manual_block" && !cancelReason) {
       return { status: 400, data: { error: "Podaj powód anulowania rezerwacji." } };
     }
@@ -5105,6 +5113,9 @@ async function handleRestaurantAdmin(env, op, request) {
     const cancelReason = cleanString(body.cancelReason, 2000);
     const existing = await getRestaurantReservationRow(env, id);
     if (!existing) return { status: 404, data: { error: "Brak rezerwacji." } };
+    if (existing.status !== "manual_block" && Number(existing.end_ms || 0) <= nowMs()) {
+      return { status: 400, data: { error: "Nie można odwołać rezerwacji, która już minęła." } };
+    }
     if (existing.status !== "manual_block" && !cancelReason) {
       return { status: 400, data: { error: "Podaj powód anulowania rezerwacji." } };
     }
@@ -5335,6 +5346,9 @@ async function handleHallAdmin(env, op, request) {
     const cancelReason = cleanString(body.cancelReason, 2000);
     const existing = await getHallReservationRow(env, id);
     if (!existing) return { status: 404, data: { error: "Brak rezerwacji." } };
+    if (existing.status !== "manual_block" && Number(existing.end_ms || 0) <= nowMs()) {
+      return { status: 400, data: { error: "Nie można odwołać rezerwacji, która już minęła." } };
+    }
     if (existing.status !== "manual_block" && !cancelReason) {
       return { status: 400, data: { error: "Podaj powód anulowania rezerwacji." } };
     }

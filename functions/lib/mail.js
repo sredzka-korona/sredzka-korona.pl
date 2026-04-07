@@ -295,6 +295,7 @@ ${infoCard("Podsumowanie pobytu", [
   ["Liczba noclegów", "{{nights}}"],
   ["Wybrane pokoje", "{{roomsList}}"],
   ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
+  ["Dodatkowy opis do rezerwacji", "{{customerNote}}"],
 ])}
 ${noteCard("<strong>Ważne:</strong> potwierdzenie adresu e-mail nie jest jeszcze ostatecznym potwierdzeniem pobytu. Po weryfikacji dostępności recepcja prześle kolejną wiadomość ze statusem rezerwacji.")}
 <p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>`,
@@ -325,6 +326,7 @@ ${infoCard("Potwierdzony pobyt", [
   ["Liczba noclegów", "{{nights}}"],
   ["Pokoje", "{{roomsList}}"],
   ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
+  ["Dodatkowy opis do rezerwacji", "{{customerNote}}"],
 ])}
 ${noteCard("Jeżeli chcesz doprecyzować godzinę przyjazdu, potrzeby dotyczące pobytu lub inne szczegóły organizacyjne, odpowiedz na tę wiadomość.")}
 <p>Dziękujemy za zaufanie i do zobaczenia w {{hotelName}}.</p>`,
