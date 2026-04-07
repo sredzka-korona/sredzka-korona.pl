@@ -8,7 +8,7 @@
   const PAGE_VISIT_ID =
     window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   /** Podbij przy zmianach w modalu — wymusza odświeżenie cache CSS po wdrożeniu. */
-  const GB_MODAL_ASSET_VERSION = "20260407-5";
+  const GB_MODAL_ASSET_VERSION = "20260407-6";
   const SERVICE_KEYS = ["hotel", "restaurant", "events"];
   const requestLocks = Object.create(null);
   const RESTAURANT_DURATION_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4];
@@ -153,49 +153,6 @@
     return `${year}-${month}-${day}`;
   }
 
-  const EVENTS_MIN_ADVANCE_MS = 2 * 60 * 60 * 1000;
-
-  function eventsYmdHmToMsWarsaw(ymd, hm) {
-    if (!ymd || !hm || !/^\d{4}-\d{2}-\d{2}$/.test(ymd) || !/^\d{2}:\d{2}$/.test(hm)) return NaN;
-    const Y = Number(ymd.slice(0, 4));
-    const M = Number(ymd.slice(5, 7));
-    const D = Number(ymd.slice(8, 10));
-    const h = Number(hm.slice(0, 2));
-    const m = Number(hm.slice(3, 5));
-    if (![Y, M, D, h, m].every((n) => Number.isFinite(n))) return NaN;
-    let utcMs = Date.UTC(Y, M - 1, D, h, m, 0, 0);
-    const dtf = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Europe/Warsaw",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-    for (let k = 0; k < 48; k += 1) {
-      const pa = dtf.formatToParts(new Date(utcMs));
-      const pv = (type) => pa.find((p) => p.type === type)?.value;
-      const y = Number(pv("year"));
-      const mo = Number(pv("month"));
-      const da = Number(pv("day"));
-      const ho = Number(pv("hour"));
-      const mi = Number(pv("minute"));
-      if (y === Y && mo === M && da === D && ho === h && mi === m) return utcMs;
-      utcMs += (h * 60 + m - (ho * 60 + mi)) * 60 * 1000;
-    }
-    return NaN;
-  }
-
-  function assertEventsStartOk(ymd, hm) {
-    const t = eventsYmdHmToMsWarsaw(ymd, hm);
-    if (!Number.isFinite(t)) return { ok: false, message: "Nieprawidłowa data lub godzina." };
-    const now = Date.now();
-    if (t < now - 60 * 1000) return { ok: false, message: "Nie można wybrać terminu z przeszłości." };
-    if (t < now + EVENTS_MIN_ADVANCE_MS) return { ok: false, message: "Wybierz termin co najmniej 2 godziny od teraz." };
-    return { ok: true };
-  }
-
   function hmToMinutes(value) {
     const match = String(value || "").match(/^(\d{2}):(\d{2})$/);
     if (!match) return null;
@@ -321,6 +278,16 @@
     return RESTAURANT_DURATION_OPTIONS.filter((hours) => hours * 60 <= availableMinutes);
   }
 
+  function eventTimeOptions() {
+    const out = [];
+    for (let hour = 0; hour <= 23; hour += 1) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        out.push(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
+      }
+    }
+    return out;
+  }
+
   function renderAvailabilityCalendar(prefix, monthCursor, selectedDate, days, loading) {
     const dayMap = availabilityDayMap(days);
     const firstLoaded = Array.isArray(days) && days.length ? String(days[0].reservationDate || "") : "";
@@ -349,7 +316,16 @@
       ]
         .filter(Boolean)
         .join(" ");
-      const status = loading ? "..." : info?.closed ? "Nieczynne" : available ? `od ${escapeHtml(info?.firstTime || "")}` : "Brak";
+      const status =
+        loading
+          ? "..."
+          : info?.closed
+            ? "Nieczynne"
+            : available
+              ? prefix === "events"
+                ? "Dostępny"
+                : `od ${escapeHtml(info?.firstTime || "")}`
+              : "Brak";
       cells.push(`
         <button
           type="button"
@@ -1020,7 +996,6 @@
       state.events.calendarDays = Array.isArray(data?.days) ? data.days : [];
       const resolvedDate = String(data?.selectedDate || data?.firstAvailableDate || state.events.reservationDate || "");
       state.events.reservationDate = resolvedDate;
-      state.events.startTime = syncSelectedTimeWithCalendar(state.events.calendarDays, resolvedDate, state.events.startTime);
       state.events.calendarMonth = monthCursorFromYmd(
         resolvedDate || state.events.calendarDays[0]?.reservationDate || todayYmdWarsaw()
       ).slice(0, 7);
@@ -1170,8 +1145,8 @@
       hotelRooms: "Pokoje",
       restaurantDateTime: "Kalendarz",
       restaurantDetails: "Szczegóły",
-      eventsGuests: "Liczba Gości",
-      eventsDateTime: "Termin",
+      eventsGuests: "Parametry",
+      eventsDateTime: "Kalendarz",
       eventsHall: "Wybór sali",
       eventsDetails: "Szczegóły wydarzenia",
       personal: "Dane osobowe",
@@ -1457,30 +1432,38 @@
           `<option value="${h}" ${!state.events.durationUnspecified && Number(state.events.durationHours) === h ? "selected" : ""}>${h} h</option>`
       )
       .join("");
+    const timeSelectHtml = eventTimeOptions()
+      .map(
+        (time) =>
+          `<option value="${escapeHtml(time)}" ${state.events.startTime === time ? "selected" : ""}>${escapeHtml(time)}</option>`
+      )
+      .join("");
     const guestsVal = clamp(toInt(state.events.guestsCount, 60), 1, 120);
     return `
       <section>
-        <p class="gb-hint" style="margin:0 0 0.75rem;">Najpierw określ liczbę gości i przewidywany czas. Na tej podstawie pokażemy tylko dni, które mogą pomieścić wydarzenie.</p>
-        <div class="gb-events-guests-row" role="group" aria-labelledby="gb-events-guests-slider-label">
-          <div class="gb-events-guests-col gb-events-guests-col--dur">
-            <label class="gb-field">
-              <span>Czas rezerwacji (h)</span>
-              <select id="gb-events-duration-setup">
-                ${durSelectHtml}
-                <option value="unspecified" ${state.events.durationUnspecified ? "selected" : ""}>Nie określaj</option>
-              </select>
-            </label>
-          </div>
-          <div class="gb-events-guests-col gb-events-guests-col--range">
-            <span class="gb-range-label" id="gb-events-guests-slider-label">Liczba gości (1–120)</span>
-            <input type="range" id="gb-events-guests-range" min="1" max="120" value="${escapeHtml(String(guestsVal))}" aria-labelledby="gb-events-guests-slider-label" />
-          </div>
-          <div class="gb-events-guests-col gb-events-guests-col--num">
-            <label class="gb-field">
-              <span class="gb-events-guests-col-head" aria-hidden="true">&#8203;</span>
-              <input type="number" id="gb-events-guests-number" min="1" max="120" value="${escapeHtml(String(guestsVal))}" required aria-labelledby="gb-events-guests-slider-label" />
-            </label>
-          </div>
+        <p class="gb-hint" style="margin:0 0 0.75rem;">Godzina rozpoczęcia i czas trwania zapisują się jako informacja dla obsługi. Kalendarz w kolejnym kroku działa dziennie i pokaże tylko daty dostępne dla wybranej liczby gości.</p>
+        <div class="gb-events-guests-row">
+          <label class="gb-field gb-events-guests-col">
+            <span>Godzina rezerwacji</span>
+            <select id="gb-events-start-time">
+              ${timeSelectHtml}
+            </select>
+          </label>
+          <label class="gb-field gb-events-guests-col">
+            <span>Czas rezerwacji</span>
+            <select id="gb-events-duration-setup">
+              ${durSelectHtml}
+              <option value="unspecified" ${state.events.durationUnspecified ? "selected" : ""}>Nie określaj</option>
+            </select>
+          </label>
+          <label class="gb-field gb-events-guests-col">
+            <span id="gb-events-guests-slider-label">Liczba gości</span>
+            <input type="number" id="gb-events-guests-number" min="1" max="120" value="${escapeHtml(String(guestsVal))}" required aria-labelledby="gb-events-guests-slider-label" />
+          </label>
+        </div>
+        <div class="gb-events-guests-slider">
+          <span class="gb-range-label">Suwak liczby gości (1–120)</span>
+          <input type="range" id="gb-events-guests-range" min="1" max="120" value="${escapeHtml(String(guestsVal))}" aria-labelledby="gb-events-guests-slider-label" />
         </div>
 
         <div class="gb-actions">
@@ -1501,27 +1484,10 @@
         </div>
       `;
     }
-    const selectedDay = selectedCalendarDay(state.events.calendarDays, state.events.reservationDate);
-    const slots = Array.isArray(selectedDay?.slots) ? selectedDay.slots : [];
     return `
       <section>
-        <p class="gb-hint" style="margin:0 0 0.75rem;">Termin musi być co najmniej <strong>2 godziny</strong> od teraz (czas Polski). Kalendarz pokazuje tylko dni, które mają wolny slot dla <strong>${escapeHtml(String(state.events.guestsCount))}</strong> gości.</p>
+        <p class="gb-hint" style="margin:0 0 0.75rem;">Kalendarz nie uwzględnia godzin. Pokazuje wyłącznie dni, w których możemy przyjąć <strong>${escapeHtml(String(state.events.guestsCount))}</strong> gości.</p>
         ${renderAvailabilityCalendar("events", state.events.calendarMonth, state.events.reservationDate, state.events.calendarDays, state.events.calendarLoading)}
-        <label class="gb-field gb-field--time-like" style="margin-top:0.85rem;">
-          <span>Godzina rezerwacji</span>
-          <select id="gb-events-time" ${slots.length ? "" : "disabled"}>
-            ${
-              slots.length
-                ? slots
-                    .map(
-                      (slot) =>
-                        `<option value="${escapeHtml(slot)}" ${state.events.startTime === slot ? "selected" : ""}>${escapeHtml(slot)}</option>`
-                    )
-                    .join("")
-                : '<option value="">Brak dostępnych godzin</option>'
-            }
-          </select>
-        </label>
         <div class="gb-actions">
           <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wróć</button>
           <button type="button" class="gb-btn gb-btn-primary" id="gb-next">Dalej</button>
@@ -1944,6 +1910,7 @@
       return;
     }
     if (state.step === "eventsGuests") {
+      state.events.startTime = String(document.getElementById("gb-events-start-time")?.value || state.events.startTime || "12:00");
       const durVal = String(document.getElementById("gb-events-duration-setup")?.value || "");
       if (durVal === "unspecified") {
         state.events.durationUnspecified = true;
@@ -1957,10 +1924,6 @@
         1,
         120
       );
-      return;
-    }
-    if (state.step === "eventsDateTime") {
-      state.events.startTime = String(document.getElementById("gb-events-time")?.value || state.events.startTime || "");
       return;
     }
     if (state.step === "eventsDetails") {
@@ -2111,7 +2074,6 @@
         }
         if (prefix === "events") {
           state.events.reservationDate = ymd;
-          state.events.startTime = syncSelectedTimeWithCalendar(state.events.calendarDays, ymd, state.events.startTime);
           setError("");
           render();
         }
@@ -2343,6 +2305,7 @@
 
     if (state.step === "eventsGuests") {
       const durationInput = document.getElementById("gb-events-duration-setup");
+      const timeInput = document.getElementById("gb-events-start-time");
       const guestsRange = document.getElementById("gb-events-guests-range");
       const guestsNumber = document.getElementById("gb-events-guests-number");
 
@@ -2357,6 +2320,7 @@
 
       document.getElementById("gb-next")?.addEventListener("click", async () => {
         renewSession({ persist: false });
+        state.events.startTime = String(timeInput?.value || state.events.startTime || "12:00");
         const durVal = String(durationInput?.value || "");
         if (durVal === "unspecified") {
           state.events.durationUnspecified = true;
@@ -2385,34 +2349,19 @@
     }
 
     if (state.step === "eventsDateTime") {
-      const timeInput = document.getElementById("gb-events-time");
-
-      timeInput?.addEventListener("change", () => {
-        state.events.startTime = String(timeInput.value || "");
-      });
-
       document.getElementById("gb-next")?.addEventListener("click", async () => {
         renewSession({ persist: false });
         const dateValue = String(state.events.reservationDate || "");
-        const timeValue = String(timeInput?.value || "");
-        const slots = Array.isArray(selectedCalendarDay(state.events.calendarDays, dateValue)?.slots)
-          ? selectedCalendarDay(state.events.calendarDays, dateValue).slots
-          : [];
+        const selectedDay = selectedCalendarDay(state.events.calendarDays, dateValue);
         if (!dateValue) {
           setError("Wybierz dostępny dzień.");
           return;
         }
-        if (!timeValue || !slots.includes(timeValue)) {
-          setError("Wybierz godzinę z dostępnej listy.");
-          return;
-        }
-        const startOk = assertEventsStartOk(dateValue, timeValue);
-        if (!startOk.ok) {
-          setError(startOk.message);
+        if (!selectedDay?.available) {
+          setError("Wybierz dostępny dzień.");
           return;
         }
 
-        state.events.startTime = timeValue;
         setError("");
         await withRequestLock("events-halls-load", async () => {
           await ensureEventHallsLoaded();
@@ -2745,14 +2694,6 @@
     if (!state.termsAccepted) {
       setError("Zaakceptuj regulamin, aby kontynuować.");
       return;
-    }
-
-    if (state.selectedService === "events") {
-      const evOk = assertEventsStartOk(state.events.reservationDate, state.events.startTime);
-      if (!evOk.ok) {
-        setError(evOk.message);
-        return;
-      }
     }
 
     if (config.turnstileSiteKey && !state.turnstileFailed && !antiBotVerified()) {

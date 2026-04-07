@@ -1274,11 +1274,11 @@ body.gb-modal-open {
   min-width: 0;
 }
 
-/* Przyjęcia — krok „Liczba gości”: czas (15%) | pasek (70%) | pole liczby (15%) */
+/* Przyjęcia — krok 1: godzina | czas | liczba gości, a pod spodem osobny suwak */
 #gb-modal .gb-events-guests-row {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 14fr) minmax(0, 3fr);
-  gap: 0.5rem;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 0.85fr);
+  gap: 0.75rem;
   align-items: end;
   width: 100%;
   min-width: 0;
@@ -1292,17 +1292,14 @@ body.gb-modal-open {
   align-content: end;
 }
 
-#gb-modal .gb-events-guests-col--range input[type="range"] {
-  width: 100%;
+#gb-modal .gb-events-guests-slider {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.8rem;
 }
 
-#gb-modal .gb-events-guests-col--num .gb-events-guests-col-head {
-  display: block;
-  font-size: 0.82rem;
-  line-height: 1.25;
-  min-height: 1.15em;
-  color: transparent;
-  user-select: none;
+#gb-modal .gb-events-guests-slider input[type="range"] {
+  width: 100%;
 }
 
 #gb-modal .gb-inline-note {

@@ -2570,9 +2570,7 @@ function buildHallCandidateSlots(settings, durationHours) {
 async function hallCalendarAvailability(env, payload = {}) {
   const halls = (await venueHalls(env)).filter((hall) => hall.active);
   const settings = await venueSettings(env);
-  const requestedStartTime = isHm(cleanString(payload.startTime, 5))
-    ? cleanString(payload.startTime, 5)
-    : "12:00";
+  const calendarCheckTime = "12:00";
   const requestedDate = cleanString(payload.reservationDate, 10);
   const startDateRaw = cleanString(payload.startDate, 10);
   const today = todayYmdInWarsaw();
@@ -2587,7 +2585,6 @@ async function hallCalendarAvailability(env, payload = {}) {
   );
   const days = [];
   let firstAvailableDate = "";
-  let firstAvailableTime = "";
   const maxHallDate = addYearsYmd(today, 3);
   const requestedWindowEnd = addDaysYmd(startDate, HALL_PUBLIC_CALENDAR_DAYS - 1);
   const lastCalendarDay = requestedWindowEnd > maxHallDate ? maxHallDate : requestedWindowEnd;
@@ -2603,7 +2600,7 @@ async function hallCalendarAvailability(env, payload = {}) {
           settings,
           {
             reservationDate,
-            startTime: requestedStartTime,
+            startTime: calendarCheckTime,
             durationHours,
             guestsCount,
             exclusive: false,
@@ -2626,13 +2623,12 @@ async function hallCalendarAvailability(env, payload = {}) {
       reservationDate,
       closed: false,
       available: dayAvailable,
-      slots: dayAvailable ? [requestedStartTime] : [],
-      firstTime: dayAvailable ? requestedStartTime : "",
+      slots: [],
+      firstTime: "",
     };
     days.push(day);
     if (!firstAvailableDate && day.available) {
       firstAvailableDate = reservationDate;
-      firstAvailableTime = day.firstTime || "";
     }
   }
   const requestedAvailable = days.find((day) => day.reservationDate === requestedDate && day.available);
@@ -2644,9 +2640,9 @@ async function hallCalendarAvailability(env, payload = {}) {
     null;
   return {
     selectedDate: selectedDay?.reservationDate || requestedDate || startDate,
-    selectedSlots: Array.isArray(selectedDay?.slots) ? selectedDay.slots : [],
+    selectedSlots: [],
     firstAvailableDate,
-    firstAvailableTime,
+    firstAvailableTime: "",
     days,
   };
 }
