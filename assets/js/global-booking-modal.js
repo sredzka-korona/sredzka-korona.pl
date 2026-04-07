@@ -8,7 +8,7 @@
   const PAGE_VISIT_ID =
     window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   /** Podbij przy zmianach w modalu — wymusza odświeżenie cache CSS po wdrożeniu. */
-  const GB_MODAL_ASSET_VERSION = "20260407-7";
+  const GB_MODAL_ASSET_VERSION = "20260407-8";
   const SERVICE_KEYS = ["hotel", "restaurant", "events"];
   const requestLocks = Object.create(null);
   const RESTAURANT_DURATION_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4];
@@ -100,6 +100,7 @@
       calendarLoading: false,
       calendarDays: [],
       calendarMonth: "",
+      dayCapacityByDate: {},
       halls: [],
       reservationDate: "",
       startTime: "12:00",
@@ -335,11 +336,89 @@
     return fallback ? Math.max(0, toInt(fallback.capacity, 120)) : 120;
   }
 
+  function eventCalendarFirstDate() {
+    return todayYmdWarsaw();
+  }
+
+  function eventCalendarLastDate() {
+    return addYearsYmd(todayYmdWarsaw(), 3);
+  }
+
+  function eventCalendarMonthBounds(monthCursor) {
+    const safeMonth = String(monthCursor || todayYmdWarsaw().slice(0, 7)).slice(0, 7);
+    const monthStart = `${safeMonth}-01`;
+    const monthEnd = `${safeMonth}-${String(daysInMonth(monthStart)).padStart(2, "0")}`;
+    const firstDate = eventCalendarFirstDate();
+    const lastDate = eventCalendarLastDate();
+    return {
+      monthStart,
+      monthEnd,
+      startDate: monthStart < firstDate ? firstDate : monthStart,
+      endDate: monthEnd > lastDate ? lastDate : monthEnd,
+      firstDate,
+      lastDate,
+    };
+  }
+
+  function eventMergedDayInfo(reservationDate, fallbackDay = null) {
+    const cached = state.events.dayCapacityByDate?.[reservationDate];
+    const source = { ...(fallbackDay && typeof fallbackDay === "object" ? fallbackDay : {}) };
+    if (cached && typeof cached === "object") {
+      if (Number.isFinite(Number(cached.smallRemaining))) {
+        source.smallRemaining = cached.smallRemaining;
+      }
+      if (Number.isFinite(Number(cached.largeRemaining))) {
+        source.largeRemaining = cached.largeRemaining;
+      }
+    }
+    const hasSmall = Number.isFinite(Number(source.smallRemaining));
+    const hasLarge = Number.isFinite(Number(source.largeRemaining));
+    const smallRemaining = hasSmall
+      ? Math.max(0, toInt(source.smallRemaining, 0))
+      : eventHallCapacityByKind("small");
+    const largeRemaining = hasLarge
+      ? Math.max(0, toInt(source.largeRemaining, 0))
+      : eventHallCapacityByKind("large");
+    const guestsCount = clamp(toInt(state.events.guestsCount, 60), 1, 120);
+    return {
+      ...(fallbackDay && typeof fallbackDay === "object" ? fallbackDay : {}),
+      reservationDate,
+      closed: false,
+      slots: [],
+      firstTime: "",
+      smallRemaining,
+      largeRemaining,
+      available:
+        (smallRemaining > 0 && guestsCount <= smallRemaining) ||
+        (largeRemaining > 0 && guestsCount <= largeRemaining),
+    };
+  }
+
+  function buildEventCalendarDaysForMonth(monthCursor, sourceDays = []) {
+    const safeMonth = String(monthCursor || todayYmdWarsaw().slice(0, 7)).slice(0, 7);
+    const monthStart = `${safeMonth}-01`;
+    const monthDayCount = daysInMonth(monthStart);
+    const bounds = eventCalendarMonthBounds(safeMonth);
+    const sourceMap = availabilityDayMap(sourceDays);
+    const out = [];
+    for (let dayNumber = 1; dayNumber <= monthDayCount; dayNumber += 1) {
+      const ymd = `${safeMonth}-${String(dayNumber).padStart(2, "0")}`;
+      const merged = eventMergedDayInfo(ymd, sourceMap.get(ymd) || null);
+      const inRange = ymd >= bounds.startDate && ymd <= bounds.endDate;
+      out.push({
+        ...merged,
+        smallRemaining: inRange ? merged.smallRemaining : 0,
+        largeRemaining: inRange ? merged.largeRemaining : 0,
+        available: inRange ? Boolean(merged.available) : false,
+      });
+    }
+    return out;
+  }
+
   function renderEventsCapacityStatus(dayInfo) {
-    const hasSmall = Number.isFinite(Number(dayInfo?.smallRemaining));
-    const hasLarge = Number.isFinite(Number(dayInfo?.largeRemaining));
-    const small = hasSmall ? Math.max(0, toInt(dayInfo?.smallRemaining, 0)) : eventHallCapacityByKind("small");
-    const large = hasLarge ? Math.max(0, toInt(dayInfo?.largeRemaining, 0)) : eventHallCapacityByKind("large");
+    const merged = eventMergedDayInfo(String(dayInfo?.reservationDate || ""), dayInfo);
+    const small = Math.max(0, toInt(merged.smallRemaining, 0));
+    const large = Math.max(0, toInt(merged.largeRemaining, 0));
     return `
       <span class="gb-calendar-capacity" aria-label="Mała sala ${small}, duża sala ${large}">
         <span class="gb-calendar-capacity-value">${escapeHtml(String(small))}</span>
@@ -351,9 +430,18 @@
 
   function renderAvailabilityCalendar(prefix, monthCursor, selectedDate, days, loading) {
     const dayMap = availabilityDayMap(days);
-    const firstLoaded = Array.isArray(days) && days.length ? String(days[0].reservationDate || "") : "";
+    const firstLoaded =
+      prefix === "events"
+        ? eventCalendarFirstDate()
+        : Array.isArray(days) && days.length
+          ? String(days[0].reservationDate || "")
+          : "";
     const lastLoaded =
-      Array.isArray(days) && days.length ? String(days[days.length - 1].reservationDate || "") : "";
+      prefix === "events"
+        ? eventCalendarLastDate()
+        : Array.isArray(days) && days.length
+          ? String(days[days.length - 1].reservationDate || "")
+          : "";
     const currentMonth = `${String(monthCursor || "").slice(0, 7)}-01`;
     const monthDays = daysInMonth(currentMonth);
     const offset = weekdayMondayFirst(currentMonth);
@@ -372,7 +460,7 @@
         continue;
       }
       const ymd = `${currentMonth.slice(0, 8)}${String(dayNumber).padStart(2, "0")}`;
-      const info = dayMap.get(ymd);
+      const info = prefix === "events" ? eventMergedDayInfo(ymd, dayMap.get(ymd) || null) : dayMap.get(ymd);
       const available = Boolean(info?.available);
       const disabled = !available;
       const classes = [
@@ -785,6 +873,7 @@
       calendarLoading: false,
       calendarDays: [],
       calendarMonth: todayYmdWarsaw().slice(0, 7),
+      dayCapacityByDate: {},
       halls: [],
       reservationDate: todayYmdWarsaw(),
       startTime: "12:00",
@@ -825,7 +914,10 @@
       personal: state.personal,
       hotel: state.hotel,
       restaurant: { ...state.restaurant, detailsNextPending: false },
-      events: state.events,
+      events: {
+        ...state.events,
+        dayCapacityByDate: {},
+      },
       humanCheck: Boolean(state.humanCheck),
     };
     try {
@@ -928,6 +1020,7 @@
         calendarLoading: false,
         calendarDays: Array.isArray(draft.events?.calendarDays) ? draft.events.calendarDays : [],
         calendarMonth: cleanString(draft.events?.calendarMonth, 7) || todayYmdWarsaw().slice(0, 7),
+        dayCapacityByDate: {},
         halls: Array.isArray(draft.events?.halls) ? draft.events.halls : [],
         reservationDate: cleanString(draft.events?.reservationDate, 10) || todayYmdWarsaw(),
         startTime: cleanString(draft.events?.startTime, 5) || "12:00",
@@ -1084,26 +1177,37 @@
     }
     try {
       await ensureEventHallsLoaded();
-      const data = await api("events", "public-calendar", {
-        method: "POST",
-        body: {
-          startDate: options.startDate || todayYmdWarsaw(),
-          reservationDate: options.reservationDate || state.events.reservationDate,
-          durationHours: state.events.durationHours,
-          guestsCount: state.events.guestsCount,
-        },
-      });
-      state.events.calendarDays = Array.isArray(data?.days) ? data.days : [];
-      const resolvedDate = String(data?.selectedDate || data?.firstAvailableDate || state.events.reservationDate || "");
-      state.events.reservationDate = resolvedDate;
-      state.events.calendarMonth = monthCursorFromYmd(
-        resolvedDate || state.events.calendarDays[0]?.reservationDate || todayYmdWarsaw()
-      ).slice(0, 7);
-      if (!data?.firstAvailableDate) {
-        setError("Brak dostępnych terminów dla podanej liczby gości.");
-      } else {
-        setError("");
+      const requestedDate = String(options.reservationDate || state.events.reservationDate || todayYmdWarsaw()).slice(0, 10);
+      const requestedMonth = String(options.monthCursor || state.events.calendarMonth || todayYmdWarsaw().slice(0, 7)).slice(
+        0,
+        7
+      );
+      let apiData = null;
+      try {
+        apiData = await api("events", "public-calendar", {
+          method: "POST",
+          body: {
+            startDate: options.startDate || todayYmdWarsaw(),
+            reservationDate: requestedDate,
+            durationHours: state.events.durationHours,
+            guestsCount: state.events.guestsCount,
+          },
+        });
+      } catch {
+        apiData = null;
       }
+      const sourceDays = Array.isArray(apiData?.days) ? apiData.days : [];
+      const resolvedDate = String(apiData?.selectedDate || apiData?.firstAvailableDate || requestedDate || "");
+      state.events.reservationDate = resolvedDate || requestedDate;
+      state.events.calendarMonth = monthCursorFromYmd(
+        resolvedDate || sourceDays[0]?.reservationDate || `${requestedMonth}-01`
+      ).slice(0, 7);
+      await refreshEventsVisibleMonthCapacity({
+        monthCursor: state.events.calendarMonth,
+        sourceDays,
+        autoSelect: true,
+      });
+      setError("");
     } catch (error) {
       setError(error?.message || "Nie udało się załadować kalendarza sal.");
     } finally {
@@ -1115,7 +1219,104 @@
   }
 
   function eventHallByKind(kind) {
-    return state.events.halls.find((hall) => hall.hallKind === kind) || null;
+    const halls = Array.isArray(state.events.halls) ? state.events.halls : [];
+    const direct = halls.find((hall) => hall?.hallKind === kind);
+    if (direct) return direct;
+    if (kind === "small") {
+      return halls.find((hall) => toInt(hall?.capacity, 0) > 0 && toInt(hall.capacity, 0) <= 40) || null;
+    }
+    return (
+      halls
+        .filter((hall) => toInt(hall?.capacity, 0) > 40)
+        .sort((a, b) => toInt(b?.capacity, 0) - toInt(a?.capacity, 0))[0] || null
+    );
+  }
+
+  async function fetchEventDayCapacity(hall, reservationDate, exclusive) {
+    if (!hall?.id) {
+      return {
+        available: false,
+        maxGuests: exclusive ? eventHallCapacityByKind("small") : eventHallCapacityByKind("large"),
+      };
+    }
+    return api("events", "public-availability", {
+      method: "POST",
+      body: {
+        hallId: hall.id,
+        reservationDate,
+        startTime: state.events.startTime,
+        durationHours: state.events.durationHours,
+        guestsCount: 1,
+        exclusive,
+      },
+    });
+  }
+
+  async function refreshEventsVisibleMonthCapacity(options = {}) {
+    await ensureEventHallsLoaded();
+    const monthCursor = String(options.monthCursor || state.events.calendarMonth || todayYmdWarsaw().slice(0, 7)).slice(0, 7);
+    const bounds = eventCalendarMonthBounds(monthCursor);
+    const sourceDays = Array.isArray(options.sourceDays) ? options.sourceDays : state.events.calendarDays;
+    const smallHall = eventHallByKind("small");
+    const largeHall = eventHallByKind("large");
+    let resolvedResponses = 0;
+    const dates = [];
+    for (let cursor = bounds.startDate; cursor <= bounds.endDate; cursor = addDaysYmd(cursor, 1)) {
+      dates.push(cursor);
+    }
+    for (let index = 0; index < dates.length; index += 6) {
+      const batch = dates.slice(index, index + 6);
+      const results = await Promise.all(
+        batch.map(async (reservationDate) => {
+          const [smallResponse, largeResponse] = await Promise.all([
+            fetchEventDayCapacity(smallHall, reservationDate, true).catch(() => null),
+            fetchEventDayCapacity(largeHall, reservationDate, false).catch(() => null),
+          ]);
+          if (smallResponse && typeof smallResponse === "object") {
+            resolvedResponses += 1;
+          }
+          if (largeResponse && typeof largeResponse === "object") {
+            resolvedResponses += 1;
+          }
+          const cached = state.events.dayCapacityByDate?.[reservationDate] || {};
+          return {
+            reservationDate,
+            smallRemaining:
+              smallResponse && typeof smallResponse === "object"
+                ? smallResponse.available
+                  ? Math.min(eventHallCapacityByKind("small"), toInt(smallResponse.maxGuests, eventHallCapacityByKind("small")))
+                  : 0
+                : Number.isFinite(Number(cached.smallRemaining))
+                  ? Math.max(0, toInt(cached.smallRemaining, 0))
+                  : eventHallCapacityByKind("small"),
+            largeRemaining:
+              largeResponse && typeof largeResponse === "object"
+                ? Math.max(0, toInt(largeResponse.maxGuests, eventHallCapacityByKind("large")))
+                : Number.isFinite(Number(cached.largeRemaining))
+                  ? Math.max(0, toInt(cached.largeRemaining, 0))
+                  : eventHallCapacityByKind("large"),
+          };
+        })
+      );
+      results.forEach(({ reservationDate, smallRemaining, largeRemaining }) => {
+        state.events.dayCapacityByDate[reservationDate] = {
+          smallRemaining,
+          largeRemaining,
+        };
+      });
+    }
+    if (dates.length && !resolvedResponses) {
+      throw new Error("Nie udało się sprawdzić dostępności sal.");
+    }
+    state.events.calendarMonth = monthCursor;
+    state.events.calendarDays = buildEventCalendarDaysForMonth(monthCursor, sourceDays);
+    const selectedDay = selectedCalendarDay(state.events.calendarDays, state.events.reservationDate);
+    if (!selectedDay?.available && options.autoSelect) {
+      const firstAvailable = state.events.calendarDays.find((day) => day?.available)?.reservationDate || "";
+      if (firstAvailable) {
+        state.events.reservationDate = firstAvailable;
+      }
+    }
   }
 
   async function refreshEventHallAvailability() {
@@ -2139,7 +2340,7 @@
     document.getElementById("gb-back")?.addEventListener("click", goBack);
 
     document.querySelectorAll("[data-calendar-nav]").forEach((button) => {
-      button.addEventListener("click", () => {
+      button.addEventListener("click", async () => {
         const [prefix, deltaRaw] = String(button.getAttribute("data-calendar-nav") || "").split(":");
         const delta = Number(deltaRaw || 0);
         if (prefix === "restaurant") {
@@ -2148,14 +2349,27 @@
           return;
         }
         if (prefix === "events") {
-          state.events.calendarMonth = addMonthsToCursor(`${state.events.calendarMonth}-01`, delta).slice(0, 7);
-          render();
+          const nextMonth = addMonthsToCursor(`${state.events.calendarMonth}-01`, delta).slice(0, 7);
+          await withRequestLock("events-calendar-month", async () => {
+            state.events.calendarLoading = true;
+            state.events.calendarMonth = nextMonth;
+            render();
+            try {
+              await refreshEventsVisibleMonthCapacity({ monthCursor: nextMonth, autoSelect: true });
+              setError("");
+            } catch (error) {
+              setError(error?.message || "Nie udało się załadować kalendarza sal.");
+            } finally {
+              state.events.calendarLoading = false;
+              render();
+            }
+          });
         }
       });
     });
 
     document.querySelectorAll("[data-calendar-jump-prefix]").forEach((field) => {
-      field.addEventListener("change", () => {
+      field.addEventListener("change", async () => {
         const prefix = String(field.getAttribute("data-calendar-jump-prefix") || "");
         if (!prefix) return;
         const monthField = document.querySelector(`[data-calendar-jump-prefix="${prefix}"][data-calendar-jump-part="month"]`);
@@ -2170,8 +2384,20 @@
           return;
         }
         if (prefix === "events") {
-          state.events.calendarMonth = nextCursor;
-          render();
+          await withRequestLock("events-calendar-month", async () => {
+            state.events.calendarLoading = true;
+            state.events.calendarMonth = nextCursor;
+            render();
+            try {
+              await refreshEventsVisibleMonthCapacity({ monthCursor: nextCursor, autoSelect: true });
+              setError("");
+            } catch (error) {
+              setError(error?.message || "Nie udało się załadować kalendarza sal.");
+            } finally {
+              state.events.calendarLoading = false;
+              render();
+            }
+          });
         }
       });
     });
@@ -2459,9 +2685,6 @@
         await loadEventsCalendar({
           reservationDate: state.events.reservationDate,
         });
-        if (!state.events.calendarDays.some((day) => day?.available)) {
-          return;
-        }
         state.step = "eventsDateTime";
         render();
       });

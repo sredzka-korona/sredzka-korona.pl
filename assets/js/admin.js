@@ -2710,6 +2710,7 @@
     const item = scheduleFindItem(service, id);
     if (!item) return;
     const isBlock = item.status === "manual_block";
+    const canCancelReservation = scheduleCanCancel(item);
     openScheduleModal(
       `
         <div class="admin-modal-head">
