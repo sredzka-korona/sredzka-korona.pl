@@ -3,6 +3,8 @@ import { parseAdminEmailAllowlist, verifyFirebaseIdToken } from "./firebase-veri
 import { handleD1BookingApi, runBookingMaintenance, sendContactFormAdminEmail } from "./booking-d1.js";
 
 const MAX_MEDIA_FILE_BYTES = 1_700_000;
+const BOOTSTRAP_EDGE_CACHE_TTL_MS = 30 * 1000;
+const bootstrapPayloadCache = new Map();
 
 export default {
   async fetch(request, env) {
@@ -487,17 +489,25 @@ async function deleteSiteNotification(env, id) {
 }
 
 async function getPublicBootstrap(env, url) {
+  const originKey = String(url?.origin || "");
+  const now = Date.now();
+  const cached = bootstrapPayloadCache.get(originKey);
+  if (cached && now - cached.ts < BOOTSTRAP_EDGE_CACHE_TTL_MS) {
+    return cached.payload;
+  }
+
   const content = await getContent(env, url);
-  const activeNotifications = await listActiveSiteNotifications(env);
-  return {
+  const payload = {
     content,
     documents: await listDocuments(env, url),
     galleryAlbums: await listGalleryAlbums(env, url),
-    activeNotifications,
+    activeNotifications: await listActiveSiteNotifications(env),
     capabilities: {
       mediaStorageEnabled: true,
     },
   };
+  bootstrapPayloadCache.set(originKey, { ts: now, payload });
+  return payload;
 }
 
 async function getContent(env, url = null) {
@@ -511,9 +521,6 @@ async function getContent(env, url = null) {
   }
   const parsed = JSON.parse(record.content_json);
   const content = sanitizeContent(parsed);
-  if (JSON.stringify(parsed) !== JSON.stringify(content)) {
-    await saveContent(env, content);
-  }
   if (!url) {
     return content;
   }

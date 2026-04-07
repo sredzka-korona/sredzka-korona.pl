@@ -6,6 +6,7 @@
   const DEFAULTS = { restaurant: false, hotel: false, events: false };
   const HEALTH_TTL_MS = 90 * 1000;
   const BOOTSTRAP_TTL_MS = 45 * 1000;
+  const BOOTSTRAP_STALE_TTL_MS = 12 * 60 * 60 * 1000;
   const BOOTSTRAP_CACHE_KEY = "sredzka-korona:bootstrap-cache:v1";
   let healthCache = { ts: 0, values: null };
   let bootstrapCache = { ts: 0, payload: null };
@@ -106,9 +107,10 @@
     }
   }
 
-  function readBootstrapCache() {
+  function readBootstrapCache(allowStale = false) {
     const now = Date.now();
-    if (bootstrapCache.payload && now - bootstrapCache.ts < BOOTSTRAP_TTL_MS) {
+    const maxAge = allowStale ? BOOTSTRAP_STALE_TTL_MS : BOOTSTRAP_TTL_MS;
+    if (bootstrapCache.payload && now - bootstrapCache.ts < maxAge) {
       return bootstrapCache.payload;
     }
     const storage = sessionStorageSafe();
@@ -117,7 +119,7 @@
       const raw = storage.getItem(BOOTSTRAP_CACHE_KEY);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      if (!parsed || now - Number(parsed.ts || 0) >= BOOTSTRAP_TTL_MS || !parsed.payload) {
+      if (!parsed || now - Number(parsed.ts || 0) >= maxAge || !parsed.payload) {
         return null;
       }
       bootstrapCache = {
@@ -163,7 +165,7 @@
     if (forceRefresh) {
       clearBootstrapCache();
     } else {
-      const cached = readBootstrapCache();
+      const cached = readBootstrapCache(false);
       if (cached) {
         return cached;
       }
@@ -265,7 +267,42 @@
           ),
       };
     } catch {
-      return { ...DEFAULTS };
+      const stalePayload = readBootstrapCache(true);
+      const health = await loadHealthFlags({ forceRefresh: refresh });
+      if (!stalePayload) {
+        return {
+          restaurant: health.restaurant,
+          hotel: health.hotel,
+          events: health.events,
+        };
+      }
+      const b = stalePayload.content?.booking || {};
+      return {
+        restaurant:
+          health.restaurant &&
+          effectiveEnabled(
+            b.restaurant !== false,
+            b.restaurantPauseRanges,
+            b.restaurantPauseFrom,
+            b.restaurantPauseTo
+          ),
+        hotel:
+          health.hotel &&
+          effectiveEnabled(
+            b.hotel !== false,
+            b.hotelPauseRanges,
+            b.hotelPauseFrom,
+            b.hotelPauseTo
+          ),
+        events:
+          health.events &&
+          effectiveEnabled(
+            b.events !== false,
+            b.eventsPauseRanges,
+            b.eventsPauseFrom,
+            b.eventsPauseTo
+          ),
+      };
     }
   };
 })();
