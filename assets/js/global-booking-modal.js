@@ -8,10 +8,10 @@
   const PAGE_VISIT_ID =
     window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   /** Podbij przy zmianach w modalu — wymusza odświeżenie cache CSS po wdrożeniu. */
-  const GB_MODAL_ASSET_VERSION = "20260407-1";
+  const GB_MODAL_ASSET_VERSION = "20260407-2";
   const SERVICE_KEYS = ["hotel", "restaurant", "events"];
   const requestLocks = Object.create(null);
-  const RESTAURANT_DURATION_OPTIONS = [1, 1.5, 2, 2.5, 3, 4, 5, 6];
+  const RESTAURANT_DURATION_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4];
 
   const SERVICE_META = {
     hotel: {
@@ -310,17 +310,13 @@
     };
   }
 
-  function restaurantDurationOptionsForDay(day, startTime) {
+  function restaurantDurationOptionsForDay(day) {
     const window = restaurantDayWindow(day);
     if (!window) {
       return RESTAURANT_DURATION_OPTIONS;
     }
-    const referenceTime = String(startTime || day?.firstTime || "");
-    const startMinutes = hmToMinutes(referenceTime);
-    if (startMinutes == null) {
-      return RESTAURANT_DURATION_OPTIONS.filter((hours) => window.openMinutes + hours * 60 <= window.closeMinutes);
-    }
-    return RESTAURANT_DURATION_OPTIONS.filter((hours) => startMinutes + hours * 60 <= window.closeMinutes);
+    const availableMinutes = window.closeMinutes - window.openMinutes;
+    return RESTAURANT_DURATION_OPTIONS.filter((hours) => hours * 60 <= availableMinutes);
   }
 
   function renderAvailabilityCalendar(prefix, monthCursor, selectedDate, days, loading) {
@@ -1337,7 +1333,7 @@
     }
     const selectedDay = selectedCalendarDay(state.restaurant.calendarDays, state.restaurant.reservationDate);
     const slots = Array.isArray(selectedDay?.slots) ? selectedDay.slots : [];
-    const durationOptions = restaurantDurationOptionsForDay(selectedDay, state.restaurant.startTime);
+    const durationOptions = restaurantDurationOptionsForDay(selectedDay);
     const hoursLabel =
       selectedDay?.closed
         ? "Restauracja jest nieczynna w wybranym dniu."
@@ -1348,27 +1344,11 @@
     return `
       <section class="gb-rest-datetime-step">
         <h3>Kalendarz</h3>
-        <p class="gb-hint">Wybierz dzień, a potem godzinę rozpoczęcia. Lista godzin i maksymalny czas rezerwacji dopasowują się do godzin otwarcia tego dnia.</p>
         <p class="gb-inline-note gb-rest-hours-note">${escapeHtml(hoursLabel)}</p>
         <div class="gb-rest-datetime-calendar-wrap">
           ${renderAvailabilityCalendar("restaurant", state.restaurant.calendarMonth, state.restaurant.reservationDate, state.restaurant.calendarDays, state.restaurant.calendarLoading)}
         </div>
         <div class="gb-rest-datetime-controls gb-grid-2">
-          <label class="gb-field gb-field--time-like">
-            <span>Godzina rezerwacji</span>
-            <select id="gb-rest-time" ${slots.length ? "" : "disabled"}>
-              ${
-                slots.length
-                  ? slots
-                      .map(
-                        (slot) =>
-                          `<option value="${escapeHtml(slot)}" ${state.restaurant.startTime === slot ? "selected" : ""}>${escapeHtml(slot)}</option>`
-                      )
-                      .join("")
-                  : '<option value="">Brak dostępnych godzin</option>'
-              }
-            </select>
-          </label>
           <label class="gb-field gb-field--time-like">
             <span>Czas rezerwacji</span>
             <select id="gb-rest-duration" ${durationOptions.length ? "" : "disabled"}>
@@ -1381,6 +1361,21 @@
                       )
                       .join("")
                   : '<option value="">Brak dostępnego czasu</option>'
+              }
+            </select>
+          </label>
+          <label class="gb-field gb-field--time-like">
+            <span>Godzina rezerwacji</span>
+            <select id="gb-rest-time" ${slots.length ? "" : "disabled"}>
+              ${
+                slots.length
+                  ? slots
+                      .map(
+                        (slot) =>
+                          `<option value="${escapeHtml(slot)}" ${state.restaurant.startTime === slot ? "selected" : ""}>${escapeHtml(slot)}</option>`
+                      )
+                      .join("")
+                  : '<option value="">Brak dostępnych godzin</option>'
               }
             </select>
           </label>
@@ -1427,7 +1422,6 @@
             <div class="gb-rest-step1-foot">
               <div class="gb-rest-step1-notes">
                 <p class="gb-inline-note">Maksymalna ilość gości przy jednym stole: <strong id="gb-rest-max">${escapeHtml(String(maxGuestsPerTable))}</strong>.</p>
-                <p class="gb-inline-note">W kolejnym kroku pokażemy tylko te dni, w których dostępna jest wybrana liczba stołów.</p>
               </div>
             </div>
             <label class="gb-field" style="margin-top:0.7rem;">
