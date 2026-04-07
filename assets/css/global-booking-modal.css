@@ -449,6 +449,26 @@ body.gb-modal-open {
   text-align: center;
 }
 
+#gb-modal .gb-calendar-capacity {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+#gb-modal .gb-calendar-capacity-value {
+  min-width: 1.4em;
+}
+
+#gb-modal .gb-calendar-capacity-divider {
+  color: rgba(255, 224, 170, 0.96);
+  font-weight: 800;
+  font-size: 1.05em;
+  transform: translateY(-0.01em);
+}
+
 #gb-modal .gb-field {
   display: grid;
   gap: 0.33rem;

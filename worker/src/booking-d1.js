@@ -2586,6 +2586,24 @@ function dayCapacityForLargeHall(hall, rows, reservationDate) {
   return Math.max(0, capacity - usedGuests);
 }
 
+function pickSmallHall(halls) {
+  return (
+    (halls || []).find((hall) => hall.hallKind === "small") ||
+    (halls || []).find((hall) => Number(hall.capacity || 0) <= 40) ||
+    null
+  );
+}
+
+function pickLargeHall(halls) {
+  return (
+    (halls || []).find((hall) => hall.hallKind === "large") ||
+    (halls || [])
+      .filter((hall) => Number(hall.capacity || 0) > 40)
+      .sort((a, b) => Number(b.capacity || 0) - Number(a.capacity || 0))[0] ||
+    null
+  );
+}
+
 async function hallCalendarAvailability(env, payload = {}) {
   const halls = (await venueHalls(env)).filter((hall) => hall.active);
   const settings = await venueSettings(env);
@@ -2604,8 +2622,8 @@ async function hallCalendarAvailability(env, payload = {}) {
   );
   const days = [];
   let firstAvailableDate = "";
-  const smallHall = halls.find((hall) => hall.hallKind === "small") || null;
-  const largeHall = halls.find((hall) => hall.hallKind === "large") || null;
+  const smallHall = pickSmallHall(halls);
+  const largeHall = pickLargeHall(halls);
   const maxHallDate = addYearsYmd(today, 3);
   const requestedWindowEnd = addDaysYmd(startDate, HALL_PUBLIC_CALENDAR_DAYS - 1);
   const lastCalendarDay = requestedWindowEnd > maxHallDate ? maxHallDate : requestedWindowEnd;

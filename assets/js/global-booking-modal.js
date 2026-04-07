@@ -288,6 +288,18 @@
     return out;
   }
 
+  function renderEventsCapacityStatus(dayInfo) {
+    const small = Math.max(0, toInt(dayInfo?.smallRemaining, 0));
+    const large = Math.max(0, toInt(dayInfo?.largeRemaining, 0));
+    return `
+      <span class="gb-calendar-capacity" aria-label="Mała sala ${small}, duża sala ${large}">
+        <span class="gb-calendar-capacity-value">${escapeHtml(String(small))}</span>
+        <span class="gb-calendar-capacity-divider" aria-hidden="true">|</span>
+        <span class="gb-calendar-capacity-value">${escapeHtml(String(large))}</span>
+      </span>
+    `;
+  }
+
   function renderAvailabilityCalendar(prefix, monthCursor, selectedDate, days, loading) {
     const dayMap = availabilityDayMap(days);
     const firstLoaded = Array.isArray(days) && days.length ? String(days[0].reservationDate || "") : "";
@@ -324,10 +336,10 @@
             ? "Nieczynne"
             : available
               ? prefix === "events"
-                ? `${escapeHtml(String(Math.max(0, toInt(info?.smallRemaining, 0))))} | ${escapeHtml(String(Math.max(0, toInt(info?.largeRemaining, 0))))}`
+                ? renderEventsCapacityStatus(info)
                 : `od ${escapeHtml(info?.firstTime || "")}`
               : prefix === "events"
-                ? `${escapeHtml(String(Math.max(0, toInt(info?.smallRemaining, 0))))} | ${escapeHtml(String(Math.max(0, toInt(info?.largeRemaining, 0))))}`
+                ? renderEventsCapacityStatus(info)
                 : "Brak";
       cells.push(`
         <button
