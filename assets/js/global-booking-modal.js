@@ -8,7 +8,7 @@
   const PAGE_VISIT_ID =
     window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   /** Podbij przy zmianach w modalu — wymusza odświeżenie cache CSS po wdrożeniu. */
-  const GB_MODAL_ASSET_VERSION = "20260407-2";
+  const GB_MODAL_ASSET_VERSION = "20260407-3";
   const SERVICE_KEYS = ["hotel", "restaurant", "events"];
   const requestLocks = Object.create(null);
   const RESTAURANT_DURATION_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4];
