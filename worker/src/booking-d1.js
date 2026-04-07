@@ -18,6 +18,7 @@ const STATUS_LABELS = {
 };
 
 const BLOCKING_STATUSES = ["pending", "confirmed", "manual_block"];
+const RESTAURANT_CLEANUP_BUFFER_MINUTES = 30;
 
 let schemaReadyPromise = null;
 
@@ -904,7 +905,26 @@ function addDaysYmd(ymd, days) {
   return out;
 }
 
-const PUBLIC_CALENDAR_DAYS = 93;
+function addMonthsYmd(ymd, months) {
+  const s = String(ymd || "");
+  const [y, m, d] = s.split("-").map((x) => Number(x));
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return s;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCMonth(dt.getUTCMonth() + Number(months || 0));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+}
+
+function addYearsYmd(ymd, years) {
+  const s = String(ymd || "");
+  const [y, m, d] = s.split("-").map((x) => Number(x));
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return s;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCFullYear(dt.getUTCFullYear() + Number(years || 0));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+}
+
+const RESTAURANT_PUBLIC_CALENDAR_DAYS = 31;
+const HALL_PUBLIC_CALENDAR_DAYS = 1096;
 const PUBLIC_CALENDAR_STEP_MINUTES = 30;
 
 async function existingReservationCountForYear(env, service, year) {
@@ -1034,6 +1054,11 @@ function assertDateRange(dateFrom, dateTo) {
   }
   if (dateTo <= dateFrom) {
     throw new Error("Wyjazd musi być po dniu przyjazdu.");
+  }
+  const today = todayYmdInWarsaw();
+  const maxHotelDate = addYearsYmd(today, 1);
+  if (dateFrom > maxHotelDate || dateTo > maxHotelDate) {
+    throw new Error("Rezerwację hotelu można złożyć maksymalnie na rok do przodu.");
   }
 }
 
@@ -1885,11 +1910,13 @@ async function restaurantTables(env, includeHidden = false) {
 
 async function restaurantBlockingRows(env, startMs, endMs, excludeId = null) {
   const rows = await env.DB.prepare(
-    `SELECT id, start_ms AS startMs, end_ms AS endMs, assigned_table_ids_json AS assignedTableIdsJson
+    `SELECT id, start_ms AS startMs, end_ms AS endMs,
+            cleanup_buffer_minutes AS cleanupBufferMinutes,
+            assigned_table_ids_json AS assignedTableIdsJson
      FROM restaurant_reservations
      WHERE status IN ('email_verification_pending','pending','confirmed','manual_block')
        AND start_ms < ?
-       AND end_ms > ?
+       AND (end_ms + (COALESCE(cleanup_buffer_minutes, ${RESTAURANT_CLEANUP_BUFFER_MINUTES}) * 60000)) > ?
        ${excludeId ? "AND id != ?" : ""}`
   )
     .bind(...(excludeId ? [endMs, startMs, excludeId] : [endMs, startMs]))
@@ -1898,8 +1925,15 @@ async function restaurantBlockingRows(env, startMs, endMs, excludeId = null) {
     id: r.id,
     startMs: Number(r.startMs || 0),
     endMs: Number(r.endMs || 0),
+    cleanupBufferMinutes: Number(r.cleanupBufferMinutes || RESTAURANT_CLEANUP_BUFFER_MINUTES),
     tableIds: parseJson(r.assignedTableIdsJson, []),
   }));
+}
+
+function restaurantReservationBlockEndMs(row) {
+  const endMs = Number(row?.endMs || 0);
+  const cleanupBufferMinutes = Number(row?.cleanupBufferMinutes || RESTAURANT_CLEANUP_BUFFER_MINUTES);
+  return endMs + Math.max(0, cleanupBufferMinutes) * 60 * 1000;
 }
 
 async function restaurantAvailableTableIds(env, startMs, endMs, tablesNeeded, excludeId = null) {
@@ -1925,7 +1959,7 @@ function restaurantWindowWithinDay(dayWindow, startTime, durationHours) {
 function restaurantFreeTableCount(blockingRows, startMs, endMs, allTableIds) {
   const blocked = new Set();
   for (const row of blockingRows || []) {
-    if (!(startMs < Number(row.endMs || 0) && endMs > Number(row.startMs || 0))) {
+    if (!(startMs < restaurantReservationBlockEndMs(row) && endMs > Number(row.startMs || 0))) {
       continue;
     }
     for (const tableId of row.tableIds || []) {
@@ -1942,6 +1976,11 @@ async function restaurantAvailabilityForSlot(env, settings, allTables, payload, 
   const tablesCount = Math.max(1, toInt(payload.tablesCount, 1));
   if (!isYmd(reservationDate) || !isHm(startTime)) {
     throw new Error("Nieprawidłowa data lub godzina.");
+  }
+  const today = todayYmdInWarsaw();
+  const maxRestaurantDate = addMonthsYmd(today, 1);
+  if (reservationDate > maxRestaurantDate) {
+    throw new Error("Rezerwację stolika można złożyć maksymalnie na miesiąc do przodu.");
   }
   if (!Number.isFinite(durationHours) || durationHours <= 0) {
     throw new Error("Nieprawidłowy czas trwania.");
@@ -2068,7 +2107,10 @@ async function restaurantCalendarAvailability(env, payload = {}) {
   const startDate = isYmd(startDateRaw) && startDateRaw >= today ? startDateRaw : today;
   const durationHours = Number(payload.durationHours || 2);
   const tablesCount = Math.max(1, toInt(payload.tablesCount, 1));
-  const lastCalendarDay = addDaysYmd(startDate, PUBLIC_CALENDAR_DAYS - 1);
+  const maxRestaurantDate = addMonthsYmd(today, 1);
+  const requestedWindowEnd = addDaysYmd(startDate, RESTAURANT_PUBLIC_CALENDAR_DAYS - 1);
+  const lastCalendarDay = requestedWindowEnd > maxRestaurantDate ? maxRestaurantDate : requestedWindowEnd;
+  const calendarDays = Math.max(1, nightsCount(startDate, addOneDayYmd(lastCalendarDay)));
   const durationMs = Math.ceil(Math.max(Number(durationHours) || 2, 1)) * 3600000;
   const globalStartMs = ymdHmToMs(startDate, "00:00");
   const globalEndMs = ymdHmToMs(addDaysYmd(lastCalendarDay, 1), "23:59") + durationMs;
@@ -2082,7 +2124,7 @@ async function restaurantCalendarAvailability(env, payload = {}) {
     globalBlockingRows,
   };
   const dayTasks = [];
-  for (let offset = 0; offset < PUBLIC_CALENDAR_DAYS; offset += 1) {
+  for (let offset = 0; offset < calendarDays; offset += 1) {
     const currentDate = addDaysYmd(startDate, offset);
     dayTasks.push(restaurantAvailableSlotsForDate(env, { ...slotOpts, reservationDate: currentDate }));
   }
@@ -2379,6 +2421,11 @@ async function hallAvailabilityAtSlot(env, hall, settings, payload, excludeId = 
   if (!isYmd(reservationDate) || !isHm(startTime) || !Number.isFinite(durationHours) || durationHours <= 0) {
     throw new Error("Nieprawidłowa data lub godzina.");
   }
+  const today = todayYmdInWarsaw();
+  const maxHallDate = addYearsYmd(today, 3);
+  if (reservationDate > maxHallDate) {
+    throw new Error("Rezerwację sali można złożyć maksymalnie na 3 lata do przodu.");
+  }
   const startMs = ymdHmToMsWarsaw(reservationDate, startTime);
   const endMs = startMs + durationHours * 3600000;
   const nowHall = nowMs();
@@ -2433,7 +2480,11 @@ async function hallCalendarAvailability(env, payload = {}) {
   const days = [];
   let firstAvailableDate = "";
   let firstAvailableTime = "";
-  for (let offset = 0; offset < PUBLIC_CALENDAR_DAYS; offset += 1) {
+  const maxHallDate = addYearsYmd(today, 3);
+  const requestedWindowEnd = addDaysYmd(startDate, HALL_PUBLIC_CALENDAR_DAYS - 1);
+  const lastCalendarDay = requestedWindowEnd > maxHallDate ? maxHallDate : requestedWindowEnd;
+  const calendarDays = Math.max(1, nightsCount(startDate, addOneDayYmd(lastCalendarDay)));
+  for (let offset = 0; offset < calendarDays; offset += 1) {
     const reservationDate = addDaysYmd(startDate, offset);
     const availableSlots = [];
     for (const slot of slotsTemplate) {
@@ -4714,7 +4765,7 @@ async function handleRestaurantAdmin(env, op, request) {
       `SELECT assigned_table_ids_json AS assignedTableIdsJson
        FROM restaurant_reservations
        WHERE status IN ('email_verification_pending','pending','confirmed','manual_block')
-         AND end_ms > ?`
+         AND (end_ms + (COALESCE(cleanup_buffer_minutes, ${RESTAURANT_CLEANUP_BUFFER_MINUTES}) * 60000)) > ?`
     )
       .bind(now)
       .all();

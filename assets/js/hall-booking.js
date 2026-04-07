@@ -92,48 +92,14 @@
     return `${year}-${month}-${day}`;
   }
 
-  const HALL_MIN_ADVANCE_MS = 2 * 60 * 60 * 1000;
-
-  function ymdHmToMsWarsaw(ymd, hm) {
-    if (!ymd || !hm || !/^\d{4}-\d{2}-\d{2}$/.test(ymd) || !/^\d{2}:\d{2}$/.test(hm)) return NaN;
-    const Y = Number(ymd.slice(0, 4));
-    const M = Number(ymd.slice(5, 7));
-    const D = Number(ymd.slice(8, 10));
-    const h = Number(hm.slice(0, 2));
-    const m = Number(hm.slice(3, 5));
-    if (![Y, M, D, h, m].every((n) => Number.isFinite(n))) return NaN;
-    let utcMs = Date.UTC(Y, M - 1, D, h, m, 0, 0);
-    const dtf = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Europe/Warsaw",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-    for (let k = 0; k < 48; k += 1) {
-      const pa = dtf.formatToParts(new Date(utcMs));
-      const pv = (type) => pa.find((p) => p.type === type)?.value;
-      const y = Number(pv("year"));
-      const mo = Number(pv("month"));
-      const da = Number(pv("day"));
-      const ho = Number(pv("hour"));
-      const mi = Number(pv("minute"));
-      if (y === Y && mo === M && da === D && ho === h && mi === m) return utcMs;
-      utcMs += (h * 60 + m - (ho * 60 + mi)) * 60 * 1000;
+  function addYearsYmd(ymd, years) {
+    const [year, month, day] = String(ymd || "").split("-").map((part) => Number(part));
+    if (![year, month, day].every((part) => Number.isFinite(part))) {
+      return String(ymd || "");
     }
-    return NaN;
-  }
-
-  /** Czy start jest co najmniej 2 h po „teraz” (i nie w przeszłości). */
-  function hallReservationStartOk(ymd, hm) {
-    const t = ymdHmToMsWarsaw(ymd, hm);
-    if (!Number.isFinite(t)) return { ok: false, message: "Nieprawidłowa data lub godzina." };
-    const now = Date.now();
-    if (t < now - 60 * 1000) return { ok: false, message: "Nie można wybrać terminu z przeszłości." };
-    if (t < now + HALL_MIN_ADVANCE_MS) return { ok: false, message: "Wybierz termin co najmniej 2 godziny od teraz." };
-    return { ok: true };
+    const date = new Date(Date.UTC(year, month - 1, day));
+    date.setUTCFullYear(date.getUTCFullYear() + Number(years || 0));
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
   }
 
   function checkSession() {
@@ -220,6 +186,9 @@
       .hb-step.on{background:#c8aa78;color:#1f1712;font-weight:600;}
       .hb-hint{font-size:.9rem;color:#6b5d4f;margin:0 0 1rem;line-height:1.5;}
       .hb-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;}
+      .hb-grid.hb-grid-3{grid-template-columns:repeat(3,minmax(0,1fr));}
+      .hb-guest-range-row{margin-top:.75rem;}
+      .hb-guest-range-row label{display:block;}
       @media(max-width:520px){.hb-grid{grid-template-columns:1fr;}}
       .hb-field label{display:block;font-size:.8rem;margin-bottom:.25rem;color:#5c4f42;}
       .hb-field input,.hb-field select,.hb-field textarea{width:100%;padding:.5rem .65rem;border-radius:12px;border:1px solid rgba(200,170,120,.35);background:#fff;}
@@ -317,9 +286,10 @@
 
     let inner = "";
     if (state.step === 1) {
+      const maxG = state.hallKind === "small" ? Math.min(40, state.hallCapacity || 40) : Math.min(state.hallCapacity || 120, 120);
       inner = `
         <h3 style="margin-top:0">Wybór sali</h3>
-        <p class="hb-hint">Wybierz salę — warunki i limity są dopasowane do typu sali.</p>
+        <p class="hb-hint">Wybierz salę, godzinę i parametry rezerwacji. Kalendarz sal działa dziennie.</p>
         <div class="hb-cards" id="hb-hall-cards">
           ${state.halls
             .map(
@@ -331,29 +301,15 @@
             )
             .join("")}
         </div>
-        <p class="hb-err" id="hb-e1" hidden></p>
-        <div class="hb-actions hb-actions--end">
-          <button type="button" class="hb-btn" id="hb-next-1" disabled>Dalej</button>
-        </div>`;
-    } else if (state.step === 2) {
-      if (state.reservationDate < todayYmdWarsaw()) {
-        state.reservationDate = todayYmdWarsaw();
-      }
-      inner = `
-        <h3 style="margin-top:0">Termin</h3>
-        <p class="hb-hint">Między rezerwacjami obowiązuje przerwa organizacyjna (bufor) — uwzględniamy ją przy sprawdzaniu dostępności. Rezerwacja możliwa co najmniej <strong>2 godziny</strong> do przodu.</p>
-        <div class="hb-field">
-          <label>Data<input type="date" id="hb-date" min="${escapeHtml(todayYmdWarsaw())}" value="${escapeHtml(state.reservationDate)}" /></label>
-        </div>
-        <div class="hb-grid">
-          <div class="hb-field"><label>Godzina startu<select id="hb-start">${timeOptions()
+        <div class="hb-grid hb-grid-3" style="margin-top:.9rem;">
+          <div class="hb-field"><label>Godzina rezerwacji<select id="hb-start">${timeOptions()
             .map(
               (t) =>
                 `<option value="${t}" ${state.startTime === t ? "selected" : ""}>${t}</option>`
             )
             .join("")}</select></label></div>
           <div class="hb-field">
-            <label>Czas trwania (godziny)
+            <label>Czas rezerwacji (godziny)
               <select id="hb-dur">${[1, 2, 3, 4, 5, 6, 8]
                 .map(
                   (h) =>
@@ -362,6 +318,31 @@
                 .join("")}</select>
             </label>
           </div>
+          <div class="hb-field"><label>Ilość gości<input type="number" id="hb-guests-num" min="1" max="${Math.max(1, maxG)}" value="${Math.min(state.guestsCount, Math.max(1, maxG))}" /></label></div>
+        </div>
+        <div class="hb-field hb-guest-range-row">
+          <label>Suwak liczby gości: <span id="hb-guest-val">${Math.min(state.guestsCount, Math.max(1, maxG))}</span>
+            <input type="range" class="hb-range" id="hb-guests-range" min="1" max="${Math.max(1, maxG)}" value="${Math.min(state.guestsCount, Math.max(1, maxG))}" />
+          </label>
+        </div>
+        <p class="hb-err" id="hb-e1" hidden></p>
+        <div class="hb-actions hb-actions--end">
+          <button type="button" class="hb-btn" id="hb-next-1" disabled>Dalej</button>
+        </div>`;
+    } else if (state.step === 2) {
+      const today = todayYmdWarsaw();
+      const maxReservationDate = addYearsYmd(today, 3);
+      if (state.reservationDate < today) {
+        state.reservationDate = today;
+      }
+      if (state.reservationDate > maxReservationDate) {
+        state.reservationDate = maxReservationDate;
+      }
+      inner = `
+        <h3 style="margin-top:0">Termin</h3>
+        <p class="hb-hint">Kalendarz sal działa dziennie: jeśli sala jest zarezerwowana danego dnia, nie jest już dostępna w tym dniu. Godzina i czas trwania są informacją dla obsługi.</p>
+        <div class="hb-field">
+          <label>Data<input type="date" id="hb-date" min="${escapeHtml(today)}" max="${escapeHtml(maxReservationDate)}" value="${escapeHtml(state.reservationDate)}" /></label>
         </div>
         <p class="hb-err" id="hb-e2" hidden></p>
         <div class="hb-actions">
@@ -369,25 +350,11 @@
           <button type="button" class="hb-btn" id="hb-next-2" disabled>Dalej</button>
         </div>`;
     } else if (state.step === 3) {
-      const maxG =
-        state.hallKind === "small"
-          ? Math.min(40, state.hallCapacity)
-          : Math.min(state.maxGuestsAvailable || 0, state.hallCapacity);
       inner = `
         <h3 style="margin-top:0">Parametry wydarzenia</h3>
-        ${
-          state.hallKind === "large"
-            ? `<p class="hb-hint">Dostępne miejsca w wybranym terminie: <strong id="hb-max-lbl">${maxG}</strong>. Wycena zostanie ustalona telefonicznie — nie ma stałego cennika online.</p>`
-            : ""
-        }
+        <p class="hb-hint">Wycena zostanie ustalona telefonicznie — nie ma stałego cennika online.</p>
         <div class="hb-grid">
           <div class="hb-field"><label>Rodzaj imprezy<input type="text" id="hb-event" maxlength="500" value="${escapeHtml(state.eventType)}" required /></label></div>
-          ${
-            state.hallKind === "large"
-              ? `<div class="hb-field"><label>Liczba gości: <span id="hb-guest-val">${state.guestsCount}</span>
-              <input type="range" class="hb-range" id="hb-guests-range" min="1" max="${maxG}" value="${Math.min(state.guestsCount, maxG)}" /></label></div>`
-              : `<div class="hb-field"><label>Liczba gości (max 40)<input type="number" id="hb-guests-sm" min="1" max="40" value="${Math.min(state.guestsCount, 40)}" /></label></div>`
-          }
         </div>
         <div class="hb-field"><label>Dodatkowe informacje<textarea id="hb-note" rows="3" maxlength="2000" required>${escapeHtml(state.customerNote)}</textarea></label></div>
         ${
@@ -468,8 +435,50 @@
 
   function bindHandlers() {
     if (state.step === 1) {
-      const goToStep2 = () => {
-        if (!state.hallId) return;
+      const syncGuestsControls = () => {
+        const range = document.getElementById("hb-guests-range");
+        const num = document.getElementById("hb-guests-num");
+        const lbl = document.getElementById("hb-guest-val");
+        const maxForHall = state.hallKind === "small" ? Math.min(40, state.hallCapacity || 40) : Math.min(state.hallCapacity || 120, 120);
+        if (range) {
+          range.max = String(Math.max(1, maxForHall));
+        }
+        if (num) {
+          num.max = String(Math.max(1, maxForHall));
+        }
+        const v = Math.max(1, Math.min(Number(state.guestsCount || 1), Math.max(1, maxForHall)));
+        state.guestsCount = v;
+        if (range) range.value = String(v);
+        if (num) num.value = String(v);
+        if (lbl) lbl.textContent = String(v);
+      };
+      const validateStep1 = async () => {
+        const err = document.getElementById("hb-e1");
+        const next = document.getElementById("hb-next-1");
+        state.startTime = document.getElementById("hb-start")?.value || "";
+        state.durationHours = Number(document.getElementById("hb-dur")?.value || 2);
+        state.guestsCount = Number(document.getElementById("hb-guests-num")?.value || state.guestsCount || 1);
+        syncGuestsControls();
+        if (!state.hallId) {
+          err.hidden = false;
+          err.textContent = "Wybierz salę.";
+          next.disabled = true;
+          return;
+        }
+        await refreshAvailability();
+        if (!state.availabilityOk) {
+          err.hidden = false;
+          err.textContent = "Wybrany termin nie jest dostępny.";
+          next.disabled = true;
+          return;
+        }
+        err.hidden = true;
+        err.textContent = "";
+        next.disabled = false;
+      };
+      const goToStep2 = async () => {
+        await validateStep1();
+        if (document.getElementById("hb-next-1")?.disabled) return;
         state.step = 2;
         renderBody();
       };
@@ -480,10 +489,28 @@
           state.hallCapacity = Number(el.dataset.cap) || 40;
           document.querySelectorAll("#hb-hall-cards .hb-card").forEach((c) => c.classList.remove("selected"));
           el.classList.add("selected");
-          document.getElementById("hb-next-1").disabled = false;
-          goToStep2();
+          syncGuestsControls();
+          validateStep1();
         });
       });
+      document.getElementById("hb-start")?.addEventListener("change", validateStep1);
+      document.getElementById("hb-dur")?.addEventListener("change", validateStep1);
+      document.getElementById("hb-guests-range")?.addEventListener("input", () => {
+        const range = document.getElementById("hb-guests-range");
+        const num = document.getElementById("hb-guests-num");
+        const lbl = document.getElementById("hb-guest-val");
+        state.guestsCount = Number(range?.value || 1);
+        if (num) num.value = String(state.guestsCount);
+        if (lbl) lbl.textContent = String(state.guestsCount);
+        validateStep1();
+      });
+      document.getElementById("hb-guests-num")?.addEventListener("input", () => {
+        state.guestsCount = Number(document.getElementById("hb-guests-num")?.value || 1);
+        syncGuestsControls();
+        validateStep1();
+      });
+      syncGuestsControls();
+      validateStep1();
       document.getElementById("hb-next-1")?.addEventListener("click", goToStep2);
     }
     if (state.step === 2) {
@@ -491,12 +518,17 @@
         const err = document.getElementById("hb-e2");
         const next = document.getElementById("hb-next-2");
         const today = todayYmdWarsaw();
+        const maxReservationDate = addYearsYmd(today, 3);
         state.reservationDate = document.getElementById("hb-date")?.value || "";
-        state.startTime = document.getElementById("hb-start")?.value || "";
-        state.durationHours = Number(document.getElementById("hb-dur")?.value || 2);
         if (!state.reservationDate || state.reservationDate < today) {
           err.hidden = false;
           err.textContent = "Wybierz datę nie z przeszłości.";
+          next.disabled = true;
+          return;
+        }
+        if (state.reservationDate > maxReservationDate) {
+          err.hidden = false;
+          err.textContent = "Rezerwację sali można wykonać maksymalnie na 3 lata do przodu.";
           next.disabled = true;
           return;
         }
@@ -514,7 +546,7 @@
           await refreshAvailability();
           if (!state.availabilityOk || (state.hallKind === "large" && state.maxGuestsAvailable < 1)) {
             err.hidden = false;
-            err.textContent = "Ten termin nie jest dostępny. Wybierz inną godzinę lub datę.";
+            err.textContent = "Ta data nie jest dostępna dla wybranej sali. Wybierz inny dzień.";
             next.disabled = true;
             return;
           }
@@ -528,8 +560,6 @@
       };
       document.getElementById("hb-date")?.addEventListener("input", validate);
       document.getElementById("hb-date")?.addEventListener("change", validate);
-      document.getElementById("hb-start")?.addEventListener("change", validate);
-      document.getElementById("hb-dur")?.addEventListener("change", validate);
       validate();
       document.getElementById("hb-back-2")?.addEventListener("click", () => {
         state.step = 1;
@@ -537,16 +567,17 @@
       });
       document.getElementById("hb-next-2")?.addEventListener("click", async () => {
         const err = document.getElementById("hb-e2");
+        const today = todayYmdWarsaw();
+        const maxReservationDate = addYearsYmd(today, 3);
         state.reservationDate = document.getElementById("hb-date")?.value || "";
-        if (state.reservationDate < todayYmdWarsaw()) {
+        if (state.reservationDate < today) {
           err.hidden = false;
           err.textContent = "Wybierz datę nie z przeszłości.";
           return;
         }
-        const startChkNext = hallReservationStartOk(state.reservationDate, state.startTime);
-        if (!startChkNext.ok) {
+        if (state.reservationDate > maxReservationDate) {
           err.hidden = false;
-          err.textContent = startChkNext.message;
+          err.textContent = "Rezerwację sali można wykonać maksymalnie na 3 lata do przodu.";
           return;
         }
         await refreshAvailability();
@@ -557,44 +588,21 @@
       });
     }
     if (state.step === 3) {
-      const syncGuests = async () => {
-        if (state.hallKind === "small") {
-          state.guestsCount = Number(document.getElementById("hb-guests-sm")?.value || 1);
-        } else {
-          const r = document.getElementById("hb-guests-range");
-          state.guestsCount = Number(r?.value || 1);
-          const lbl = document.getElementById("hb-guest-val");
-          if (lbl) lbl.textContent = String(state.guestsCount);
-        }
+      const syncInputs = async () => {
         state.eventType = document.getElementById("hb-event")?.value || "";
         state.customerNote = document.getElementById("hb-note")?.value || "";
         if (state.hallKind === "large") {
           state.exclusive = document.getElementById("hb-exc")?.checked || false;
         }
         await refreshAvailability();
-        if (state.hallKind === "large") {
-          const maxG = Math.min(state.maxGuestsAvailable, state.hallCapacity);
-          const range = document.getElementById("hb-guests-range");
-          if (range) {
-            range.max = String(Math.max(1, maxG));
-            if (state.guestsCount > maxG) {
-              state.guestsCount = maxG;
-              range.value = String(maxG);
-              document.getElementById("hb-guest-val").textContent = String(maxG);
-            }
-          }
-          document.getElementById("hb-max-lbl").textContent = String(maxG);
-        }
       };
 
-      document.getElementById("hb-guests-range")?.addEventListener("input", syncGuests);
-      document.getElementById("hb-guests-sm")?.addEventListener("input", syncGuests);
-      document.getElementById("hb-event")?.addEventListener("input", syncGuests);
-      document.getElementById("hb-note")?.addEventListener("input", syncGuests);
-      document.getElementById("hb-exc")?.addEventListener("change", syncGuests);
+      document.getElementById("hb-event")?.addEventListener("input", syncInputs);
+      document.getElementById("hb-note")?.addEventListener("input", syncInputs);
+      document.getElementById("hb-exc")?.addEventListener("change", syncInputs);
 
       const validate = async (showErrors = false) => {
-        await syncGuests();
+        await syncInputs();
         const err = document.getElementById("hb-e3");
         const next = document.getElementById("hb-next-3");
         if (!String(state.eventType).trim()) {
@@ -629,13 +637,6 @@
         await validate(true);
         const next = document.getElementById("hb-next-3");
         if (next.disabled) return;
-        const startChk3 = hallReservationStartOk(state.reservationDate, state.startTime);
-        if (!startChk3.ok) {
-          const err = document.getElementById("hb-e3");
-          err.hidden = false;
-          err.textContent = `${startChk3.message} Wróć do kroku „Termin”.`;
-          return;
-        }
         state.step = 4;
         renderBody();
       });
@@ -682,12 +683,6 @@
           return;
         }
         err.hidden = true;
-        const startChk5 = hallReservationStartOk(state.reservationDate, state.startTime);
-        if (!startChk5.ok) {
-          err.hidden = false;
-          err.textContent = `${startChk5.message} Wróć do kroku „Termin”.`;
-          return;
-        }
         try {
           const siteKey = config.turnstileSiteKey;
           if (siteKey && !state.turnstileToken) {

@@ -1,7 +1,6 @@
 const { DateTime } = require("luxon");
 const { FieldValue } = require("firebase-admin/firestore");
 const { allocateSharedReservationNumber } = require("./humanNumber");
-const { HALL_MIN_ADVANCE_MS } = require("./bookingConstants");
 
 const WARSAW = "Europe/Warsaw";
 
@@ -20,9 +19,14 @@ function assertNotPastCalendarDateWarsaw(dateStr) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) {
     return { ok: false, error: "Nieprawidłowa data." };
   }
-  const today = DateTime.now().setZone(WARSAW).toISODate();
+  const now = DateTime.now().setZone(WARSAW);
+  const today = now.toISODate();
   if (d < today) {
     return { ok: false, error: "Data rezerwacji nie może być z przeszłości." };
+  }
+  const maxDate = now.plus({ years: 3 }).toISODate();
+  if (d > maxDate) {
+    return { ok: false, error: "Rezerwację sali można złożyć maksymalnie na 3 lata do przodu." };
   }
   return { ok: true };
 }
@@ -120,6 +124,26 @@ async function loadOverlappingReservations(db, hallId, blockStartMs, blockEndMs,
   return rows;
 }
 
+async function hasBlockingReservationOnDate(db, hallId, reservationDate, excludeId) {
+  const rows = await loadBlockingReservationsOnDate(db, hallId, reservationDate, excludeId);
+  return rows.length > 0;
+}
+
+async function loadBlockingReservationsOnDate(db, hallId, reservationDate, excludeId) {
+  const snap = await db
+    .collection("venueReservations")
+    .where("hallId", "==", hallId)
+    .where("reservationDate", "==", String(reservationDate || ""))
+    .where("status", "in", ["pending", "confirmed", "manual_block"])
+    .get();
+  const rows = [];
+  for (const d of snap.docs) {
+    if (excludeId && d.id === excludeId) continue;
+    rows.push({ id: d.id, ...d.data() });
+  }
+  return rows;
+}
+
 async function checkHallAvailability(db, hallDoc, input, excludeReservationId, internalOptions = {}) {
   const hall = hallDoc.data ? { id: hallDoc.id, ...hallDoc.data() } : hallDoc;
   const bufferMinutes = Number(hall.bufferMinutes) ?? 60;
@@ -141,22 +165,21 @@ async function checkHallAvailability(db, hallDoc, input, excludeReservationId, i
   if (startMs < now - 60 * 1000) {
     return { ok: false, error: "Nie można rezerwować terminu z przeszłości." };
   }
-  if (!internalOptions.skipMinAdvance && startMs < now + HALL_MIN_ADVANCE_MS) {
-    return { ok: false, error: "Wybierz termin co najmniej 2 godziny od teraz." };
-  }
-
-  const overlapping = await loadOverlappingReservations(db, hall.id, blockStartMs, blockEndMs, excludeReservationId);
-
   const guestsCount = Number(input.guestsCount || 0);
   const exclusive = Boolean(input.exclusive);
 
   if (hallKind === "small") {
+    const isTakenOnDate = await hasBlockingReservationOnDate(
+      db,
+      hall.id,
+      input.reservationDate,
+      excludeReservationId
+    );
+    if (isTakenOnDate) {
+      return { ok: false, error: "Wybrana data jest już zarezerwowana dla tej sali." };
+    }
     if (guestsCount > Number(hall.capacity || 40)) {
       return { ok: false, error: `Maksymalnie ${hall.capacity} osób w tej sali.` };
-    }
-    const ev = evaluateSmallHallOverlap({ overlapping, excludeReservationId });
-    if (!ev.ok) {
-      return { ok: false, error: "Wybrany termin koliduje z inną rezerwacją lub przerwą organizacyjną." };
     }
     return {
       ok: true,
@@ -180,38 +203,29 @@ async function checkHallAvailability(db, hallDoc, input, excludeReservationId, i
     return { ok: false, error: "Podaj liczbę gości." };
   }
 
+  const blockingOnDate = await loadBlockingReservationsOnDate(
+    db,
+    hall.id,
+    input.reservationDate,
+    excludeReservationId
+  );
   const ev = evaluateLargeHallOverlap({
     hallCapacity: cap,
     fullGuestThreshold: fullThr,
     newGuests: guestsCount,
     newExclusive: exclusive,
-    overlapping,
+    overlapping: blockingOnDate,
     excludeReservationId,
   });
-
   if (!ev.ok) {
     if (ev.reason === "capacity") {
       return {
         ok: false,
-        error: `Brak miejsc: w tym terminie pozostało maks. ${ev.maxGuests} osób (limit sali ${cap}).`,
+        error: `Brak miejsc: w tym dniu pozostało maks. ${ev.maxGuests} osób (limit sali ${cap}).`,
         maxGuests: ev.maxGuests,
       };
     }
-    return { ok: false, error: "Wybrany termin nie jest dostępny (kolizja z inną rezerwacją, wyłącznością lub przerwą)." };
-  }
-
-  let maxGuests = cap;
-  if (!exclusive && guestsCount < fullThr) {
-    let partialSum = 0;
-    for (const r of overlapping) {
-      if (excludeReservationId && r.id === excludeReservationId) continue;
-      if (isFullBlockLargeHall(r, fullThr)) {
-        maxGuests = 0;
-        break;
-      }
-      partialSum += Number(r.guestsCount || 0);
-    }
-    maxGuests = Math.max(0, cap - partialSum);
+    return { ok: false, error: "Wybrana data nie jest dostępna (kolizja z inną rezerwacją lub wyłącznością)." };
   }
 
   return {
@@ -223,7 +237,7 @@ async function checkHallAvailability(db, hallDoc, input, excludeReservationId, i
     reservationDate: input.reservationDate,
     endTimeLabel: end.toFormat("HH:mm"),
     startTimeLabel: start.toFormat("HH:mm"),
-    maxGuests: exclusive || guestsCount >= fullThr ? Math.min(guestsCount, cap) : maxGuests,
+    maxGuests: ev.maxGuests != null ? ev.maxGuests : cap,
   };
 }
 

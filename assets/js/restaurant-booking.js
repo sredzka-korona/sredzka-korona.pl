@@ -79,7 +79,6 @@
     durationHours: 2,
     tablesCount: 1,
     guestsCount: 2,
-    joinTables: false,
     customerNote: "",
     customer: {},
     requiresEmailConfirmation: true,
@@ -91,6 +90,16 @@
     const m = String(now.getMonth() + 1).padStart(2, "0");
     const d = String(now.getDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
+  }
+
+  function addMonthsYmd(ymd, months) {
+    const [year, month, day] = String(ymd || "").split("-").map((part) => Number(part));
+    if (![year, month, day].every((part) => Number.isFinite(part))) {
+      return String(ymd || "");
+    }
+    const date = new Date(Date.UTC(year, month - 1, day));
+    date.setUTCMonth(date.getUTCMonth() + Number(months || 0));
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
   }
 
   function hmToMinutes(value) {
@@ -173,7 +182,6 @@
     state.durationHours = 2;
     state.tablesCount = 1;
     state.guestsCount = 2;
-    state.joinTables = false;
     state.customerNote = "";
     state.customer = {};
     state.requiresEmailConfirmation = true;
@@ -232,6 +240,8 @@
 
     let inner = "";
     if (state.step === 1) {
+      const today = todayYmdLocal();
+      const maxReservationDate = addMonthsYmd(today, 1);
       const slots = durationAwareSlots();
       const dayWindow = getDayWindow();
       const dayHoursLabel =
@@ -245,7 +255,7 @@
         <p class="booking-hint">Wybierz datę, godzinę rozpoczęcia i czas trwania rezerwacji.</p>
         ${dayHoursLabel ? `<p class="booking-hint">${escapeHtml(dayHoursLabel)}</p>` : ""}
         <div class="booking-field-grid">
-          <label>Data<input type="date" id="rb-date" value="${escapeHtml(state.reservationDate)}" required /></label>
+          <label>Data<input type="date" id="rb-date" min="${escapeHtml(today)}" max="${escapeHtml(maxReservationDate)}" value="${escapeHtml(state.reservationDate)}" required /></label>
           <label>Godzina rozpoczęcia
             <select id="rb-start" ${slots.length ? "" : "disabled"}>${timeOptionsHtml()}</select>
           </label>
@@ -274,10 +284,6 @@
           <label>Liczba gości<input type="number" id="rb-guests" min="1" max="${maxG}" value="${state.guestsCount}" /></label>
         </div>
         <p class="booking-hint">Aktywnych stolików: <strong id="rb-max-tables">${maxTables}</strong>. Przy obecnych ustawieniach maksymalnie <strong id="rb-max-guests">${maxG}</strong> gości (liczba stolików × max osób przy jednym stoliku).</p>
-        <label class="booking-checkbox">
-          <input type="checkbox" id="rb-join" ${state.joinTables ? "checked" : ""} />
-          <span>Poproszę o połączenie stołów (preferencja organizacyjna)</span>
-        </label>
         <label>Uwagi / opis<input type="text" id="rb-note" maxlength="2000" value="${escapeHtml(state.customerNote)}" placeholder="np. okazja, dieta" /></label>
         <p class="booking-error" id="rb-step-error" hidden></p>
         <div class="booking-actions">
@@ -312,7 +318,6 @@
           <li>Data: ${escapeHtml(state.reservationDate)}</li>
           <li>Godziny: ${escapeHtml(state.startTime)} – (ok. ${state.durationHours} h)</li>
           <li>Stoliki: ${state.tablesCount} · Goście: ${state.guestsCount}</li>
-          <li>Łączenie stołów: ${state.joinTables ? "tak" : "nie"}</li>
           ${state.customerNote ? `<li>Uwagi: ${escapeHtml(state.customerNote)}</li>` : ""}
         </ul>
         <p><strong>Dane:</strong> ${escapeHtml(state.customer.fullName || "")}, ${escapeHtml(state.customer.email || "")}</p>
@@ -392,6 +397,7 @@
         const d = dateEl?.value;
         const t = startEl?.value;
         const today = todayYmdLocal();
+        const maxReservationDate = addMonthsYmd(today, 1);
         const slots = durationAwareSlots();
         if (!d || !slots.length || !t) {
           if (d && !slots.length) {
@@ -408,6 +414,12 @@
         if (d < today) {
           err.hidden = false;
           err.textContent = "Data nie może być w przeszłości.";
+          next.disabled = true;
+          return;
+        }
+        if (d > maxReservationDate) {
+          err.hidden = false;
+          err.textContent = "Rezerwację stolika można wykonać maksymalnie na miesiąc do przodu.";
           next.disabled = true;
           return;
         }
@@ -453,7 +465,6 @@
               startTime: state.startTime,
               durationHours: state.durationHours,
               tablesCount: state.tablesCount,
-              joinTables: state.joinTables,
             },
           });
           if (!chk.available) {
@@ -507,9 +518,6 @@
         state.guestsCount = Number(guestsEl.value);
         refreshMax();
       });
-      document.querySelector("#rb-join")?.addEventListener("change", (e) => {
-        state.joinTables = e.target.checked;
-      });
       document.querySelector("#rb-note")?.addEventListener("change", (e) => {
         state.customerNote = e.target.value.trim();
       });
@@ -520,7 +528,6 @@
       });
       next?.addEventListener("click", async () => {
         state.customerNote = document.querySelector("#rb-note")?.value?.trim() || "";
-        state.joinTables = document.querySelector("#rb-join")?.checked || false;
         err.hidden = true;
         next.disabled = true;
         try {
@@ -531,7 +538,6 @@
               startTime: state.startTime,
               durationHours: state.durationHours,
               tablesCount: state.tablesCount,
-              joinTables: state.joinTables,
             },
           });
           if (!chk.available) {
@@ -608,7 +614,7 @@
               durationHours: state.durationHours,
               tablesCount: state.tablesCount,
               guestsCount: state.guestsCount,
-              joinTables: state.joinTables,
+              joinTables: false,
               customerNote: state.customerNote,
               fullName: state.customer.fullName,
               email: state.customer.email,

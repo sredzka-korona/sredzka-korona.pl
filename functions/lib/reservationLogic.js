@@ -168,6 +168,10 @@ function assertDatesValid(dateFrom, dateTo) {
   if (dateFrom < t) {
     throw new Error("Nie można rezerwować dat wstecz.");
   }
+  const maxHotelDate = parseYmd(t).plus({ years: 1 }).toISODate();
+  if (dateFrom > maxHotelDate || dateTo > maxHotelDate) {
+    throw new Error("Rezerwację hotelu można złożyć maksymalnie na rok do przodu.");
+  }
   if (nightsCount(dateFrom, dateTo) < 1) {
     throw new Error("Minimum jedna noc.");
   }

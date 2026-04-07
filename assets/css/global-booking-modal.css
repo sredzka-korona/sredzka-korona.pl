@@ -267,11 +267,6 @@ body.gb-modal-open {
   margin-top: 0.35rem;
 }
 
-#gb-modal .gb-check--rest-join {
-  flex: 0 0 auto;
-  max-width: min(100%, 16rem);
-}
-
 #gb-modal .gb-rest-details-wrap {
   position: relative;
 }
@@ -900,6 +895,24 @@ body.gb-modal-open {
   margin-top: 0.85rem;
 }
 
+#gb-modal .gb-hotel-rooms-divider {
+  height: 1px;
+  margin: 1.45rem 0 1.1rem;
+  background: linear-gradient(90deg, rgba(255, 225, 179, 0.02), rgba(255, 225, 179, 0.28), rgba(255, 225, 179, 0.02));
+}
+
+#gb-modal .gb-cart--hotel {
+  margin-top: 0;
+}
+
+#gb-modal .gb-hotel-note-field {
+  margin-top: 1rem;
+}
+
+#gb-modal .gb-hotel-note-field textarea {
+  min-height: 72px;
+}
+
 #gb-modal .gb-cart-selection-label,
 #gb-modal .gb-summary-section-label {
   display: inline-block;
@@ -1217,11 +1230,6 @@ body.gb-modal-open {
   display: block;
   flex: 1 1 auto;
   min-width: 0;
-}
-
-/* Po ogólnej regule .gb-check (margin-top), inaczej checkbox „połącz stoły” jest niżej niż notatka obok */
-#gb-modal .gb-check.gb-check--rest-join {
-  margin-top: 0;
 }
 
 #gb-modal .gb-actions {

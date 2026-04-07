@@ -8,9 +8,10 @@
   const PAGE_VISIT_ID =
     window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   /** Podbij przy zmianach w modalu — wymusza odświeżenie cache CSS po wdrożeniu. */
-  const GB_MODAL_ASSET_VERSION = "20260403-2";
+  const GB_MODAL_ASSET_VERSION = "20260407-1";
   const SERVICE_KEYS = ["hotel", "restaurant", "events"];
   const requestLocks = Object.create(null);
+  const RESTAURANT_DURATION_OPTIONS = [1, 1.5, 2, 2.5, 3, 4, 5, 6];
 
   const SERVICE_META = {
     hotel: {
@@ -78,6 +79,7 @@
       dateTo: "",
       availability: null,
       selectedRoomIds: [],
+      customerNote: "",
     },
     restaurant: {
       loading: false,
@@ -91,7 +93,6 @@
       tablesCount: 1,
       guestsCount: 2,
       placePreference: "no_preference",
-      joinTables: false,
       customerNote: "",
     },
     events: {
@@ -215,6 +216,16 @@
     return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
   }
 
+  function addYearsYmd(ymd, years) {
+    const [year, month, day] = String(ymd || "").split("-").map((part) => Number(part));
+    if (![year, month, day].every((part) => Number.isFinite(part))) {
+      return String(ymd || "");
+    }
+    const date = new Date(Date.UTC(year, month - 1, day));
+    date.setUTCFullYear(date.getUTCFullYear() + Number(years || 0));
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+  }
+
   function monthCursorFromYmd(ymd) {
     const safe = String(ymd || "");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(safe)) {
@@ -283,6 +294,35 @@
     return String(day?.firstTime || slots[0] || "");
   }
 
+  function restaurantDayWindow(day) {
+    const openRaw = String(day?.reservationOpenTime || "");
+    const closeRaw = String(day?.reservationCloseTime || "");
+    const openMinutes = hmToMinutes(openRaw);
+    const closeMinutesRaw = hmToMinutes(closeRaw);
+    if (openMinutes == null || closeMinutesRaw == null) {
+      return null;
+    }
+    return {
+      openRaw,
+      closeRaw,
+      openMinutes,
+      closeMinutes: closeMinutesRaw <= openMinutes ? closeMinutesRaw + 1440 : closeMinutesRaw,
+    };
+  }
+
+  function restaurantDurationOptionsForDay(day, startTime) {
+    const window = restaurantDayWindow(day);
+    if (!window) {
+      return RESTAURANT_DURATION_OPTIONS;
+    }
+    const referenceTime = String(startTime || day?.firstTime || "");
+    const startMinutes = hmToMinutes(referenceTime);
+    if (startMinutes == null) {
+      return RESTAURANT_DURATION_OPTIONS.filter((hours) => window.openMinutes + hours * 60 <= window.closeMinutes);
+    }
+    return RESTAURANT_DURATION_OPTIONS.filter((hours) => startMinutes + hours * 60 <= window.closeMinutes);
+  }
+
   function renderAvailabilityCalendar(prefix, monthCursor, selectedDate, days, loading) {
     const dayMap = availabilityDayMap(days);
     const firstLoaded = Array.isArray(days) && days.length ? String(days[0].reservationDate || "") : "";
@@ -311,7 +351,7 @@
       ]
         .filter(Boolean)
         .join(" ");
-      const status = loading ? "..." : available ? `od ${escapeHtml(info?.firstTime || "")}` : "Brak";
+      const status = loading ? "..." : info?.closed ? "Nieczynne" : available ? `od ${escapeHtml(info?.firstTime || "")}` : "Brak";
       cells.push(`
         <button
           type="button"
@@ -648,6 +688,7 @@
       dateTo: "",
       availability: null,
       selectedRoomIds: [],
+      customerNote: "",
     };
 
     state.restaurant = {
@@ -663,7 +704,6 @@
       tablesCount: 1,
       guestsCount: 2,
       placePreference: "no_preference",
-      joinTables: false,
       customerNote: "",
     };
 
@@ -789,6 +829,7 @@
         selectedRoomIds: Array.isArray(draft.hotel?.selectedRoomIds)
           ? draft.hotel.selectedRoomIds.map((id) => cleanString(id, 80)).filter(Boolean)
           : [],
+        customerNote: cleanString(draft.hotel?.customerNote, 2000),
       };
 
       state.restaurant = {
@@ -806,7 +847,6 @@
         placePreference: RESTAURANT_PLACE_OPTIONS.includes(cleanString(draft.restaurant?.placePreference, 30))
           ? cleanString(draft.restaurant?.placePreference, 30)
           : "no_preference",
-        joinTables: Boolean(draft.restaurant?.joinTables),
         customerNote: cleanString(draft.restaurant?.customerNote, 2000),
       };
 
@@ -904,45 +944,6 @@
       .join("");
   }
 
-  function restaurantWindow() {
-    const openRaw = String(state.restaurant.publicSettings?.reservationOpenTime || "");
-    const closeRaw = String(state.restaurant.publicSettings?.reservationCloseTime || "");
-    const openMinutes = hmToMinutes(openRaw);
-    const closeMinutesRaw = hmToMinutes(closeRaw);
-    if (openMinutes == null || closeMinutesRaw == null) return null;
-    return {
-      openRaw,
-      closeRaw,
-      openMinutes,
-      closeMinutes: closeMinutesRaw <= openMinutes ? closeMinutesRaw + 1440 : closeMinutesRaw,
-    };
-  }
-
-  function restaurantSlotsForDuration() {
-    const slots = Array.isArray(state.restaurant.publicSettings?.timeSlots)
-      ? state.restaurant.publicSettings.timeSlots
-      : [];
-    const window = restaurantWindow();
-    if (!window) return slots;
-    const durationMinutes = Math.max(30, Math.round(Number(state.restaurant.durationHours || 0) * 60));
-    return slots.filter((slot) => {
-      const start = hmToMinutes(slot);
-      if (start == null) return false;
-      return start >= window.openMinutes && start + durationMinutes <= window.closeMinutes;
-    });
-  }
-
-  function syncRestaurantStartTime() {
-    const slots = restaurantSlotsForDuration();
-    if (!slots.length) {
-      state.restaurant.startTime = "";
-      return;
-    }
-    if (!slots.includes(state.restaurant.startTime)) {
-      state.restaurant.startTime = slots[0];
-    }
-  }
-
   async function loadRestaurantCalendar(options = {}) {
     state.restaurant.calendarLoading = true;
     if (options.render !== false) {
@@ -977,7 +978,7 @@
         resolvedDate || state.restaurant.calendarDays[0]?.reservationDate || todayYmdWarsaw()
       ).slice(0, 7);
       if (!data?.firstAvailableDate) {
-        setError("Brak wolnych terminów dla wybranej liczby stolików.");
+        setError("Brak wolnych dni dla wybranej liczby stolików i wybranego czasu rezerwacji.");
       } else {
         setError("");
       }
@@ -1169,7 +1170,7 @@
       service: "System Rezerwacji",
       hotelDates: "Termin pobytu",
       hotelRooms: "Pokoje",
-      restaurantDateTime: "Termin",
+      restaurantDateTime: "Kalendarz",
       restaurantDetails: "Szczegóły",
       eventsGuests: "Liczba Gości",
       eventsDateTime: "Termin",
@@ -1209,16 +1210,18 @@
   }
 
   function renderHotelDatesStep() {
+    const today = todayYmdLocal();
+    const maxHotelDate = addYearsYmd(today, 1);
     return `
       <section>
         <div class="gb-grid-2">
           <label class="gb-field">
             <span>Rezerwacja od</span>
-            <input type="date" id="gb-hotel-date-from" min="${escapeHtml(todayYmdLocal())}" value="${escapeHtml(state.hotel.dateFrom)}" required />
+            <input type="date" id="gb-hotel-date-from" min="${escapeHtml(today)}" max="${escapeHtml(maxHotelDate)}" value="${escapeHtml(state.hotel.dateFrom)}" required />
           </label>
           <label class="gb-field">
             <span>Rezerwacja do</span>
-            <input type="date" id="gb-hotel-date-to" min="${escapeHtml(todayYmdLocal())}" value="${escapeHtml(state.hotel.dateTo)}" required />
+            <input type="date" id="gb-hotel-date-to" min="${escapeHtml(today)}" max="${escapeHtml(maxHotelDate)}" value="${escapeHtml(state.hotel.dateTo)}" required />
           </label>
         </div>
         <div class="gb-actions">
@@ -1280,7 +1283,8 @@
               : "<p class=\"gb-hint\">Brak wolnych pokoi w podanym terminie.</p>"
           }
         </div>
-        <div class="gb-cart">
+        <div class="gb-hotel-rooms-divider" aria-hidden="true"></div>
+        <div class="gb-cart gb-cart--hotel">
           <div class="gb-cart-head">
             <strong>Podsumowanie pobytu</strong>
             <strong class="gb-cart-total">Razem ${escapeHtml(hotelTotalPrice().toFixed(2))} PLN</strong>
@@ -1308,6 +1312,10 @@
                 : '<p class="gb-cart-empty">Brak wybranych pokoi.</p>'
             }
           </div>
+          <label class="gb-field gb-hotel-note-field">
+            <span>Dodatkowe uwagi</span>
+            <textarea id="gb-hotel-note" maxlength="2000" rows="2" placeholder="Np. preferencje dot. pokoju, godzina przyjazdu">${escapeHtml(state.hotel.customerNote)}</textarea>
+          </label>
         </div>
         <div class="gb-actions">
           <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wróć</button>
@@ -1329,10 +1337,22 @@
     }
     const selectedDay = selectedCalendarDay(state.restaurant.calendarDays, state.restaurant.reservationDate);
     const slots = Array.isArray(selectedDay?.slots) ? selectedDay.slots : [];
+    const durationOptions = restaurantDurationOptionsForDay(selectedDay, state.restaurant.startTime);
+    const hoursLabel =
+      selectedDay?.closed
+        ? "Restauracja jest nieczynna w wybranym dniu."
+        : selectedDay?.reservationOpenTime && selectedDay?.reservationCloseTime
+          ? `W tym dniu rezerwacje są możliwe w godzinach ${selectedDay.reservationOpenTime}-${selectedDay.reservationCloseTime}.`
+          : "Godziny rezerwacji zależą od godzin otwarcia wybranego dnia.";
 
     return `
       <section class="gb-rest-datetime-step">
-        <h3 class="gb-sr-only">Termin</h3>
+        <h3>Kalendarz</h3>
+        <p class="gb-hint">Wybierz dzień, a potem godzinę rozpoczęcia. Lista godzin i maksymalny czas rezerwacji dopasowują się do godzin otwarcia tego dnia.</p>
+        <p class="gb-inline-note gb-rest-hours-note">${escapeHtml(hoursLabel)}</p>
+        <div class="gb-rest-datetime-calendar-wrap">
+          ${renderAvailabilityCalendar("restaurant", state.restaurant.calendarMonth, state.restaurant.reservationDate, state.restaurant.calendarDays, state.restaurant.calendarLoading)}
+        </div>
         <div class="gb-rest-datetime-controls gb-grid-2">
           <label class="gb-field gb-field--time-like">
             <span>Godzina rezerwacji</span>
@@ -1350,17 +1370,20 @@
             </select>
           </label>
           <label class="gb-field gb-field--time-like">
-            <span>Preferowane miejsce</span>
-            <select id="gb-rest-place">
-              <option value="no_preference" ${state.restaurant.placePreference === "no_preference" ? "selected" : ""}>Brak preferencji</option>
-              <option value="inside" ${state.restaurant.placePreference === "inside" ? "selected" : ""}>W lokalu</option>
-              <option value="terrace" ${state.restaurant.placePreference === "terrace" ? "selected" : ""}>Na tarasie</option>
+            <span>Czas rezerwacji</span>
+            <select id="gb-rest-duration" ${durationOptions.length ? "" : "disabled"}>
+              ${
+                durationOptions.length
+                  ? durationOptions
+                      .map(
+                        (hours) =>
+                          `<option value="${escapeHtml(String(hours))}" ${Number(state.restaurant.durationHours) === Number(hours) ? "selected" : ""}>${escapeHtml(String(hours))} h</option>`
+                      )
+                      .join("")
+                  : '<option value="">Brak dostępnego czasu</option>'
+              }
             </select>
           </label>
-        </div>
-        <p class="gb-inline-note gb-rest-place-disclaimer">Nie gwarantujemy stolika w wybranym miejscu.</p>
-        <div class="gb-rest-datetime-calendar-wrap">
-          ${renderAvailabilityCalendar("restaurant", state.restaurant.calendarMonth, state.restaurant.reservationDate, state.restaurant.calendarDays, state.restaurant.calendarLoading)}
         </div>
         <div class="gb-actions">
           <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wróć</button>
@@ -1393,25 +1416,19 @@
                 <input type="number" id="gb-rest-guests" min="1" max="${escapeHtml(String(maxGuests))}" value="${escapeHtml(String(state.restaurant.guestsCount))}" required${dis} />
               </label>
               <label class="gb-field gb-field--time-like">
-                <span>Czas rezerwacji</span>
-                <select id="gb-rest-duration"${dis}>
-                  ${[1, 1.5, 2, 2.5, 3, 4, 5, 6]
-                    .map(
-                      (h) =>
-                        `<option value="${escapeHtml(String(h))}" ${Number(state.restaurant.durationHours) === Number(h) ? "selected" : ""}>${escapeHtml(String(h))} h</option>`
-                    )
-                    .join("")}
+                <span>Preferowane miejsce</span>
+                <select id="gb-rest-place"${dis}>
+                  <option value="no_preference" ${state.restaurant.placePreference === "no_preference" ? "selected" : ""}>Brak preferencji</option>
+                  <option value="inside" ${state.restaurant.placePreference === "inside" ? "selected" : ""}>W lokalu</option>
+                  <option value="terrace" ${state.restaurant.placePreference === "terrace" ? "selected" : ""}>Na tarasie</option>
                 </select>
               </label>
             </div>
             <div class="gb-rest-step1-foot">
               <div class="gb-rest-step1-notes">
                 <p class="gb-inline-note">Maksymalna ilość gości przy jednym stole: <strong id="gb-rest-max">${escapeHtml(String(maxGuestsPerTable))}</strong>.</p>
+                <p class="gb-inline-note">W kolejnym kroku pokażemy tylko te dni, w których dostępna jest wybrana liczba stołów.</p>
               </div>
-              <label class="gb-check gb-check--rest-join">
-                <input type="checkbox" id="gb-rest-join" ${state.restaurant.joinTables ? "checked" : ""}${dis} />
-                <span>Prośba o połączenie stołów</span>
-              </label>
             </div>
             <label class="gb-field" style="margin-top:0.7rem;">
               <span>Dodatkowe informacje</span>
@@ -1685,6 +1702,7 @@
               .join("")}
           </ul>
           </div>
+          ${state.hotel.customerNote ? `<div class="gb-summary-section"><span class="gb-summary-section-label">Dodatkowe uwagi</span><p class="gb-inline-note">${escapeHtml(state.hotel.customerNote)}</p></div>` : ""}
           <p class="gb-summary-total">Razem ${escapeHtml(hotelTotalPrice().toFixed(2))} PLN</p>
         </div>
       `;
@@ -1707,7 +1725,6 @@
                   ? "Na tarasie"
                   : "Brak preferencji"
             )}</span></li>
-            <li class="gb-summary-li"><span class="gb-summary-k">Prośba o połączenie stołów</span><span class="gb-summary-v">${state.restaurant.joinTables ? "tak" : "nie"}</span></li>
             ${state.restaurant.customerNote ? `<li class="gb-summary-li gb-summary-li--block"><span class="gb-summary-k">Dodatkowe informacje</span><span class="gb-summary-v">${escapeHtml(state.restaurant.customerNote)}</span></li>` : ""}
           </ul>
         </div>
@@ -1916,8 +1933,9 @@
     }
     if (state.step === "restaurantDateTime") {
       state.restaurant.startTime = String(document.getElementById("gb-rest-time")?.value || state.restaurant.startTime || "");
-      const placePreference = String(document.getElementById("gb-rest-place")?.value || state.restaurant.placePreference || "no_preference");
-      state.restaurant.placePreference = RESTAURANT_PLACE_OPTIONS.includes(placePreference) ? placePreference : "no_preference";
+      state.restaurant.durationHours = Number(
+        document.getElementById("gb-rest-duration")?.value || state.restaurant.durationHours || 2
+      );
       return;
     }
     if (state.step === "restaurantDetails") {
@@ -1926,8 +1944,8 @@
       }
       state.restaurant.tablesCount = clamp(toInt(document.getElementById("gb-rest-tables")?.value || state.restaurant.tablesCount || 1, 1), 1, 30);
       state.restaurant.guestsCount = clamp(toInt(document.getElementById("gb-rest-guests")?.value || state.restaurant.guestsCount || 1, 1), 1, 300);
-      state.restaurant.durationHours = Number(document.getElementById("gb-rest-duration")?.value || state.restaurant.durationHours || 2);
-      state.restaurant.joinTables = Boolean(document.getElementById("gb-rest-join")?.checked);
+      const placePreference = String(document.getElementById("gb-rest-place")?.value || state.restaurant.placePreference || "no_preference");
+      state.restaurant.placePreference = RESTAURANT_PLACE_OPTIONS.includes(placePreference) ? placePreference : "no_preference";
       state.restaurant.customerNote = String(document.getElementById("gb-rest-note")?.value || state.restaurant.customerNote || "").trim();
       return;
     }
@@ -2114,6 +2132,7 @@
         const from = String(fromInput?.value || "");
         const to = String(toInput?.value || "");
         const today = todayYmdLocal();
+        const maxHotelDate = addYearsYmd(today, 1);
 
         if (!from || !to) {
           setError("Wypełnij oba pola dat.");
@@ -2125,6 +2144,10 @@
         }
         if (to <= from) {
           setError("Data wyjazdu musi być późniejsza niż data przyjazdu.");
+          return;
+        }
+        if (from > maxHotelDate || to > maxHotelDate) {
+          setError("Rezerwację hotelu można złożyć maksymalnie na rok do przodu.");
           return;
         }
 
@@ -2157,6 +2180,10 @@
     }
 
     if (state.step === "hotelRooms") {
+      const noteInput = document.getElementById("gb-hotel-note");
+      noteInput?.addEventListener("change", () => {
+        state.hotel.customerNote = String(noteInput.value || "").trim();
+      });
       document.querySelectorAll("[data-toggle-room]").forEach((button) => {
         button.addEventListener("click", () => {
           const roomId = button.getAttribute("data-toggle-room");
@@ -2185,14 +2212,21 @@
 
     if (state.step === "restaurantDateTime") {
       const timeInput = document.getElementById("gb-rest-time");
-      const placeInput = document.getElementById("gb-rest-place");
+      const durationInput = document.getElementById("gb-rest-duration");
 
       timeInput?.addEventListener("change", () => {
         state.restaurant.startTime = String(timeInput.value || "");
+        render();
       });
-      placeInput?.addEventListener("change", () => {
-        const placePreference = String(placeInput.value || "no_preference");
-        state.restaurant.placePreference = RESTAURANT_PLACE_OPTIONS.includes(placePreference) ? placePreference : "no_preference";
+      durationInput?.addEventListener("change", async () => {
+        const nextDuration = Number(durationInput.value || state.restaurant.durationHours || 2);
+        if (!Number.isFinite(nextDuration) || nextDuration <= 0 || nextDuration === state.restaurant.durationHours) {
+          return;
+        }
+        state.restaurant.durationHours = nextDuration;
+        await withRequestLock("restaurant-public-calendar", async () => {
+          await loadRestaurantCalendar({ reservationDate: state.restaurant.reservationDate });
+        });
       });
 
       document.getElementById("gb-next")?.addEventListener("click", async () => {
@@ -2202,11 +2236,7 @@
           ? selectedCalendarDay(state.restaurant.calendarDays, dateValue).slots
           : [];
         const selectedTime = String(timeInput?.value || "");
-        const placePreferenceRaw = String(placeInput?.value || "no_preference");
-        state.restaurant.placePreference = RESTAURANT_PLACE_OPTIONS.includes(placePreferenceRaw)
-          ? placePreferenceRaw
-          : "no_preference";
-
+        state.restaurant.durationHours = Number(durationInput?.value || state.restaurant.durationHours || 2);
         state.restaurant.startTime = selectedTime;
 
         if (!dateValue) {
@@ -2231,7 +2261,6 @@
                 startTime: state.restaurant.startTime,
                 durationHours: state.restaurant.durationHours,
                 tablesCount: state.restaurant.tablesCount,
-                joinTables: state.restaurant.joinTables,
               },
             });
             if (!check?.available) {
@@ -2253,8 +2282,7 @@
     if (state.step === "restaurantDetails") {
       const tablesInput = document.getElementById("gb-rest-tables");
       const guestsInput = document.getElementById("gb-rest-guests");
-      const durationInput = document.getElementById("gb-rest-duration");
-      const joinInput = document.getElementById("gb-rest-join");
+      const placeInput = document.getElementById("gb-rest-place");
       const noteInput = document.getElementById("gb-rest-note");
 
       const syncGuestsMax = () => {
@@ -2284,8 +2312,8 @@
 
         state.restaurant.tablesCount = tablesCount;
         state.restaurant.guestsCount = guestsCount;
-        state.restaurant.durationHours = Number(durationInput?.value || 2);
-        state.restaurant.joinTables = Boolean(joinInput?.checked);
+        const placePreference = String(placeInput?.value || "no_preference");
+        state.restaurant.placePreference = RESTAURANT_PLACE_OPTIONS.includes(placePreference) ? placePreference : "no_preference";
         state.restaurant.customerNote = String(noteInput?.value || "").trim();
 
         if (guestsCount < 1 || guestsCount > maxGuests) {
@@ -2671,7 +2699,7 @@
           dateFrom: state.hotel.dateFrom,
           dateTo: state.hotel.dateTo,
           roomIds: state.hotel.selectedRoomIds.slice(),
-          customerNote: "",
+          customerNote: state.hotel.customerNote,
         },
       };
     }
@@ -2687,7 +2715,7 @@
           tablesCount: state.restaurant.tablesCount,
           guestsCount: state.restaurant.guestsCount,
           placePreference: state.restaurant.placePreference,
-          joinTables: state.restaurant.joinTables,
+          joinTables: false,
           customerNote: state.restaurant.customerNote,
         },
       };

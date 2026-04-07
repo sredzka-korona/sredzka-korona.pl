@@ -412,6 +412,10 @@ function assertNotPast(startMs) {
   if (startMs < now - 60 * 1000) {
     throw new Error("Nie można rezerwować terminów z przeszłości.");
   }
+  const maxMs = DateTime.now().setZone("Europe/Warsaw").plus({ months: 1 }).toMillis();
+  if (startMs > maxMs) {
+    throw new Error("Rezerwację stolika można złożyć maksymalnie na miesiąc do przodu.");
+  }
 }
 
 module.exports = {
