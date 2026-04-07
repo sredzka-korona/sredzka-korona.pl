@@ -2437,7 +2437,7 @@ async function hallCalendarAvailability(env, payload = {}) {
     const reservationDate = addDaysYmd(startDate, offset);
     const availableSlots = [];
     for (const slot of slotsTemplate) {
-      const startCheck = eventsYmdHmToMsWarsaw(reservationDate, slot);
+      const startCheck = ymdHmToMsWarsaw(reservationDate, slot);
       if (!Number.isFinite(startCheck)) {
         continue;
       }
