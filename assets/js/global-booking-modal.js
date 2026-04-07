@@ -8,7 +8,7 @@
   const PAGE_VISIT_ID =
     window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   /** Podbij przy zmianach w modalu — wymusza odświeżenie cache CSS po wdrożeniu. */
-  const GB_MODAL_ASSET_VERSION = "20260407-4";
+  const GB_MODAL_ASSET_VERSION = "20260407-5";
   const SERVICE_KEYS = ["hotel", "restaurant", "events"];
   const requestLocks = Object.create(null);
   const RESTAURANT_DURATION_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4];
@@ -310,12 +310,14 @@
     };
   }
 
-  function restaurantDurationOptionsForDay(day) {
+  function restaurantDurationOptionsForDay(day, startTime) {
     const window = restaurantDayWindow(day);
     if (!window) {
       return RESTAURANT_DURATION_OPTIONS;
     }
-    const availableMinutes = window.closeMinutes - window.openMinutes;
+    const startMinutes = hmToMinutes(startTime);
+    const availableMinutes =
+      startMinutes == null ? window.closeMinutes - window.openMinutes : window.closeMinutes - startMinutes;
     return RESTAURANT_DURATION_OPTIONS.filter((hours) => hours * 60 <= availableMinutes);
   }
 
@@ -1333,7 +1335,7 @@
     }
     const selectedDay = selectedCalendarDay(state.restaurant.calendarDays, state.restaurant.reservationDate);
     const slots = Array.isArray(selectedDay?.slots) ? selectedDay.slots : [];
-    const durationOptions = restaurantDurationOptionsForDay(selectedDay);
+    const durationOptions = restaurantDurationOptionsForDay(selectedDay, state.restaurant.startTime);
     const hoursLabel =
       selectedDay?.closed
         ? "Restauracja jest nieczynna w wybranym dniu."
@@ -2208,6 +2210,11 @@
 
       timeInput?.addEventListener("change", () => {
         state.restaurant.startTime = String(timeInput.value || "");
+        const selectedDay = selectedCalendarDay(state.restaurant.calendarDays, state.restaurant.reservationDate);
+        const durationOptions = restaurantDurationOptionsForDay(selectedDay, state.restaurant.startTime);
+        if (durationOptions.length && !durationOptions.includes(Number(state.restaurant.durationHours))) {
+          state.restaurant.durationHours = Number(durationOptions[durationOptions.length - 1]);
+        }
         render();
       });
       durationInput?.addEventListener("change", async () => {

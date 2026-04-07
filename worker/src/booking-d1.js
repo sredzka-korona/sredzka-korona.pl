@@ -711,6 +711,7 @@ function ymdHmToMs(ymd, hm) {
 
 /** Jak ymdHmToMs, ale dla czasu lokalnego Europe/Warsaw (zgodnie z modułem sal w Firebase). */
 const HALL_MIN_ADVANCE_MS = 2 * 60 * 60 * 1000;
+const RESTAURANT_MIN_ADVANCE_MS = 2 * 60 * 60 * 1000;
 
 function ymdHmToMsWarsaw(ymd, hm) {
   if (!isYmd(ymd) || !isHm(hm)) return NaN;
@@ -757,6 +758,20 @@ function todayYmdInWarsaw() {
   const month = parts.find((part) => part.type === "month")?.value || "01";
   const day = parts.find((part) => part.type === "day")?.value || "01";
   return `${year}-${month}-${day}`;
+}
+
+function assertRestaurantStartLeadTime(reservationDate, startTime, now = Date.now()) {
+  const startMs = ymdHmToMsWarsaw(reservationDate, startTime);
+  if (!Number.isFinite(startMs)) {
+    throw new Error("Nieprawidłowa data lub godzina.");
+  }
+  if (startMs < now - 60 * 1000) {
+    throw new Error("Nie można wybrać terminu z przeszłości.");
+  }
+  if (reservationDate === todayYmdInWarsaw() && startMs < now + RESTAURANT_MIN_ADVANCE_MS) {
+    throw new Error("Wybierz godzinę co najmniej 2 godziny od teraz.");
+  }
+  return startMs;
 }
 
 function formatHm(ms) {
@@ -1991,6 +2006,7 @@ async function restaurantTables(env, includeHidden = false) {
 async function restaurantBlockingRows(env, startMs, endMs, excludeId = null) {
   const rows = await env.DB.prepare(
     `SELECT id, start_ms AS startMs, end_ms AS endMs,
+            tables_count AS tablesCount,
             cleanup_buffer_minutes AS cleanupBufferMinutes,
             assigned_table_ids_json AS assignedTableIdsJson
      FROM restaurant_reservations
@@ -2005,6 +2021,7 @@ async function restaurantBlockingRows(env, startMs, endMs, excludeId = null) {
     id: r.id,
     startMs: Number(r.startMs || 0),
     endMs: Number(r.endMs || 0),
+    tablesCount: Math.max(0, Number(r.tablesCount || 0)),
     cleanupBufferMinutes: Number(r.cleanupBufferMinutes || RESTAURANT_CLEANUP_BUFFER_MINUTES),
     tableIds: parseJson(r.assignedTableIdsJson, []),
   }));
@@ -2020,10 +2037,15 @@ async function restaurantAvailableTableIds(env, startMs, endMs, tablesNeeded, ex
   const allTables = await restaurantTables(env, false);
   const blockedRows = await restaurantBlockingRows(env, startMs, endMs, excludeId);
   const blocked = new Set();
+  let anonymousReservedCount = 0;
   blockedRows.forEach((r) => {
     (r.tableIds || []).forEach((id) => blocked.add(id));
+    anonymousReservedCount += Math.max(0, Number(r.tablesCount || 0) - Number((r.tableIds || []).length || 0));
   });
-  const free = allTables.filter((t) => !blocked.has(t.id)).map((t) => t.id);
+  const free = allTables
+    .filter((t) => !blocked.has(t.id))
+    .map((t) => t.id)
+    .slice(Math.max(0, anonymousReservedCount));
   return free.slice(0, Math.max(0, Number(tablesNeeded || 1)));
 }
 
@@ -2038,6 +2060,7 @@ function restaurantWindowWithinDay(dayWindow, startTime, durationHours) {
 
 function restaurantFreeTableCount(blockingRows, startMs, endMs, allTableIds) {
   const blocked = new Set();
+  let anonymousReservedCount = 0;
   for (const row of blockingRows || []) {
     if (!(startMs < restaurantReservationBlockEndMs(row) && endMs > Number(row.startMs || 0))) {
       continue;
@@ -2045,8 +2068,9 @@ function restaurantFreeTableCount(blockingRows, startMs, endMs, allTableIds) {
     for (const tableId of row.tableIds || []) {
       blocked.add(tableId);
     }
+    anonymousReservedCount += Math.max(0, Number(row.tablesCount || 0) - Number((row.tableIds || []).length || 0));
   }
-  return Math.max(0, allTableIds.length - blocked.size);
+  return Math.max(0, allTableIds.length - blocked.size - anonymousReservedCount);
 }
 
 async function restaurantAvailabilityForSlot(env, settings, allTables, payload, excludeId = null) {
@@ -2069,6 +2093,7 @@ async function restaurantAvailabilityForSlot(env, settings, allTables, payload, 
   if (dayWindow.closed) {
     throw new Error("Restauracja jest nieczynna w wybranym dniu.");
   }
+  assertRestaurantStartLeadTime(reservationDate, startTime);
   restaurantWindowWithinDay(dayWindow, startTime, durationHours);
   const startMs = ymdHmToMs(reservationDate, startTime);
   const endMs = startMs + durationHours * 3600000;
@@ -2132,6 +2157,7 @@ async function restaurantAvailableSlotsForDate(env, options) {
   }
   const rawSlots = buildTimeSlotsFromMinutes(dayWindow.openMinutes, dayWindow.closeMinutes, settings.timeSlotMinutes).filter((slot) => {
     try {
+      assertRestaurantStartLeadTime(reservationDate, slot);
       restaurantWindowWithinDay(dayWindow, slot, durationHours);
       return true;
     } catch {
@@ -2345,7 +2371,12 @@ async function createRestaurantReservation(env, payload, options = {}) {
   const token = options.withConfirmationToken ? randomToken() : "";
   const tokenHash = token ? await sha256Hex(token) : null;
   const status = options.status || "email_verification_pending";
-  const assigned = Array.isArray(options.assignedTableIds) ? options.assignedTableIds : [];
+  const assigned =
+    Array.isArray(options.assignedTableIds) && options.assignedTableIds.length
+      ? options.assignedTableIds
+      : Array.isArray(availability.availableIds)
+        ? availability.availableIds.slice(0, tablesCount)
+        : [];
   const emailExp = status === "email_verification_pending" ? now + EMAIL_LINK_MS : null;
   const pendingExp = status === "pending" ? now + RESTAURANT_PENDING_MS : null;
   const placePreference = normalizeRestaurantPlacePreference(payload.placePreference);
@@ -4274,13 +4305,17 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
       return { status: 400, data: { error: "Link potwierdzający wygasł." } };
     }
     try {
-      const assigned = await restaurantAvailableTableIds(
-        env,
-        Number(row.start_ms),
-        Number(row.end_ms),
-        Number(row.tables_count),
-        row.id
-      );
+      const existingAssigned = parseJson(row.assigned_table_ids_json, []).filter(Boolean);
+      const assigned =
+        existingAssigned.length >= Number(row.tables_count)
+          ? existingAssigned.slice(0, Number(row.tables_count))
+          : await restaurantAvailableTableIds(
+              env,
+              Number(row.start_ms),
+              Number(row.end_ms),
+              Number(row.tables_count),
+              row.id
+            );
       if (assigned.length < Number(row.tables_count)) {
         return { status: 409, data: { error: "Brak wolnych stolików w tym terminie." } };
       }
