@@ -296,10 +296,11 @@
     const currentMonth = `${String(monthCursor || "").slice(0, 7)}-01`;
     const monthDays = daysInMonth(currentMonth);
     const offset = weekdayMondayFirst(currentMonth);
+    const totalCells = Math.ceil((offset + monthDays) / 7) * 7;
     const previousDisabled = !firstLoaded || addMonthsToCursor(currentMonth, -1) < monthCursorFromYmd(firstLoaded);
     const nextDisabled = !lastLoaded || addMonthsToCursor(currentMonth, 1) > monthCursorFromYmd(lastLoaded);
     const cells = [];
-    for (let index = 0; index < 42; index += 1) {
+    for (let index = 0; index < totalCells; index += 1) {
       const dayNumber = index - offset + 1;
       if (dayNumber < 1 || dayNumber > monthDays) {
         cells.push('<span class="gb-calendar-cell gb-calendar-cell--empty" aria-hidden="true"></span>');
@@ -323,9 +324,11 @@
             ? "Nieczynne"
             : available
               ? prefix === "events"
-                ? "Dostępny"
+                ? `${escapeHtml(String(Math.max(0, toInt(info?.smallRemaining, 0))))} | ${escapeHtml(String(Math.max(0, toInt(info?.largeRemaining, 0))))}`
                 : `od ${escapeHtml(info?.firstTime || "")}`
-              : "Brak";
+              : prefix === "events"
+                ? `${escapeHtml(String(Math.max(0, toInt(info?.smallRemaining, 0))))} | ${escapeHtml(String(Math.max(0, toInt(info?.largeRemaining, 0))))}`
+                : "Brak";
       cells.push(`
         <button
           type="button"

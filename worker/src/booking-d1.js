@@ -2567,6 +2567,25 @@ function buildHallCandidateSlots(settings, durationHours) {
   return slots;
 }
 
+function dayCapacityForSmallHall(hall, rows, reservationDate) {
+  const capacity = Math.min(40, Number(hall?.capacity || 40));
+  const hasBlocking = (rows || []).some((row) => cleanString(row.reservationDate, 10) === reservationDate);
+  return hasBlocking ? 0 : capacity;
+}
+
+function dayCapacityForLargeHall(hall, rows, reservationDate) {
+  const capacity = Math.max(0, Number(hall?.capacity || 120));
+  let usedGuests = 0;
+  for (const row of rows || []) {
+    if (cleanString(row.reservationDate, 10) !== reservationDate) continue;
+    if (Boolean(row.fullBlock) || Boolean(row.exclusive)) {
+      return 0;
+    }
+    usedGuests += Math.max(0, Number(row.guestsCount || 0));
+  }
+  return Math.max(0, capacity - usedGuests);
+}
+
 async function hallCalendarAvailability(env, payload = {}) {
   const halls = (await venueHalls(env)).filter((hall) => hall.active);
   const settings = await venueSettings(env);
@@ -2585,46 +2604,31 @@ async function hallCalendarAvailability(env, payload = {}) {
   );
   const days = [];
   let firstAvailableDate = "";
+  const smallHall = halls.find((hall) => hall.hallKind === "small") || null;
+  const largeHall = halls.find((hall) => hall.hallKind === "large") || null;
   const maxHallDate = addYearsYmd(today, 3);
   const requestedWindowEnd = addDaysYmd(startDate, HALL_PUBLIC_CALENDAR_DAYS - 1);
   const lastCalendarDay = requestedWindowEnd > maxHallDate ? maxHallDate : requestedWindowEnd;
   const calendarDays = Math.max(1, nightsCount(startDate, addOneDayYmd(lastCalendarDay)));
   for (let offset = 0; offset < calendarDays; offset += 1) {
     const reservationDate = addDaysYmd(startDate, offset);
-    let dayAvailable = false;
-    for (const hall of halls) {
-      try {
-        const availability = await hallAvailabilityAtSlot(
-          env,
-          hall,
-          settings,
-          {
-            reservationDate,
-            startTime: calendarCheckTime,
-            durationHours,
-            guestsCount,
-            exclusive: false,
-          },
-          null,
-          {
-            skipMinAdvance: true,
-            rows: rowsByHallId.get(hall.id) || [],
-          }
-        );
-        if (availability.available) {
-          dayAvailable = true;
-          break;
-        }
-      } catch {
-        /* ignore and check next hall */
-      }
-    }
+    const smallRemaining = smallHall
+      ? dayCapacityForSmallHall(smallHall, rowsByHallId.get(smallHall.id) || [], reservationDate)
+      : 0;
+    const largeRemaining = largeHall
+      ? dayCapacityForLargeHall(largeHall, rowsByHallId.get(largeHall.id) || [], reservationDate)
+      : 0;
+    const smallFits = smallRemaining > 0 && guestsCount <= smallRemaining;
+    const largeFits = largeRemaining > 0 && guestsCount <= largeRemaining;
+    const dayAvailable = smallFits || largeFits;
     const day = {
       reservationDate,
       closed: false,
       available: dayAvailable,
       slots: [],
       firstTime: "",
+      smallRemaining,
+      largeRemaining,
     };
     days.push(day);
     if (!firstAvailableDate && day.available) {
