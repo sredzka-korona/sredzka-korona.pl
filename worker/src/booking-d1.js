@@ -1440,50 +1440,130 @@ async function seedDefaults(env) {
   }
 }
 
-async function expireReservations(env) {
+function maintenanceRequestLike(env) {
+  const fallbackUrl = cleanString(env.PUBLIC_SITE_URL, 1000) || "https://example.com";
+  return { url: fallbackUrl };
+}
+
+async function expireGroupAndNotify(env, { service, table, initialStatus, expiresColumn, clientEventKey, notifyAdmin }) {
   const now = nowMs();
-  const hotelEmail = await env.DB.prepare(
-    "UPDATE hotel_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='email_verification_pending' AND email_verification_expires_at IS NOT NULL AND email_verification_expires_at < ?"
+  const rows = await env.DB.prepare(
+    `SELECT * FROM ${table}
+     WHERE status = ?
+       AND ${expiresColumn} IS NOT NULL
+       AND ${expiresColumn} < ?`
   )
-    .bind(now, now)
-    .run();
-  const hotelPending = await env.DB.prepare(
-    "UPDATE hotel_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='pending' AND pending_expires_at IS NOT NULL AND pending_expires_at < ?"
-  )
-    .bind(now, now)
-    .run();
-  const restaurantEmail = await env.DB.prepare(
-    "UPDATE restaurant_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='email_verification_pending' AND email_verification_expires_at IS NOT NULL AND email_verification_expires_at < ?"
-  )
-    .bind(now, now)
-    .run();
-  const restaurantPending = await env.DB.prepare(
-    "UPDATE restaurant_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='pending' AND pending_expires_at IS NOT NULL AND pending_expires_at < ?"
-  )
-    .bind(now, now)
-    .run();
-  const venueEmail = await env.DB.prepare(
-    "UPDATE venue_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='email_verification_pending' AND email_verification_expires_at IS NOT NULL AND email_verification_expires_at < ?"
-  )
-    .bind(now, now)
-    .run();
-  const venuePending = await env.DB.prepare(
-    "UPDATE venue_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE status='pending' AND pending_expires_at IS NOT NULL AND pending_expires_at < ?"
-  )
-    .bind(now, now)
-    .run();
+    .bind(initialStatus, now)
+    .all();
+  const expiredRows = rows.results || [];
+  if (!expiredRows.length) {
+    return 0;
+  }
+  const requestLike = maintenanceRequestLike(env);
+  const adminRecipients = notifyAdmin ? parseAdminNotifyEmails(env) : [];
+  let changed = 0;
+  for (const row of expiredRows) {
+    const update = await env.DB.prepare(
+      `UPDATE ${table}
+       SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, pending_expires_at=NULL, updated_at=?
+       WHERE id = ? AND status = ?`
+    )
+      .bind(now, row.id, initialStatus)
+      .run();
+    const rowChanged = Number(update.meta?.changes || 0);
+    if (!rowChanged) {
+      continue;
+    }
+    changed += rowChanged;
+    try {
+      await sendTemplatedBookingMail(env, requestLike, {
+        service,
+        eventKey: clientEventKey,
+        row: { ...row, status: "expired", pending_expires_at: null },
+        to: row.email || "",
+      });
+    } catch (error) {
+      console.error(`${service} ${clientEventKey} mail error:`, error);
+    }
+    if (adminRecipients.length) {
+      for (const adminEmail of adminRecipients) {
+        try {
+          await sendTemplatedBookingMail(env, requestLike, {
+            service,
+            eventKey: `${service === "restaurant" ? "restaurant_" : service === "hall" ? "hall_" : ""}expired_pending_admin`,
+            row: { ...row, status: "expired", pending_expires_at: null },
+            to: adminEmail,
+          });
+        } catch (error) {
+          console.error(`${service} expired_pending_admin mail error:`, error);
+        }
+      }
+    }
+  }
+  return changed;
+}
+
+async function expireReservations(env) {
+  const hotelEmail = await expireGroupAndNotify(env, {
+    service: "hotel",
+    table: "hotel_reservations",
+    initialStatus: "email_verification_pending",
+    expiresColumn: "email_verification_expires_at",
+    clientEventKey: "expired_email_client",
+    notifyAdmin: false,
+  });
+  const hotelPending = await expireGroupAndNotify(env, {
+    service: "hotel",
+    table: "hotel_reservations",
+    initialStatus: "pending",
+    expiresColumn: "pending_expires_at",
+    clientEventKey: "expired_pending_client",
+    notifyAdmin: true,
+  });
+  const restaurantEmail = await expireGroupAndNotify(env, {
+    service: "restaurant",
+    table: "restaurant_reservations",
+    initialStatus: "email_verification_pending",
+    expiresColumn: "email_verification_expires_at",
+    clientEventKey: "restaurant_expired_email_client",
+    notifyAdmin: false,
+  });
+  const restaurantPending = await expireGroupAndNotify(env, {
+    service: "restaurant",
+    table: "restaurant_reservations",
+    initialStatus: "pending",
+    expiresColumn: "pending_expires_at",
+    clientEventKey: "restaurant_expired_pending_client",
+    notifyAdmin: true,
+  });
+  const venueEmail = await expireGroupAndNotify(env, {
+    service: "hall",
+    table: "venue_reservations",
+    initialStatus: "email_verification_pending",
+    expiresColumn: "email_verification_expires_at",
+    clientEventKey: "hall_expired_email_client",
+    notifyAdmin: false,
+  });
+  const venuePending = await expireGroupAndNotify(env, {
+    service: "hall",
+    table: "venue_reservations",
+    initialStatus: "pending",
+    expiresColumn: "pending_expires_at",
+    clientEventKey: "hall_expired_pending_client",
+    notifyAdmin: true,
+  });
   return {
     hotel: {
-      emailVerification: Number(hotelEmail.meta?.changes || 0),
-      pending: Number(hotelPending.meta?.changes || 0),
+      emailVerification: hotelEmail,
+      pending: hotelPending,
     },
     restaurant: {
-      emailVerification: Number(restaurantEmail.meta?.changes || 0),
-      pending: Number(restaurantPending.meta?.changes || 0),
+      emailVerification: restaurantEmail,
+      pending: restaurantPending,
     },
     hall: {
-      emailVerification: Number(venueEmail.meta?.changes || 0),
-      pending: Number(venuePending.meta?.changes || 0),
+      emailVerification: venueEmail,
+      pending: venuePending,
     },
   };
 }
@@ -2355,7 +2435,7 @@ function hallTimeWindow(settings, startTime, durationHours) {
 
 async function hallReservationRows(env, hallId, excludeId = null) {
   const rows = await env.DB.prepare(
-    `SELECT id, guests_count AS guestsCount, exclusive, full_block AS fullBlock, start_ms AS startMs, end_ms AS endMs
+    `SELECT id, reservation_date AS reservationDate, guests_count AS guestsCount, exclusive, full_block AS fullBlock, start_ms AS startMs, end_ms AS endMs
      FROM venue_reservations
      WHERE hall_id = ?
        AND status IN ('email_verification_pending','pending','confirmed','manual_block')
@@ -2365,6 +2445,7 @@ async function hallReservationRows(env, hallId, excludeId = null) {
     .all();
   return (rows.results || []).map((row) => ({
     id: row.id,
+    reservationDate: cleanString(row.reservationDate, 10),
     guestsCount: Number(row.guestsCount || 0),
     exclusive: Boolean(row.exclusive),
     fullBlock: Boolean(row.fullBlock),
@@ -2376,16 +2457,13 @@ async function hallReservationRows(env, hallId, excludeId = null) {
 function hallAvailabilityFromRows(hall, rows, payload) {
   const startMs = Number(payload.startMs || 0);
   const endMs = Number(payload.endMs || 0);
+  const reservationDate = cleanString(payload.reservationDate, 10);
   const guestsCount = Math.max(0, toInt(payload.guestsCount, hall.hallKind === "small" ? 1 : 10));
   const exclusive = hall.hallKind === "small" ? true : Boolean(payload.exclusive);
   const fullBlock = hallFullBlock(hall, guestsCount, exclusive);
-  const bufferMs = Math.max(0, toInt(hall.bufferMinutes, 60)) * 60000;
   let usedGuests = 0;
   for (const row of rows || []) {
-    const existingStart = Number(row.startMs || 0) - bufferMs;
-    const existingEnd = Number(row.endMs || 0) + bufferMs;
-    const overlap = startMs < existingEnd && endMs > existingStart;
-    if (!overlap) continue;
+    if (cleanString(row.reservationDate, 10) !== reservationDate) continue;
     const existingFull = Boolean(row.fullBlock) || Boolean(row.exclusive);
     if (hall.hallKind === "small") {
       return { ok: false, available: false, maxGuests: 0, hall, startMs, endMs, guestsCount, exclusive, fullBlock };
@@ -2426,15 +2504,12 @@ async function hallAvailabilityAtSlot(env, hall, settings, payload, excludeId = 
   if (reservationDate > maxHallDate) {
     throw new Error("Rezerwację sali można złożyć maksymalnie na 3 lata do przodu.");
   }
-  const startMs = ymdHmToMsWarsaw(reservationDate, startTime);
-  const endMs = startMs + durationHours * 3600000;
-  const nowHall = nowMs();
-  if (!Number.isFinite(startMs) || startMs < nowHall - 60 * 1000) {
+  if (reservationDate < today) {
     throw new Error("Nie można rezerwować terminu z przeszłości.");
   }
-  if (!options.skipMinAdvance && startMs < nowHall + HALL_MIN_ADVANCE_MS) {
-    throw new Error("Wybierz termin co najmniej 2 godziny od teraz.");
-  }
+  const startMs = ymdHmToMsWarsaw(reservationDate, startTime);
+  const endMs = startMs + durationHours * 3600000;
+  if (!Number.isFinite(startMs)) throw new Error("Nieprawidłowa data lub godzina.");
   hallTimeWindow(settings, startTime, durationHours);
   const rows = Array.isArray(options.rows) ? options.rows : await hallReservationRows(env, hall.id, excludeId);
   return hallAvailabilityFromRows(hall, rows, {
@@ -2464,6 +2539,9 @@ function buildHallCandidateSlots(settings, durationHours) {
 async function hallCalendarAvailability(env, payload = {}) {
   const halls = (await venueHalls(env)).filter((hall) => hall.active);
   const settings = await venueSettings(env);
+  const requestedStartTime = isHm(cleanString(payload.startTime, 5))
+    ? cleanString(payload.startTime, 5)
+    : "12:00";
   const requestedDate = cleanString(payload.reservationDate, 10);
   const startDateRaw = cleanString(payload.startDate, 10);
   const today = todayYmdInWarsaw();
@@ -2476,7 +2554,6 @@ async function hallCalendarAvailability(env, payload = {}) {
       rowsByHallId.set(hall.id, await hallReservationRows(env, hall.id, null));
     })
   );
-  const slotsTemplate = buildHallCandidateSlots(settings, durationHours);
   const days = [];
   let firstAvailableDate = "";
   let firstAvailableTime = "";
@@ -2486,53 +2563,40 @@ async function hallCalendarAvailability(env, payload = {}) {
   const calendarDays = Math.max(1, nightsCount(startDate, addOneDayYmd(lastCalendarDay)));
   for (let offset = 0; offset < calendarDays; offset += 1) {
     const reservationDate = addDaysYmd(startDate, offset);
-    const availableSlots = [];
-    for (const slot of slotsTemplate) {
-      const startCheck = ymdHmToMsWarsaw(reservationDate, slot);
-      if (!Number.isFinite(startCheck)) {
-        continue;
-      }
-      if (startCheck < nowMs() + HALL_MIN_ADVANCE_MS) {
-        continue;
-      }
-      let slotAvailable = false;
-      for (const hall of halls) {
-        try {
-          const availability = await hallAvailabilityAtSlot(
-            env,
-            hall,
-            settings,
-            {
-              reservationDate,
-              startTime: slot,
-              durationHours,
-              guestsCount,
-              exclusive: false,
-            },
-            null,
-            {
-              skipMinAdvance: true,
-              rows: rowsByHallId.get(hall.id) || [],
-            }
-          );
-          if (availability.available) {
-            slotAvailable = true;
-            break;
+    let dayAvailable = false;
+    for (const hall of halls) {
+      try {
+        const availability = await hallAvailabilityAtSlot(
+          env,
+          hall,
+          settings,
+          {
+            reservationDate,
+            startTime: requestedStartTime,
+            durationHours,
+            guestsCount,
+            exclusive: false,
+          },
+          null,
+          {
+            skipMinAdvance: true,
+            rows: rowsByHallId.get(hall.id) || [],
           }
-        } catch {
-          /* invalid slot for this day */
+        );
+        if (availability.available) {
+          dayAvailable = true;
+          break;
         }
-      }
-      if (slotAvailable) {
-        availableSlots.push(slot);
+      } catch {
+        /* ignore and check next hall */
       }
     }
     const day = {
       reservationDate,
       closed: false,
-      available: availableSlots.length > 0,
-      slots: availableSlots,
-      firstTime: availableSlots[0] || "",
+      available: dayAvailable,
+      slots: dayAvailable ? [requestedStartTime] : [],
+      firstTime: dayAvailable ? requestedStartTime : "",
     };
     days.push(day);
     if (!firstAvailableDate && day.available) {

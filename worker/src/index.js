@@ -1402,8 +1402,16 @@ function binaryResponse(object, contentType, request, env, extraHeaders = {}) {
 
 function corsHeaders(request, env) {
   const origin = request.headers.get("Origin");
-  const allowedOrigin = env.ALLOWED_ORIGIN || origin || "*";
-  const canUseOrigin = allowedOrigin === "*" ? "*" : origin && origin === allowedOrigin ? origin : allowedOrigin;
+  const allowedRaw = String(env.ALLOWED_ORIGIN || "*")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const allowAll = allowedRaw.includes("*") || allowedRaw.length === 0;
+  const canUseOrigin = allowAll
+    ? "*"
+    : origin && allowedRaw.includes(origin)
+      ? origin
+      : allowedRaw[0];
   return {
     "Access-Control-Allow-Origin": canUseOrigin,
     "Access-Control-Allow-Credentials": "true",

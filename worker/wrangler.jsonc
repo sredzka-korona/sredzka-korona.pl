@@ -19,7 +19,7 @@
     }
   ],
   "vars": {
-    "ALLOWED_ORIGIN": "https://sredzka-korona.pl",
+    "ALLOWED_ORIGIN": "https://sredzka-korona.pl,https://www.sredzka-korona.pl",
     "FIREBASE_PROJECT_ID": "sredzka-korona",
     "FIREBASE_ADMIN_EMAILS": "kontakt@sredzka-korona.pl",
     "PUBLIC_SITE_URL": "https://sredzka-korona.pl",

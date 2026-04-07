@@ -8,7 +8,7 @@
   const PAGE_VISIT_ID =
     window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   /** Podbij przy zmianach w modalu — wymusza odświeżenie cache CSS po wdrożeniu. */
-  const GB_MODAL_ASSET_VERSION = "20260407-3";
+  const GB_MODAL_ASSET_VERSION = "20260407-4";
   const SERVICE_KEYS = ["hotel", "restaurant", "events"];
   const requestLocks = Object.create(null);
   const RESTAURANT_DURATION_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4];
@@ -1345,9 +1345,7 @@
       <section class="gb-rest-datetime-step">
         <h3>Kalendarz</h3>
         <p class="gb-inline-note gb-rest-hours-note">${escapeHtml(hoursLabel)}</p>
-        <div class="gb-rest-datetime-calendar-wrap">
-          ${renderAvailabilityCalendar("restaurant", state.restaurant.calendarMonth, state.restaurant.reservationDate, state.restaurant.calendarDays, state.restaurant.calendarLoading)}
-        </div>
+        ${renderAvailabilityCalendar("restaurant", state.restaurant.calendarMonth, state.restaurant.reservationDate, state.restaurant.calendarDays, state.restaurant.calendarLoading)}
         <div class="gb-rest-datetime-controls gb-grid-2">
           <label class="gb-field gb-field--time-like">
             <span>Czas rezerwacji</span>
