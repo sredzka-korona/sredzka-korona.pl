@@ -360,9 +360,9 @@ body.gb-modal-open {
 }
 
 #gb-modal .gb-calendar-title-wrap {
-  display: grid;
-  justify-items: center;
-  gap: 0.4rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   min-width: 0;
   flex: 1 1 auto;
 }
@@ -374,9 +374,10 @@ body.gb-modal-open {
 
 #gb-modal .gb-calendar-jump {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
   gap: 0.45rem;
+  align-items: center;
 }
 
 #gb-modal .gb-calendar-jump-select {
@@ -387,6 +388,7 @@ body.gb-modal-open {
   color: var(--gb-text);
   padding: 0.28rem 0.75rem;
   text-align: center;
+  text-align-last: center;
 }
 
 #gb-modal .gb-calendar-jump-select--year {
@@ -1507,16 +1509,12 @@ body.gb-modal-open {
     align-items: flex-start;
   }
 
-  #gb-modal .gb-calendar-title-wrap {
-    gap: 0.55rem;
-  }
-
   #gb-modal .gb-calendar-jump {
-    width: 100%;
+    width: auto;
   }
 
   #gb-modal .gb-calendar-jump-select {
-    flex: 1 1 0;
+    flex: 0 1 auto;
   }
 
   #gb-modal .gb-events-guests-row {

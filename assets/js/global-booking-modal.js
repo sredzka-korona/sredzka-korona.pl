@@ -412,7 +412,6 @@
         <div class="gb-calendar-head">
           <button type="button" class="gb-calendar-nav" data-calendar-nav="${escapeHtml(prefix)}:-1" ${previousDisabled || loading ? "disabled" : ""}>‹</button>
           <div class="gb-calendar-title-wrap">
-            <strong class="gb-calendar-title">${escapeHtml(monthLabel(currentMonth))}</strong>
             <div class="gb-calendar-jump" data-calendar-jump-group="${escapeHtml(prefix)}">
               <select
                 class="gb-calendar-jump-select"
@@ -1586,7 +1585,6 @@
     }
     return `
       <section>
-        <p class="gb-hint" style="margin:0 0 0.75rem;">Kalendarz nie uwzględnia godzin. Pokazuje wyłącznie dni, w których możemy przyjąć <strong>${escapeHtml(String(state.events.guestsCount))}</strong> gości.</p>
         ${renderAvailabilityCalendar("events", state.events.calendarMonth, state.events.reservationDate, state.events.calendarDays, state.events.calendarLoading)}
         <div class="gb-actions">
           <button type="button" class="gb-btn gb-btn-secondary" id="gb-back">Wróć</button>
