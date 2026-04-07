@@ -1231,6 +1231,10 @@ const restaurantApi = onRequest(
           json(res, { error: "Nie znaleziono." }, 404);
           return;
         }
+        if (!["pending", "confirmed", "email_verification_pending"].includes(String(before.status || "").trim())) {
+          json(res, { error: "Nie można anulować tego statusu." }, 400);
+          return;
+        }
         await releaseLocksForReservation(db, id);
         await db.collection("restaurantReservations").doc(id).update({
           status: "cancelled",

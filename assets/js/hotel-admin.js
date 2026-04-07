@@ -108,6 +108,10 @@
     return `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
   }
 
+  function canCancelReservationStatus(status) {
+    return ["pending", "confirmed", "email_verification_pending"].includes(String(status || "").trim().toLowerCase());
+  }
+
   let hotelSubTab = "reservations";
   let hotelResFilter = "active";
   let roomsData = [];
@@ -596,7 +600,11 @@
         <td class="hotel-countdown" data-pending="${r.pendingExpiresAt || ""}" data-email-exp="${r.emailVerificationExpiresAt || ""}" data-status="${escapeHtml(r.status)}">${r.status === "pending" ? countdown(r.pendingExpiresAt) : r.status === "email_verification_pending" ? countdown(r.emailVerificationExpiresAt) : "—"}</td>
         <td class="admin-row-actions">
           <button type="button" class="button secondary hotel-res-edit" data-id="${escapeHtml(r.id)}">Edytuj</button>
-          <button type="button" class="button secondary danger-muted hotel-res-cancel" data-id="${escapeHtml(r.id)}">Anuluj</button>
+          ${
+            canCancelReservationStatus(r.status)
+              ? `<button type="button" class="button secondary danger-muted hotel-res-cancel" data-id="${escapeHtml(r.id)}">Anuluj</button>`
+              : ""
+          }
         </td>
       </tr>`
       )

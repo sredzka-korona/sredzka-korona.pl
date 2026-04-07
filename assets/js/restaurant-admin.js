@@ -112,6 +112,10 @@
     return `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
   }
 
+  function canCancelReservationStatus(status) {
+    return ["pending", "confirmed", "email_verification_pending"].includes(String(status || "").trim().toLowerCase());
+  }
+
   function parseTimeToMinutes(value) {
     const match = String(value || "").trim().match(/^([01]\d|2[0-3]):([0-5]\d)$/);
     if (!match) return null;
@@ -483,7 +487,11 @@
         <td>${formatMs(r.createdAtMs)}</td>
         <td class="admin-row-actions">
           <button type="button" class="button secondary rest-res-edit" data-id="${escapeHtml(r.id)}">Edytuj</button>
-          <button type="button" class="button secondary danger-muted rest-res-cancel" data-id="${escapeHtml(r.id)}">Anuluj</button>
+          ${
+            canCancelReservationStatus(r.status)
+              ? `<button type="button" class="button secondary danger-muted rest-res-cancel" data-id="${escapeHtml(r.id)}">Anuluj</button>`
+              : ""
+          }
         </td>
       </tr>`
       )

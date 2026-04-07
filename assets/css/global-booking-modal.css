@@ -1423,7 +1423,10 @@ body.gb-modal-open {
     border-radius: 22px;
   }
 
-  #gb-modal .gb-service-tiles,
+  #gb-modal .gb-service-tiles {
+    grid-template-columns: 1fr;
+  }
+
   #gb-modal .gb-grid-3,
   #gb-modal .gb-grid-4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -1974,6 +1974,13 @@
       .toLowerCase() === "cancelled";
   }
 
+  function scheduleCanCancel(item) {
+    const status = String(item?.status || "")
+      .trim()
+      .toLowerCase();
+    return ["pending", "confirmed", "email_verification_pending"].includes(status);
+  }
+
   function scheduleRegistryItemMarkup(item) {
     const createdLabel = item.createdAtMs ? scheduleFormatDateTime(item.createdAtMs) : "Brak daty utworzenia";
     const registryToneClass = `${scheduleIsPast(item) ? " is-past" : ""}${scheduleIsCancelled(item) ? " is-cancelled" : ""}`;
@@ -2142,7 +2149,9 @@
   }
 
   function scheduleListItemBottomActionsMarkup(kind, item) {
-    const cancelBtn = `<button type="button" class="button secondary danger-muted schedule-inline-cancel schedule-card-action-cancel" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`;
+    const cancelBtn = scheduleCanCancel(item)
+      ? `<button type="button" class="button secondary danger-muted schedule-inline-cancel schedule-card-action-cancel" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`
+      : "";
     if (kind === "pending") {
       const confirmBtn = `<button type="button" class="button secondary schedule-card-action-confirm" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>`;
       return `${cancelBtn}${confirmBtn}`;
@@ -2384,7 +2393,11 @@
                           ${
                             item.status !== "manual_block"
                               ? `<div class="schedule-card-actions-bottom">
-                            <button type="button" class="button secondary danger-muted schedule-inline-cancel schedule-card-action-cancel" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>
+                            ${
+                              scheduleCanCancel(item)
+                                ? `<button type="button" class="button secondary danger-muted schedule-inline-cancel schedule-card-action-cancel" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`
+                                : ""
+                            }
                             ${
                               item.status === "pending"
                                 ? `<button type="button" class="button secondary schedule-card-action-confirm" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>`
@@ -2592,6 +2605,7 @@
 
   function scheduleReservationDetailsMarkup(item) {
     const isBlock = item.status === "manual_block";
+    const canCancelReservation = scheduleCanCancel(item);
     const rows = [];
     const notes = [];
 
@@ -2711,9 +2725,13 @@
         ${scheduleReservationDetailsMarkup(item)}
         <div class="admin-modal-footer schedule-modal-footer">
           <div class="schedule-details-footer-actions">
-            <button type="button" class="button ${isBlock ? "danger icon-button" : "danger"}" data-schedule-details-action="delete" aria-label="${escapeAttribute(
-              isBlock ? "Usuń blokadę" : "Odwołaj rezerwację"
-            )}">${isBlock ? scheduleIconMarkup("trash") : "Odwołaj rezerwację"}</button>
+            ${
+              isBlock || canCancelReservation
+                ? `<button type="button" class="button ${isBlock ? "danger icon-button" : "danger"}" data-schedule-details-action="delete" aria-label="${escapeAttribute(
+                    isBlock ? "Usuń blokadę" : "Odwołaj rezerwację"
+                  )}">${isBlock ? scheduleIconMarkup("trash") : "Odwołaj rezerwację"}</button>`
+                : ""
+            }
             ${
               item.status === "pending"
                 ? `<button type="button" class="button secondary" data-schedule-details-action="confirm">Potwierdź</button>`
