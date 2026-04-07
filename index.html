@@ -887,6 +887,10 @@
         padding-right: 10%;
       }
 
+      .main-split-section:nth-child(3) .main-split-overlay-stack {
+        transform: translateX(0.45rem);
+      }
+
       .main-split-section:hover .main-split-overlay {
         opacity: 1;
       }
@@ -1831,7 +1835,7 @@
                 text: "Komfortowe pokoje dla gosci indywidualnych, rodzin i uczestnikow wydarzen.",
               },
               {
-                title: "Przyjecia",
+                title: "Przyjęcia",
                 text: "Sale na wesela, komunie, jubileusze, spotkania firmowe i kameralne kolacje.",
               },
             ],
@@ -2081,7 +2085,7 @@
             : window.location.hostname && !window.location.hostname.endsWith("github.io")
               ? "https://api." + window.location.hostname.replace(/^www\./, "")
               : "";
-        const BOOTSTRAP_CACHE_KEY = "sredzka-korona:bootstrap-cache:v2";
+        const BOOTSTRAP_CACHE_KEY = "sredzka-korona:bootstrap-cache:v3";
         const BOOTSTRAP_TTL_MS = 2 * 60 * 1000;
 
         function readBootstrapCache() {
@@ -2109,14 +2113,18 @@
 
         async function loadBootstrapPayload(base) {
           const cached = readBootstrapCache();
-          if (cached) return cached;
-          const response = await fetch(base + "/api/public/bootstrap");
-          if (!response.ok) {
-            throw new Error("bootstrap unavailable");
+          try {
+            const response = await fetch(base + "/api/public/bootstrap", { cache: "no-store" });
+            if (!response.ok) {
+              throw new Error("bootstrap unavailable");
+            }
+            const payload = await response.json();
+            writeBootstrapCache(payload);
+            return payload;
+          } catch (error) {
+            if (cached) return cached;
+            throw error;
           }
-          const payload = await response.json();
-          writeBootstrapCache(payload);
-          return payload;
         }
 
         const state = {
@@ -2131,7 +2139,7 @@
           { id: "services", label: "Uslugi" },
           { id: "hotel", label: "Hotel", indent: true },
           { id: "restaurant", label: "Restauracja", indent: true },
-          { id: "events", label: "Przyjecia", indent: true },
+          { id: "events", label: "Przyjęcia", indent: true },
           { id: "availability", label: "Kalendarz" },
           { id: "contact", label: "Kontakt" },
         ];
@@ -2242,7 +2250,7 @@
               images: content.restaurant.gallery?.images || [],
             },
             events: {
-              title: "Przyjecia",
+              title: "Przyjęcia",
               description: content.events.intro,
               coverUrl: content.events.gallery?.coverUrl || "",
               images: content.events.gallery?.images || [],
@@ -2399,7 +2407,7 @@
                   })()}
                   ${(() => {
                     const media = resolveSectionMedia("events");
-                    return renderMainSplitSection("events", "./Przyjec/index.html", "Przyjecia", media, false);
+                    return renderMainSplitSection("events", "./Przyjec/index.html", "Przyjęcia", media, false);
                   })()}
                 </div>
               </div>

@@ -6,6 +6,10 @@ const MAX_MEDIA_FILE_BYTES = 1_700_000;
 const BOOTSTRAP_EDGE_CACHE_TTL_MS = 30 * 1000;
 const bootstrapPayloadCache = new Map();
 
+function invalidateBootstrapPayloadCache() {
+  bootstrapPayloadCache.clear();
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -96,6 +100,7 @@ export default {
         await requireFirebaseAdmin(request, env);
         const payload = await request.json();
         const row = await createSiteNotification(env, payload);
+        invalidateBootstrapPayloadCache();
         return jsonResponse({ notification: row }, 201, request, env);
       }
 
@@ -104,6 +109,7 @@ export default {
         const id = Number(url.pathname.split("/").pop());
         const payload = await request.json();
         const row = await updateSiteNotification(env, id, payload);
+        invalidateBootstrapPayloadCache();
         return jsonResponse({ notification: row }, 200, request, env);
       }
 
@@ -111,6 +117,7 @@ export default {
         await requireFirebaseAdmin(request, env);
         const id = Number(url.pathname.split("/").pop());
         await deleteSiteNotification(env, id);
+        invalidateBootstrapPayloadCache();
         return jsonResponse({ ok: true }, 200, request, env);
       }
 
