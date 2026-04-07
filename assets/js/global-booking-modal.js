@@ -288,9 +288,25 @@
     return out;
   }
 
+  function eventHallCapacityByKind(kind) {
+    const halls = Array.isArray(state.events.halls) ? state.events.halls : [];
+    const direct = halls.find((hall) => hall?.hallKind === kind);
+    if (direct) return Math.max(0, toInt(direct.capacity, kind === "small" ? 40 : 120));
+    if (kind === "small") {
+      const fallback = halls.find((hall) => toInt(hall?.capacity, 0) > 0 && toInt(hall.capacity, 0) <= 40);
+      return fallback ? Math.max(0, toInt(fallback.capacity, 40)) : 40;
+    }
+    const fallback = halls
+      .filter((hall) => toInt(hall?.capacity, 0) > 40)
+      .sort((a, b) => toInt(b?.capacity, 0) - toInt(a?.capacity, 0))[0];
+    return fallback ? Math.max(0, toInt(fallback.capacity, 120)) : 120;
+  }
+
   function renderEventsCapacityStatus(dayInfo) {
-    const small = Math.max(0, toInt(dayInfo?.smallRemaining, 0));
-    const large = Math.max(0, toInt(dayInfo?.largeRemaining, 0));
+    const hasSmall = Number.isFinite(Number(dayInfo?.smallRemaining));
+    const hasLarge = Number.isFinite(Number(dayInfo?.largeRemaining));
+    const small = hasSmall ? Math.max(0, toInt(dayInfo?.smallRemaining, 0)) : eventHallCapacityByKind("small");
+    const large = hasLarge ? Math.max(0, toInt(dayInfo?.largeRemaining, 0)) : eventHallCapacityByKind("large");
     return `
       <span class="gb-calendar-capacity" aria-label="Mała sala ${small}, duża sala ${large}">
         <span class="gb-calendar-capacity-value">${escapeHtml(String(small))}</span>
@@ -999,6 +1015,7 @@
       render();
     }
     try {
+      await ensureEventHallsLoaded();
       const data = await api("events", "public-calendar", {
         method: "POST",
         body: {
