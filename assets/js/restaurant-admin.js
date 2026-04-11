@@ -493,10 +493,20 @@
         `<p class="helper">Ten widok pokazuje szablon <strong>jedynej wiadomości do odbiorcy</strong> — o przyjęciu rezerwacji dostawy (po utworzeniu w grafiku / panelu, po potwierdzeniu oczekującej lub z pytania po zapisie w grafiku).</p>
         <p class="helper">Zmienne: <code>{{fullName}}</code>, <code>{{restaurantName}}</code>, <code>{{reservationNumber}}</code> oraz bloki HTML: <code>{{cateringWhenHtml}}</code> (pierwsza data i godzina dostawy, ewent. lista terminów), <code>{{cateringCycleHtml}}</code> (jednorazowo / co ile / do kiedy), <code>{{cateringRecipientHtml}}</code>, <code>{{cateringDescriptionHtml}}</code> (opis zamówienia — może być pusty).</p>`
       : `<p class="helper">Zmienne m.in.: <code>{{reservationNumber}}</code> (np. slug/CATERING/rok), <code>{{fullName}}</code>, <code>{{email}}</code>, <code>{{phone}}</code>, <code>{{date}}</code>, <code>{{timeFrom}}</code>, <code>{{timeTo}}</code>, <code>{{customerNote}}</code>, <code>{{restaurantName}}</code>.</p>`;
+    const showResetCateringConfirmed =
+      keys.includes("restaurant_confirmed_client") || keys.includes("rest_confirmed_client");
     return `
       <div class="hotel-subpanel">
         <h3>Szablony mailingowe — catering</h3>
         ${helperBlock}
+        ${
+          showResetCateringConfirmed
+            ? `<p class="inline-actions" style="margin:0 0 1rem 0;flex-wrap:wrap;gap:0.5rem;">
+            <button type="button" class="button secondary" id="rest-catering-reset-confirmed-default">Przywróć domyślny szablon potwierdzenia dostawy</button>
+            <span class="helper" style="margin:0;">Nadpisze temat i treść szablonu <code>restaurant_confirmed_client</code> aktualną wersją systemową (numer, pierwsza dostawa, cykl, odbiorca).</span>
+          </p>`
+            : ""
+        }
         <p class="helper">Logo, przycisk akcji i premium-layout wiadomości są dodawane automatycznie przy wysyłce. W polu poniżej edytujesz główną treść maila.</p>
         <p class="helper">Podgląd pokazuje wiadomość z przykładowymi danymi dostawy. Przy szablonie z <code>{{confirmationLink}}</code> możesz ustawić tekst przycisku w polu poniżej.</p>
         <div id="rest-template-forms">
@@ -660,6 +670,36 @@
       });
       document.querySelectorAll(".rest-res-cancel").forEach((btn) => {
         btn.addEventListener("click", () => quickCancelRestaurant(btn.getAttribute("data-id")));
+      });
+
+      document.querySelector("#rest-catering-reset-confirmed-default")?.addEventListener("click", async () => {
+        if (
+          !window.confirm(
+            "Zastąpić temat i treść szablonu potwierdzenia dostawy cateringu domyślną wersją z systemu (bloki: pierwsza dostawa, cykl, odbiorca)?"
+          )
+        ) {
+          return;
+        }
+        try {
+          const out = await restaurantApi("admin-catering-confirmed-template-reset-default", {
+            method: "POST",
+            body: {},
+          });
+          if (out && out.templates && typeof out.templates === "object") {
+            templatesData = out.templates;
+          } else {
+            const d = await restaurantApi("admin-mail-templates", { method: "GET" });
+            templatesData = d.templates || {};
+          }
+          const mount = document.querySelector("#rest-sub-content");
+          if (mount) {
+            mount.innerHTML = renderTemplates();
+            bindSub();
+          }
+          alert("Przywrócono domyślny szablon.");
+        } catch (err) {
+          alert(err.message || "Nie udało się przywrócić szablonu.");
+        }
       });
 
       document.querySelectorAll(".rest-save-tpl").forEach((btn) => {

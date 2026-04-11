@@ -2556,7 +2556,7 @@ body.admin-modal-open {
 .schedule-calendar-nav {
   position: relative;
   justify-self: center;
-  width: min(100%, 420px);
+  width: min(100%, 460px);
   min-width: 0;
   min-height: 44px;
   display: flex;
@@ -2593,9 +2593,10 @@ body.admin-modal-open {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.75rem;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
   max-width: 100%;
+  min-width: 0;
 }
 
 .schedule-calendar-field {
@@ -2608,15 +2609,16 @@ body.admin-modal-open {
   cursor: pointer;
 }
 
+/* Bez basis 100% — inaczej przy wrap miesiąc zajmuje cały rząd i rok spada w dół. */
 .schedule-calendar-field--month {
-  flex: 1 1 min(12.5rem, 100%);
-  min-width: 7.75rem;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .schedule-calendar-field--year {
-  flex: 0 0 5.5rem;
-  width: 5.5rem;
-  min-width: 5.5rem;
+  flex: 0 0 auto;
+  width: 4.85rem;
+  min-width: 4.85rem;
 }
 
 .schedule-calendar-field-label {
@@ -3511,7 +3513,7 @@ button.icon-btn {
   }
 
   .schedule-calendar-nav {
-    width: min(100%, 420px);
+    width: min(100%, 460px);
   }
 
   .schedule-detail-row {

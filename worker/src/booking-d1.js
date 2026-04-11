@@ -3972,6 +3972,18 @@ const EVENT_TEMPLATE_KEYS = {
   },
 };
 
+/**
+ * Stary szablon „stolików” albo bez bloków cateringu — wymiana na domyślny z buildRestaurantDefaultTemplates().
+ */
+function obsoleteCateringConfirmedClientTemplateRow(subject, bodyHtml) {
+  const body = String(bodyHtml || "");
+  const subj = String(subject || "");
+  if (!/\{\{\s*cateringWhenHtml\s*\}\}/iu.test(body)) return true;
+  if (/stolik/i.test(body) || /stolik/i.test(subj)) return true;
+  if (/\{\{\s*tablesList\s*\}\}/u.test(body)) return true;
+  return false;
+}
+
 async function loadTemplates(env, service) {
   const defaults = defaultTemplateMap(service);
   const legacyDefaults = legacyDefaultTemplateMap(service);
@@ -4024,8 +4036,7 @@ async function loadTemplates(env, service) {
     const staleCateringConfirmedTemplate =
       service === "restaurant" &&
       (key === "restaurant_confirmed_client" || key === "rest_confirmed_client") &&
-      (!/\{\{\s*cateringWhenHtml\s*\}\}/iu.test(String(existing.bodyHtml || "")) ||
-        /stolik/i.test(String(existing.subject || "")));
+      obsoleteCateringConfirmedClientTemplateRow(existing.subject, existing.bodyHtml);
     if (matchesAnyTemplateShape(existing, [legacyDefaults[key], ultraLegacyDefaults[key]]) || staleCateringConfirmedTemplate) {
       out[key] = {
         subject: template.subject || "",
@@ -6061,6 +6072,14 @@ async function handleRestaurantAdmin(env, op, request) {
     }
     return { status: 200, data: { ok: true } };
   }
+  if (op === "admin-catering-confirmed-template-reset-default" && request.method === "POST") {
+    const defs = buildRestaurantDefaultTemplates();
+    const t = defs.restaurant_confirmed_client;
+    const al = cleanString(t.actionLabel, 200);
+    await saveTemplate(env, "restaurant", "restaurant_confirmed_client", t.subject, t.bodyHtml, al);
+    await saveTemplate(env, "restaurant", "rest_confirmed_client", t.subject, t.bodyHtml, al);
+    return { status: 200, data: { ok: true, templates: await loadTemplates(env, "restaurant") } };
+  }
   if (op === "admin-mail-templates" && request.method === "GET") {
     return { status: 200, data: { templates: await loadTemplates(env, "restaurant") } };
   }
@@ -6070,6 +6089,9 @@ async function handleRestaurantAdmin(env, op, request) {
     await saveTemplate(env, "restaurant", key, body.subject, body.bodyHtml, body.actionLabel);
     if (key === "restaurant_confirmed_client") {
       await saveTemplate(env, "restaurant", "rest_confirmed_client", body.subject, body.bodyHtml, body.actionLabel);
+    }
+    if (key === "rest_confirmed_client") {
+      await saveTemplate(env, "restaurant", "restaurant_confirmed_client", body.subject, body.bodyHtml, body.actionLabel);
     }
     return { status: 200, data: { ok: true } };
   }

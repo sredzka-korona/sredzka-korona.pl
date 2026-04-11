@@ -3043,6 +3043,90 @@
     });
   }
 
+  /** Heurystyka jak w Workerze (pierwsze dwa terminy posortowane). */
+  function scheduleInferCateringRepeatFromSortedYmds(sortedYmds) {
+    if (!Array.isArray(sortedYmds) || sortedYmds.length < 2) return "";
+    const a = sortedYmds[0];
+    const b = sortedYmds[1];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(a) || !/^\d{4}-\d{2}-\d{2}$/.test(b)) return "";
+    const da = scheduleYmdToDate(a).getTime();
+    const db = scheduleYmdToDate(b).getTime();
+    if (!Number.isFinite(da) || !Number.isFinite(db)) return "";
+    const diffDays = Math.round((db - da) / 86400000);
+    if (diffDays === 7) return "weekly";
+    if (diffDays === 14) return "biweekly";
+    if (diffDays >= 27 && diffDays <= 35) return "monthly";
+    return "";
+  }
+
+  /**
+   * Podsumowanie harmonogramu cateringu: z API (`cateringScheduleSummary`) albo — gdy backend jest starszy —
+   * z agregacji `state.schedule.allItems` (ta sama seria / te same aktywne statusy).
+   */
+  function scheduleCateringScheduleSummaryForItem(item) {
+    const raw = item?.raw || {};
+    if (!raw.cateringDelivery) return null;
+    const fromApi = raw.cateringScheduleSummary;
+    if (fromApi && typeof fromApi === "object" && String(fromApi.firstYmd || "").trim()) {
+      return {
+        firstYmd: String(fromApi.firstYmd || "").trim(),
+        cycleLabel: String(fromApi.cycleLabel || "").trim() || "—",
+        lastIsIndefinite: Boolean(fromApi.lastIsIndefinite),
+        lastYmd: String(fromApi.lastYmd || "").trim(),
+      };
+    }
+
+    const sid = String(raw.cateringSeriesId || "").trim();
+    const all = Array.isArray(state.schedule.allItems) ? state.schedule.allItems : [];
+    const isActive = (x) => SCHEDULE_ACTIVE_STATUSES.has(x.status);
+
+    if (!sid) {
+      const ymd = String(raw.reservationDate || "").slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+      return {
+        firstYmd: ymd,
+        cycleLabel: "Dostawa jednorazowa — bez cyklu powtarzania.",
+        lastIsIndefinite: false,
+        lastYmd: ymd,
+      };
+    }
+
+    const siblings = all.filter(
+      (x) =>
+        x.service === "restaurant" &&
+        x.raw?.cateringDelivery &&
+        isActive(x) &&
+        String(x.raw.cateringSeriesId || "").trim() === sid
+    );
+    const dates = [
+      ...new Set(
+        siblings
+          .map((x) => String(x.raw?.reservationDate || "").slice(0, 10))
+          .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+      ),
+    ].sort();
+    const firstYmd = dates[0] || String(raw.reservationDate || "").slice(0, 10);
+    const lastYmd = dates[dates.length - 1] || firstYmd;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(firstYmd)) return null;
+
+    let cycleLabel = "Dostawa jednorazowa — bez cyklu powtarzania.";
+    if (dates.length >= 2) {
+      const inferred = scheduleInferCateringRepeatFromSortedYmds(dates);
+      if (inferred === "weekly") cycleLabel = "Dostawy powtarzane co tydzień.";
+      else if (inferred === "biweekly") cycleLabel = "Dostawy powtarzane co dwa tygodnie.";
+      else if (inferred === "monthly") cycleLabel = "Dostawy powtarzane co miesiąc.";
+      else
+        cycleLabel = `Seria dostaw: ${dates.length} zaplanowane terminy (wśród wczytanych rezerwacji).`;
+    }
+
+    return {
+      firstYmd,
+      cycleLabel,
+      lastIsIndefinite: false,
+      lastYmd,
+    };
+  }
+
   function scheduleReservationDetailsMarkup(item) {
     const isBlock = item.status === "manual_block";
     const rows = [];
@@ -3118,8 +3202,8 @@
           rows.push(scheduleDetailSheetRowMarkup("Odbiorca", "Brak danych odbiorcy w systemie."));
         }
         rows.push(scheduleDetailSheetRowMarkup("Numer rezerwacji", item.humanNumberLabel || item.raw.humanNumberLabel || "—"));
-        const cs = item.raw.cateringScheduleSummary;
-        if (cs && typeof cs === "object") {
+        const cs = scheduleCateringScheduleSummaryForItem(item);
+        if (cs) {
           rows.push(scheduleDetailSheetRowMarkup("Pierwszy dowóz", scheduleFormatCompactDate(cs.firstYmd)));
           rows.push(scheduleDetailSheetRowMarkup("Cykl dostaw", cs.cycleLabel || "—"));
           rows.push(
