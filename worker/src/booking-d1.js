@@ -6142,14 +6142,18 @@ export async function handleD1BookingApi({ service, op, request, env, isAdmin, v
   await ensureSchema(env);
   await expireReservations(env);
   try {
+    if (service === "restaurant") {
+      return {
+        status: 410,
+        data: { error: "Rezerwacje cateringu są wyłączone." },
+      };
+    }
     if (isAdmin) {
       if (service === "hotel") return await handleHotelAdmin(env, op, request);
-      if (service === "restaurant") return await handleRestaurantAdmin(env, op, request);
       if (service === "hall") return await handleHallAdmin(env, op, request);
       return null;
     }
     if (service === "hotel") return await handleHotelPublic(env, op, request, verifyTurnstileToken);
-    if (service === "restaurant") return await handleRestaurantPublic(env, op, request, verifyTurnstileToken);
     if (service === "hall") return await handleHallPublic(env, op, request, verifyTurnstileToken);
     return null;
   } catch (error) {

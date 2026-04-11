@@ -17,13 +17,31 @@
     />
     <link rel="stylesheet" href="../assets/css/booking-confirm.css" />
   </head>
-  <body class="confirm-body" data-booking-service="restaurant">
+  <body class="confirm-body">
     <div class="confirm-wrap">
       <div class="confirm-card" id="out">
-        <p class="confirm-loading">Trwa otwieranie rezerwacji…</p>
+        <div class="confirm-brand">
+          <a href="../index.html" class="confirm-logo-link" aria-label="Średzka Korona — strona główna">
+            <span class="confirm-logo-text">ŚREDZKA</span>
+            <img
+              class="confirm-logo-img"
+              src="../ikony/logo-korona.png"
+              alt=""
+              width="48"
+              height="48"
+              decoding="async"
+            />
+            <span class="confirm-logo-text">KORONA</span>
+          </a>
+        </div>
+        <h1 class="confirm-err-title">Moduł niedostępny</h1>
+        <p class="confirm-err-text">
+          Akceptacja rezerwacji cateringu z linku e-mail nie jest już obsługiwana. W sprawie cateringu skontaktuj się z obiektem bezpośrednio.
+        </p>
+        <div class="confirm-actions">
+          <a class="confirm-cta" href="../index.html">Wróć na stronę główną</a>
+        </div>
       </div>
     </div>
-    <script src="../assets/js/config.js"></script>
-    <script src="../assets/js/admin-booking-action.js"></script>
   </body>
 </html>

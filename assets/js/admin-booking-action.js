@@ -147,6 +147,10 @@
       renderError(out, "Konfiguracja", "Brak informacji o typie rezerwacji.");
       return;
     }
+    if (service === "restaurant") {
+      renderError(out, "Moduł niedostępny", "Rezerwacje cateringu zostały wyłączone.");
+      return;
+    }
     if (!token) {
       renderError(out, "Brak tokenu", "Link jest niepełny lub nieprawidłowy.");
       return;

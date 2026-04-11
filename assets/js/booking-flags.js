@@ -208,7 +208,7 @@
     }
     const out = { ...DEFAULTS };
     await Promise.all(
-      Object.keys(out).map(async (key) => {
+      ["hotel", "events"].map(async (key) => {
         const base = bookingFnBase(key);
         if (!base) {
           out[key] = false;
@@ -222,6 +222,7 @@
         }
       })
     );
+    out.restaurant = false;
     healthCache = { ts: now, values: out };
     return out;
   }
@@ -241,14 +242,7 @@
       const b = payload.content?.booking || {};
       const health = await loadHealthFlags({ forceRefresh: refresh });
       return {
-        restaurant:
-          health.restaurant &&
-          effectiveEnabled(
-            b.restaurant !== false,
-            b.restaurantPauseRanges,
-            b.restaurantPauseFrom,
-            b.restaurantPauseTo
-          ),
+        restaurant: false,
         hotel:
           health.hotel &&
           effectiveEnabled(
@@ -271,21 +265,14 @@
       const health = await loadHealthFlags({ forceRefresh: refresh });
       if (!stalePayload) {
         return {
-          restaurant: health.restaurant,
+          restaurant: false,
           hotel: health.hotel,
           events: health.events,
         };
       }
       const b = stalePayload.content?.booking || {};
       return {
-        restaurant:
-          health.restaurant &&
-          effectiveEnabled(
-            b.restaurant !== false,
-            b.restaurantPauseRanges,
-            b.restaurantPauseFrom,
-            b.restaurantPauseTo
-          ),
+        restaurant: false,
         hotel:
           health.hotel &&
           effectiveEnabled(

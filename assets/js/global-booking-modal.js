@@ -8,13 +8,8 @@
   const PAGE_VISIT_ID =
     window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   /** Podbij przy zmianach w modalu — wymusza odświeżenie cache CSS po wdrożeniu. */
-  const GB_MODAL_ASSET_VERSION = "20260411-1";
-  /**
-   * Gdy true, w pierwszym kroku modala pojawia się kafelek rezerwacji stolika (restaurant).
-   * Logika przepływu i API pozostają w kodzie — wystarczy ustawić na true, aby przywrócić.
-   */
-  const SHOW_RESTAURANT_BOOKING_IN_MODAL = false;
-  const SERVICE_KEYS = ["hotel", "restaurant", "events"];
+  const GB_MODAL_ASSET_VERSION = "20260411-2";
+  const SERVICE_KEYS = ["hotel", "events"];
   const requestLocks = Object.create(null);
   const RESTAURANT_DURATION_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4];
 
@@ -47,12 +42,10 @@
   const RESTAURANT_PLACE_OPTIONS = ["no_preference", "inside", "terrace"];
 
   function serviceKeysForModalTiles() {
-    if (SHOW_RESTAURANT_BOOKING_IN_MODAL) return SERVICE_KEYS;
-    return SERVICE_KEYS.filter((key) => key !== "restaurant");
+    return SERVICE_KEYS;
   }
 
   function clearRestaurantModalSelectionIfHidden() {
-    if (SHOW_RESTAURANT_BOOKING_IN_MODAL) return;
     if (state.selectedService === "restaurant") state.selectedService = "";
     const step = String(state.step || "");
     if (step.startsWith("restaurant")) state.step = "service";
@@ -65,7 +58,7 @@
     sessionStartedAt: 0,
     bookingFlags: {
       hotel: true,
-      restaurant: true,
+      restaurant: false,
       events: true,
     },
     error: "",
@@ -1126,7 +1119,7 @@
   async function loadBookingFlags() {
     const fetchFn = window.SREDZKA_fetchBookingSettings;
     if (typeof fetchFn !== "function") {
-      state.bookingFlags = { hotel: true, restaurant: true, events: true };
+      state.bookingFlags = { hotel: true, restaurant: false, events: true };
       return;
     }
     try {
@@ -1137,7 +1130,7 @@
         events: flags?.events !== false,
       };
     } catch {
-      state.bookingFlags = { hotel: true, restaurant: true, events: true };
+      state.bookingFlags = { hotel: true, restaurant: false, events: true };
     }
   }
 

@@ -34,109 +34,14 @@
             <span class="confirm-logo-text">KORONA</span>
           </a>
         </div>
-        <p class="confirm-loading">Trwa potwierdzanie…</p>
+        <h1 class="confirm-err-title">Rezerwacje cateringu wyłączone</h1>
+        <p class="confirm-err-text">
+          Ten link pochodzi ze starego systemu. Rezerwacji cateringu online już nie obsługujemy — skontaktuj się telefonicznie lub mailowo.
+        </p>
+        <div class="confirm-actions">
+          <a class="confirm-cta" href="../index.html">Wróć na stronę główną</a>
+        </div>
       </div>
     </div>
-    <script src="../assets/js/config.js"></script>
-    <script>
-      (function () {
-        const BRAND =
-          '<div class="confirm-brand">' +
-          '<a href="../index.html" class="confirm-logo-link" aria-label="Średzka Korona — strona główna">' +
-          '<span class="confirm-logo-text">ŚREDZKA</span>' +
-          '<img class="confirm-logo-img" src="../ikony/logo-korona.png" alt="" width="48" height="48" decoding="async" />' +
-          '<span class="confirm-logo-text">KORONA</span>' +
-          "</a></div>";
-        const CTA = "";
-        const CONFIRM_ACTION =
-          '<div class="confirm-action-stack">' +
-          '<button type="button" class="confirm-cta confirm-cta-button" id="confirm-reservation">Potwierdź rezerwację</button>' +
-          "</div>";
-
-        function restaurantApiBase() {
-          const c = window.SREDZKA_CONFIG || {};
-          if (c.apiBase) {
-            return String(c.apiBase).replace(/\/$/, "") + "/api/public/legacy-bookings/restaurant";
-          }
-          if (c.restaurantApiBase) return String(c.restaurantApiBase).replace(/\/$/, "");
-          if (c.firebaseProjectId) {
-            return "https://europe-west1-" + c.firebaseProjectId + ".cloudfunctions.net/restaurantApi";
-          }
-          return "";
-        }
-        const params = new URLSearchParams(window.location.search);
-        const token = params.get("token");
-        const out = document.querySelector("#out");
-        if (!token) {
-          out.innerHTML =
-            BRAND +
-            '<h1 class="confirm-err-title">Brak tokenu</h1>' +
-            '<p class="confirm-err-text">Link jest niepełny lub nieprawidłowy. Skorzystaj z pełnego adresu z wiadomości e-mail.</p>' +
-            CTA;
-          return;
-        }
-        const base = restaurantApiBase();
-        if (!base) {
-          out.innerHTML =
-            BRAND +
-            '<h1 class="confirm-err-title">Konfiguracja</h1>' +
-            '<p class="confirm-err-text">Brak konfiguracji API (plik <span class="confirm-highlight">config.js</span>).</p>' +
-            CTA;
-          return;
-        }
-        let confirming = false;
-
-        function renderReadyState() {
-          out.innerHTML =
-            BRAND +
-            '<p class="confirm-kicker">Potwierdzenie rezerwacji</p>' +
-            '<p class="confirm-lead">Kliknij w przycisk, aby potwierdzić złożenie rezerwacji i przekazać ją do dalszej obsługi.</p>' +
-            CONFIRM_ACTION +
-            CTA;
-
-          const button = document.getElementById("confirm-reservation");
-          button?.addEventListener("click", async () => {
-            if (confirming) return;
-            confirming = true;
-            button.disabled = true;
-            button.textContent = "Potwierdzanie...";
-            try {
-              const r = await fetch(base + "?op=public-reservation-confirm", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token }),
-              });
-              const d = await r.json().catch(() => ({}));
-              if (!r.ok) {
-                out.innerHTML =
-                  BRAND +
-                  '<h1 class="confirm-err-title">Nie udało się potwierdzić</h1>' +
-                  "<p class=\"confirm-err-text\">" +
-                  (d.error || "Spróbuj ponownie później albo skontaktuj się z restauracją.") +
-                  "</p>" +
-                  CTA;
-                return;
-              }
-              out.innerHTML =
-                BRAND +
-                '<p class="confirm-kicker">Potwierdzenie rezerwacji</p>' +
-                '<p class="confirm-lead">Rezerwacja została potwierdzona, tym samym rezerwacja otrzymała status oczekującej na akceptację przez obsługę.</p>' +
-                '<div class="confirm-note"><strong>Co dalej?</strong> Restauracja ma do 3 dni na potwierdzenie rezerwacji. Otrzymają Państwo kolejną wiadomość e-mail po podjęciu decyzji.</div>' +
-                CTA;
-            } catch {
-              out.innerHTML =
-                BRAND +
-                '<h1 class="confirm-err-title">Błąd połączenia</h1>' +
-                '<p class="confirm-err-text">Serwer nie odpowiedział. Sprawdź połączenie z internetem i spróbuj ponownie za chwilę.</p>' +
-                CTA;
-            } finally {
-              confirming = false;
-            }
-          });
-        }
-
-        renderReadyState();
-      })();
-    </script>
   </body>
 </html>
