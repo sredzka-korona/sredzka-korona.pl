@@ -3084,7 +3084,6 @@
         <div class="field-grid">
           <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(raw.reservationDate || "")}" required /></label>
           <label class="field"><span>Godzina</span><input type="time" name="startTime" min="00:00" max="23:59" step="60" value="${escapeAttribute(raw.startTime || "")}" required /></label>
-          <label class="field"><span>Czas trwania (h)</span><input type="number" step="0.25" min="0.25" name="durationHours" value="${escapeAttribute(String(raw.durationHours || 1))}" required /></label>
         </div>
         <div class="field-grid schedule-catering-recipient-line">
           ${scheduleCateringRecipientSelectMarkup(raw.recipientId || raw.recipient?.id || "")}
@@ -3194,7 +3193,7 @@
             if (item.raw?.cateringDelivery) {
               body.reservationDate = formData.get("reservationDate");
               body.startTime = formData.get("startTime");
-              body.durationHours = Number(formData.get("durationHours") || 0);
+              body.durationHours = 1;
               body.recipientId = String(formData.get("recipientId") || "").trim();
               if (!body.recipientId) {
                 throw new Error("Wybierz odbiorcę.");
@@ -3337,7 +3336,6 @@
               <div class="field-grid">
                 <label class="field"><span>Data pierwszej dostawy</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
                 <label class="field"><span>Godzina</span><input type="time" name="startTime" min="00:00" max="23:59" step="60" value="12:00" required /></label>
-                <label class="field"><span>Czas trwania (h)</span><input type="number" step="0.25" min="0.25" name="durationHours" value="1" required /></label>
               </div>
               <div class="field-grid schedule-catering-recipient-line">
                 ${scheduleCateringRecipientSelectMarkup("")}
@@ -3353,30 +3351,42 @@
                 <span>Powtarzanie</span>
                 <select name="repeatMode" data-catering-repeat-mode>
                   <option value="none" selected>Jednorazowo</option>
-                  <option value="weekly">Co tydzień (wybrany dzień)</option>
+                  <option value="selected_days">W wybrane dni tygodnia</option>
+                  <option value="weekly">Co tydzień</option>
+                  <option value="biweekly">Co dwa tygodnie</option>
+                  <option value="monthly">Co miesiąc</option>
                 </select>
               </label>
-              <p class="helper" data-catering-repeat-hint hidden>
-                Kolejne terminy to ten sam dzień tygodnia co najbliżej wybranej daty startu, aż do daty końca (włącznie).
+              <p class="helper" data-catering-repeat-hint-none>
+                Jedna dostawa w wybranej dacie i godzinie.
               </p>
-              <div class="field-grid" data-catering-repeat-weekly-fields hidden>
-                <label class="field">
-                  <span>Dzień tygodnia</span>
-                  <select name="repeatWeekday">
-                    ${SCHEDULE_CATERING_WEEKDAYS.map(({ value, label }) => {
-                      const parts = String(model.date || "").split("-").map((x) => Number(x));
-                      const dt =
-                        parts.length === 3 && parts.every((n) => Number.isFinite(n))
-                          ? new Date(parts[0], parts[1] - 1, parts[2])
-                          : null;
-                      const wd = dt && Number.isFinite(dt.getTime()) ? dt.getDay() : 4;
-                      return `<option value="${String(value)}" ${value === wd ? "selected" : ""}>${escapeHtml(label)}</option>`;
-                    }).join("")}
-                  </select>
+              <p class="helper" data-catering-repeat-hint-repeat hidden>
+                <strong>Co tydzień / co dwa tygodnie / co miesiąc:</strong> pierwszy termin to data powyżej; kolejne według cyklu aż do daty końca (włącznie) albo w trybie bezterminowym — maks. ok. 5 lat lub 250 terminów w systemie.<br />
+                <strong>W wybrane dni:</strong> zaznacz dni tygodnia; pierwsze możliwe terminy liczone są od daty pierwszej dostawy.
+              </p>
+              <fieldset class="schedule-catering-weekdays-fieldset" data-catering-repeat-weekdays hidden>
+                <legend>Dni tygodnia (wiele opcji)</legend>
+                <div class="schedule-catering-weekday-grid">
+                  ${SCHEDULE_CATERING_WEEKDAYS.map(
+                    ({ value, label }) => `
+                    <label class="schedule-catering-weekday-item">
+                      <input type="checkbox" name="repeatWeekdays" value="${String(value)}" />
+                      <span>${escapeHtml(label)}</span>
+                    </label>
+                  `
+                  ).join("")}
+                </div>
+              </fieldset>
+              <div class="stack" data-catering-repeat-end-fields hidden>
+                <label class="field field-checkbox">
+                  <span>
+                    <input type="checkbox" name="repeatIndefinite" value="1" data-catering-repeat-indefinite />
+                    Bezterminowo (limit systemu: ok. 5 lat / do 250 terminów)
+                  </span>
                 </label>
                 <label class="field">
                   <span>Do dnia (włącznie)</span>
-                  <input type="date" name="repeatUntil" value="${escapeAttribute(model.date)}" />
+                  <input type="date" name="repeatUntil" data-catering-repeat-until-input value="${escapeAttribute(model.date)}" />
                 </label>
               </div>
             `;
@@ -3462,11 +3472,31 @@
         model.hallId = String(event.currentTarget?.value || "");
         rerender();
       });
-      mount.querySelector("[data-catering-repeat-mode]")?.addEventListener("change", (event) => {
-        const weekly = String(event.currentTarget?.value || "") === "weekly";
-        mount.querySelector("[data-catering-repeat-weekly-fields]")?.toggleAttribute("hidden", !weekly);
-        mount.querySelector("[data-catering-repeat-hint]")?.toggleAttribute("hidden", !weekly);
-      });
+      const syncCateringRepeatUi = () => {
+        const select = mount.querySelector("[data-catering-repeat-mode]");
+        const mode = String(select?.value || "none");
+        const none = mode === "none";
+        mount.querySelector("[data-catering-repeat-end-fields]")?.toggleAttribute("hidden", none);
+        mount.querySelector("[data-catering-repeat-weekdays]")?.toggleAttribute("hidden", mode !== "selected_days");
+        mount.querySelector("[data-catering-repeat-hint-none]")?.toggleAttribute("hidden", !none);
+        mount.querySelector("[data-catering-repeat-hint-repeat]")?.toggleAttribute("hidden", none);
+        const untilInput = mount.querySelector("[data-catering-repeat-until-input]");
+        const indef = mount.querySelector("[data-catering-repeat-indefinite]");
+        if (untilInput) {
+          if (none) {
+            untilInput.removeAttribute("required");
+            untilInput.disabled = false;
+          } else {
+            const dis = Boolean(indef?.checked);
+            untilInput.disabled = dis;
+            if (dis) untilInput.removeAttribute("required");
+            else untilInput.setAttribute("required", "required");
+          }
+        }
+      };
+      mount.querySelector("[data-catering-repeat-mode]")?.addEventListener("change", () => syncCateringRepeatUi());
+      mount.querySelector("[data-catering-repeat-indefinite]")?.addEventListener("change", () => syncCateringRepeatUi());
+      syncCateringRepeatUi();
       if (model.service === "restaurant" && model.mode === "reservation") {
         scheduleWireCateringRecipientInlinePanel(mount);
       }
@@ -3544,19 +3574,30 @@
                 throw new Error("Wybierz odbiorcę lub dodaj nowego.");
               }
               const repeatMode = String(formData.get("repeatMode") || "none");
+              const repeatIndefinite = formData.get("repeatIndefinite") === "1";
               const repeatUntilRaw = String(formData.get("repeatUntil") || "").trim();
+              const repeatWeekdays = formData
+                .getAll("repeatWeekdays")
+                .map((x) => Number(x))
+                .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+              if (repeatMode === "selected_days" && !repeatWeekdays.length) {
+                throw new Error("Wybierz co najmniej jeden dzień tygodnia albo zmień tryb powtarzania.");
+              }
+              if (repeatMode !== "none" && !repeatIndefinite && !repeatUntilRaw) {
+                throw new Error("Podaj datę końca powtarzania albo zaznacz „bezterminowo”.");
+              }
               const createdOut = await bookingAdminApi("restaurant", "admin-catering-delivery-create", {
                 method: "POST",
                 body: {
                   recipientId,
                   reservationDate: formData.get("reservationDate"),
                   startTime: formData.get("startTime"),
-                  durationHours: Number(formData.get("durationHours") || 1),
                   description: String(formData.get("description") || "").trim(),
                   adminNote: String(formData.get("adminNoteCreate") || "").trim(),
                   repeatMode,
-                  repeatWeekday: Number(formData.get("repeatWeekday")),
-                  repeatUntil: repeatMode === "weekly" ? repeatUntilRaw : undefined,
+                  repeatIndefinite,
+                  repeatUntil: repeatIndefinite ? undefined : repeatUntilRaw || undefined,
+                  repeatWeekdays: repeatMode === "selected_days" ? repeatWeekdays : undefined,
                   status: "confirmed",
                 },
               });

@@ -596,21 +596,6 @@
         border: 1px solid rgba(200, 170, 120, 0.3);
       }
 
-      #turnstile-slot {
-        margin: 0.75rem 0;
-        display: flex;
-        justify-content: center;
-        width: 100%;
-        max-width: 100%;
-        box-sizing: border-box;
-        overflow: hidden;
-      }
-
-      #turnstile-slot > * {
-        max-width: 100%;
-        box-sizing: border-box;
-      }
-
       .floating-nav {
         position: fixed;
         top: 0;
@@ -811,6 +796,61 @@
 
       .modal-close:hover {
         color: var(--gold);
+      }
+
+      .turnstile-modal {
+        z-index: 1200;
+      }
+
+      .turnstile-modal-panel {
+        position: relative;
+        background: rgba(255, 255, 255, 0.96);
+        backdrop-filter: blur(12px);
+        border-radius: 20px;
+        padding: 1.75rem 1.5rem 1.5rem;
+        max-width: 420px;
+        width: 100%;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+        color: var(--text);
+        text-align: center;
+        text-shadow: none;
+      }
+
+      .turnstile-modal-panel .modal-close {
+        position: absolute;
+        top: 0.65rem;
+        right: 0.65rem;
+      }
+
+      .turnstile-modal-title {
+        font-family: "Cormorant Garamond", serif;
+        font-size: 1.35rem;
+        font-weight: 600;
+        margin: 0 2rem 0.5rem 0;
+        color: var(--text);
+        line-height: 1.3;
+      }
+
+      .turnstile-modal-hint {
+        margin: 0 0 1.25rem;
+        font-size: 0.9rem;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      #turnstile-modal-host {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 4.5rem;
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow: hidden;
+      }
+
+      #turnstile-modal-host > * {
+        max-width: 100%;
+        box-sizing: border-box;
       }
 
       .modal-content h3 {
@@ -1079,8 +1119,6 @@
                 <textarea id="message" name="message" required placeholder="Twoja wiadomość..."></textarea>
               </div>
 
-              <div id="turnstile-slot"></div>
-
               <button type="submit" class="form-submit" id="submit-btn">Wyślij wiadomość</button>
 
               <div id="form-status" class="form-status" style="display: none;"></div>
@@ -1207,6 +1245,21 @@
       </div>
     </div>
     <a href="../admin/index.html" class="admin-corner-link">Panel</a>
+    <div
+      class="modal turnstile-modal"
+      id="turnstile-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="turnstile-modal-title"
+      aria-hidden="true"
+    >
+      <div class="turnstile-modal-panel">
+        <button type="button" class="modal-close" id="turnstile-modal-close" aria-label="Zamknij">×</button>
+        <h2 id="turnstile-modal-title" class="turnstile-modal-title">Potwierdź, że jesteś człowiekiem</h2>
+        <p class="turnstile-modal-hint">Dokończ krótką weryfikację — potem wiadomość zostanie wysłana.</p>
+        <div id="turnstile-modal-host"></div>
+      </div>
+    </div>
     <script src="../assets/js/config.js"></script>
     <script>
       (() => {
@@ -1334,20 +1387,101 @@
           });
         }
 
-        // Inicjalizacja Cloudflare Turnstile
-        if (config.turnstileSiteKey) {
-          const script = document.createElement("script");
-          script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
-          script.async = true;
-          script.defer = true;
-          document.head.appendChild(script);
-          
-          script.onload = () => {
-            const turnstileSlot = document.querySelector("#turnstile-slot");
-            if (turnstileSlot) {
-              turnstileSlot.innerHTML = `<div class="cf-turnstile" data-sitekey="${config.turnstileSiteKey}"></div>`;
+        const turnstileModal = document.querySelector("#turnstile-modal");
+        const turnstileModalHost = document.querySelector("#turnstile-modal-host");
+        const turnstileModalClose = document.querySelector("#turnstile-modal-close");
+        let turnstileScriptPromise = null;
+        let turnstileWidgetId = null;
+        let pendingPayloadAfterTurnstile = null;
+
+        function loadTurnstileExplicit() {
+          if (window.turnstile) {
+            return Promise.resolve();
+          }
+          if (turnstileScriptPromise) {
+            return turnstileScriptPromise;
+          }
+          turnstileScriptPromise = new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+            script.async = true;
+            script.defer = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error("Nie udało się załadować weryfikacji antyspamowej."));
+            document.head.appendChild(script);
+          });
+          return turnstileScriptPromise;
+        }
+
+        function destroyTurnstileWidget() {
+          if (turnstileWidgetId != null && window.turnstile) {
+            try {
+              window.turnstile.remove(turnstileWidgetId);
+            } catch (_) {}
+            turnstileWidgetId = null;
+          }
+          if (turnstileModalHost) {
+            turnstileModalHost.innerHTML = "";
+          }
+        }
+
+        function closeTurnstileModal() {
+          if (turnstileModal) {
+            turnstileModal.classList.remove("open");
+            turnstileModal.setAttribute("aria-hidden", "true");
+          }
+          destroyTurnstileWidget();
+          pendingPayloadAfterTurnstile = null;
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Wyślij wiadomość";
+        }
+
+        function openTurnstileModal() {
+          if (!turnstileModal) return;
+          turnstileModal.classList.add("open");
+          turnstileModal.setAttribute("aria-hidden", "false");
+          turnstileModalClose?.focus();
+        }
+
+        if (turnstileModalClose) {
+          turnstileModalClose.addEventListener("click", () => {
+            closeTurnstileModal();
+          });
+        }
+
+        if (turnstileModal) {
+          turnstileModal.addEventListener("click", (e) => {
+            if (e.target === turnstileModal) {
+              closeTurnstileModal();
             }
-          };
+          });
+        }
+
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && turnstileModal?.classList.contains("open")) {
+            closeTurnstileModal();
+          }
+        });
+
+        async function sendContactPayload(payload) {
+          if (!apiBase) {
+            throw new Error("Brak konfiguracji API. Ustaw apiBase na adres Workera Cloudflare.");
+          }
+          const response = await fetch(apiBase + "/api/public/contact", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!response.ok) {
+            let msg = "Nie udało się wysłać formularza.";
+            try {
+              const errBody = await response.json();
+              if (errBody && typeof errBody.error === "string" && errBody.error.trim()) {
+                msg = errBody.error.trim();
+              }
+            } catch (_) {}
+            throw new Error(msg);
+          }
         }
 
         // Obsługa wyboru tematu
@@ -1409,52 +1543,12 @@
           });
           topicSelection.classList.remove("error");
           
-          submitBtn.disabled = true;
-          submitBtn.textContent = "Wysyłanie...";
           status.style.display = "none";
 
           const formData = new FormData(form);
           const payload = Object.fromEntries(formData.entries());
-          
-          // Pobierz token Turnstile jeśli jest dostępny
-          if (config.turnstileSiteKey) {
-            const turnstileResponse = form.querySelector("[name='cf-turnstile-response']");
-            if (turnstileResponse) {
-              payload.turnstileToken = turnstileResponse.value;
-            }
-          }
 
-          if (config.turnstileSiteKey && !String(payload.turnstileToken || "").trim()) {
-            status.textContent =
-              "Poczekaj chwilę, aż zabezpieczenie antyspamowe się załaduje (pole nad przyciskiem), potem wyślij ponownie.";
-            status.className = "form-status error";
-            status.style.display = "block";
-            submitBtn.disabled = false;
-            submitBtn.textContent = "Wyślij wiadomość";
-            return;
-          }
-
-          try {
-            if (!apiBase) {
-              throw new Error("Brak konfiguracji API. Ustaw apiBase na adres Workera Cloudflare.");
-            }
-            const response = await fetch(apiBase + "/api/public/contact", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            });
-
-            if (!response.ok) {
-              let msg = "Nie udało się wysłać formularza.";
-              try {
-                const errBody = await response.json();
-                if (errBody && typeof errBody.error === "string" && errBody.error.trim()) {
-                  msg = errBody.error.trim();
-                }
-              } catch (_) {}
-              throw new Error(msg);
-            }
-
+          const finishSuccess = () => {
             form.reset();
             topicButtons.forEach(btn => btn.classList.remove("selected"));
             topicInput.value = "";
@@ -1462,15 +1556,96 @@
             status.textContent = "Dziękujemy! Wiadomość została wysłana.";
             status.className = "form-status success";
             status.style.display = "block";
+          };
 
-            if (window.turnstile) {
-              window.turnstile.reset();
+          const siteKey = config.turnstileSiteKey ? String(config.turnstileSiteKey).trim() : "";
+
+          if (!siteKey) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Wysyłanie...";
+            try {
+              await sendContactPayload(payload);
+              finishSuccess();
+            } catch (error) {
+              status.textContent =
+                error.message || "Wystąpił błąd podczas wysyłania formularza. Spróbuj ponownie.";
+              status.className = "form-status error";
+              status.style.display = "block";
+            } finally {
+              submitBtn.disabled = false;
+              submitBtn.textContent = "Wyślij wiadomość";
             }
+            return;
+          }
+
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Otwieranie weryfikacji…";
+          pendingPayloadAfterTurnstile = payload;
+
+          try {
+            await loadTurnstileExplicit();
+            if (!turnstileModalHost) {
+              throw new Error("Brak kontenera weryfikacji.");
+            }
+            destroyTurnstileWidget();
+            openTurnstileModal();
+
+            turnstileWidgetId = window.turnstile.render(turnstileModalHost, {
+              sitekey: siteKey,
+              callback: (token) => {
+                const base = pendingPayloadAfterTurnstile;
+                pendingPayloadAfterTurnstile = null;
+                if (!base) {
+                  submitBtn.disabled = false;
+                  submitBtn.textContent = "Wyślij wiadomość";
+                  return;
+                }
+                if (turnstileModal) {
+                  turnstileModal.classList.remove("open");
+                  turnstileModal.setAttribute("aria-hidden", "true");
+                }
+                destroyTurnstileWidget();
+                submitBtn.disabled = true;
+                submitBtn.textContent = "Wysyłanie…";
+                void (async () => {
+                  try {
+                    await sendContactPayload({ ...base, turnstileToken: token });
+                    finishSuccess();
+                  } catch (error) {
+                    status.textContent =
+                      error.message || "Wystąpił błąd podczas wysyłania formularza. Spróbuj ponownie.";
+                    status.className = "form-status error";
+                    status.style.display = "block";
+                  } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Wyślij wiadomość";
+                  }
+                })();
+              },
+              "expired-callback": () => {
+                if (window.turnstile && turnstileWidgetId != null) {
+                  try {
+                    window.turnstile.reset(turnstileWidgetId);
+                  } catch (_) {}
+                }
+              },
+              "error-callback": () => {
+                status.textContent =
+                  "Nie udało się pokazać weryfikacji. Odśwież stronę lub spróbuj ponownie za chwilę.";
+                status.className = "form-status error";
+                status.style.display = "block";
+                closeTurnstileModal();
+              },
+            });
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Dokończ weryfikację w oknie…";
           } catch (error) {
-            status.textContent = error.message || "Wystąpił błąd podczas wysyłania formularza. Spróbuj ponownie.";
+            status.textContent =
+              error.message || "Nie udało się przygotować weryfikacji. Spróbuj ponownie.";
             status.className = "form-status error";
             status.style.display = "block";
-          } finally {
+            pendingPayloadAfterTurnstile = null;
+            closeTurnstileModal();
             submitBtn.disabled = false;
             submitBtn.textContent = "Wyślij wiadomość";
           }

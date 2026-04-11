@@ -1,6 +1,7 @@
 /**
  * Cloud Functions — moduł restauracji (HTTPS restaurantApi ?op=...).
  */
+const { randomUUID } = require("node:crypto");
 const { onRequest } = require("firebase-functions/v2/https");
 const { initializeApp, getApps } = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
@@ -428,6 +429,162 @@ function formatRestaurantRow(x, tableMap) {
     createdAtMs: createdAt,
     cleanupBufferMinutes: x.cleanupBufferMinutes ?? cleanupBufferMinutes(),
   };
+}
+
+function isYmdFirebase(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
+}
+
+function mapCateringRecipientDoc(id, d) {
+  const data = d || {};
+  return {
+    id,
+    displayName: data.displayName || "",
+    contactFirstName: data.contactFirstName || "",
+    contactLastName: data.contactLastName || "",
+    email: data.email || "",
+    phonePrefix: data.phonePrefix || "+48",
+    phoneNational: data.phoneNational || "",
+    street: data.street || "",
+    buildingNumber: data.buildingNumber || "",
+    postalCode: data.postalCode || "",
+    city: data.city || "",
+    extraInfo: data.extraInfo || "",
+  };
+}
+
+async function listCateringRecipientsFirestore(db) {
+  const snap = await db.collection("cateringRecipients").limit(500).get();
+  const rows = snap.docs.map((doc) => mapCateringRecipientDoc(doc.id, doc.data()));
+  rows.sort((a, b) =>
+    String(a.displayName).localeCompare(String(b.displayName), "pl", { sensitivity: "base" })
+  );
+  return rows;
+}
+
+async function assertCateringRecipientDeletableFirestore(db, id) {
+  const now = Date.now();
+  const blocking = new Set(["email_verification_pending", "pending", "confirmed", "manual_block"]);
+  const q = await db.collection("restaurantReservations").where("recipientId", "==", id).limit(200).get();
+  for (const doc of q.docs) {
+    const d = doc.data();
+    if (!blocking.has(d.status)) continue;
+    const endMs = Number(d.endMs || 0);
+    if (!endMs) continue;
+    const bufMs = Number(d.cleanupBufferMinutes ?? cleanupBufferMinutes()) * 60000;
+    if (endMs + bufMs > now) {
+      return "Nie można usunąć odbiorcy powiązanego z aktywną lub przyszłą rezerwacją dostawy.";
+    }
+  }
+  return null;
+}
+
+const MAX_CATERING_REPEAT_OCCURRENCES_FIREBASE = 250;
+const CATERING_INDEFINITE_UNTIL_YEARS_FIREBASE = 5;
+
+function cateringDateFromYmdFirebase(ymd) {
+  const [y, m, d] = String(ymd).split("-").map((x) => Number(x));
+  const dt = new Date(y, m - 1, d);
+  return Number.isFinite(dt.getTime()) ? dt : null;
+}
+
+function cateringYmdFromDateFirebase(dt) {
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+
+function cateringAddOneCalendarMonthFirebase(dt) {
+  const y = dt.getFullYear();
+  const m = dt.getMonth();
+  const day = dt.getDate();
+  const nm = m + 1;
+  const ny = nm > 11 ? y + 1 : y;
+  const nmonth = nm > 11 ? 0 : nm;
+  const lastDay = new Date(ny, nmonth + 1, 0).getDate();
+  const nd = Math.min(day, lastDay);
+  return new Date(ny, nmonth, nd);
+}
+
+function cateringEffectiveRepeatUntilFirebase(reservationDate, repeatUntilRaw, repeatIndefinite) {
+  const u = String(repeatUntilRaw || "").trim();
+  if (repeatIndefinite || !u) {
+    const start = cateringDateFromYmdFirebase(reservationDate);
+    if (!start) throw new Error("Nieprawidłowa data pierwszej dostawy.");
+    const end = new Date(start);
+    end.setFullYear(end.getFullYear() + CATERING_INDEFINITE_UNTIL_YEARS_FIREBASE);
+    return cateringYmdFromDateFirebase(end);
+  }
+  return u;
+}
+
+function expandCateringRepeatDatesFirebase(reservationDate, repeatMode, repeatWeekday, repeatUntilRaw, options = {}) {
+  const repeatIndefinite = Boolean(options.repeatIndefinite);
+  const repeatWeekdays = Array.isArray(options.repeatWeekdays) ? options.repeatWeekdays : [];
+  const rd = String(reservationDate || "").trim();
+  if (!isYmdFirebase(rd)) throw new Error("Nieprawidłowa data pierwszej dostawy.");
+  const mode = String(repeatMode || "none").toLowerCase();
+  if (!mode || mode === "none") {
+    return [rd];
+  }
+  const until = cateringEffectiveRepeatUntilFirebase(rd, repeatUntilRaw, repeatIndefinite);
+  if (!isYmdFirebase(until)) throw new Error("Nieprawidłowy zakres dat.");
+  if (until.localeCompare(rd) < 0) {
+    throw new Error("Data końca powtarzania nie może być wcześniejsza od pierwszej dostawy.");
+  }
+  const endD = cateringDateFromYmdFirebase(until);
+  if (!endD) throw new Error("Nieprawidłowa data końca powtarzania.");
+  const dates = [];
+
+  if (mode === "selected_days") {
+    const set = new Set(
+      repeatWeekdays.map((x) => Number(x)).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6)
+    );
+    if (!set.size) throw new Error("Wybierz co najmniej jeden dzień tygodnia.");
+    let cur = cateringDateFromYmdFirebase(rd);
+    if (!cur) throw new Error("Nieprawidłowa data pierwszej dostawy.");
+    while (cur <= endD && dates.length < MAX_CATERING_REPEAT_OCCURRENCES_FIREBASE) {
+      if (set.has(cur.getDay())) {
+        dates.push(cateringYmdFromDateFirebase(cur));
+      }
+      cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
+    }
+    if (!dates.length) throw new Error("Brak terminów w podanym zakresie.");
+    return dates;
+  }
+
+  if (mode === "weekly") {
+    let cur = cateringDateFromYmdFirebase(rd);
+    if (!cur) throw new Error("Nieprawidłowa data pierwszej dostawy.");
+    while (cur <= endD && dates.length < MAX_CATERING_REPEAT_OCCURRENCES_FIREBASE) {
+      dates.push(cateringYmdFromDateFirebase(cur));
+      cur.setDate(cur.getDate() + 7);
+    }
+    if (!dates.length) throw new Error("Brak terminów w podanym zakresie.");
+    return dates;
+  }
+
+  if (mode === "biweekly") {
+    let cur = cateringDateFromYmdFirebase(rd);
+    if (!cur) throw new Error("Nieprawidłowa data pierwszej dostawy.");
+    while (cur <= endD && dates.length < MAX_CATERING_REPEAT_OCCURRENCES_FIREBASE) {
+      dates.push(cateringYmdFromDateFirebase(cur));
+      cur.setDate(cur.getDate() + 14);
+    }
+    if (!dates.length) throw new Error("Brak terminów w podanym zakresie.");
+    return dates;
+  }
+
+  if (mode === "monthly") {
+    let cur = cateringDateFromYmdFirebase(rd);
+    if (!cur) throw new Error("Nieprawidłowa data pierwszej dostawy.");
+    while (cur <= endD && dates.length < MAX_CATERING_REPEAT_OCCURRENCES_FIREBASE) {
+      dates.push(cateringYmdFromDateFirebase(cur));
+      cur = cateringAddOneCalendarMonthFirebase(cur);
+    }
+    if (!dates.length) throw new Error("Brak terminów w podanym zakresie.");
+    return dates;
+  }
+
+  throw new Error("Nieobsługiwany tryb powtarzania.");
 }
 
 const restaurantApi = onRequest(
@@ -1365,6 +1522,207 @@ const restaurantApi = onRequest(
           details: { key },
         });
         json(res, { ok: true });
+        return;
+      }
+
+      if (req.method === "GET" && op === "admin-catering-recipients-list") {
+        const recipients = await listCateringRecipientsFirestore(db);
+        json(res, { recipients });
+        return;
+      }
+
+      if (req.method === "PUT" && op === "admin-catering-recipient-save") {
+        const body = typeof req.body === "object" && req.body ? req.body : JSON.parse(req.body || "{}");
+        const displayName = String(body.displayName || "").trim();
+        if (!displayName) {
+          json(res, { error: "Podaj nazwę odbiorcy." }, 400);
+          return;
+        }
+        const email = String(body.email || "").trim().toLowerCase();
+        if (!email.includes("@")) {
+          json(res, { error: "Podaj prawidłowy e-mail odbiorcy." }, 400);
+          return;
+        }
+        const phoneE164 = validatePhone(body.phonePrefix, body.phoneNational);
+        if (!phoneE164) {
+          json(res, { error: "Podaj prawidłowy numer telefonu." }, 400);
+          return;
+        }
+        const id = String(body.id || "").trim() || randomUUID();
+        const payload = {
+          displayName: displayName.slice(0, 200),
+          contactFirstName: String(body.contactFirstName || "").trim().slice(0, 80),
+          contactLastName: String(body.contactLastName || "").trim().slice(0, 80),
+          email: email.slice(0, 180),
+          phonePrefix: String(body.phonePrefix || "+48").trim().slice(0, 8),
+          phoneNational: String(body.phoneNational || "").replace(/[^\d]/g, "").slice(0, 32),
+          phoneE164,
+          street: String(body.street || "").trim().slice(0, 200),
+          buildingNumber: String(body.buildingNumber || "").trim().slice(0, 80),
+          postalCode: String(body.postalCode || "").trim().slice(0, 16),
+          city: String(body.city || "").trim().slice(0, 120),
+          extraInfo: String(body.extraInfo || "").trim().slice(0, 2000),
+          updatedAt: FieldValue.serverTimestamp(),
+          updatedBy: adminUser.email,
+        };
+        const ref = db.collection("cateringRecipients").doc(id);
+        const existing = await ref.get();
+        if (!existing.exists) {
+          payload.createdAt = FieldValue.serverTimestamp();
+          payload.createdBy = adminUser.email;
+        }
+        await ref.set(payload, { merge: true });
+        const saved = await ref.get();
+        await appendRestaurantAudit(db, {
+          action: "catering_recipient_save",
+          actorEmail: adminUser.email,
+          details: { id },
+        });
+        json(res, { ok: true, recipient: mapCateringRecipientDoc(saved.id, saved.data()) });
+        return;
+      }
+
+      if ((req.method === "DELETE" || req.method === "POST") && op === "admin-catering-recipient-delete") {
+        const body = typeof req.body === "object" && req.body ? req.body : JSON.parse(req.body || "{}");
+        const id = String(body.id || url.searchParams.get("id") || "").trim();
+        if (!id) {
+          json(res, { error: "Brak id odbiorcy." }, 400);
+          return;
+        }
+        const blockMsg = await assertCateringRecipientDeletableFirestore(db, id);
+        if (blockMsg) {
+          json(res, { error: blockMsg }, 409);
+          return;
+        }
+        await db.collection("cateringRecipients").doc(id).delete();
+        await appendRestaurantAudit(db, {
+          action: "catering_recipient_delete",
+          actorEmail: adminUser.email,
+          details: { id },
+        });
+        json(res, { ok: true });
+        return;
+      }
+
+      if (req.method === "POST" && op === "admin-catering-delivery-create") {
+        const body = typeof req.body === "object" && req.body ? req.body : JSON.parse(req.body || "{}");
+        const recipientId = String(body.recipientId || "").trim();
+        if (!recipientId) {
+          json(res, { error: "Wybierz odbiorcę." }, 400);
+          return;
+        }
+        const recSnap = await db.collection("cateringRecipients").doc(recipientId).get();
+        if (!recSnap.exists) {
+          json(res, { error: "Nie znaleziono odbiorcy." }, 400);
+          return;
+        }
+        const rec = recSnap.data();
+        const startTime = String(body.startTime || "").trim();
+        const durationHours = 1;
+        const repeatModeRaw = String(body.repeatMode || "none").toLowerCase();
+        if (
+          repeatModeRaw &&
+          repeatModeRaw !== "none" &&
+          !body.repeatIndefinite &&
+          !String(body.repeatUntil || "").trim()
+        ) {
+          json(res, { error: "Podaj datę końca powtarzania albo zaznacz „bezterminowo”." }, 400);
+          return;
+        }
+        let dates;
+        try {
+          dates = expandCateringRepeatDatesFirebase(
+            String(body.reservationDate || "").trim(),
+            body.repeatMode,
+            Number(body.repeatWeekday),
+            body.repeatUntil,
+            {
+              repeatIndefinite: Boolean(body.repeatIndefinite),
+              repeatWeekdays: Array.isArray(body.repeatWeekdays) ? body.repeatWeekdays : [],
+            }
+          );
+        } catch (e) {
+          json(res, { error: e.message || "Nieprawidłowe daty." }, 400);
+          return;
+        }
+        const description = String(body.description || "").trim().slice(0, 2000);
+        const adminNote = String(body.adminNote || "").trim().slice(0, 2000);
+        const stRaw = String(body.status || "confirmed").trim();
+        const st = stRaw === "pending" ? "pending" : "confirmed";
+        const phoneE164 = validatePhone(rec.phonePrefix, rec.phoneNational);
+        if (!phoneE164) {
+          json(res, { error: "U odbiorcy zapisany jest nieprawidłowy telefon — popraw kartę odbiorcy." }, 400);
+          return;
+        }
+        const createdIds = [];
+        for (const reservationDate of dates) {
+          let startMs;
+          let endMs;
+          try {
+            ({ startMs, endMs } = computeWindowMs(reservationDate, startTime, durationHours));
+          } catch (e) {
+            json(res, { error: e.message || "Nieprawidłowa data lub godzina." }, 400);
+            return;
+          }
+          try {
+            assertNotPast(startMs);
+          } catch (e) {
+            json(res, { error: e.message || "Termin w przeszłości." }, 400);
+            return;
+          }
+          const humanNumber = await allocateRestaurantNumber(db);
+          const resRef = db.collection("restaurantReservations").doc();
+          const pendingUntil = Timestamp.fromMillis(Date.now() + RESTAURANT_PENDING_MS);
+          const reservationPayload = {
+            humanNumber,
+            status: st,
+            cateringDelivery: true,
+            recipientId,
+            fullName: String(rec.displayName || "").trim(),
+            email: String(rec.email || "").trim().toLowerCase(),
+            phonePrefix: String(rec.phonePrefix || "+48").trim(),
+            phoneNational: String(rec.phoneNational || "").replace(/[^\d]/g, ""),
+            phoneE164,
+            guestsCount: 1,
+            tablesCount: 1,
+            joinTables: false,
+            placePreference: "no_preference",
+            customerNote: description,
+            adminNote,
+            reservationDate,
+            startTime,
+            durationHours,
+            startDateTime: Timestamp.fromMillis(startMs),
+            endDateTime: Timestamp.fromMillis(endMs),
+            startMs,
+            endMs,
+            cleanupBufferMinutes: cleanupBufferMinutes(),
+            assignedTableIds: [],
+            confirmationTokenHash: null,
+            emailVerificationExpiresAt: null,
+            pendingExpiresAt: st === "pending" ? pendingUntil : null,
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+            source: "admin_catering_delivery",
+            createdBy: adminUser.email,
+          };
+          await db.runTransaction(async (tx) => {
+            await setReservationAndTableLocksInTransaction(tx, db, {
+              resRef,
+              reservationPayload,
+              tableIds: [],
+              startMs,
+              endMs,
+            });
+          });
+          createdIds.push(resRef.id);
+        }
+        await appendRestaurantAudit(db, {
+          action: "catering_delivery_create",
+          actorEmail: adminUser.email,
+          details: { count: createdIds.length, recipientId },
+        });
+        json(res, { ok: true, reservationIds: createdIds, count: createdIds.length });
         return;
       }
 

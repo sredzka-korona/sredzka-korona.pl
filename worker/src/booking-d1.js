@@ -1520,51 +1520,114 @@ async function upsertCateringRecipient(env, body) {
   return mapCateringRecipientApi(saved);
 }
 
-function expandCateringRepeatDates(reservationDate, repeatMode, repeatWeekday, repeatUntil) {
-  const dates = [];
-  const until = cleanString(repeatUntil, 10) || reservationDate;
-  if (!isYmd(reservationDate) || !isYmd(until)) {
-    throw new Error("Nieprawidłowy zakres dat.");
+const MAX_CATERING_REPEAT_OCCURRENCES = 250;
+const CATERING_INDEFINITE_UNTIL_YEARS = 5;
+
+function cateringDateFromYmd(ymd) {
+  const [y, m, d] = String(ymd).split("-").map((x) => Number(x));
+  const dt = new Date(y, m - 1, d);
+  return Number.isFinite(dt.getTime()) ? dt : null;
+}
+
+function cateringYmdFromDate(dt) {
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+
+function cateringAddOneCalendarMonth(dt) {
+  const y = dt.getFullYear();
+  const m = dt.getMonth();
+  const day = dt.getDate();
+  const nm = m + 1;
+  const ny = nm > 11 ? y + 1 : y;
+  const nmonth = nm > 11 ? 0 : nm;
+  const lastDay = new Date(ny, nmonth + 1, 0).getDate();
+  const nd = Math.min(day, lastDay);
+  return new Date(ny, nmonth, nd);
+}
+
+function cateringEffectiveRepeatUntil(reservationDate, repeatUntilRaw, repeatIndefinite) {
+  const u = cleanString(repeatUntilRaw, 10);
+  if (repeatIndefinite || !u) {
+    const start = cateringDateFromYmd(reservationDate);
+    if (!start) throw new Error("Nieprawidłowa data pierwszej dostawy.");
+    const end = new Date(start);
+    end.setFullYear(end.getFullYear() + CATERING_INDEFINITE_UNTIL_YEARS);
+    return cateringYmdFromDate(end);
   }
-  if (String(until).localeCompare(String(reservationDate)) < 0) {
+  return u;
+}
+
+/**
+ * repeatMode: none | selected_days | weekly | biweekly | monthly
+ * Dla selected_days: repeatWeekdays = tablica 0–6 (0=niedziela … 6=sobota), jak w Date.getDay().
+ */
+function expandCateringRepeatDates(reservationDate, repeatMode, repeatWeekday, repeatUntilRaw, options = {}) {
+  const repeatIndefinite = Boolean(options.repeatIndefinite);
+  const repeatWeekdays = Array.isArray(options.repeatWeekdays) ? options.repeatWeekdays : [];
+  const rd = cleanString(reservationDate, 10);
+  if (!isYmd(rd)) throw new Error("Nieprawidłowa data pierwszej dostawy.");
+  const mode = cleanString(repeatMode, 24).toLowerCase();
+  if (!mode || mode === "none") {
+    return [rd];
+  }
+  const until = cateringEffectiveRepeatUntil(rd, repeatUntilRaw, repeatIndefinite);
+  if (until.localeCompare(rd) < 0) {
     throw new Error("Data końca powtarzania nie może być wcześniejsza od pierwszej dostawy.");
   }
-  const mode = cleanString(repeatMode, 20).toLowerCase();
-  if (!mode || mode === "none") {
-    dates.push(reservationDate);
-    return dates;
-  }
-  if (mode === "weekly") {
-    const wd = Number(repeatWeekday);
-    if (!Number.isInteger(wd) || wd < 0 || wd > 6) {
-      throw new Error("Wybierz dzień tygodnia (0=niedziela … 6=sobota).");
-    }
-    const [y, m, d] = reservationDate.split("-").map((x) => Number(x));
-    const cur = new Date(y, m - 1, d);
-    if (!Number.isFinite(cur.getTime())) throw new Error("Nieprawidłowa data początkowa.");
-    let guard = 0;
-    while (cur.getDay() !== wd && guard < 8) {
-      cur.setDate(cur.getDate() + 1);
-      guard += 1;
-    }
-    if (cur.getDay() !== wd) throw new Error("Nie udało się dopasować dnia tygodnia.");
-    const untilDate = new Date(
-      Number(until.slice(0, 4)),
-      Number(until.slice(5, 7)) - 1,
-      Number(until.slice(8, 10))
+  const endD = cateringDateFromYmd(until);
+  if (!endD) throw new Error("Nieprawidłowa data końca powtarzania.");
+  const dates = [];
+
+  if (mode === "selected_days") {
+    const set = new Set(
+      repeatWeekdays.map((x) => Number(x)).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6)
     );
-    const maxIterations = 120;
-    let n = 0;
-    while (n < maxIterations) {
-      const ymd = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
-      if (ymd.localeCompare(until) > 0) break;
-      dates.push(ymd);
-      cur.setDate(cur.getDate() + 7);
-      n += 1;
+    if (!set.size) throw new Error("Wybierz co najmniej jeden dzień tygodnia.");
+    let cur = cateringDateFromYmd(rd);
+    if (!cur) throw new Error("Nieprawidłowa data pierwszej dostawy.");
+    while (cur <= endD && dates.length < MAX_CATERING_REPEAT_OCCURRENCES) {
+      if (set.has(cur.getDay())) {
+        dates.push(cateringYmdFromDate(cur));
+      }
+      cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
     }
     if (!dates.length) throw new Error("Brak terminów w podanym zakresie.");
     return dates;
   }
+
+  if (mode === "weekly") {
+    let cur = cateringDateFromYmd(rd);
+    if (!cur) throw new Error("Nieprawidłowa data pierwszej dostawy.");
+    while (cur <= endD && dates.length < MAX_CATERING_REPEAT_OCCURRENCES) {
+      dates.push(cateringYmdFromDate(cur));
+      cur.setDate(cur.getDate() + 7);
+    }
+    if (!dates.length) throw new Error("Brak terminów w podanym zakresie.");
+    return dates;
+  }
+
+  if (mode === "biweekly") {
+    let cur = cateringDateFromYmd(rd);
+    if (!cur) throw new Error("Nieprawidłowa data pierwszej dostawy.");
+    while (cur <= endD && dates.length < MAX_CATERING_REPEAT_OCCURRENCES) {
+      dates.push(cateringYmdFromDate(cur));
+      cur.setDate(cur.getDate() + 14);
+    }
+    if (!dates.length) throw new Error("Brak terminów w podanym zakresie.");
+    return dates;
+  }
+
+  if (mode === "monthly") {
+    let cur = cateringDateFromYmd(rd);
+    if (!cur) throw new Error("Nieprawidłowa data pierwszej dostawy.");
+    while (cur <= endD && dates.length < MAX_CATERING_REPEAT_OCCURRENCES) {
+      dates.push(cateringYmdFromDate(cur));
+      cur = cateringAddOneCalendarMonth(cur);
+    }
+    if (!dates.length) throw new Error("Brak terminów w podanym zakresie.");
+    return dates;
+  }
+
   throw new Error("Nieobsługiwany tryb powtarzania.");
 }
 
@@ -4147,31 +4210,41 @@ function cateringDeliveryTerminWord(n) {
   return "terminów";
 }
 
-function buildCateringManualCreatedMailExtraVars(recipientSqlRow, { dates, startTime, durationHours, repeatMode, repeatWeekday, description }) {
+function cateringRepeatSummaryPhrase(repeatMode, repeatWeekdays) {
+  const mode = cleanString(repeatMode, 24).toLowerCase();
+  if (mode === "weekly") return ", co tydzień";
+  if (mode === "biweekly") return ", co dwa tygodnie";
+  if (mode === "monthly") return ", co miesiąc";
+  if (mode === "selected_days") {
+    const labels = ["niedz.", "pon.", "wt.", "śr.", "czw.", "pt.", "sob."];
+    const xs = [...new Set((Array.isArray(repeatWeekdays) ? repeatWeekdays : []).map(Number))].filter(
+      (n) => Number.isInteger(n) && n >= 0 && n <= 6
+    );
+    xs.sort((a, b) => a - b);
+    if (!xs.length) return ", w wybrane dni tygodnia";
+    return `, w dni: ${xs.map((i) => labels[i]).join(", ")}`;
+  }
+  return ", harmonogram cykliczny";
+}
+
+function buildCateringManualCreatedMailExtraVars(recipientSqlRow, { dates, startTime, repeatMode, repeatWeekdays, description }) {
   const sorted = [...(Array.isArray(dates) ? dates : [])].filter((d) => isYmd(cleanString(d, 10))).sort();
   const first = sorted[0] || "";
   const last = sorted[sorted.length - 1] || first;
-  const dh = Number(durationHours || 1);
   const st = cleanString(startTime, 5);
-  let timeTo = "";
-  if (first && st && Number.isFinite(dh) && dh > 0) {
-    const startMs = ymdHmToMs(first, st);
-    timeTo = formatHm(startMs + dh * 3600000);
-  }
-  const mode = cleanString(repeatMode, 20).toLowerCase();
+  const mode = cleanString(repeatMode, 24).toLowerCase();
   let cateringWhenHtml = "";
   let cateringWhenPlain = "";
   if (sorted.length <= 1 || !mode || mode === "none") {
-    const line = first ? `${first}, godz. ${st}–${timeTo} (ok. ${dh} h)` : "—";
+    const line = first && st ? `${first}, godz. ${st}` : first ? String(first) : "—";
     cateringWhenHtml = infoCard("Na kiedy", [["Termin dostawy", escapeHtml(line)]]);
     cateringWhenPlain = `Na kiedy: ${line}`;
   } else {
-    const wd = Number(repeatWeekday);
-    const dayCo = ["niedzielę", "poniedziałek", "wtorek", "środę", "czwartek", "piątek", "sobotę"];
-    const dayPart =
-      Number.isInteger(wd) && wd >= 0 && wd <= 6 ? `, dostawy co ${dayCo[wd]}` : ", dostawy co tydzień w ustalonym dniu";
     const tw = cateringDeliveryTerminWord(sorted.length);
-    const summaryLine = `${sorted.length} ${tw} od ${first} do ${last} (włącznie)${dayPart}, zawsze o ${st}–${timeTo} (ok. ${dh} h)`;
+    const summaryLine = `${sorted.length} ${tw} od ${first} do ${last} (włącznie)${cateringRepeatSummaryPhrase(
+      repeatMode,
+      repeatWeekdays
+    )}, zawsze o ${st}`;
     const listNote =
       sorted.length <= 16
         ? `<p style="margin:14px 0 0 0;color:#5e4b39;font-size:14px;line-height:1.65;">Kolejne daty: ${sorted.map((d) => escapeHtml(d)).join(", ")}</p>`
@@ -5405,16 +5478,29 @@ async function handleRestaurantAdmin(env, op, request) {
       const recipientId = cleanString(body.recipientId, 80);
       if (!recipientId) return { status: 400, data: { error: "Wybierz odbiorcę." } };
       const startTime = cleanString(body.startTime, 5);
-      const durationHours = Number(body.durationHours || 1);
+      const durationHours = 1;
       if (!isHm(startTime)) return { status: 400, data: { error: "Nieprawidłowa godzina." } };
-      if (!Number.isFinite(durationHours) || durationHours <= 0) {
-        return { status: 400, data: { error: "Nieprawidłowy czas trwania." } };
+      const repeatModeRaw = cleanString(body.repeatMode, 24).toLowerCase();
+      if (
+        repeatModeRaw &&
+        repeatModeRaw !== "none" &&
+        !body.repeatIndefinite &&
+        !cleanString(body.repeatUntil, 10)
+      ) {
+        return {
+          status: 400,
+          data: { error: "Podaj datę końca powtarzania albo zaznacz „bezterminowo”." },
+        };
       }
       const dates = expandCateringRepeatDates(
         cleanString(body.reservationDate, 10),
         body.repeatMode,
         body.repeatWeekday,
-        cleanString(body.repeatUntil, 10)
+        cleanString(body.repeatUntil, 10),
+        {
+          repeatIndefinite: Boolean(body.repeatIndefinite),
+          repeatWeekdays: Array.isArray(body.repeatWeekdays) ? body.repeatWeekdays : [],
+        }
       );
       const description = cleanString(body.description, 2000);
       const adminNote = cleanString(body.adminNote, 2000);
@@ -5460,9 +5546,8 @@ async function handleRestaurantAdmin(env, op, request) {
             const extraVars = buildCateringManualCreatedMailExtraVars(recRow, {
               dates,
               startTime,
-              durationHours,
               repeatMode: body.repeatMode,
-              repeatWeekday: body.repeatWeekday,
+              repeatWeekdays: body.repeatWeekdays,
               description,
             });
             await sendTemplatedBookingMail(env, request, {
