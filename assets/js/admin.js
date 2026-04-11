@@ -580,6 +580,14 @@
       lastLoadedAt: 0,
     },
   };
+  (function warnApiBaseIfMisconfigured() {
+    const b = String(state.apiBase || "").trim().toLowerCase();
+    if (b.includes("cloudfunctions.net")) {
+      console.warn(
+        "[Sredzka admin] apiBase wskazuje na Firebase (cloudfunctions.net). Ustaw w config.js adres Workera Cloudflare, np. https://api.sredzka-korona.pl — bez /restaurantApi ani /hotelApi."
+      );
+    }
+  })();
   const SCHEDULE_PENDING_WATCH_MS = 20000;
   const ADMIN_TABS = [
     {
@@ -1139,6 +1147,22 @@
     return { Authorization: `Bearer ${token}` };
   }
 
+  /** HTML 404 z Google przy wywołaniu *.cloudfunctions.net — zła ścieżka albo funkcja niewdrożona. */
+  function explainLikelyGoogleFunctions404(status, rawBody) {
+    if (status !== 404) {
+      return "";
+    }
+    const t = String(rawBody || "").toLowerCase();
+    if (!t.includes("page not found") && !t.includes("requested url was not found")) {
+      return "";
+    }
+    return (
+      " To jest odpowiedź Google (Firebase Cloud Functions), nie Workera. " +
+      "W assets/js/config.js ustaw apiBase na adres Workera Cloudflare, np. https://api.sredzka-korona.pl — bez cloudfunctions.net i bez /restaurantApi. " +
+      "Jeśli rezerwacje są na D1, w Cloudflare (Worker) usuń lub ustaw LEGACY_FIREBASE_BOOKINGS_PROXY na false."
+    );
+  }
+
   async function api(path, options = {}) {
     let response;
     const authHeaders = await getFirebaseAuthHeaders();
@@ -1164,10 +1188,11 @@
           data = JSON.parse(raw);
         } catch {
           const snippet = raw.replace(/\s+/g, " ").trim().slice(0, 240);
+          const head = snippet
+            ? `Odpowiedz serwera (HTTP ${response.status}): ${snippet}`
+            : `Blad HTTP ${response.status}.`;
           data = {
-            error: snippet
-              ? `Odpowiedz serwera (HTTP ${response.status}): ${snippet}`
-              : `Blad HTTP ${response.status}.`,
+            error: head + explainLikelyGoogleFunctions404(response.status, raw),
           };
         }
       } else {

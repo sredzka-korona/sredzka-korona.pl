@@ -59,6 +59,7 @@
 
   function shouldRetryRestaurantViaDirectApi(base, directBase, res, data) {
     if (!base || !directBase || base === directBase) return false;
+    if (String(base).includes("/legacy-bookings/")) return false;
     if (res.ok) return false;
     if (res.status !== 404) return false;
     const nonJson = String(data?._nonJson || "");
@@ -80,10 +81,20 @@
       ({ res, data } = await performRestaurantApiRequest(directBase, token, op, options));
     }
     if (!res.ok) {
-      const hint =
+      let hint =
         data.error ||
         data.message ||
         (data._nonJson ? `Odpowiedź serwera (${res.status}): ${data._nonJson}` : "");
+      const raw = String(data._nonJson || "");
+      if (
+        res.status === 404 &&
+        /page not found|requested url was not found/i.test(raw) &&
+        !hint.includes("LEGACY_FIREBASE")
+      ) {
+        hint +=
+          " To jest typowa odpowiedź Google (Firebase), gdy wywołano zły URL albo funkcja restaurantApi nie jest wdrożona. " +
+          "Używaj apiBase = adres Workera (https://api.sredzka-korona.pl), nie cloudfunctions.net. Na Workerze z D1 wyłącz LEGACY_FIREBASE_BOOKINGS_PROXY.";
+      }
       throw new Error(hint || `Błąd API cateringu (HTTP ${res.status}).`);
     }
     return data;

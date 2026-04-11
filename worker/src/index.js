@@ -1541,6 +1541,7 @@ function assertBrowserLikePublicRequest(request, url) {
   });
 }
 
+/** Włącz tylko przy faktycznie wdrożonych Functions; inaczej proxy zwróci HTML 404 z Google (restaurantApi itd.). */
 function legacyFirebaseBookingsProxyEnabled(env) {
   const v = String(env.LEGACY_FIREBASE_BOOKINGS_PROXY || "")
     .trim()

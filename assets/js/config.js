@@ -1,7 +1,7 @@
 window.SREDZKA_CONFIG = {
   /**
-   * Publiczne API strony i panelu admina.
-   * Dla GitHub Pages ustaw tu adres Workera, np. https://api.twoja-domena.pl
+   * Publiczne API strony i panelu admina — wyłącznie adres Workera Cloudflare (bez końcowego slasha).
+   * Nie ustawiaj tu URL Firebase Cloud Functions (cloudfunctions.net) ani /restaurantApi — wtedy dostaniesz HTML 404 od Google.
    */
   apiBase: "https://api.sredzka-korona.pl",
   /**
