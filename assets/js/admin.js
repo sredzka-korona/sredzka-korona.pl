@@ -1147,6 +1147,19 @@
     return { Authorization: `Bearer ${token}` };
   }
 
+  function rejectMisconfiguredApiBase() {
+    const base = String(state.apiBase || "").trim().toLowerCase();
+    if (!base) {
+      return;
+    }
+    if (base.includes("cloudfunctions.net")) {
+      throw new Error(
+        "apiBase wskazuje na Firebase (cloudfunctions.net). Panel dokleja sciezke /api/admin/legacy-bookings/... — Google zwroci HTML 404 (funkcja restaurantApi nie istnieje pod tym adresem). " +
+        "Ustaw w assets/js/config.js apiBase na sam adres Workera: https://api.sredzka-korona.pl (bez cloudfunctions.net i bez /restaurantApi). Wdróz strone i odswiez panel (twarde odswiezenie / wyczysc cache)."
+      );
+    }
+  }
+
   /** HTML 404 z Google przy wywołaniu *.cloudfunctions.net — zła ścieżka albo funkcja niewdrożona. */
   function explainLikelyGoogleFunctions404(status, rawBody) {
     if (status !== 404) {
@@ -1166,6 +1179,7 @@
   async function api(path, options = {}) {
     let response;
     const authHeaders = await getFirebaseAuthHeaders();
+    rejectMisconfiguredApiBase();
 
     try {
       response = await fetch(state.apiBase + path, {
@@ -1192,7 +1206,12 @@
             ? `Odpowiedz serwera (HTTP ${response.status}): ${snippet}`
             : `Blad HTTP ${response.status}.`;
           data = {
-            error: head + explainLikelyGoogleFunctions404(response.status, raw),
+            error:
+              head +
+              explainLikelyGoogleFunctions404(response.status, raw) +
+              (String(state.apiBase || "").includes("api.sredzka-korona.pl") && response.status === 404
+                ? " (Jesli apiBase jest poprawny, w Cloudflare Worker wylacz zmienna LEGACY_FIREBASE_BOOKINGS_PROXY — proxy moze zwracac ten sam HTML z Firebase.)"
+                : ""),
           };
         }
       } else {
