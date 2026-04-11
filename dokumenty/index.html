@@ -412,6 +412,9 @@
 
       .floating-contact-button {
         position: fixed;
+        top: auto;
+        left: auto;
+        margin: 0;
         right: 2rem;
         bottom: 2rem;
         width: 64px;
@@ -428,16 +431,18 @@
         z-index: 99;
         cursor: pointer;
         border: none;
+        transform: translateZ(0);
+        backface-visibility: hidden;
       }
 
       .floating-contact-button:hover {
-        transform: scale(1.1);
+        transform: translateZ(0) scale(1.1);
         box-shadow: 0 6px 24px rgba(168, 137, 90, 0.6);
         background: #b8946a;
       }
 
       .floating-contact-button:active {
-        transform: scale(0.95);
+        transform: translateZ(0) scale(0.95);
       }
 
       .floating-contact-button svg {

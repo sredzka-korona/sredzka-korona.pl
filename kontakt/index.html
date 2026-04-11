@@ -13,10 +13,10 @@
     <meta name="robots" content="index,follow" />
     <meta name="geo.region" content="PL-DS" />
     <meta name="geo.placename" content="Środa Śląska" />
-    <title>Sredzka Korona - Hotel | Restauracja | Imprezy</title>
+    <title>Sredzka Korona - Hotel | Catering | Imprezy</title>
     <meta
       name="description"
-      content="Kontakt do Średzkiej Korony w Środzie Śląskiej: telefon, e-mail, adres. Rezerwacje hotelu, restauracji i sal na imprezy okolicznościowe."
+      content="Kontakt do Średzkiej Korony w Środzie Śląskiej: telefon, e-mail, adres. Rezerwacje hotelu, cateringu i sal na imprezy okolicznościowe."
     />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pl_PL" />
@@ -1068,7 +1068,7 @@
               <div class="topic-selection" id="topic-selection">
                 <div class="topic-buttons">
                   <button type="button" class="topic-button" data-topic="Hotel">Hotel</button>
-                  <button type="button" class="topic-button" data-topic="Restauracja">Restauracja</button>
+                  <button type="button" class="topic-button" data-topic="Catering">Catering</button>
                   <button type="button" class="topic-button" data-topic="Przyjecia">Przyjęcia</button>
                   <button type="button" class="topic-button" data-topic="Inne">Inne</button>
                 </div>
@@ -1195,7 +1195,7 @@
               <span class="info-value" id="info-company-email">kontakt@sredzkakorona.pl</span>
             </div>
             <h3 id="info-owner-heading">O właścicielu</h3>
-            <p id="info-owner-paragraph-1">Średzka Korona, to firma rodzinna, prowadzona przez polskiego przedsiębiorcę. Od 2 lat oferuje Państwu usługi restauracyjne i hotelowe.</p>
+            <p id="info-owner-paragraph-1">Średzka Korona, to firma rodzinna, prowadzona przez polskiego przedsiębiorcę. Od 2 lat oferuje Państwu usługi cateringowe i hotelowe.</p>
             <p id="info-owner-paragraph-2">Właściciel odpowiada za standard obiektu, rozwój oferty oraz kontakt z klientami biznesowymi i prywatnymi.</p>
             <div class="info-watermark">
               <a href="https://i-janicki.pl">Design &amp; Development by Igor Janicki</a>
@@ -1207,6 +1207,7 @@
       </div>
     </div>
     <a href="../admin/index.html" class="admin-corner-link">Panel</a>
+    <script src="../assets/js/config.js"></script>
     <script>
       (() => {
         const nav = document.querySelector("#floating-nav");
@@ -1369,7 +1370,8 @@
 
         // Obsługa parametrów URL z kalendarza
         const urlParams = new URLSearchParams(window.location.search);
-        const topicParam = urlParams.get("topic");
+        const rawTopicParam = urlParams.get("topic");
+        const topicParam = rawTopicParam === "Restauracja" ? "Catering" : rawTopicParam;
         const messageParam = urlParams.get("message");
 
         if (topicParam) {
@@ -1492,6 +1494,5 @@
         });
       })();
     </script>
-    <script src="../assets/js/config.js"></script>
   </body>
 </html>

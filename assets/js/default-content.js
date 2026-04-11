@@ -90,7 +90,7 @@ window.SREDZKA_DEFAULT_CONTENT = {
     heroText: "Smaczne jedzenie, profesjonalna obsługa i terminowy dowóz.",
     orderButtonText: "Zamów catering",
     ordersInfoText:
-      "Zamówienia indywidualne są tymczasowo wstrzymane. Catering zamawiany poprzez kontakt telefoniczny i mailowy.",
+      "<p>Ceny oraz zasady współpracy ustalane indywidualnie.</p><p>Prosimy o kontakt telefoniczny i mailowy lub poprzez formularz kontaktowy.</p>",
     menuSections: [
       {
         title: "Przystawki",

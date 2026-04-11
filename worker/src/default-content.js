@@ -92,7 +92,7 @@ export const DEFAULT_CONTENT = {
       "Restauracja Sredzka Korona laczy elegancje sali, staranna obsluge i kuchnie, ktora dobrze sprawdza sie zarowno podczas codziennych kolacji, jak i okazji specjalnych.",
     orderButtonText: "Zamów catering",
     ordersInfoText:
-      "Zamówienia indywidualne są tymczasowo wstrzymane. Catering zamawiany poprzez kontakt telefoniczny i mailowy.",
+      "<p>Ceny oraz zasady współpracy ustalane indywidualnie.</p><p>Prosimy o kontakt telefoniczny i mailowy lub poprzez formularz kontaktowy.</p>",
     menuSections: [
       {
         title: "Przystawki",

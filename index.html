@@ -1591,6 +1591,9 @@
 
       .floating-contact-button {
         position: fixed;
+        top: auto;
+        left: auto;
+        margin: 0;
         right: 2rem;
         bottom: calc(2rem + var(--bottom-floating-extra, 0px) + env(safe-area-inset-bottom, 0px));
         width: 64px;
@@ -1607,16 +1610,18 @@
         z-index: 99;
         cursor: pointer;
         border: none;
+        transform: translateZ(0);
+        backface-visibility: hidden;
       }
 
       .floating-contact-button:hover {
-        transform: scale(1.1);
+        transform: translateZ(0) scale(1.1);
         box-shadow: 0 6px 24px rgba(168, 137, 90, 0.6);
         background: #b8946a;
       }
 
       .floating-contact-button:active {
-        transform: scale(0.95);
+        transform: translateZ(0) scale(0.95);
       }
 
       .floating-contact-button svg {
@@ -2722,7 +2727,8 @@
           const cookie = document.querySelector(".cookie-banner");
           let fabExtra = 0;
           if (cookie) {
-            fabExtra = 16 + cookie.getBoundingClientRect().height;
+            const h = cookie.getBoundingClientRect().height;
+            fabExtra = 16 + (Number.isFinite(h) ? h : 0);
           }
           rootEl.style.setProperty("--bottom-floating-extra", `${Math.ceil(fabExtra)}px`);
         }

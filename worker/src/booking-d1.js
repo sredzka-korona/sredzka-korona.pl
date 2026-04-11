@@ -844,7 +844,7 @@ function normalizePhone(prefix, national) {
 
 function reservationTypeLabel(service) {
   if (service === "hotel") return "HOTEL";
-  if (service === "restaurant") return "RESTAURACJA";
+  if (service === "restaurant") return "CATERING";
   return "PRZYJĘCIA";
 }
 
@@ -891,7 +891,7 @@ function extractReservationSequenceAndYear(rawValue, service = "") {
   const raw = cleanString(rawValue, 120);
   if (!raw) return { sequence: null, year: null };
 
-  const modern = raw.match(/^(\d+)\/(\d{4})\/(?:HOTEL|RESTAURACJA|PRZYJ(?:Ę|E)CIA)$/u);
+  const modern = raw.match(/^(\d+)\/(\d{4})\/(?:HOTEL|RESTAURACJA|CATERING|PRZYJ(?:Ę|E)CIA)$/u);
   if (modern) {
     return {
       sequence: normalizeLegacyReservationSequence(Number(modern[1]), service),
@@ -1030,6 +1030,17 @@ async function nextHumanSequenceForYear(env, service, year) {
 
 function formatHumanReservationNumber(row, service) {
   if (!row) return "";
+  if (service === "restaurant" && Number(row.catering_delivery) === 1) {
+    const slug = cleanString(row.human_slug ?? row.humanSlug, 80);
+    const explicitYear = Number(row.human_year ?? row.humanYear);
+    const inferredYear =
+      Number.isInteger(explicitYear) && explicitYear >= 2000 && explicitYear <= 2100
+        ? explicitYear
+        : yearFromMsWarsaw(row.created_at ?? row.createdAtMs ?? row.start_ms ?? row.startDateTime);
+    if (slug && Number.isInteger(inferredYear) && inferredYear >= 2000 && inferredYear <= 2100) {
+      return `${slug}/CATERING/${inferredYear}`;
+    }
+  }
   const rawValue = row.human_number ?? row.humanNumber ?? row.humanNumberLabel;
   const rawText = cleanString(rawValue, 120);
   if (!rawText) return "";
@@ -1302,8 +1313,256 @@ async function ensureSchema(env) {
     await migrateBookingMailTemplatesActionLabel(env);
     await seedDefaults(env);
     await migrateHumanYearAndTemplates(env);
+    await migrateCateringDeliverySchema(env);
   })();
   return schemaReadyPromise;
+}
+
+async function migrateCateringDeliverySchema(env) {
+  await env.DB
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS catering_recipients (
+        id TEXT PRIMARY KEY,
+        display_name TEXT NOT NULL,
+        contact_first_name TEXT NOT NULL DEFAULT '',
+        contact_last_name TEXT NOT NULL DEFAULT '',
+        email TEXT NOT NULL,
+        phone_prefix TEXT NOT NULL DEFAULT '+48',
+        phone_national TEXT NOT NULL DEFAULT '',
+        phone_e164 TEXT NOT NULL DEFAULT '',
+        street TEXT NOT NULL DEFAULT '',
+        building_number TEXT NOT NULL DEFAULT '',
+        postal_code TEXT NOT NULL DEFAULT '',
+        city TEXT NOT NULL DEFAULT '',
+        extra_info TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`
+    )
+    .run();
+  const cols = [
+    ["recipient_id", "TEXT"],
+    ["catering_delivery", "INTEGER NOT NULL DEFAULT 0"],
+    ["human_slug", "TEXT NOT NULL DEFAULT ''"],
+  ];
+  for (const [name, def] of cols) {
+    try {
+      await env.DB.prepare(`ALTER TABLE restaurant_reservations ADD COLUMN ${name} ${def}`).run();
+    } catch {
+      /* kolumna już istnieje */
+    }
+  }
+}
+
+function slugifyForHumanNumber(rawName) {
+  const mapPl = {
+    ą: "a",
+    ć: "c",
+    ę: "e",
+    ł: "l",
+    ń: "n",
+    ó: "o",
+    ś: "s",
+    ź: "z",
+    ż: "z",
+  };
+  let s = cleanString(rawName, 200).toLowerCase();
+  let out = "";
+  for (const ch of s) {
+    const lower = ch.toLowerCase();
+    if (mapPl[lower]) {
+      out += mapPl[lower];
+    } else if (/[a-z0-9]/u.test(ch)) {
+      out += ch;
+    } else if (/[\s._-]/u.test(ch)) {
+      out += "_";
+    }
+  }
+  out = out.replace(/_+/g, "_").replace(/^_|_$/g, "");
+  if (out.length > 48) out = out.slice(0, 48).replace(/_+$/g, "");
+  return out;
+}
+
+async function allocateCateringHumanSlug(env, displayName, year, excludeReservationId = null) {
+  const y = Number(year);
+  const base = slugifyForHumanNumber(displayName);
+  if (!base) {
+    throw new Error("Nazwa odbiorcy nie nadaje się do numeru rezerwacji — użyj liter lub cyfr.");
+  }
+  const ex = cleanString(excludeReservationId, 80) || null;
+  for (let n = 0; n < 500; n += 1) {
+    const candidate = cleanString(n === 0 ? base : `${base}-${n}`, 80);
+    let clashSql =
+      "SELECT id FROM restaurant_reservations WHERE human_year = ? AND human_slug = ? AND catering_delivery = 1";
+    const clashBinds = [y, candidate];
+    if (ex) {
+      clashSql += " AND id != ?";
+      clashBinds.push(ex);
+    }
+    clashSql += " LIMIT 1";
+    const clash = await env.DB.prepare(clashSql).bind(...clashBinds).first();
+    if (!clash) return candidate;
+  }
+  throw new Error("Nie udało się nadać unikalnego numeru rezerwacji.");
+}
+
+function mapCateringRecipientApi(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    displayName: row.display_name || "",
+    contactFirstName: row.contact_first_name || "",
+    contactLastName: row.contact_last_name || "",
+    email: row.email || "",
+    phonePrefix: row.phone_prefix || "+48",
+    phoneNational: row.phone_national || "",
+    street: row.street || "",
+    buildingNumber: row.building_number || "",
+    postalCode: row.postal_code || "",
+    city: row.city || "",
+    extraInfo: row.extra_info || "",
+  };
+}
+
+async function getCateringRecipientRow(env, id) {
+  const rid = cleanString(id, 80);
+  if (!rid) return null;
+  return env.DB.prepare("SELECT * FROM catering_recipients WHERE id = ?").bind(rid).first();
+}
+
+async function listCateringRecipients(env) {
+  const out = await env.DB.prepare(
+    "SELECT * FROM catering_recipients ORDER BY display_name COLLATE NOCASE ASC, id ASC LIMIT 500"
+  ).all();
+  return (out.results || []).map(mapCateringRecipientApi);
+}
+
+async function upsertCateringRecipient(env, body) {
+  const now = nowMs();
+  const id = cleanString(body.id, 80) || crypto.randomUUID();
+  const displayName = cleanString(body.displayName, 200);
+  if (!displayName) throw new Error("Podaj nazwę odbiorcy.");
+  const email = cleanString(body.email, 180).toLowerCase();
+  if (!email || !email.includes("@")) throw new Error("Podaj prawidłowy e-mail odbiorcy.");
+  const phone = normalizePhone(body.phonePrefix, body.phoneNational);
+  const row = {
+    display_name: displayName,
+    contact_first_name: cleanString(body.contactFirstName, 80),
+    contact_last_name: cleanString(body.contactLastName, 80),
+    email,
+    phone_prefix: phone.prefix,
+    phone_national: phone.national,
+    phone_e164: phone.e164,
+    street: cleanString(body.street, 200),
+    building_number: cleanString(body.buildingNumber, 80),
+    postal_code: cleanString(body.postalCode, 16),
+    city: cleanString(body.city, 120),
+    extra_info: cleanString(body.extraInfo, 2000),
+    updated_at: now,
+  };
+  const existing = await env.DB.prepare("SELECT id FROM catering_recipients WHERE id = ?").bind(id).first();
+  if (existing) {
+    await env.DB.prepare(
+      `UPDATE catering_recipients SET
+        display_name=?, contact_first_name=?, contact_last_name=?, email=?,
+        phone_prefix=?, phone_national=?, phone_e164=?,
+        street=?, building_number=?, postal_code=?, city=?, extra_info=?, updated_at=?
+       WHERE id=?`
+    )
+      .bind(
+        row.display_name,
+        row.contact_first_name,
+        row.contact_last_name,
+        row.email,
+        row.phone_prefix,
+        row.phone_national,
+        row.phone_e164,
+        row.street,
+        row.building_number,
+        row.postal_code,
+        row.city,
+        row.extra_info,
+        row.updated_at,
+        id
+      )
+      .run();
+  } else {
+    await env.DB.prepare(
+      `INSERT INTO catering_recipients (
+        id, display_name, contact_first_name, contact_last_name, email,
+        phone_prefix, phone_national, phone_e164,
+        street, building_number, postal_code, city, extra_info, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(
+        id,
+        row.display_name,
+        row.contact_first_name,
+        row.contact_last_name,
+        row.email,
+        row.phone_prefix,
+        row.phone_national,
+        row.phone_e164,
+        row.street,
+        row.building_number,
+        row.postal_code,
+        row.city,
+        row.extra_info,
+        now,
+        now
+      )
+      .run();
+  }
+  const saved = await getCateringRecipientRow(env, id);
+  return mapCateringRecipientApi(saved);
+}
+
+function expandCateringRepeatDates(reservationDate, repeatMode, repeatWeekday, repeatUntil) {
+  const dates = [];
+  const until = cleanString(repeatUntil, 10) || reservationDate;
+  if (!isYmd(reservationDate) || !isYmd(until)) {
+    throw new Error("Nieprawidłowy zakres dat.");
+  }
+  if (String(until).localeCompare(String(reservationDate)) < 0) {
+    throw new Error("Data końca powtarzania nie może być wcześniejsza od pierwszej dostawy.");
+  }
+  const mode = cleanString(repeatMode, 20).toLowerCase();
+  if (!mode || mode === "none") {
+    dates.push(reservationDate);
+    return dates;
+  }
+  if (mode === "weekly") {
+    const wd = Number(repeatWeekday);
+    if (!Number.isInteger(wd) || wd < 0 || wd > 6) {
+      throw new Error("Wybierz dzień tygodnia (0=niedziela … 6=sobota).");
+    }
+    const [y, m, d] = reservationDate.split("-").map((x) => Number(x));
+    const cur = new Date(y, m - 1, d);
+    if (!Number.isFinite(cur.getTime())) throw new Error("Nieprawidłowa data początkowa.");
+    let guard = 0;
+    while (cur.getDay() !== wd && guard < 8) {
+      cur.setDate(cur.getDate() + 1);
+      guard += 1;
+    }
+    if (cur.getDay() !== wd) throw new Error("Nie udało się dopasować dnia tygodnia.");
+    const untilDate = new Date(
+      Number(until.slice(0, 4)),
+      Number(until.slice(5, 7)) - 1,
+      Number(until.slice(8, 10))
+    );
+    const maxIterations = 120;
+    let n = 0;
+    while (n < maxIterations) {
+      const ymd = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
+      if (ymd.localeCompare(until) > 0) break;
+      dates.push(ymd);
+      cur.setDate(cur.getDate() + 7);
+      n += 1;
+    }
+    if (!dates.length) throw new Error("Brak terminów w podanym zakresie.");
+    return dates;
+  }
+  throw new Error("Nieobsługiwany tryb powtarzania.");
 }
 
 async function migrateBookingMailTemplatesActionLabel(env) {
@@ -2332,7 +2591,7 @@ function restaurantPlacePreferenceLabel(pref) {
   return "Bez preferencji";
 }
 
-function mapRestaurantReservation(row, tableMap) {
+function mapRestaurantReservation(row, tableMap, recipientRow = null) {
   const ids = parseJson(row.assigned_table_ids_json, []);
   const labels = ids
     .map((id) => {
@@ -2340,10 +2599,12 @@ function mapRestaurantReservation(row, tableMap) {
       return t ? `${t.number} (${t.zone || "sala"})` : id;
     })
     .join(", ");
+  const recipient = row.recipient_id ? mapCateringRecipientApi(recipientRow) : null;
   return {
     id: row.id,
     humanNumber: row.human_number,
     humanYear: row.human_year != null ? Number(row.human_year) : null,
+    humanSlug: row.human_slug || "",
     humanNumberLabel: formatHumanReservationNumber(row, "restaurant"),
     fullName: row.full_name,
     email: row.email,
@@ -2369,11 +2630,21 @@ function mapRestaurantReservation(row, tableMap) {
     emailVerificationExpiresAt: row.email_verification_expires_at || null,
     createdAtMs: Number(row.created_at || 0),
     cleanupBufferMinutes: Number(row.cleanup_buffer_minutes || 30),
+    cateringDelivery: Boolean(Number(row.catering_delivery)),
+    recipientId: row.recipient_id || null,
+    recipient,
   };
 }
 
 async function createRestaurantReservation(env, payload, options = {}) {
   const now = nowMs();
+  const cateringDelivery = Boolean(options.cateringDelivery);
+  if (cateringDelivery) {
+    options.skipAvailabilityCheck = true;
+    options.skipPublicBookingRules = true;
+    if (payload.tablesCount == null) payload.tablesCount = 1;
+    if (payload.guestsCount == null) payload.guestsCount = 1;
+  }
   let availability;
   if (options.skipAvailabilityCheck) {
     const reservationDate = cleanString(payload.reservationDate, 10);
@@ -2412,18 +2683,37 @@ async function createRestaurantReservation(env, payload, options = {}) {
   const tablesCount = availability.tablesCount;
   const guestsCount = Math.max(1, toInt(payload.guestsCount, 1));
   const maxGuests = Math.max(1, toInt(settings.maxGuestsPerTable, 4)) * tablesCount;
-  if (guestsCount > maxGuests) {
+  if (!cateringDelivery && guestsCount > maxGuests) {
     throw new Error(`Maksymalnie ${maxGuests} gości przy ${tablesCount} stolikach.`);
   }
   const id = crypto.randomUUID();
-  const humanYear = yearFromMsWarsaw(now);
-  const humanNumber = await nextHumanSequenceForYear(env, "restaurant", humanYear);
+  let humanYear = yearFromMsWarsaw(now);
+  let humanNumber;
+  let humanSlug = "";
+  let recipientIdForInsert = null;
+  if (cateringDelivery) {
+    const rec = await getCateringRecipientRow(env, cleanString(options.recipientId, 80));
+    if (!rec) throw new Error("Nie znaleziono odbiorcy.");
+    recipientIdForInsert = rec.id;
+    humanNumber = 0;
+    humanYear = yearFromMsWarsaw(availability.startMs);
+    humanSlug = await allocateCateringHumanSlug(env, rec.display_name, humanYear);
+    payload.fullName = rec.display_name;
+    payload.email = rec.email;
+    payload.phonePrefix = rec.phone_prefix;
+    payload.phoneNational = rec.phone_national;
+    payload.joinTables = false;
+    payload.placePreference = "no_preference";
+  } else {
+    humanNumber = await nextHumanSequenceForYear(env, "restaurant", humanYear);
+  }
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const token = options.withConfirmationToken ? randomToken() : "";
   const tokenHash = token ? await sha256Hex(token) : null;
   const status = options.status || "email_verification_pending";
-  const assigned =
-    Array.isArray(options.assignedTableIds) && options.assignedTableIds.length
+  const assigned = cateringDelivery
+    ? []
+    : Array.isArray(options.assignedTableIds) && options.assignedTableIds.length
       ? options.assignedTableIds
       : Array.isArray(availability.availableIds)
         ? availability.availableIds.slice(0, tablesCount)
@@ -2436,8 +2726,9 @@ async function createRestaurantReservation(env, payload, options = {}) {
       id, human_number, human_year, status, full_name, email, phone_prefix, phone_national, phone_e164,
       reservation_date, start_time, duration_hours, start_ms, end_ms, tables_count, guests_count, join_tables, place_preference,
       assigned_table_ids_json, customer_note, admin_note, cleanup_buffer_minutes,
-      confirmation_token_hash, email_verification_expires_at, pending_expires_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      confirmation_token_hash, email_verification_expires_at, pending_expires_at, created_at, updated_at,
+      recipient_id, catering_delivery, human_slug
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       id,
@@ -2466,10 +2757,13 @@ async function createRestaurantReservation(env, payload, options = {}) {
       emailExp,
       pendingExp,
       now,
-      now
+      now,
+      recipientIdForInsert,
+      cateringDelivery ? 1 : 0,
+      cleanString(cateringDelivery ? humanSlug : "", 80)
     )
     .run();
-  return { id, humanNumber, token, availability };
+  return { id, humanNumber, humanSlug, token, availability };
 }
 
 async function venueHalls(env) {
@@ -2828,7 +3122,7 @@ function legacyDefaultTemplateMap(service) {
       confirm_email: {
         subject: "{{hotelName}} | potwierdzenie adresu e-mail dla rezerwacji {{reservationNumber}}",
         bodyHtml:
-          '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie zapytania rezerwacyjnego do <strong>{{hotelName}}</strong>.</p><p>Aby przekazac zgloszenie do dalszej obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz adres e-mail</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Pokoje: {{roomsList}}<br>Szacunkowa kwota: {{totalPrice}} PLN</p><p>Jesli to nie Ty wysylales zgloszenie, zignoruj te wiadomosc.</p><p>Pozdrawiamy,<br>Recepcja {{hotelName}}</p>',
+          '<p>Dzien dobry {{fullName}},</p><p>Dziekujemy za wyslanie zapytania rezerwacyjnego do <strong>{{hotelName}}</strong>.</p><p>Aby przekazac zgloszenie do dalszej obslugi, potwierdz adres e-mail:</p><p><a href="{{confirmationLink}}">Potwierdz adres e-mail</a></p><p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Zameldowanie: od 14:00, wymeldowanie: do 11:00<br>Pokoje: {{roomsList}}<br>Szacunkowa kwota: {{totalPrice}} PLN</p><p>Jesli to nie Ty wysylales zgloszenie, zignoruj te wiadomosc.</p><p>Pozdrawiamy,<br>Recepcja {{hotelName}}</p>',
       },
       pending_admin: {
         subject: "[{{hotelName}}] Rezerwacja do decyzji: {{reservationNumber}}",
@@ -2838,7 +3132,7 @@ function legacyDefaultTemplateMap(service) {
       confirmed_client: {
         subject: "{{hotelName}} | rezerwacja {{reservationNumber}} potwierdzona",
         bodyHtml:
-          "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje o numerze <strong>{{reservationNumber}}</strong>.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Liczba noclegow: {{nights}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>W razie pytan mozesz odpowiedziec na te wiadomosc lub skontaktowac sie bezposrednio z recepcja.</p><p>Pozdrawiamy,<br>Recepcja {{hotelName}}</p>",
+          "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje o numerze <strong>{{reservationNumber}}</strong>.</p><p>Termin pobytu: {{dateFrom}} - {{dateTo}}<br>Zameldowanie: od 14:00, wymeldowanie: do 11:00<br>Liczba noclegow: {{nights}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>W razie pytan mozesz odpowiedziec na te wiadomosc lub skontaktowac sie bezposrednio z recepcja.</p><p>Pozdrawiamy,<br>Recepcja {{hotelName}}</p>",
       },
       cancelled_client: {
         subject: "{{hotelName}} | anulowanie rezerwacji {{reservationNumber}}",
@@ -2848,7 +3142,7 @@ function legacyDefaultTemplateMap(service) {
       changed_client: {
         subject: "{{hotelName}} | zmiana rezerwacji {{reservationNumber}}",
         bodyHtml:
-          "<p>Dzien dobry {{fullName}},</p><p>Wprowadzilismy zmiany w rezerwacji o numerze <strong>{{reservationNumber}}</strong>.</p><p>Aktualny termin pobytu: {{dateFrom}} - {{dateTo}}<br>Liczba noclegow: {{nights}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>Uwagi do rezerwacji: {{customerNote}}</p><p>Jesli chcesz cos doprecyzowac, odpowiedz na te wiadomosc lub skontaktuj sie z recepcja.</p><p>Pozdrawiamy,<br>Recepcja {{hotelName}}</p>",
+          "<p>Dzien dobry {{fullName}},</p><p>Wprowadzilismy zmiany w rezerwacji o numerze <strong>{{reservationNumber}}</strong>.</p><p>Aktualny termin pobytu: {{dateFrom}} - {{dateTo}}<br>Zameldowanie: od 14:00, wymeldowanie: do 11:00<br>Liczba noclegow: {{nights}}<br>Pokoje: {{roomsList}}<br>Kwota orientacyjna: {{totalPrice}} PLN</p><p>Uwagi do rezerwacji: {{customerNote}}</p><p>Jesli chcesz cos doprecyzowac, odpowiedz na te wiadomosc lub skontaktuj sie z recepcja.</p><p>Pozdrawiamy,<br>Recepcja {{hotelName}}</p>",
       },
     };
   }
@@ -2950,7 +3244,8 @@ function ultraLegacyDefaultTemplateMap(service) {
     },
     confirmed_client: {
       subject: "{{hotelName}} — rezerwacja potwierdzona ({{reservationNumber}})",
-      bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została potwierdzona.</p>",
+      bodyHtml:
+        "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została potwierdzona.</p><p>Zameldowanie: od 14:00. Wymeldowanie: do 11:00.</p>",
     },
     cancelled_client: {
       subject: "{{hotelName}} — rezerwacja anulowana ({{reservationNumber}})",
@@ -2978,6 +3273,8 @@ function buildHotelDefaultTemplates() {
 ${infoCard("Podsumowanie pobytu", [
   ["Numer rezerwacji", "{{reservationNumber}}"],
   ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Zameldowanie", "od 14:00"],
+  ["Wymeldowanie", "do 11:00"],
   ["Liczba noclegów", "{{nights}}"],
   ["Wybrane pokoje", "{{roomsList}}"],
   ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
@@ -2998,6 +3295,8 @@ ${infoCard("Dane rezerwacji", [
   ["E-mail", "{{email}}"],
   ["Telefon", "{{phone}}"],
   ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Zameldowanie", "od 14:00"],
+  ["Wymeldowanie", "do 11:00"],
   ["Liczba noclegów", "{{nights}}"],
   ["Pokoje", "{{roomsList}}"],
   ["Orientacyjna kwota", "{{totalPrice}} PLN"],
@@ -3011,6 +3310,8 @@ ${infoCard("Dane rezerwacji", [
 ${infoCard("Potwierdzony pobyt", [
   ["Numer rezerwacji", "{{reservationNumber}}"],
   ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Zameldowanie", "od 14:00"],
+  ["Wymeldowanie", "do 11:00"],
   ["Liczba noclegów", "{{nights}}"],
   ["Pokoje", "{{roomsList}}"],
   ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
@@ -3037,6 +3338,8 @@ ${noteCard("Jeżeli chcesz zarezerwować nowy termin lub potrzebujesz pomocy w p
 ${infoCard("Aktualne podsumowanie rezerwacji", [
   ["Numer rezerwacji", "{{reservationNumber}}"],
   ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Zameldowanie", "od 14:00"],
+  ["Wymeldowanie", "do 11:00"],
   ["Liczba noclegów", "{{nights}}"],
   ["Pokoje", "{{roomsList}}"],
   ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
@@ -3557,7 +3860,19 @@ async function listRestaurantReservations(env, status) {
   )
     .bind(...binds)
     .all();
-  return (rows.results || []).map((r) => mapRestaurantReservation(r, map));
+  const list = rows.results || [];
+  const recipientIds = [...new Set(list.map((r) => cleanString(r.recipient_id, 80)).filter(Boolean))];
+  const recipientById = new Map();
+  if (recipientIds.length) {
+    const placeholders = recipientIds.map(() => "?").join(",");
+    const recRes = await env.DB.prepare(`SELECT * FROM catering_recipients WHERE id IN (${placeholders})`)
+      .bind(...recipientIds)
+      .all();
+    for (const rec of recRes.results || []) {
+      recipientById.set(rec.id, rec);
+    }
+  }
+  return list.map((r) => mapRestaurantReservation(r, map, recipientById.get(r.recipient_id) || null));
 }
 
 async function listHallReservations(env, status) {
@@ -4956,7 +5271,99 @@ async function handleRestaurantAdmin(env, op, request) {
     if (!row) return { status: 404, data: { error: "Brak rezerwacji." } };
     const tables = await restaurantTables(env, true);
     const map = new Map(tables.map((t) => [t.id, t]));
-    return { status: 200, data: { reservation: mapRestaurantReservation(row, map) } };
+    const recRow = row.recipient_id ? await getCateringRecipientRow(env, row.recipient_id) : null;
+    return { status: 200, data: { reservation: mapRestaurantReservation(row, map, recRow) } };
+  }
+  if (op === "admin-catering-recipients-list" && request.method === "GET") {
+    return { status: 200, data: { recipients: await listCateringRecipients(env) } };
+  }
+  if (op === "admin-catering-recipient-save" && request.method === "PUT") {
+    const body = await readBody(request);
+    try {
+      const recipient = await upsertCateringRecipient(env, body);
+      return { status: 200, data: { ok: true, recipient } };
+    } catch (error) {
+      return { status: 400, data: { error: error.message || "Błąd zapisu odbiorcy." } };
+    }
+  }
+  if (op === "admin-catering-recipient-delete" && ["DELETE", "POST"].includes(request.method)) {
+    const url = new URL(request.url);
+    const body = await readBody(request).catch(() => ({}));
+    const id = cleanString(body.id || url.searchParams.get("id"), 80);
+    if (!id) return { status: 400, data: { error: "Brak id odbiorcy." } };
+    const now = nowMs();
+    const inUse = await env.DB.prepare(
+      `SELECT COUNT(*) AS c FROM restaurant_reservations
+       WHERE recipient_id = ?
+         AND status IN ('email_verification_pending','pending','confirmed','manual_block')
+         AND (end_ms + (COALESCE(cleanup_buffer_minutes, ${RESTAURANT_CLEANUP_BUFFER_MINUTES}) * 60000)) > ?`
+    )
+      .bind(id, now)
+      .first();
+    if (Number(inUse?.c || 0) > 0) {
+      return {
+        status: 409,
+        data: { error: "Nie można usunąć odbiorcy powiązanego z aktywną lub przyszłą rezerwacją dostawy." },
+      };
+    }
+    await env.DB.prepare("DELETE FROM catering_recipients WHERE id=?").bind(id).run();
+    return { status: 200, data: { ok: true } };
+  }
+  if (op === "admin-catering-delivery-create" && request.method === "POST") {
+    const body = await readBody(request);
+    try {
+      const recipientId = cleanString(body.recipientId, 80);
+      if (!recipientId) return { status: 400, data: { error: "Wybierz odbiorcę." } };
+      const startTime = cleanString(body.startTime, 5);
+      const durationHours = Number(body.durationHours || 1);
+      if (!isHm(startTime)) return { status: 400, data: { error: "Nieprawidłowa godzina." } };
+      if (!Number.isFinite(durationHours) || durationHours <= 0) {
+        return { status: 400, data: { error: "Nieprawidłowy czas trwania." } };
+      }
+      const dates = expandCateringRepeatDates(
+        cleanString(body.reservationDate, 10),
+        body.repeatMode,
+        body.repeatWeekday,
+        cleanString(body.repeatUntil, 10)
+      );
+      const description = cleanString(body.description, 2000);
+      const adminNote = cleanString(body.adminNote, 2000);
+      const status = ["pending", "confirmed"].includes(cleanString(body.status, 20)) ? body.status : "confirmed";
+      const createdIds = [];
+      for (const reservationDate of dates) {
+        if (!isYmd(reservationDate)) continue;
+        const out = await createRestaurantReservation(
+          env,
+          {
+            reservationDate,
+            startTime,
+            durationHours,
+            tablesCount: 1,
+            guestsCount: 1,
+            joinTables: false,
+            placePreference: "no_preference",
+            fullName: "",
+            email: "",
+            phonePrefix: "+48",
+            phoneNational: "",
+            customerNote: description,
+            adminNote,
+          },
+          {
+            cateringDelivery: true,
+            recipientId,
+            status,
+            withConfirmationToken: false,
+            skipAvailabilityCheck: true,
+            skipPublicBookingRules: true,
+          }
+        );
+        createdIds.push(out.id);
+      }
+      return { status: 200, data: { ok: true, reservationIds: createdIds, count: createdIds.length } };
+    } catch (error) {
+      return { status: 400, data: { error: error.message || "Błąd tworzenia dostaw." } };
+    }
   }
   if (op === "admin-reservation-create" && request.method === "POST") {
     const body = await readBody(request);
@@ -5042,7 +5449,8 @@ async function handleRestaurantAdmin(env, op, request) {
       body.email != null ||
       body.phonePrefix != null ||
       body.phoneNational != null ||
-      body.customerNote != null;
+      body.customerNote != null ||
+      Object.prototype.hasOwnProperty.call(body, "recipientId");
     if (!fullEdit) {
       await env.DB.prepare("UPDATE restaurant_reservations SET admin_note=?, updated_at=? WHERE id=?")
         .bind(cleanString(body.adminNote, 2000), nowMs(), id)
@@ -5050,6 +5458,86 @@ async function handleRestaurantAdmin(env, op, request) {
       return { status: 200, data: { ok: true } };
     }
     try {
+      if (Number(row.catering_delivery) === 1) {
+        const reservationDate = cleanString(body.reservationDate ?? row.reservation_date, 10);
+        const startTime = cleanString(body.startTime ?? row.start_time, 5);
+        const durationHours = Number(body.durationHours ?? row.duration_hours);
+        if (!isYmd(reservationDate) || !isHm(startTime)) {
+          return { status: 400, data: { error: "Nieprawidłowa data lub godzina." } };
+        }
+        if (!Number.isFinite(durationHours) || durationHours <= 0) {
+          return { status: 400, data: { error: "Nieprawidłowy czas trwania." } };
+        }
+        const startMs = ymdHmToMs(reservationDate, startTime);
+        const endMs = startMs + durationHours * 3600000;
+        const customerNote = cleanString(body.customerNote ?? row.customer_note, 2000);
+        const adminNote = cleanString(body.adminNote ?? row.admin_note, 2000);
+        let nextRecipientId = cleanString(row.recipient_id, 80);
+        if (body.recipientId != null && String(body.recipientId).trim() !== "") {
+          nextRecipientId = cleanString(body.recipientId, 80);
+        }
+        if (!nextRecipientId) {
+          return { status: 400, data: { error: "Wybierz odbiorcę." } };
+        }
+        let fullName = row.full_name;
+        let email = row.email;
+        let phonePrefix = row.phone_prefix;
+        let phoneNational = row.phone_national;
+        if (nextRecipientId) {
+          const rec = await getCateringRecipientRow(env, nextRecipientId);
+          if (!rec) return { status: 400, data: { error: "Nie znaleziono odbiorcy." } };
+          fullName = rec.display_name;
+          email = rec.email;
+          phonePrefix = rec.phone_prefix;
+          phoneNational = rec.phone_national;
+        }
+        const phone = normalizePhone(phonePrefix, phoneNational);
+        const newHumanYear = yearFromMsWarsaw(startMs);
+        const newSlug = await allocateCateringHumanSlug(env, fullName, newHumanYear, id);
+        await env.DB.prepare(
+          `UPDATE restaurant_reservations SET
+            recipient_id=?, human_year=?, human_slug=?, human_number=0,
+            full_name=?, email=?, phone_prefix=?, phone_national=?, phone_e164=?,
+            reservation_date=?, start_time=?, duration_hours=?, start_ms=?, end_ms=?,
+            customer_note=?, admin_note=?, assigned_table_ids_json='[]', tables_count=1, guests_count=1,
+            join_tables=0, place_preference='no_preference', updated_at=?
+           WHERE id=?`
+        )
+          .bind(
+            nextRecipientId || null,
+            newHumanYear,
+            newSlug,
+            fullName,
+            String(email || "").toLowerCase(),
+            phone.prefix,
+            phone.national,
+            phone.e164,
+            reservationDate,
+            startTime,
+            durationHours,
+            startMs,
+            endMs,
+            customerNote,
+            adminNote,
+            nowMs(),
+            id
+          )
+          .run();
+        if (notifyClient) {
+          try {
+            const updated = await getRestaurantReservationRow(env, id);
+            await sendTemplatedBookingMail(env, request, {
+              service: "restaurant",
+              eventKey: "changed_client",
+              row: updated,
+              to: updated?.email,
+            });
+          } catch (error) {
+            console.error("Restaurant changed mail error:", error);
+          }
+        }
+        return { status: 200, data: { ok: true } };
+      }
       const payload = {
         reservationDate: cleanString(body.reservationDate ?? row.reservation_date, 10),
         startTime: cleanString(body.startTime ?? row.start_time, 5),

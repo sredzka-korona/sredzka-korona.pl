@@ -8,7 +8,7 @@
   const PAGE_VISIT_ID =
     window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   /** Podbij przy zmianach w modalu — wymusza odświeżenie cache CSS po wdrożeniu. */
-  const GB_MODAL_ASSET_VERSION = "20260407-9";
+  const GB_MODAL_ASSET_VERSION = "20260411-1";
   /**
    * Gdy true, w pierwszym kroku modala pojawia się kafelek rezerwacji stolika (restaurant).
    * Logika przepływu i API pozostają w kodzie — wystarczy ustawić na true, aby przywrócić.
@@ -743,6 +743,39 @@
       throw new Error(data.error || "Nie udało się połączyć z systemem rezerwacji.");
     }
     return data;
+  }
+
+  function commitServiceSelection(service) {
+    if (!SERVICE_KEYS.includes(service)) return false;
+    if (state.bookingFlags[service] === false) return false;
+    if (service === "restaurant" && !SHOW_RESTAURANT_BOOKING_IN_MODAL) return false;
+    setError("");
+    state.selectedService = service;
+    state.decisionDaysLabel = service === "events" ? "7 dni" : "3 dni";
+    const flow = FLOW_BY_SERVICE[service];
+    if (!flow || flow.length < 2) return false;
+    state.step = flow[1] || "summary";
+    if (service === "restaurant") {
+      void api("restaurant", "public-settings", {
+        method: "GET",
+        query: { reservationDate: state.restaurant.reservationDate || todayYmdWarsaw() },
+      })
+        .then((data) => {
+          state.restaurant.publicSettings = data;
+          render();
+        })
+        .catch(() => {
+          /* fallback to defaults in UI */
+        });
+    }
+    return true;
+  }
+
+  function applyPreselectedGlobalBookingService(preRaw) {
+    const pre = String(preRaw || "").trim();
+    if (pre !== "hotel" && pre !== "events") return;
+    if (state.step !== "service") return;
+    commitServiceSelection(pre);
   }
 
   function ensureCss() {
@@ -2330,25 +2363,9 @@
         button.addEventListener("click", () => {
           renewSession({ persist: false });
           const service = button.getAttribute("data-service-select");
-          if (!service || state.bookingFlags[service] === false) return;
-          setError("");
-          state.selectedService = service;
-          state.decisionDaysLabel = service === "events" ? "7 dni" : "3 dni";
-          const flow = getFlow();
-          state.step = flow[1] || "summary";
-          render();
-          if (service === "restaurant") {
-            api("restaurant", "public-settings", {
-              method: "GET",
-              query: { reservationDate: state.restaurant.reservationDate || todayYmdWarsaw() },
-            })
-              .then((data) => {
-                state.restaurant.publicSettings = data;
-                render();
-              })
-              .catch(() => {
-                /* fallback to defaults in UI */
-              });
+          if (!service) return;
+          if (commitServiceSelection(service)) {
+            render();
           }
         });
       });
@@ -3121,7 +3138,7 @@
     state.countdownTimer = window.setInterval(tick, 1000);
   }
 
-  async function openModal() {
+  async function openModal(options = {}) {
     if (state.isOpen || requestLocks.openModal) {
       return;
     }
@@ -3149,6 +3166,7 @@
     if (!state.selectedService && state.step !== "service") {
       state.step = "service";
     }
+    applyPreselectedGlobalBookingService(options.preselectService);
     if (state.selectedService === "restaurant" && ["restaurantDateTime"].includes(state.step) && !state.restaurant.calendarDays.length) {
       await loadRestaurantCalendar({ render: false, reservationDate: state.restaurant.reservationDate });
     }
@@ -3204,7 +3222,7 @@
       const opener = target.closest("[data-open-global-booking]");
       if (!opener) return;
       event.preventDefault();
-      openModal();
+      void openModal({ preselectService: opener.getAttribute("data-global-booking-service") });
     });
 
     document.addEventListener("keydown", (event) => {
@@ -3218,7 +3236,7 @@
       const opener = target.closest("[data-open-global-booking]");
       if (!opener) return;
       event.preventDefault();
-      openModal();
+      void openModal({ preselectService: opener.getAttribute("data-global-booking-service") });
     });
   }
 

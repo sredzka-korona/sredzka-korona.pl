@@ -148,14 +148,14 @@
   }
 
   function renderOpeningHoursEditorMarkup(items, options = {}) {
-    const { idPrefix = "company-opening-hours", intro = "" } = options;
+    const { idPrefix = "company-opening-hours", intro = "", sectionTitle = "Godziny dowozów" } = options;
     const schedule = getOpeningHoursEditorState(items);
 
     return `
       <div class="stack">
         <div>
-          <strong>Godziny otwarcia</strong>
-          <p class="helper">${escapeHtml(intro || "Każdy dzień ma osobne pola od i do. Puste pola oznaczają, że lokal jest nieczynny.")}</p>
+          <strong>${escapeHtml(sectionTitle)}</strong>
+          <p class="helper">${escapeHtml(intro || "Każdy dzień ma osobne pola od i do. Puste pola oznaczają dzień bez dowozu.")}</p>
         </div>
         <div class="stack">
           ${schedule
@@ -164,7 +164,7 @@
                 <div class="repeater-item opening-hours-day-card">
                   <div class="repeater-head">
                     <strong>${escapeHtml(entry.day)}</strong>
-                    <span class="helper">Pozostaw puste, aby oznaczyć dzień jako nieczynny.</span>
+                    <span class="helper">Pozostaw puste, aby oznaczyć dzień bez dowozu.</span>
                   </div>
                   <div class="field-grid">
                     <label class="field">
@@ -570,6 +570,7 @@
       roomOptions: [],
       tableOptions: [],
       hallOptions: [],
+      cateringRecipients: [],
       countdownTimer: null,
       isLoading: false,
       lastError: "",
@@ -604,13 +605,13 @@
     {
       key: "restauracja",
       label: "Catering",
-      description: "Menu, media i konfiguracja systemu rezerwacji stolików (obecnie ukryty na stronie — do przywrócenia).",
+      description: "Menu, media, odbiorcy dostaw cateringu oraz ustawienia modułu.",
       tiles: [
         { key: "menu", label: "Menu", description: "Kategorie, pozycje, składniki i kolejność." },
         { key: "gallery", label: "Galeria", description: "Zdjęcia cateringu i ich kolejność." },
         { key: "orders", label: "Zamówienia", description: "Edycja treści modala zamówień widocznej na stronie cateringu." },
-        { key: "hours", label: "Godziny otwarcia", description: "Dni i godziny widoczne na stronie cateringu." },
-        { key: "tables", label: "Stoliki", description: "Konfiguracja stolików i godzin systemu rezerwacji." },
+        { key: "hours", label: "Godziny dowozów", description: "Dni i przedziały dowozu widoczne w kafelku na stronie cateringu." },
+        { key: "recipients", label: "Odbiorcy", description: "Lista odbiorców dostaw: dane kontaktowe i adresowe." },
         { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Catering na stronie głównej (pozycja i zoom)." },
         { key: "settings", label: "Ustawienia rezerwacji", description: "Włączenie i przerwy w przyjmowaniu rezerwacji." },
       ],
@@ -1573,7 +1574,12 @@
         status: row.status,
         statusLabel: scheduleStatusLabel(row.status, row.statusLabel || row.status),
         humanNumberLabel: row.humanNumberLabel || row.id,
-        title: row.status === "manual_block" ? "Blokada terminu" : row.fullName || "Rezerwacja cateringu",
+        title:
+          row.status === "manual_block"
+            ? "Blokada terminu"
+            : row.cateringDelivery && row.recipient && row.recipient.displayName
+              ? row.recipient.displayName
+              : row.fullName || "Rezerwacja cateringu",
         subtitle: `${row.reservationDate || ""} ${scheduleFormatTime(startMs)} - ${scheduleFormatTime(endMs)}`.trim(),
         dateFrom: String(row.reservationDate || "").slice(0, 10),
         dateTo: String(row.reservationDate || "").slice(0, 10),
@@ -1795,7 +1801,7 @@
     }
 
     try {
-      const [hotelReservations, restaurantReservations, hallReservations, hotelRooms, restaurantTables, hallList] =
+      const [hotelReservations, restaurantReservations, hallReservations, hotelRooms, restaurantTables, hallList, cateringRecipientsRes] =
         await Promise.all([
           bookingAdminApi("hotel", "admin-reservations-list", { query: { status: "all" } }),
           bookingAdminApi("restaurant", "admin-reservations-list", { query: { status: "all" } }),
@@ -1803,6 +1809,7 @@
           bookingAdminApi("hotel", "admin-rooms-list"),
           bookingAdminApi("restaurant", "admin-tables-list"),
           bookingAdminApi("hall", "admin-halls-list"),
+          bookingAdminApi("restaurant", "admin-catering-recipients-list"),
         ]);
 
       const allItems = [
@@ -1843,6 +1850,9 @@
       state.schedule.roomOptions = Array.isArray(hotelRooms?.rooms) ? hotelRooms.rooms : [];
       state.schedule.tableOptions = Array.isArray(restaurantTables?.tables) ? restaurantTables.tables : [];
       state.schedule.hallOptions = Array.isArray(hallList?.halls) ? hallList.halls : [];
+      state.schedule.cateringRecipients = Array.isArray(cateringRecipientsRes?.recipients)
+        ? cateringRecipientsRes.recipients
+        : [];
       state.schedule.lastError = "";
 
       const pendingList = state.schedule.pendingItems;
@@ -1869,6 +1879,7 @@
       state.schedule.tomorrowItems = [];
       state.schedule.upcomingItems = [];
       state.schedule.unconfirmedItems = [];
+      state.schedule.cateringRecipients = [];
       state.schedule.lastError = error.message || "Nie udało się pobrać danych grafiku.";
     } finally {
       state.schedule.isLoading = false;
@@ -2656,12 +2667,14 @@
         rows.push(scheduleDetailSheetRowMarkup("Pokoje", scheduleRoomLabels(item.raw.roomIds || item.resourceIds || []) || "Wskazane pokoje"));
       } else if (item.service === "restaurant") {
         rows.push(scheduleDetailSheetRowMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
-        rows.push(
-          scheduleDetailSheetRowMarkup(
-            "Przydzielone stoliki",
-            item.raw.assignedTablesLabel || scheduleTableLabels(item.raw.assignedTableIds || item.resourceIds || []) || "Wskazane stoliki"
-          )
-        );
+        if (!item.raw.cateringDelivery) {
+          rows.push(
+            scheduleDetailSheetRowMarkup(
+              "Przydzielone stoliki",
+              item.raw.assignedTablesLabel || scheduleTableLabels(item.raw.assignedTableIds || item.resourceIds || []) || "Wskazane stoliki"
+            )
+          );
+        }
       } else {
         rows.push(scheduleDetailSheetRowMarkup("Sala", item.raw.hallName || "Wybrana sala"));
         rows.push(scheduleDetailSheetRowMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
@@ -2698,26 +2711,47 @@
       rows.push(scheduleDetailSheetRowMarkup("E-mail", item.raw.email || "—"));
     } else if (item.service === "restaurant") {
       rows.push(scheduleDetailSheetRowMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
-      rows.push(
-        scheduleDetailSheetRowMarkup(
-          "Przydzielone stoliki",
-          item.raw.assignedTablesLabel || scheduleTableLabels(item.raw.assignedTableIds || item.resourceIds || []) || "—"
-        )
-      );
-      const tc = item.raw.tablesCount;
-      const gc = item.raw.guestsCount;
-      const tablesPart =
-        tc !== undefined && tc !== null && String(tc).trim() !== ""
-          ? `Stoliki (rezerwacja): ${tc}`
-          : "Stoliki (rezerwacja): —";
-      const guestsPart =
-        gc !== undefined && gc !== null && String(gc).trim() !== "" ? `Goście: ${gc}` : "Goście: —";
-      const placePart = `Miejsce: ${scheduleRestaurantPlaceLabel(item.raw.placePreference)}`;
-      const joinPart = `Łączenie: ${scheduleBooleanLabel(Boolean(item.raw.joinTables))}`;
-      rows.push(scheduleDetailSheetRowMarkup("Parametry rezerwacji", `${tablesPart} · ${guestsPart} · ${placePart} · ${joinPart}`));
-      rows.push(scheduleDetailSheetRowMarkup("Klient", item.raw.fullName || "—"));
-      rows.push(scheduleDetailSheetRowMarkup("Telefon", item.raw.phone || "—"));
-      rows.push(scheduleDetailSheetRowMarkup("E-mail", item.raw.email || "—"));
+      if (item.raw.cateringDelivery) {
+        rows.push(scheduleDetailSheetRowMarkup("Typ", "Dostawa cateringu"));
+        const r = item.raw.recipient;
+        if (r && typeof r === "object") {
+          rows.push(scheduleDetailSheetRowMarkup("Nazwa odbiorcy", r.displayName || "—"));
+          const person = [r.contactFirstName, r.contactLastName].filter(Boolean).join(" ");
+          if (person) rows.push(scheduleDetailSheetRowMarkup("Osoba kontaktowa", person));
+          rows.push(scheduleDetailSheetRowMarkup("E-mail", r.email || "—"));
+          const phoneLine = `${r.phonePrefix || ""} ${r.phoneNational || ""}`.trim();
+          rows.push(scheduleDetailSheetRowMarkup("Telefon", phoneLine || "—"));
+          const streetLine = [r.street, r.buildingNumber].filter(Boolean).join(" ");
+          if (streetLine) rows.push(scheduleDetailSheetRowMarkup("Ulica i numer", streetLine));
+          const cityLine = [r.postalCode, r.city].filter(Boolean).join(" ");
+          if (cityLine) rows.push(scheduleDetailSheetRowMarkup("Kod i miejscowość", cityLine));
+          if (r.extraInfo) rows.push(scheduleDetailSheetRowMarkup("Dodatkowe informacje", r.extraInfo));
+        } else {
+          rows.push(scheduleDetailSheetRowMarkup("Odbiorca", "Brak danych odbiorcy w systemie."));
+        }
+        rows.push(scheduleDetailSheetRowMarkup("Numer rezerwacji", item.humanNumberLabel || item.raw.humanNumberLabel || "—"));
+      } else {
+        rows.push(
+          scheduleDetailSheetRowMarkup(
+            "Przydzielone stoliki",
+            item.raw.assignedTablesLabel || scheduleTableLabels(item.raw.assignedTableIds || item.resourceIds || []) || "—"
+          )
+        );
+        const tc = item.raw.tablesCount;
+        const gc = item.raw.guestsCount;
+        const tablesPart =
+          tc !== undefined && tc !== null && String(tc).trim() !== ""
+            ? `Stoliki (rezerwacja): ${tc}`
+            : "Stoliki (rezerwacja): —";
+        const guestsPart =
+          gc !== undefined && gc !== null && String(gc).trim() !== "" ? `Goście: ${gc}` : "Goście: —";
+        const placePart = `Miejsce: ${scheduleRestaurantPlaceLabel(item.raw.placePreference)}`;
+        const joinPart = `Łączenie: ${scheduleBooleanLabel(Boolean(item.raw.joinTables))}`;
+        rows.push(scheduleDetailSheetRowMarkup("Parametry rezerwacji", `${tablesPart} · ${guestsPart} · ${placePart} · ${joinPart}`));
+        rows.push(scheduleDetailSheetRowMarkup("Klient", item.raw.fullName || "—"));
+        rows.push(scheduleDetailSheetRowMarkup("Telefon", item.raw.phone || "—"));
+        rows.push(scheduleDetailSheetRowMarkup("E-mail", item.raw.email || "—"));
+      }
     } else {
       rows.push(scheduleDetailSheetRowMarkup("Sala", item.raw.hallName || "—"));
       rows.push(scheduleDetailSheetRowMarkup("Termin", `${scheduleFormatDateTime(item.startMs)} - ${scheduleFormatTime(item.endMs)}`));
@@ -2855,6 +2889,130 @@
     return Math.max(0, Array.isArray(state.schedule.tableOptions) ? state.schedule.tableOptions.length : 0);
   }
 
+  const SCHEDULE_CATERING_WEEKDAYS = [
+    { value: 1, label: "Poniedziałek" },
+    { value: 2, label: "Wtorek" },
+    { value: 3, label: "Środa" },
+    { value: 4, label: "Czwartek" },
+    { value: 5, label: "Piątek" },
+    { value: 6, label: "Sobota" },
+    { value: 0, label: "Niedziela" },
+  ];
+
+  function scheduleCateringRecipientSelectMarkup(selectedId) {
+    const list = Array.isArray(state.schedule.cateringRecipients) ? state.schedule.cateringRecipients : [];
+    const sel = String(selectedId || "").trim();
+    return `
+      <label class="field field-grow">
+        <span>Odbiorca</span>
+        <select name="recipientId" required>
+          <option value="">— Wybierz odbiorcę —</option>
+          ${list
+            .map(
+              (r) =>
+                `<option value="${escapeAttribute(r.id)}" ${String(r.id) === sel ? "selected" : ""}>${escapeHtml(
+                  r.displayName || r.id
+                )}</option>`
+            )
+            .join("")}
+        </select>
+      </label>
+    `;
+  }
+
+  function scheduleCateringNewRecipientFieldsetMarkup() {
+    return `
+      <fieldset id="catering-new-recipient-fieldset" class="catering-new-recipient-fieldset" hidden disabled>
+        <legend>Nowy odbiorca</legend>
+        <div class="field-grid">
+          <label class="field"><span>Nazwa odbiorcy</span><input name="newRecipientDisplayName" autocomplete="organization" /></label>
+          <label class="field"><span>Imię</span><input name="newRecipientFirstName" autocomplete="given-name" /></label>
+          <label class="field"><span>Nazwisko</span><input name="newRecipientLastName" autocomplete="family-name" /></label>
+          <label class="field"><span>E-mail</span><input name="newRecipientEmail" type="email" autocomplete="email" /></label>
+          <label class="field"><span>Prefiks tel.</span><input name="newRecipientPhonePrefix" value="+48" /></label>
+          <label class="field"><span>Numer telefonu</span><input name="newRecipientPhoneNational" autocomplete="tel-national" /></label>
+          <label class="field"><span>Ulica</span><input name="newRecipientStreet" autocomplete="street-address" /></label>
+          <label class="field"><span>Nr budynku / lokalu</span><input name="newRecipientBuilding" /></label>
+          <label class="field"><span>Kod pocztowy</span><input name="newRecipientPostalCode" autocomplete="postal-code" /></label>
+          <label class="field"><span>Miasto</span><input name="newRecipientCity" autocomplete="address-level2" /></label>
+          <label class="field-full"><span>Dodatkowe informacje</span><textarea name="newRecipientExtra" rows="2"></textarea></label>
+        </div>
+        <div class="field-row-btns">
+          <button type="button" class="button secondary" data-schedule-cancel-new-catering-recipient>Anuluj</button>
+          <button type="button" class="button" data-schedule-save-new-catering-recipient>Zapisz odbiorcę</button>
+        </div>
+      </fieldset>
+    `;
+  }
+
+  async function scheduleSaveNewCateringRecipientFromFieldset(fieldset) {
+    if (!fieldset) return null;
+    const q = (name) => String(fieldset.querySelector(`[name="${name}"]`)?.value || "").trim();
+    const body = {
+      displayName: q("newRecipientDisplayName"),
+      contactFirstName: q("newRecipientFirstName"),
+      contactLastName: q("newRecipientLastName"),
+      email: q("newRecipientEmail"),
+      phonePrefix: q("newRecipientPhonePrefix") || "+48",
+      phoneNational: q("newRecipientPhoneNational"),
+      street: q("newRecipientStreet"),
+      buildingNumber: q("newRecipientBuilding"),
+      postalCode: q("newRecipientPostalCode"),
+      city: q("newRecipientCity"),
+      extraInfo: q("newRecipientExtra"),
+    };
+    const res = await bookingAdminApi("restaurant", "admin-catering-recipient-save", { method: "PUT", body });
+    const rec = res && res.recipient;
+    if (!rec || !rec.id) {
+      throw new Error((res && res.error) || "Nie udało się zapisać odbiorcy.");
+    }
+    const list = Array.isArray(state.schedule.cateringRecipients) ? state.schedule.cateringRecipients : [];
+    const next = [...list.filter((x) => String(x.id) !== String(rec.id)), rec];
+    next.sort((a, b) =>
+      String(a.displayName || a.id || "").localeCompare(String(b.displayName || b.id || ""), "pl", {
+        sensitivity: "base",
+      })
+    );
+    state.schedule.cateringRecipients = next;
+    return rec;
+  }
+
+  function scheduleWireCateringRecipientInlinePanel(mount) {
+    const fs = mount.querySelector("#catering-new-recipient-fieldset");
+    const select = mount.querySelector('select[name="recipientId"]');
+    mount.querySelector("[data-schedule-add-catering-recipient]")?.addEventListener("click", () => {
+      if (!fs) return;
+      fs.hidden = false;
+      fs.disabled = false;
+    });
+    mount.querySelector("[data-schedule-cancel-new-catering-recipient]")?.addEventListener("click", () => {
+      if (!fs) return;
+      fs.hidden = true;
+      fs.disabled = true;
+    });
+    mount.querySelector("[data-schedule-save-new-catering-recipient]")?.addEventListener("click", async () => {
+      try {
+        const rec = await scheduleSaveNewCateringRecipientFromFieldset(fs);
+        if (select && rec) {
+          const exists = Array.from(select.options).some((o) => String(o.value) === String(rec.id));
+          if (!exists) {
+            const opt = document.createElement("option");
+            opt.value = rec.id;
+            opt.textContent = rec.displayName || rec.id;
+            select.appendChild(opt);
+          }
+          select.value = String(rec.id);
+        }
+        if (fs) {
+          fs.hidden = true;
+          fs.disabled = true;
+        }
+      } catch (error) {
+        window.alert(error.message || "Nie udało się zapisać odbiorcy.");
+      }
+    });
+  }
+
   function scheduleHallOptionsMarkup(selectedHallId) {
     const current = String(selectedHallId || "");
     return `
@@ -2920,6 +3078,24 @@
           <label class="field-full"><span>Uwagi klienta</span><textarea name="customerNote">${escapeHtml(raw.customerNote || "")}</textarea></label>
           <label class="field-full"><span>Notatka administratora</span><textarea name="adminNote">${escapeHtml(raw.adminNote || "")}</textarea></label>
         </div>
+      `;
+    } else if (item.service === "restaurant" && raw.cateringDelivery) {
+      fieldsMarkup = `
+        <div class="field-grid">
+          <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(raw.reservationDate || "")}" required /></label>
+          <label class="field"><span>Godzina</span><input type="time" name="startTime" min="00:00" max="23:59" step="60" value="${escapeAttribute(raw.startTime || "")}" required /></label>
+          <label class="field"><span>Czas trwania (h)</span><input type="number" step="0.25" min="0.25" name="durationHours" value="${escapeAttribute(String(raw.durationHours || 1))}" required /></label>
+        </div>
+        <div class="field-grid schedule-catering-recipient-line">
+          ${scheduleCateringRecipientSelectMarkup(raw.recipientId || raw.recipient?.id || "")}
+          <label class="field schedule-catering-add-recipient-wrap">
+            <span class="helper"> </span>
+            <button type="button" class="button secondary" data-schedule-add-catering-recipient>Dodaj odbiorcę</button>
+          </label>
+        </div>
+        ${scheduleCateringNewRecipientFieldsetMarkup()}
+        <label class="field-full"><span>Opis</span><textarea name="customerNote">${escapeHtml(raw.customerNote || "")}</textarea></label>
+        <label class="field-full"><span>Notatka administratora</span><textarea name="adminNote">${escapeHtml(raw.adminNote || "")}</textarea></label>
       `;
     } else if (item.service === "restaurant") {
       fieldsMarkup = `
@@ -2989,6 +3165,9 @@
         </form>
       `,
       (mount) => {
+        if (item.service === "restaurant" && item.raw?.cateringDelivery) {
+          scheduleWireCateringRecipientInlinePanel(mount);
+        }
         mount.querySelector("#schedule-edit-form")?.addEventListener("submit", async (event) => {
           event.preventDefault();
           const formData = new FormData(event.currentTarget);
@@ -3006,25 +3185,37 @@
             body.customerNote = formData.get("customerNote") || "";
             body.adminNote = formData.get("adminNote") || "";
           } else if (item.service === "restaurant") {
-            body.reservationDate = formData.get("reservationDate");
-            body.startTime = formData.get("startTime");
-            body.durationHours = Number(formData.get("durationHours") || 0);
-            body.tablesCount = Number(formData.get("tablesCount") || 1);
-            if (!restaurantTableLimit) {
-              throw new Error("Brak aktywnych stolików w cateringu.");
+            if (item.raw?.cateringDelivery) {
+              body.reservationDate = formData.get("reservationDate");
+              body.startTime = formData.get("startTime");
+              body.durationHours = Number(formData.get("durationHours") || 0);
+              body.recipientId = String(formData.get("recipientId") || "").trim();
+              if (!body.recipientId) {
+                throw new Error("Wybierz odbiorcę.");
+              }
+              body.customerNote = formData.get("customerNote") || "";
+              body.adminNote = formData.get("adminNote") || "";
+            } else {
+              body.reservationDate = formData.get("reservationDate");
+              body.startTime = formData.get("startTime");
+              body.durationHours = Number(formData.get("durationHours") || 0);
+              body.tablesCount = Number(formData.get("tablesCount") || 1);
+              if (!restaurantTableLimit) {
+                throw new Error("Brak aktywnych stolików w cateringu.");
+              }
+              if (body.tablesCount > restaurantTableLimit) {
+                throw new Error(`Mozesz wybrac maksymalnie ${restaurantTableLimit} stolikow.`);
+              }
+              body.guestsCount = Number(formData.get("guestsCount") || 1);
+              body.joinTables = formData.get("joinTables") === "1";
+              body.placePreference = String(formData.get("placePreference") || "no_preference");
+              body.fullName = formData.get("fullName");
+              body.email = formData.get("email");
+              body.phonePrefix = formData.get("phonePrefix");
+              body.phoneNational = formData.get("phoneNational");
+              body.customerNote = formData.get("customerNote") || "";
+              body.adminNote = formData.get("adminNote") || "";
             }
-            if (body.tablesCount > restaurantTableLimit) {
-              throw new Error(`Mozesz wybrac maksymalnie ${restaurantTableLimit} stolikow.`);
-            }
-            body.guestsCount = Number(formData.get("guestsCount") || 1);
-            body.joinTables = formData.get("joinTables") === "1";
-            body.placePreference = String(formData.get("placePreference") || "no_preference");
-            body.fullName = formData.get("fullName");
-            body.email = formData.get("email");
-            body.phonePrefix = formData.get("phonePrefix");
-            body.phoneNational = formData.get("phoneNational");
-            body.customerNote = formData.get("customerNote") || "";
-            body.adminNote = formData.get("adminNote") || "";
           } else {
             body.hallId = formData.get("hallId");
             body.reservationDate = formData.get("reservationDate");
@@ -3087,7 +3278,7 @@
           </div>
           <div class="schedule-create-services">
             <button type="button" class="schedule-create-service" data-create-service="hotel"><strong>Hotel</strong><span>Pokoje i pobyty.</span></button>
-            <button type="button" class="schedule-create-service" data-create-service="restaurant"><strong>Catering</strong><span>Stoliki i godziny.</span></button>
+            <button type="button" class="schedule-create-service" data-create-service="restaurant"><strong>Catering</strong><span>Dostawy, blokady stolików.</span></button>
             <button type="button" class="schedule-create-service" data-create-service="hall"><strong>Przyjęcia</strong><span>Sale i wydarzenia.</span></button>
           </div>
         `;
@@ -3138,24 +3329,50 @@
             `
             : `
               <div class="field-grid">
-                <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
-                <label class="field"><span>Start</span><input type="time" name="startTime" min="00:00" max="23:59" value="12:00" required /></label>
-                <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="2" required /></label>
-                <label class="field"><span>Liczba stolików</span><input type="number" min="1" max="${escapeAttribute(String(Math.max(1, restaurantTableLimit)))}" name="tablesCount" value="1" required /></label>
-                <label class="field"><span>Liczba gości</span><input type="number" min="1" name="guestsCount" value="2" required /></label>
-                <label class="field"><span>Łączone stoliki</span><select name="joinTables"><option value="0">Nie</option><option value="1">Tak</option></select></label>
-                <label class="field"><span>Preferencja miejsca</span><select name="placePreference">
-                  <option value="no_preference">Bez preferencji</option>
-                  <option value="inside">W lokalu</option>
-                  <option value="terrace">Na tarasie</option>
-                </select></label>
-                <label class="field"><span>Imię i nazwisko</span><input name="fullName" required /></label>
-                <label class="field"><span>E-mail</span><input name="email" type="email" /></label>
-                <label class="field"><span>Prefiks</span><input name="phonePrefix" value="+48" /></label>
-                <label class="field"><span>Numer telefonu</span><input name="phoneNational" /></label>
-                <label class="field-full"><span>Uwagi klienta</span><textarea name="customerNote"></textarea></label>
+                <label class="field"><span>Data pierwszej dostawy</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
+                <label class="field"><span>Godzina</span><input type="time" name="startTime" min="00:00" max="23:59" step="60" value="12:00" required /></label>
+                <label class="field"><span>Czas trwania (h)</span><input type="number" step="0.25" min="0.25" name="durationHours" value="1" required /></label>
               </div>
-              <p class="helper">Aktualnie aktywnych stolików: ${escapeHtml(String(restaurantTableLimit))}.</p>
+              <div class="field-grid schedule-catering-recipient-line">
+                ${scheduleCateringRecipientSelectMarkup("")}
+                <label class="field schedule-catering-add-recipient-wrap">
+                  <span class="helper"> </span>
+                  <button type="button" class="button secondary" data-schedule-add-catering-recipient>Dodaj odbiorcę</button>
+                </label>
+              </div>
+              ${scheduleCateringNewRecipientFieldsetMarkup()}
+              <label class="field-full"><span>Opis</span><textarea name="description" rows="3" placeholder="Treść zamówienia, uwagi do dowozu…"></textarea></label>
+              <label class="field-full"><span>Notatka administratora</span><textarea name="adminNoteCreate" rows="2"></textarea></label>
+              <label class="field">
+                <span>Powtarzanie</span>
+                <select name="repeatMode" data-catering-repeat-mode>
+                  <option value="none" selected>Jednorazowo</option>
+                  <option value="weekly">Co tydzień (wybrany dzień)</option>
+                </select>
+              </label>
+              <p class="helper" data-catering-repeat-hint hidden>
+                Kolejne terminy to ten sam dzień tygodnia co najbliżej wybranej daty startu, aż do daty końca (włącznie).
+              </p>
+              <div class="field-grid" data-catering-repeat-weekly-fields hidden>
+                <label class="field">
+                  <span>Dzień tygodnia</span>
+                  <select name="repeatWeekday">
+                    ${SCHEDULE_CATERING_WEEKDAYS.map(({ value, label }) => {
+                      const parts = String(model.date || "").split("-").map((x) => Number(x));
+                      const dt =
+                        parts.length === 3 && parts.every((n) => Number.isFinite(n))
+                          ? new Date(parts[0], parts[1] - 1, parts[2])
+                          : null;
+                      const wd = dt && Number.isFinite(dt.getTime()) ? dt.getDay() : 4;
+                      return `<option value="${String(value)}" ${value === wd ? "selected" : ""}>${escapeHtml(label)}</option>`;
+                    }).join("")}
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Do dnia (włącznie)</span>
+                  <input type="date" name="repeatUntil" value="${escapeAttribute(model.date)}" />
+                </label>
+              </div>
             `;
       } else if (isHall) {
         fields =
@@ -3239,10 +3456,19 @@
         model.hallId = String(event.currentTarget?.value || "");
         rerender();
       });
+      mount.querySelector("[data-catering-repeat-mode]")?.addEventListener("change", (event) => {
+        const weekly = String(event.currentTarget?.value || "") === "weekly";
+        mount.querySelector("[data-catering-repeat-weekly-fields]")?.toggleAttribute("hidden", !weekly);
+        mount.querySelector("[data-catering-repeat-hint]")?.toggleAttribute("hidden", !weekly);
+      });
+      if (model.service === "restaurant" && model.mode === "reservation") {
+        scheduleWireCateringRecipientInlinePanel(mount);
+      }
       mount.querySelector("#schedule-create-form")?.addEventListener("submit", async (event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
         try {
+          let createSuccessMessage = "Nowy wpis został utworzony.";
           if (model.service === "hotel") {
             if (model.mode === "block") {
               const dateFrom = String(formData.get("dateFrom") || "");
@@ -3307,34 +3533,31 @@
                 },
               });
             } else {
-              const tablesCount = Number(formData.get("tablesCount") || 1);
-              if (!restaurantTableLimit) {
-                throw new Error("Brak aktywnych stolików w cateringu.");
+              const recipientId = String(formData.get("recipientId") || "").trim();
+              if (!recipientId) {
+                throw new Error("Wybierz odbiorcę lub dodaj nowego.");
               }
-              if (tablesCount > restaurantTableLimit) {
-                throw new Error(`Mozesz wybrac maksymalnie ${restaurantTableLimit} stolikow.`);
-              }
-              await bookingAdminApi("restaurant", "admin-reservation-create", {
+              const repeatMode = String(formData.get("repeatMode") || "none");
+              const repeatUntilRaw = String(formData.get("repeatUntil") || "").trim();
+              const createdOut = await bookingAdminApi("restaurant", "admin-catering-delivery-create", {
                 method: "POST",
                 body: {
+                  recipientId,
                   reservationDate: formData.get("reservationDate"),
                   startTime: formData.get("startTime"),
-                  durationHours: Number(formData.get("durationHours") || 0),
-                  tablesCount,
-                  guestsCount: Number(formData.get("guestsCount") || 1),
-                  joinTables: formData.get("joinTables") === "1",
-                  placePreference: String(formData.get("placePreference") || "no_preference"),
-                  fullName: formData.get("fullName"),
-                  email: String(formData.get("email") || "").trim(),
-                  phonePrefix: String(formData.get("phoneNational") || "").trim()
-                    ? String(formData.get("phonePrefix") || "+48").trim()
-                    : "",
-                  phoneNational: String(formData.get("phoneNational") || "").trim(),
-                  customerNote: formData.get("customerNote") || "",
-                  adminNote: "",
+                  durationHours: Number(formData.get("durationHours") || 1),
+                  description: String(formData.get("description") || "").trim(),
+                  adminNote: String(formData.get("adminNoteCreate") || "").trim(),
+                  repeatMode,
+                  repeatWeekday: Number(formData.get("repeatWeekday")),
+                  repeatUntil: repeatMode === "weekly" ? repeatUntilRaw : undefined,
                   status: "confirmed",
                 },
               });
+              const cnt = Number(createdOut?.count);
+              if (Number.isFinite(cnt) && cnt > 1) {
+                createSuccessMessage = `Utworzono ${cnt} rezerwacji dostawy cateringu.`;
+              }
             }
           } else if (model.service === "hall") {
             if (model.mode === "block") {
@@ -3395,7 +3618,7 @@
 
           closeScheduleModal();
           await loadScheduleData({ silent: true });
-          renderSchedulePanel("Nowy wpis został utworzony.");
+          renderSchedulePanel(createSuccessMessage);
         } catch (error) {
           window.alert(error.message || "Nie udało się utworzyć wpisu.");
         }
@@ -3411,7 +3634,7 @@
 
     openScheduleModal(renderContent(), attachEvents, { closeOnOverlayClick: false });
     if (
-      (!state.schedule.roomOptions.length || !state.schedule.tableOptions.length || !state.schedule.hallOptions.length) &&
+      (!state.schedule.roomOptions.length || !state.schedule.hallOptions.length) &&
       !state.schedule.isLoading
     ) {
       loadScheduleData({ silent: true }).then(() => {
@@ -3478,7 +3701,10 @@
 
   function getActiveAdminTile(tabKey = state.ui.topTab) {
     const tab = getAdminTabConfig(tabKey);
-    const stored = state.ui.tileByTab?.[tab.key];
+    let stored = state.ui.tileByTab?.[tab.key];
+    if (tab.key === "restauracja" && stored === "tables") {
+      stored = "recipients";
+    }
     return tab.tiles.find((tile) => tile.key === stored)?.key || tab.tiles[0]?.key || "";
   }
 
@@ -3606,8 +3832,8 @@
     if (tabKey === "restauracja" && tileKey === "hours") {
       return `<section class="panel col-12" id="restaurant-opening-hours-panel"></section>`;
     }
-    if (tabKey === "restauracja" && tileKey === "tables") {
-      return `<div id="admin-panel-restaurant-tables" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
+    if (tabKey === "restauracja" && tileKey === "recipients") {
+      return `<div id="admin-panel-catering-recipients" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
     }
     if (tabKey === "restauracja" && tileKey === "templates") {
       return `<div id="admin-panel-restaurant-templates" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
@@ -3789,7 +4015,7 @@
       };
       const copyMap = {
         hotel: "Ten widok wymaga wlaczonego backendu rezerwacji hotelu.",
-        restaurant: "Ten widok wymaga wlaczonego backendu rezerwacji cateringu (stoliki).",
+        restaurant: "Ten widok wymaga wlaczonego backendu rezerwacji cateringu.",
         hall: "Ten widok wymaga wlaczonego backendu rezerwacji przyjec.",
       };
       renderOnlineBookingsUnavailable(panelSelector, {
@@ -3868,13 +4094,8 @@
         renderRestaurantOrderPanel(statusMessage);
       } else if (tileKey === "hours") {
         renderRestaurantOpeningHoursPanel(statusMessage);
-      } else if (tileKey === "tables") {
-        mountLegacyBookingModule(
-          "#admin-panel-restaurant-tables",
-          "restaurant",
-          { defaultTab: "tables", allowedTabs: ["tables", "settings"] },
-          statusMessage
-        );
+      } else if (tileKey === "recipients") {
+        renderCateringRecipientsPanel(statusMessage);
       } else if (tileKey === "templates") {
         mountLegacyBookingModule(
           "#admin-panel-restaurant-templates",
@@ -4136,7 +4357,7 @@
             <p class="helper" style="margin: 0.75rem 0 0.35rem;">Okresy przerw ustawisz nizej, osobno w panelach: Hotel / Catering / Przyjecia.</p>
           </div>
           <div class="panel-note">
-            <strong>Uwaga:</strong> część treści poniżej pochodzi ze starszej wersji panelu. Aktualny front korzysta głównie z blokad sekcji, rezerwacji online, godzin otwarcia, menu, galerii, dokumentów, kalendarza i modala „Oferta”.
+            <strong>Uwaga:</strong> część treści poniżej pochodzi ze starszej wersji panelu. Aktualny front korzysta głównie z blokad sekcji, rezerwacji online, godzin dowozów, menu, galerii, dokumentów, kalendarza i modala „Oferta”.
           </div>
           <div class="field-grid">
             <label class="field-full"><span>Naglowek bloku (np. modal Kontakt)</span><input id="home-about-title" value="${escapeAttribute(content.home.aboutTitle || "")}" /></label>
@@ -4854,6 +5075,197 @@
     bindRepeaterButtons();
   }
 
+  async function refreshCateringRecipientsState() {
+    try {
+      const data = await bookingAdminApi("restaurant", "admin-catering-recipients-list");
+      state.schedule.cateringRecipients = Array.isArray(data?.recipients) ? data.recipients : [];
+    } catch {
+      /* grafik może ładować listę osobno */
+    }
+  }
+
+  function openCateringRecipientEditorModal(initial, onSaved) {
+    const r = initial && typeof initial === "object" ? initial : {};
+    const isEdit = Boolean(r.id);
+    openScheduleModal(
+      `
+        <form class="stack" id="catering-recipient-editor-form">
+          <div class="admin-modal-head">
+            <div>
+              <p class="pill">Catering</p>
+              <h3>${isEdit ? "Edycja odbiorcy" : "Nowy odbiorca"}</h3>
+            </div>
+            <button type="button" class="button secondary" data-schedule-modal-close>Zamknij</button>
+          </div>
+          ${isEdit ? `<input type="hidden" name="id" value="${escapeAttribute(String(r.id))}" />` : ""}
+          <div class="field-grid">
+            <label class="field-full"><span>Nazwa odbiorcy</span><input name="displayName" required value="${escapeAttribute(r.displayName || "")}" /></label>
+            <label class="field"><span>Imię</span><input name="contactFirstName" value="${escapeAttribute(r.contactFirstName || "")}" /></label>
+            <label class="field"><span>Nazwisko</span><input name="contactLastName" value="${escapeAttribute(r.contactLastName || "")}" /></label>
+            <label class="field"><span>E-mail</span><input name="email" type="email" required value="${escapeAttribute(r.email || "")}" /></label>
+            <label class="field"><span>Prefiks tel.</span><input name="phonePrefix" value="${escapeAttribute(r.phonePrefix || "+48")}" /></label>
+            <label class="field"><span>Numer telefonu</span><input name="phoneNational" value="${escapeAttribute(r.phoneNational || "")}" /></label>
+            <label class="field"><span>Ulica</span><input name="street" value="${escapeAttribute(r.street || "")}" /></label>
+            <label class="field"><span>Nr budynku / lokalu</span><input name="buildingNumber" value="${escapeAttribute(r.buildingNumber || "")}" /></label>
+            <label class="field"><span>Kod pocztowy</span><input name="postalCode" value="${escapeAttribute(r.postalCode || "")}" /></label>
+            <label class="field"><span>Miasto</span><input name="city" value="${escapeAttribute(r.city || "")}" /></label>
+            <label class="field-full"><span>Dodatkowe informacje</span><textarea name="extraInfo" rows="3">${escapeHtml(r.extraInfo || "")}</textarea></label>
+          </div>
+          <div class="admin-modal-footer">
+            <button type="button" class="button secondary" data-schedule-modal-close>Anuluj</button>
+            <button type="submit" class="button">Zapisz</button>
+          </div>
+        </form>
+      `,
+      (mount) => {
+        mount.querySelector("#catering-recipient-editor-form")?.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const form = event.currentTarget;
+          const fd = new FormData(form);
+          const body = {
+            id: fd.get("id") || undefined,
+            displayName: String(fd.get("displayName") || "").trim(),
+            contactFirstName: String(fd.get("contactFirstName") || "").trim(),
+            contactLastName: String(fd.get("contactLastName") || "").trim(),
+            email: String(fd.get("email") || "").trim(),
+            phonePrefix: String(fd.get("phonePrefix") || "+48").trim(),
+            phoneNational: String(fd.get("phoneNational") || "").trim(),
+            street: String(fd.get("street") || "").trim(),
+            buildingNumber: String(fd.get("buildingNumber") || "").trim(),
+            postalCode: String(fd.get("postalCode") || "").trim(),
+            city: String(fd.get("city") || "").trim(),
+            extraInfo: String(fd.get("extraInfo") || "").trim(),
+          };
+          try {
+            await bookingAdminApi("restaurant", "admin-catering-recipient-save", { method: "PUT", body });
+            closeScheduleModal();
+            await refreshCateringRecipientsState();
+            if (typeof onSaved === "function") await onSaved();
+          } catch (error) {
+            window.alert(error.message || "Nie udało się zapisać odbiorcy.");
+          }
+        });
+      },
+      { closeOnOverlayClick: false }
+    );
+  }
+
+  async function renderCateringRecipientsPanel(statusMessage = "") {
+    const root = document.querySelector("#admin-panel-catering-recipients");
+    if (!root) return;
+
+    if (!onlineBookingsEnabled) {
+      renderOnlineBookingsUnavailable("#admin-panel-catering-recipients", {
+        title: "Odbiorcy cateringu",
+        copy: "Ten widok wymaga włączonego backendu rezerwacji cateringu.",
+        statusMessage,
+      });
+      return;
+    }
+
+    root.innerHTML = `<section class="panel col-12"><p class="status">Ładowanie listy odbiorców…</p></section>`;
+
+    const paint = (recipients, message = "") => {
+      const list = Array.isArray(recipients) ? recipients : [];
+      const rows = list
+        .map((rec) => {
+          const person = [rec.contactFirstName, rec.contactLastName].filter(Boolean).join(" ");
+          const phone = `${rec.phonePrefix || ""} ${rec.phoneNational || ""}`.trim();
+          const addr = [rec.street, rec.buildingNumber].filter(Boolean).join(" ");
+          const cityLine = [rec.postalCode, rec.city].filter(Boolean).join(" ");
+          return `
+            <tr>
+              <td><strong>${escapeHtml(rec.displayName || rec.id || "—")}</strong></td>
+              <td>${escapeHtml(person || "—")}<br /><span class="helper">${escapeHtml(rec.email || "—")}</span><br /><span class="helper">${escapeHtml(phone || "—")}</span></td>
+              <td>${escapeHtml(addr || "—")}<br /><span class="helper">${escapeHtml(cityLine || "")}</span></td>
+              <td>
+                <div class="inline-actions">
+                  <button type="button" class="button secondary" data-catering-recipient-edit="${escapeAttribute(rec.id)}">Edytuj</button>
+                  <button type="button" class="button danger" data-catering-recipient-delete="${escapeAttribute(rec.id)}">Usuń</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        })
+        .join("");
+
+      root.innerHTML = `
+        <section class="panel col-12 catering-recipients-panel">
+          <p class="pill">Catering</p>
+          <div class="catering-recipients-head">
+            <div>
+              <h2>Odbiorcy</h2>
+              <p class="section-intro">Lista odbiorców dostaw: nazwa firmy lub miejsca, osoba kontaktowa, e-mail, telefon oraz adres. Tych odbiorców wybierasz też w grafiku przy ręcznej rezerwacji dostawy.</p>
+            </div>
+            <button type="button" class="button" data-catering-recipients-add>Dodaj odbiorcę</button>
+          </div>
+          <p class="status" data-catering-recipients-status>${escapeHtml(message || statusMessage || "")}</p>
+          ${
+            list.length
+              ? `<div class="table-scroll"><table class="hotel-table"><thead><tr><th>Nazwa</th><th>Kontakt</th><th>Adres</th><th>Akcje</th></tr></thead><tbody>${rows}</tbody></table></div>`
+              : `<p class="helper">Brak zapisanych odbiorców. Dodaj pierwszego, aby używać go przy dostawach w grafiku.</p>`
+          }
+        </section>
+      `;
+
+      root.querySelector("[data-catering-recipients-add]")?.addEventListener("click", () => {
+        openCateringRecipientEditorModal(null, async () => {
+          await renderCateringRecipientsPanel("");
+        });
+      });
+
+      root.querySelectorAll("[data-catering-recipient-edit]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-catering-recipient-edit");
+          const rec = list.find((x) => String(x.id) === String(id));
+          if (!rec) return;
+          openCateringRecipientEditorModal(rec, async () => {
+            await renderCateringRecipientsPanel("");
+          });
+        });
+      });
+
+      root.querySelectorAll("[data-catering-recipient-delete]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-catering-recipient-delete");
+          if (!id) return;
+          if (!window.confirm("Usunąć tego odbiorcę? Nie usuniesz odbiorcy, jeśli ma aktywne lub przyszłe rezerwacje dostawy.")) {
+            return;
+          }
+          try {
+            await bookingAdminApi("restaurant", "admin-catering-recipient-delete", {
+              method: "DELETE",
+              query: { id },
+            });
+            await refreshCateringRecipientsState();
+            await renderCateringRecipientsPanel("Odbiorca został usunięty.");
+          } catch (error) {
+            window.alert(error.message || "Nie udało się usunąć odbiorcy.");
+          }
+        });
+      });
+    };
+
+    try {
+      const data = await bookingAdminApi("restaurant", "admin-catering-recipients-list");
+      const recipients = data?.recipients || [];
+      state.schedule.cateringRecipients = Array.isArray(recipients) ? recipients : [];
+      paint(recipients, statusMessage);
+    } catch (error) {
+      root.innerHTML = `
+        <section class="panel col-12">
+          <p class="pill">Catering</p>
+          <h2>Odbiorcy</h2>
+          <p class="status">${escapeHtml(error.message || "Nie udało się pobrać listy odbiorców.")}</p>
+          <button type="button" class="button secondary" data-catering-recipients-retry>Spróbuj ponownie</button>
+        </section>
+      `;
+      root.querySelector("[data-catering-recipients-retry]")?.addEventListener("click", () => {
+        renderCateringRecipientsPanel("");
+      });
+    }
+  }
+
   function renderHotelBookingSettingsPanel(statusMessage = "") {
     renderDomainBookingSettingsPanel("#hotel-booking-settings-panel", {
       title: "Hotel",
@@ -5053,11 +5465,11 @@
 
     panel.innerHTML = `
       <p class="pill">Catering</p>
-      <h2>Godziny otwarcia</h2>
-      <p class="section-intro">Te godziny pojawiaja sie w kafelku "Godziny" na stronie cateringu.</p>
+      <h2>Godziny dowozów</h2>
+      <p class="section-intro">Te godziny pojawiaja sie w kafelku „Godziny dowozów” na stronie cateringu.</p>
       <div class="stack">
         ${renderOpeningHoursEditorMarkup(state.content.company?.openingHours, {
-          intro: "Ustaw godzine otwarcia i zamkniecia dla kazdego dnia osobno. Puste pola zapisza dzien jako nieczynny.",
+          intro: "Ustaw przedział dowozu (od–do) dla kazdego dnia osobno. Puste pola zapisza dzien bez dowozu.",
         })}
         <p class="status">${escapeHtml(statusMessage)}</p>
       </div>
@@ -5069,7 +5481,7 @@
     if (!panel) return;
     const currentInfoText =
       state.content.restaurant?.ordersInfoText ||
-      "Dowozimy za darmo w odleglosci do 5 km od obiektu.";
+      "<p>Ceny oraz zasady współpracy ustalane indywidualnie.</p><p>Prosimy o kontakt telefoniczny i mailowy lub poprzez formularz kontaktowy.</p>";
 
     panel.innerHTML = `
       <p class="pill">Catering</p>
@@ -7938,7 +8350,7 @@
           <div class="field-grid">
             <label class="field-full">
               <span>Tytul</span>
-              <input id="notification-title" type="text" maxlength="200" required placeholder="np. Zmiana godzin otwarcia" />
+              <input id="notification-title" type="text" maxlength="200" required placeholder="np. Zmiana godzin dowozów" />
             </label>
             <label class="field-full">
               <span>Opis</span>

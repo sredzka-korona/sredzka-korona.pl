@@ -771,6 +771,9 @@
 
       .floating-contact-button {
         position: fixed;
+        top: auto;
+        left: auto;
+        margin: 0;
         right: 2rem;
         bottom: 2rem;
         width: 64px;
@@ -787,16 +790,18 @@
         z-index: 99;
         cursor: pointer;
         border: none;
+        transform: translateZ(0);
+        backface-visibility: hidden;
       }
 
       .floating-contact-button:hover {
-        transform: scale(1.1);
+        transform: translateZ(0) scale(1.1);
         box-shadow: 0 6px 24px rgba(168, 137, 90, 0.6);
         background: #b8946a;
       }
 
       .floating-contact-button:active {
-        transform: scale(0.95);
+        transform: translateZ(0) scale(0.95);
       }
 
       .floating-contact-button svg {
@@ -1013,7 +1018,7 @@
                   </div>
                 </div>
               </div>
-              <div class="reservation-info" role="button" tabindex="0" data-open-global-booking aria-label="Otworz system rezerwacji">
+              <div class="reservation-info" role="button" tabindex="0" data-open-global-booking data-global-booking-service="hotel" aria-label="Otworz system rezerwacji">
                 <span>Rezerwacja pokoju hotelowego</span>
               </div>
             </div>
@@ -1065,7 +1070,7 @@
     </script>
     <script src="../assets/js/config.js"></script>
     <script src="../assets/js/booking-flags.js"></script>
-    <script src="../assets/js/global-booking-modal.js?v=20260407-9"></script>
+    <script src="../assets/js/global-booking-modal.js?v=20260411-1"></script>
     <a href="../kontakt/index.html" class="floating-contact-button" aria-label="Kontakt">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>

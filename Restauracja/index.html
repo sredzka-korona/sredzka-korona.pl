@@ -1196,6 +1196,9 @@
 
       .floating-contact-button {
         position: fixed;
+        top: auto;
+        left: auto;
+        margin: 0;
         right: 2rem;
         bottom: 2rem;
         width: 64px;
@@ -1212,16 +1215,18 @@
         z-index: 99;
         cursor: pointer;
         border: none;
+        transform: translateZ(0);
+        backface-visibility: hidden;
       }
 
       .floating-contact-button:hover {
-        transform: scale(1.1);
+        transform: translateZ(0) scale(1.1);
         box-shadow: 0 6px 24px rgba(168, 137, 90, 0.6);
         background: #b8946a;
       }
 
       .floating-contact-button:active {
-        transform: scale(0.95);
+        transform: translateZ(0) scale(0.95);
       }
 
       .floating-contact-button svg {
@@ -1718,7 +1723,7 @@
         let companyEmail = "kontakt@sredzkakorona.pl";
         let restaurantOrderButtonText = "Zamów catering";
         let restaurantOrdersInfoText =
-          "Zamówienia indywidualne są tymczasowo wstrzymane. Catering zamawiany poprzez kontakt telefoniczny i mailowy.";
+          "<p>Ceny oraz zasady współpracy ustalane indywidualnie.</p><p>Prosimy o kontakt telefoniczny i mailowy lub poprzez formularz kontaktowy.</p>";
 
         function menuPriceHtml(price) {
           const t = String(price ?? "").trim();
@@ -1881,7 +1886,7 @@
           return `
             <div class="modal-body modal-body-hours">
               <div class="modal-header">
-                <h2>Godziny Otwarcia</h2>
+                <h2>Godziny dowozów</h2>
                 <button class="modal-close" id="close-hours" aria-label="Zamknij">×</button>
               </div>
               <div class="opening-hours-list">
@@ -1955,7 +1960,7 @@
                   </button>
                   <button class="action-button" id="hours-button">
                     <div class="action-button-title">GODZINY</div>
-                    <div class="action-button-label">Otwarcia</div>
+                    <div class="action-button-label">Dowozów</div>
                   </button>
                 </div>
               </div>

@@ -5,6 +5,9 @@
 (function () {
   const config = window.SREDZKA_CONFIG || {};
   const CONTACT_EMAIL = "kontakt@sredzka-korona.pl";
+  /** Godziny obowiązujące przy pobycie hotelowym — spójne z mailami po akceptacji. */
+  const HOTEL_CHECK_IN_OUT_HTML =
+    '<p class="booking-hint booking-hint--times"><strong>Zameldowanie:</strong> od 14:00.<br /><strong>Wymeldowanie:</strong> do 11:00.</p>';
 
   function hotelApiBase() {
     if (config.hotelApiBase) {
@@ -195,6 +198,7 @@
       inner = `
         <h3>Termin pobytu</h3>
         <p class="booking-hint">Przyjazd — pierwszy dzień, wyjazd — dzień opuszczenia pokoju (jak w hotelu).</p>
+        ${HOTEL_CHECK_IN_OUT_HTML}
         <div class="booking-field-grid">
           <label>Od (przyjazd)<input type="date" id="bf-from" value="${escapeHtml(state.dateFrom)}" required /></label>
           <label>Do (wyjazd)<input type="date" id="bf-to" value="${escapeHtml(state.dateTo)}" required /></label>
@@ -269,6 +273,7 @@
       });
       inner = `
         <h3>Podsumowanie</h3>
+        ${HOTEL_CHECK_IN_OUT_HTML}
         <p><strong>Termin:</strong> ${escapeHtml(state.dateFrom)} → ${escapeHtml(state.dateTo)} (${n} nocy)</p>
         <ul class="booking-summary-list">${lines.join("")}</ul>
         <p><strong>Łącznie:</strong> ${totalPrice().toFixed(2)} PLN</p>
@@ -293,6 +298,7 @@
         ? `
         <div class="booking-success">
           <h3>Wysłano wiadomość</h3>
+          ${HOTEL_CHECK_IN_OUT_HTML}
           <p>Na podany adres e-mail wysłaliśmy link potwierdzający. Kliknij w niego w ciągu 2 godzin, w celu dokończenia rezerwacji.</p>
           <p>O przyjęciu rezerwacji zostaną Państwo poinformowani mailowo w ciągu 3 dni.</p>
           <p>Jeśli nie widzisz wiadomości e-mail, sprawdź folder SPAM. W razie problemów skontaktuj się z nami mailowo lub telefonicznie.</p>

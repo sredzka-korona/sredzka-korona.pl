@@ -2443,6 +2443,9 @@
 
       .floating-contact-button {
         position: fixed;
+        top: auto;
+        left: auto;
+        margin: 0;
         right: 2rem;
         bottom: 2rem;
         width: 64px;
@@ -2459,16 +2462,18 @@
         z-index: 99;
         cursor: pointer;
         border: none;
+        transform: translateZ(0);
+        backface-visibility: hidden;
       }
 
       .floating-contact-button:hover {
-        transform: scale(1.1);
+        transform: translateZ(0) scale(1.1);
         box-shadow: 0 6px 24px rgba(168, 137, 90, 0.6);
         background: #b8946a;
       }
 
       .floating-contact-button:active {
-        transform: scale(0.95);
+        transform: translateZ(0) scale(0.95);
       }
 
       .floating-contact-button svg {
@@ -2621,7 +2626,7 @@
     <script src="../assets/js/default-content.js"></script>
     <script src="../assets/js/config.js"></script>
     <script src="../assets/js/booking-flags.js"></script>
-    <script src="../assets/js/global-booking-modal.js?v=20260407-9"></script>
+    <script src="../assets/js/global-booking-modal.js?v=20260411-1"></script>
     <script>
       (async () => {
         const app = document.querySelector("#app");
@@ -3198,7 +3203,7 @@
                   </div>
                 </div>
               </div>
-              <div class="reservation-info" data-open-global-booking role="button" tabindex="0" aria-label="Otwórz system rezerwacji">
+              <div class="reservation-info" data-open-global-booking data-global-booking-service="events" role="button" tabindex="0" aria-label="Otwórz system rezerwacji">
                 <span class="reservation-info-text">Rezerwacja sali / przyjęcia okolicznościowego</span>
               </div>
             </div>

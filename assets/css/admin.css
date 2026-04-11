@@ -442,6 +442,58 @@ a {
   gap: 0.9rem;
 }
 
+.field-grid.schedule-catering-recipient-line {
+  align-items: end;
+}
+
+.field.field-grow {
+  min-width: 0;
+}
+
+.schedule-catering-add-recipient-wrap .button {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.field-row-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.catering-new-recipient-fieldset {
+  margin-top: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px dashed rgba(200, 170, 120, 0.45);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.catering-new-recipient-fieldset legend {
+  padding: 0 0.35rem;
+  font-weight: 600;
+}
+
+.catering-recipients-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.catering-recipients-head h2 {
+  margin: 0.2rem 0 0.35rem;
+}
+
+.catering-recipients-panel .inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
 .field,
 .field-full {
   display: grid;
@@ -2188,6 +2240,11 @@ body.admin-modal-open {
   min-width: 0;
 }
 
+.schedule-registry-column:not(:last-child) {
+  border-right: 1px solid rgba(93, 110, 143, 0.28);
+  padding-right: 1rem;
+}
+
 .schedule-registry-column-head {
   display: flex;
   align-items: center;
@@ -2236,6 +2293,13 @@ body.admin-modal-open {
 @media (max-width: 1024px) {
   .schedule-registry-columns {
     grid-template-columns: 1fr;
+  }
+
+  .schedule-registry-column:not(:last-child) {
+    border-right: none;
+    padding-right: 0;
+    border-bottom: 1px solid rgba(93, 110, 143, 0.28);
+    padding-bottom: 1rem;
   }
 }
 

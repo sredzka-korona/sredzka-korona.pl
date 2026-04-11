@@ -292,6 +292,8 @@ function buildHotelDefaultTemplates() {
 ${infoCard("Podsumowanie pobytu", [
   ["Numer rezerwacji", "{{reservationNumber}}"],
   ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Zameldowanie", "od 14:00"],
+  ["Wymeldowanie", "do 11:00"],
   ["Liczba noclegów", "{{nights}}"],
   ["Wybrane pokoje", "{{roomsList}}"],
   ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
@@ -309,6 +311,8 @@ ${infoCard("Dane rezerwacji", [
   ["E-mail", "{{email}}"],
   ["Telefon", "{{phone}}"],
   ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Zameldowanie", "od 14:00"],
+  ["Wymeldowanie", "do 11:00"],
   ["Liczba noclegów", "{{nights}}"],
   ["Pokoje", "{{roomsList}}"],
   ["Orientacyjna kwota", "{{totalPrice}} PLN"],
@@ -323,6 +327,8 @@ ${noteCard("Po zatwierdzeniu klient otrzyma wiadomość z potwierdzeniem rezerwa
 ${infoCard("Potwierdzony pobyt", [
   ["Numer rezerwacji", "{{reservationNumber}}"],
   ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Zameldowanie", "od 14:00"],
+  ["Wymeldowanie", "do 11:00"],
   ["Liczba noclegów", "{{nights}}"],
   ["Pokoje", "{{roomsList}}"],
   ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
@@ -349,6 +355,8 @@ ${noteCard("Jeżeli chcesz zarezerwować nowy termin lub potrzebujesz pomocy w p
 ${infoCard("Aktualne podsumowanie rezerwacji", [
   ["Numer rezerwacji", "{{reservationNumber}}"],
   ["Termin pobytu", "{{dateFrom}} — {{dateTo}}"],
+  ["Zameldowanie", "od 14:00"],
+  ["Wymeldowanie", "do 11:00"],
   ["Liczba noclegów", "{{nights}}"],
   ["Pokoje", "{{roomsList}}"],
   ["Orientacyjna kwota do zapłaty na miejscu", "{{totalPrice}} PLN"],
@@ -656,6 +664,7 @@ const LEGACY_DEFAULT_TEMPLATES = {
 <p><a href="{{confirmationLink}}">Potwierdź rezerwację</a></p>
 <p>Numer rezerwacji: <strong>{{reservationNumber}}</strong><br/>
 Termin pobytu: {{dateFrom}} — {{dateTo}} ({{nights}} nocy)<br/>
+Zameldowanie: od 14:00 · Wymeldowanie: do 11:00<br/>
 Szacunkowa wartość pobytu: {{totalPrice}} PLN</p>
 <p>{{roomsList}}</p>
 <p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>
@@ -676,6 +685,7 @@ Kwota: {{totalPrice}} PLN</p>
     bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>Potwierdzamy rezerwację pobytu o numerze <strong>{{reservationNumber}}</strong>.</p>
 <p>Termin pobytu: {{dateFrom}} — {{dateTo}} ({{nights}} nocy)<br/>
+Zameldowanie: od 14:00 · Wymeldowanie: do 11:00<br/>
 Szacunkowa kwota: {{totalPrice}} PLN</p>
 <p>{{roomsList}}</p>
 <p>Jeżeli chcesz doprecyzować godzinę przyjazdu lub inne szczegóły pobytu, odpowiedz na tę wiadomość albo skontaktuj się z recepcją.</p>
@@ -694,6 +704,7 @@ Szacunkowa kwota: {{totalPrice}} PLN</p>
     bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>Wprowadziliśmy zmiany w rezerwacji <strong>{{reservationNumber}}</strong>.</p>
 <p>Aktualny termin pobytu: {{dateFrom}} — {{dateTo}} ({{nights}} nocy)<br/>
+Zameldowanie: od 14:00 · Wymeldowanie: do 11:00<br/>
 Szacunkowa kwota: {{totalPrice}} PLN</p>
 <p>{{roomsList}}</p>
 <p>Uwagi do rezerwacji: {{customerNote}}</p>
@@ -740,7 +751,8 @@ const ULTRA_LEGACY_HOTEL_DEFAULT_TEMPLATES = {
   },
   confirmed_client: {
     subject: "{{hotelName}} — rezerwacja potwierdzona ({{reservationNumber}})",
-    bodyHtml: "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została potwierdzona.</p>",
+    bodyHtml:
+      "<p>Witaj {{fullName}},</p><p>Rezerwacja {{reservationNumber}} została potwierdzona.</p><p>Zameldowanie: od 14:00. Wymeldowanie: do 11:00.</p>",
   },
   cancelled_client: {
     subject: "{{hotelName}} — rezerwacja anulowana ({{reservationNumber}})",
