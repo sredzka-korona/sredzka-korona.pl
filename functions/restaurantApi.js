@@ -1618,7 +1618,11 @@ const restaurantApi = onRequest(
         }
         const rec = recSnap.data();
         const startTime = String(body.startTime || "").trim();
-        const durationHours = 1;
+        const durationHours = Number(body.durationHours);
+        if (!Number.isFinite(durationHours) || durationHours <= 0) {
+          json(res, { error: "Nieprawidłowy czas trwania." }, 400);
+          return;
+        }
         const repeatModeRaw = String(body.repeatMode || "none").toLowerCase();
         if (
           repeatModeRaw &&

@@ -391,10 +391,11 @@
     if (!content.booking || typeof content.booking !== "object") {
       content.booking = {};
     }
-    content.booking.restaurant = false;
-    content.booking.restaurantPauseRanges = [];
-    content.booking.restaurantPauseFrom = "";
-    content.booking.restaurantPauseTo = "";
+    content.booking.restaurantPauseRanges = normalizePauseRanges(
+      content.booking.restaurantPauseRanges,
+      content.booking.restaurantPauseFrom,
+      content.booking.restaurantPauseTo
+    );
     content.booking.hotelPauseRanges = normalizePauseRanges(
       content.booking.hotelPauseRanges,
       content.booking.hotelPauseFrom,
@@ -612,13 +613,15 @@
     {
       key: "restauracja",
       label: "Catering",
-      description: "Menu, media i treści strony cateringu (bez rezerwacji online).",
+      description: "Menu, media, odbiorcy dostaw cateringu oraz ustawienia modułu.",
       tiles: [
         { key: "menu", label: "Menu", description: "Kategorie, pozycje, składniki i kolejność." },
         { key: "gallery", label: "Galeria", description: "Zdjęcia cateringu i ich kolejność." },
         { key: "orders", label: "Zamówienia", description: "Edycja treści modala zamówień widocznej na stronie cateringu." },
         { key: "hours", label: "Godziny dowozów", description: "Dni i przedziały dowozu widoczne w kafelku na stronie cateringu." },
+        { key: "recipients", label: "Odbiorcy", description: "Lista odbiorców dostaw: dane kontaktowe i adresowe." },
         { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Catering na stronie głównej (pozycja i zoom)." },
+        { key: "settings", label: "Ustawienia rezerwacji", description: "Włączenie i przerwy w przyjmowaniu rezerwacji." },
       ],
     },
     {
@@ -646,7 +649,7 @@
         {
           key: "maile",
           label: "Maile",
-          description: "Szablony wiadomosci e-mail wysylanych do gosci i obslugi dla hotelu i przyjec.",
+          description: "Szablony wiadomosci e-mail wysylanych do gosci i obslugi dla hotelu, cateringu i przyjec.",
         },
       ],
     },
@@ -1635,7 +1638,7 @@
             ? "Blokada terminu"
             : row.cateringDelivery && row.recipient && row.recipient.displayName
               ? row.recipient.displayName
-              : row.fullName || "Rezerwacja cateringu",
+              : row.fullName || "Dostawa cateringu",
         subtitle: `${row.reservationDate || ""} ${scheduleFormatTime(startMs)} - ${scheduleFormatTime(endMs)}`.trim(),
         dateFrom: String(row.reservationDate || "").slice(0, 10),
         dateTo: String(row.reservationDate || "").slice(0, 10),
@@ -1857,16 +1860,22 @@
     }
 
     try {
-      const [hotelReservations, hallReservations, hotelRooms, hallList] = await Promise.all([
-        bookingAdminApi("hotel", "admin-reservations-list", { query: { status: "all" } }),
-        bookingAdminApi("hall", "admin-reservations-list", { query: { status: "all" } }),
-        bookingAdminApi("hotel", "admin-rooms-list"),
-        bookingAdminApi("hall", "admin-halls-list"),
-      ]);
+      const [hotelReservations, restaurantReservations, hallReservations, hotelRooms, hallList, cateringRecipientsRes] =
+        await Promise.all([
+          bookingAdminApi("hotel", "admin-reservations-list", { query: { status: "all" } }),
+          bookingAdminApi("restaurant", "admin-reservations-list", { query: { status: "all" } }),
+          bookingAdminApi("hall", "admin-reservations-list", { query: { status: "all" } }),
+          bookingAdminApi("hotel", "admin-rooms-list"),
+          bookingAdminApi("hall", "admin-halls-list"),
+          bookingAdminApi("restaurant", "admin-catering-recipients-list"),
+        ]);
 
       const allItems = [
         ...((hotelReservations?.reservations || [])
           .map((row) => scheduleNormalizeItem("hotel", row))
+          .filter(Boolean)),
+        ...((restaurantReservations?.reservations || [])
+          .map((row) => scheduleNormalizeItem("restaurant", row))
           .filter(Boolean)),
         ...((hallReservations?.reservations || [])
           .map((row) => scheduleNormalizeItem("hall", row))
@@ -1899,7 +1908,9 @@
       state.schedule.roomOptions = Array.isArray(hotelRooms?.rooms) ? hotelRooms.rooms : [];
       state.schedule.tableOptions = [];
       state.schedule.hallOptions = Array.isArray(hallList?.halls) ? hallList.halls : [];
-      state.schedule.cateringRecipients = [];
+      state.schedule.cateringRecipients = Array.isArray(cateringRecipientsRes?.recipients)
+        ? cateringRecipientsRes.recipients
+        : [];
       state.schedule.lastError = "";
 
       const pendingList = state.schedule.pendingItems;
@@ -2116,10 +2127,12 @@
 
   function scheduleReservationIndexMarkup(items) {
     const hotelItems = items.filter((item) => item.service === "hotel");
+    const restaurantItems = items.filter((item) => item.service === "restaurant");
     const hallItems = items.filter((item) => item.service === "hall");
     return `
       <div class="schedule-registry-columns">
         ${scheduleRegistryColumnMarkup("hotel", hotelItems)}
+        ${scheduleRegistryColumnMarkup("restaurant", restaurantItems)}
         ${scheduleRegistryColumnMarkup("hall", hallItems)}
       </div>
     `;
@@ -2699,6 +2712,36 @@
     syncScheduleCountdownTicker();
   }
 
+  function openScheduleYesNoModal(messageText) {
+    const message = escapeHtml(messageText);
+    return new Promise((resolve) => {
+      openScheduleModal(
+        `
+        <div class="admin-modal-head">
+          <div>
+            <p class="pill">Wiadomość e-mail</p>
+            <h3>Powiadomienie dla klienta</h3>
+          </div>
+        </div>
+        <p class="helper" style="margin:0 0 1rem;">${message}</p>
+        <div class="admin-modal-footer">
+          <button type="button" class="button secondary" data-schedule-yes-no="no">Nie</button>
+          <button type="button" class="button" data-schedule-yes-no="yes">Tak</button>
+        </div>
+      `,
+        (mount) => {
+          const finish = (value) => {
+            closeScheduleModal();
+            resolve(value);
+          };
+          mount.querySelector('[data-schedule-yes-no="no"]')?.addEventListener("click", () => finish(false));
+          mount.querySelector('[data-schedule-yes-no="yes"]')?.addEventListener("click", () => finish(true));
+        },
+        { closeOnOverlayClick: false }
+      );
+    });
+  }
+
   function scheduleReservationDetailsMarkup(item) {
     const isBlock = item.status === "manual_block";
     const canCancelReservation = scheduleCanCancel(item);
@@ -2909,6 +2952,130 @@
     `;
   }
 
+  const SCHEDULE_CATERING_WEEKDAYS = [
+    { value: 1, label: "Poniedziałek" },
+    { value: 2, label: "Wtorek" },
+    { value: 3, label: "Środa" },
+    { value: 4, label: "Czwartek" },
+    { value: 5, label: "Piątek" },
+    { value: 6, label: "Sobota" },
+    { value: 0, label: "Niedziela" },
+  ];
+
+  function scheduleCateringRecipientSelectMarkup(selectedId) {
+    const list = Array.isArray(state.schedule.cateringRecipients) ? state.schedule.cateringRecipients : [];
+    const sel = String(selectedId || "").trim();
+    return `
+      <label class="field field-grow">
+        <span>Odbiorca</span>
+        <select name="recipientId" required>
+          <option value="">— Wybierz odbiorcę —</option>
+          ${list
+            .map(
+              (r) =>
+                `<option value="${escapeAttribute(r.id)}" ${String(r.id) === sel ? "selected" : ""}>${escapeHtml(
+                  r.displayName || r.id
+                )}</option>`
+            )
+            .join("")}
+        </select>
+      </label>
+    `;
+  }
+
+  function scheduleCateringNewRecipientFieldsetMarkup() {
+    return `
+      <fieldset id="catering-new-recipient-fieldset" class="catering-new-recipient-fieldset" hidden disabled>
+        <legend>Nowy odbiorca</legend>
+        <div class="field-grid">
+          <label class="field"><span>Nazwa odbiorcy</span><input name="newRecipientDisplayName" autocomplete="organization" /></label>
+          <label class="field"><span>Imię</span><input name="newRecipientFirstName" autocomplete="given-name" /></label>
+          <label class="field"><span>Nazwisko</span><input name="newRecipientLastName" autocomplete="family-name" /></label>
+          <label class="field"><span>E-mail</span><input name="newRecipientEmail" type="email" autocomplete="email" /></label>
+          <label class="field"><span>Prefiks tel.</span><input name="newRecipientPhonePrefix" value="+48" /></label>
+          <label class="field"><span>Numer telefonu</span><input name="newRecipientPhoneNational" autocomplete="tel-national" /></label>
+          <label class="field"><span>Ulica</span><input name="newRecipientStreet" autocomplete="street-address" /></label>
+          <label class="field"><span>Nr budynku / lokalu</span><input name="newRecipientBuilding" /></label>
+          <label class="field"><span>Kod pocztowy</span><input name="newRecipientPostalCode" autocomplete="postal-code" /></label>
+          <label class="field"><span>Miasto</span><input name="newRecipientCity" autocomplete="address-level2" /></label>
+          <label class="field-full"><span>Dodatkowe informacje</span><textarea name="newRecipientExtra" rows="2"></textarea></label>
+        </div>
+        <div class="field-row-btns">
+          <button type="button" class="button secondary" data-schedule-cancel-new-catering-recipient>Anuluj</button>
+          <button type="button" class="button" data-schedule-save-new-catering-recipient>Zapisz odbiorcę</button>
+        </div>
+      </fieldset>
+    `;
+  }
+
+  async function scheduleSaveNewCateringRecipientFromFieldset(fieldset) {
+    if (!fieldset) return null;
+    const q = (name) => String(fieldset.querySelector(`[name="${name}"]`)?.value || "").trim();
+    const body = {
+      displayName: q("newRecipientDisplayName"),
+      contactFirstName: q("newRecipientFirstName"),
+      contactLastName: q("newRecipientLastName"),
+      email: q("newRecipientEmail"),
+      phonePrefix: q("newRecipientPhonePrefix") || "+48",
+      phoneNational: q("newRecipientPhoneNational"),
+      street: q("newRecipientStreet"),
+      buildingNumber: q("newRecipientBuilding"),
+      postalCode: q("newRecipientPostalCode"),
+      city: q("newRecipientCity"),
+      extraInfo: q("newRecipientExtra"),
+    };
+    const res = await bookingAdminApi("restaurant", "admin-catering-recipient-save", { method: "PUT", body });
+    const rec = res && res.recipient;
+    if (!rec || !rec.id) {
+      throw new Error((res && res.error) || "Nie udało się zapisać odbiorcy.");
+    }
+    const list = Array.isArray(state.schedule.cateringRecipients) ? state.schedule.cateringRecipients : [];
+    const next = [...list.filter((x) => String(x.id) !== String(rec.id)), rec];
+    next.sort((a, b) =>
+      String(a.displayName || a.id || "").localeCompare(String(b.displayName || b.id || ""), "pl", {
+        sensitivity: "base",
+      })
+    );
+    state.schedule.cateringRecipients = next;
+    return rec;
+  }
+
+  function scheduleWireCateringRecipientInlinePanel(mount) {
+    const fs = mount.querySelector("#catering-new-recipient-fieldset");
+    const select = mount.querySelector('select[name="recipientId"]');
+    mount.querySelector("[data-schedule-add-catering-recipient]")?.addEventListener("click", () => {
+      if (!fs) return;
+      fs.hidden = false;
+      fs.disabled = false;
+    });
+    mount.querySelector("[data-schedule-cancel-new-catering-recipient]")?.addEventListener("click", () => {
+      if (!fs) return;
+      fs.hidden = true;
+      fs.disabled = true;
+    });
+    mount.querySelector("[data-schedule-save-new-catering-recipient]")?.addEventListener("click", async () => {
+      try {
+        const rec = await scheduleSaveNewCateringRecipientFromFieldset(fs);
+        if (select && rec) {
+          const exists = Array.from(select.options).some((o) => String(o.value) === String(rec.id));
+          if (!exists) {
+            const opt = document.createElement("option");
+            opt.value = rec.id;
+            opt.textContent = rec.displayName || rec.id;
+            select.appendChild(opt);
+          }
+          select.value = String(rec.id);
+        }
+        if (fs) {
+          fs.hidden = true;
+          fs.disabled = true;
+        }
+      } catch (error) {
+        window.alert(error.message || "Nie udało się zapisać odbiorcy.");
+      }
+    });
+  }
+
   function scheduleHallOptionsMarkup(selectedHallId) {
     const current = String(selectedHallId || "");
     return `
@@ -2946,12 +3113,11 @@
 
   function openScheduleEditModal(item) {
     if (!item) return;
-    if (item.service === "restaurant") {
-      window.alert("Rezerwacje cateringu są wyłączone.");
-      return;
-    }
     const isBlock = item.status === "manual_block";
-    const title = isBlock ? "Edycja blokady" : "Edycja rezerwacji";
+    const title =
+      isBlock ? "Edycja blokady"
+      : item.service === "restaurant" ? "Edycja dostawy cateringu"
+      : "Edycja rezerwacji";
     const raw = item.raw || {};
     let fieldsMarkup = "";
 
@@ -2977,6 +3143,24 @@
           <label class="field-full"><span>Uwagi klienta</span><textarea name="customerNote">${escapeHtml(raw.customerNote || "")}</textarea></label>
           <label class="field-full"><span>Notatka administratora</span><textarea name="adminNote">${escapeHtml(raw.adminNote || "")}</textarea></label>
         </div>
+      `;
+    } else if (item.service === "restaurant") {
+      fieldsMarkup = `
+        <div class="field-grid">
+          <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(raw.reservationDate || "")}" required /></label>
+          <label class="field"><span>Godzina</span><input type="time" name="startTime" min="00:00" max="23:59" step="60" value="${escapeAttribute(raw.startTime || "")}" required /></label>
+          <label class="field"><span>Czas trwania (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="${escapeAttribute(String(raw.durationHours || 1))}" required /></label>
+        </div>
+        <div class="field-grid schedule-catering-recipient-line">
+          ${scheduleCateringRecipientSelectMarkup(raw.recipientId || raw.recipient?.id || "")}
+          <label class="field schedule-catering-add-recipient-wrap">
+            <span class="helper"> </span>
+            <button type="button" class="button secondary" data-schedule-add-catering-recipient>Dodaj odbiorcę</button>
+          </label>
+        </div>
+        ${scheduleCateringNewRecipientFieldsetMarkup()}
+        <label class="field-full"><span>Opis</span><textarea name="customerNote">${escapeHtml(raw.customerNote || "")}</textarea></label>
+        <label class="field-full"><span>Notatka administratora</span><textarea name="adminNote">${escapeHtml(raw.adminNote || "")}</textarea></label>
       `;
     } else {
       fieldsMarkup = `
@@ -3009,13 +3193,19 @@
             <button type="button" class="button secondary" data-schedule-modal-close>Zamknij</button>
           </div>
           ${fieldsMarkup}
+          ${
+            isBlock || item.service === "restaurant"
+              ? ""
+              : `
           <label class="checkbox-field">
             <input type="checkbox" name="notifyClient" />
             <span class="checkbox-copy">
               <strong>Powiadom klienta e-mailem o zmianie</strong>
-              <span>Zadziała tylko dla standardowych rezerwacji.</span>
+              <span>Działa, gdy klient ma zapisany adres e-mail.</span>
             </span>
           </label>
+          `
+          }
           <div class="admin-modal-footer">
             <button type="button" class="button secondary" data-schedule-modal-close>Anuluj</button>
             <button type="submit" class="button">Zapisz</button>
@@ -3023,10 +3213,16 @@
         </form>
       `,
       (mount) => {
+        if (item.service === "restaurant" && !isBlock) {
+          scheduleWireCateringRecipientInlinePanel(mount);
+        }
         mount.querySelector("#schedule-edit-form")?.addEventListener("submit", async (event) => {
           event.preventDefault();
           const formData = new FormData(event.currentTarget);
-          const body = { id: item.id, notifyClient: formData.get("notifyClient") === "on" };
+          const body = {
+            id: item.id,
+            notifyClient: item.service === "restaurant" ? false : formData.get("notifyClient") === "on",
+          };
           if (isBlock) {
             body.adminNote = String(formData.get("adminNote") || "");
           } else if (item.service === "hotel") {
@@ -3037,6 +3233,19 @@
             body.email = formData.get("email");
             body.phonePrefix = formData.get("phonePrefix");
             body.phoneNational = formData.get("phoneNational");
+            body.customerNote = formData.get("customerNote") || "";
+            body.adminNote = formData.get("adminNote") || "";
+          } else if (item.service === "restaurant") {
+            body.reservationDate = formData.get("reservationDate");
+            body.startTime = formData.get("startTime");
+            body.durationHours = Number(formData.get("durationHours") || 0);
+            body.recipientId = String(formData.get("recipientId") || "").trim();
+            if (!body.recipientId) {
+              throw new Error("Wybierz odbiorcę.");
+            }
+            if (!Number.isFinite(body.durationHours) || body.durationHours <= 0) {
+              throw new Error("Podaj poprawny czas trwania (w godzinach).");
+            }
             body.customerNote = formData.get("customerNote") || "";
             body.adminNote = formData.get("adminNote") || "";
           } else {
@@ -3101,12 +3310,14 @@
           </div>
           <div class="schedule-create-services">
             <button type="button" class="schedule-create-service" data-create-service="hotel"><strong>Hotel</strong><span>Pokoje i pobyty.</span></button>
+            <button type="button" class="schedule-create-service" data-create-service="restaurant"><strong>Catering</strong><span>Dostawy do odbiorców (terminy i powtórzenia).</span></button>
             <button type="button" class="schedule-create-service" data-create-service="hall"><strong>Przyjęcia</strong><span>Sale i wydarzenia.</span></button>
           </div>
         `;
       }
 
       const isHotel = model.service === "hotel";
+      const isRestaurant = model.service === "restaurant";
       const isHall = model.service === "hall";
 
       let fields = "";
@@ -3135,6 +3346,66 @@
                 <label class="field-full"><span>Uwagi klienta</span><textarea name="customerNote"></textarea></label>
               </div>
             `;
+      } else if (isRestaurant) {
+        fields = `
+              <div class="field-grid">
+                <label class="field"><span>Data pierwszej dostawy</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
+                <label class="field"><span>Godzina</span><input type="time" name="startTime" min="00:00" max="23:59" step="60" value="12:00" required /></label>
+                <label class="field"><span>Czas trwania (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="1" required /></label>
+              </div>
+              <div class="field-grid schedule-catering-recipient-line">
+                ${scheduleCateringRecipientSelectMarkup("")}
+                <label class="field schedule-catering-add-recipient-wrap">
+                  <span class="helper"> </span>
+                  <button type="button" class="button secondary" data-schedule-add-catering-recipient>Dodaj odbiorcę</button>
+                </label>
+              </div>
+              ${scheduleCateringNewRecipientFieldsetMarkup()}
+              <label class="field-full"><span>Opis</span><textarea name="description" rows="3" placeholder="Treść zamówienia, uwagi do dowozu…"></textarea></label>
+              <label class="field-full"><span>Notatka administratora</span><textarea name="adminNoteCreate" rows="2"></textarea></label>
+              <label class="field">
+                <span>Powtarzanie</span>
+                <select name="repeatMode" data-catering-repeat-mode>
+                  <option value="none" selected>Jednorazowo</option>
+                  <option value="selected_days">W wybrane dni tygodnia</option>
+                  <option value="weekly">Co tydzień</option>
+                  <option value="biweekly">Co dwa tygodnie</option>
+                  <option value="monthly">Co miesiąc</option>
+                </select>
+              </label>
+              <p class="helper" data-catering-repeat-hint-none>
+                Jedna dostawa w wybranej dacie i godzinie.
+              </p>
+              <p class="helper" data-catering-repeat-hint-repeat hidden>
+                <strong>Co tydzień / co dwa tygodnie / co miesiąc:</strong> pierwszy termin to data powyżej; kolejne według cyklu aż do daty końca (włącznie). W trybie <strong>bezterminowym</strong> od razu powstaje ok. rok terminów; kolejne uzupełnia automatycznie harmonogram serwera (cron), z wyprzedzeniem ok. roku — bez limitu 5 lat.<br />
+                <strong>W wybrane dni:</strong> zaznacz dni tygodnia; pierwsze możliwe terminy liczone są od daty pierwszej dostawy.
+              </p>
+              <fieldset class="schedule-catering-weekdays-fieldset" data-catering-repeat-weekdays hidden>
+                <legend>Dni tygodnia (wiele opcji)</legend>
+                <div class="schedule-catering-weekday-grid">
+                  ${SCHEDULE_CATERING_WEEKDAYS.map(
+                    ({ value, label }) => `
+                    <label class="schedule-catering-weekday-item">
+                      <input type="checkbox" name="repeatWeekdays" value="${String(value)}" />
+                      <span>${escapeHtml(label)}</span>
+                    </label>
+                  `
+                  ).join("")}
+                </div>
+              </fieldset>
+              <div class="stack" data-catering-repeat-end-fields hidden>
+                <label class="field field-checkbox">
+                  <span>
+                    <input type="checkbox" name="repeatIndefinite" value="1" data-catering-repeat-indefinite />
+                    Bezterminowo (pierwsza partia ok. roku; potem automatyczne przedłużanie)
+                  </span>
+                </label>
+                <label class="field">
+                  <span>Do dnia (włącznie)</span>
+                  <input type="date" name="repeatUntil" data-catering-repeat-until-input value="${escapeAttribute(model.date)}" />
+                </label>
+              </div>
+        `;
       } else if (isHall) {
         fields =
           model.mode === "block"
@@ -3170,17 +3441,27 @@
           <div class="admin-modal-head">
             <div>
               <p class="pill ${scheduleServicePillClass(model.service)}">${escapeHtml(scheduleServiceLabel(model.service))}</p>
-              <h3>${model.mode === "block" ? "Nowa blokada" : "Nowa rezerwacja"}</h3>
+              <h3>${
+                model.service === "restaurant"
+                  ? "Nowa dostawa cateringu"
+                  : model.mode === "block"
+                    ? "Nowa blokada"
+                    : "Nowa rezerwacja"
+              }</h3>
             </div>
             <button type="button" class="button secondary" data-schedule-modal-close>Zamknij</button>
           </div>
           <div class="schedule-create-mode-switch">
             <button type="button" class="button secondary" data-create-back>← Zmień obszar</button>
             <button type="button" class="button ${model.mode === "reservation" ? "" : "secondary"}" data-create-mode="reservation">Rezerwacja</button>
-            <button type="button" class="button ${model.mode === "block" ? "" : "secondary"}" data-create-mode="block">Blokada</button>
+            ${
+              model.service === "restaurant"
+                ? ""
+                : `<button type="button" class="button ${model.mode === "block" ? "" : "secondary"}" data-create-mode="block">Blokada</button>`
+            }
           </div>
           ${
-            model.mode === "block"
+            model.mode === "block" && model.service !== "restaurant"
               ? '<p class="helper schedule-block-helper">Blokada nie usuwa istniejących rezerwacji i działa tylko na kolejne próby rezerwacji.</p>'
               : ""
           }
@@ -3200,6 +3481,9 @@
       mount.querySelectorAll("[data-create-service]").forEach((button) => {
         button.addEventListener("click", () => {
           model.service = button.dataset.createService;
+          if (model.service === "restaurant") {
+            model.mode = "reservation";
+          }
           rerender();
         });
       });
@@ -3242,11 +3526,15 @@
       mount.querySelector("[data-catering-repeat-mode]")?.addEventListener("change", () => syncCateringRepeatUi());
       mount.querySelector("[data-catering-repeat-indefinite]")?.addEventListener("change", () => syncCateringRepeatUi());
       syncCateringRepeatUi();
+      if (model.service === "restaurant" && model.mode === "reservation") {
+        scheduleWireCateringRecipientInlinePanel(mount);
+      }
       mount.querySelector("#schedule-create-form")?.addEventListener("submit", async (event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
         try {
           let createSuccessMessage = "Nowy wpis został utworzony.";
+          let afterCreateEmailPrompt = null;
           if (model.service === "hotel") {
             if (model.mode === "block") {
               const dateFrom = String(formData.get("dateFrom") || "");
@@ -3268,14 +3556,15 @@
                 body: { dateFrom, dateTo, roomIds, note: String(formData.get("note") || "") },
               });
             } else {
-              await bookingAdminApi("hotel", "admin-reservation-create", {
+              const emailTrim = String(formData.get("email") || "").trim();
+              const createdHotel = await bookingAdminApi("hotel", "admin-reservation-create", {
                 method: "POST",
                 body: {
                   dateFrom: formData.get("dateFrom"),
                   dateTo: formData.get("dateTo"),
                   roomIds: formData.getAll("roomIds"),
                   fullName: formData.get("fullName"),
-                  email: String(formData.get("email") || "").trim(),
+                  email: emailTrim,
                   phonePrefix: String(formData.get("phoneNational") || "").trim()
                     ? String(formData.get("phonePrefix") || "+48").trim()
                     : "",
@@ -3285,6 +3574,74 @@
                   status: "confirmed",
                 },
               });
+              const newHotelId = String(createdHotel?.reservationId || "").trim();
+              if (newHotelId && emailTrim.includes("@")) {
+                afterCreateEmailPrompt = {
+                  kind: "confirm",
+                  service: "hotel",
+                  reservationId: newHotelId,
+                };
+              }
+            }
+          } else if (model.service === "restaurant") {
+            const recipientId = String(formData.get("recipientId") || "").trim();
+            if (!recipientId) {
+              throw new Error("Wybierz odbiorcę lub dodaj nowego.");
+            }
+            const durationHours = Number(formData.get("durationHours") || 0);
+            if (!Number.isFinite(durationHours) || durationHours <= 0) {
+              throw new Error("Podaj poprawny czas trwania dostawy (w godzinach).");
+            }
+            const repeatMode = String(formData.get("repeatMode") || "none");
+            const repeatIndefinite = formData.get("repeatIndefinite") === "1";
+            const repeatUntilRaw = String(formData.get("repeatUntil") || "").trim();
+            const repeatWeekdays = formData
+              .getAll("repeatWeekdays")
+              .map((x) => Number(x))
+              .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+            if (repeatMode === "selected_days" && !repeatWeekdays.length) {
+              throw new Error("Wybierz co najmniej jeden dzień tygodnia albo zmień tryb powtarzania.");
+            }
+            if (repeatMode !== "none" && !repeatIndefinite && !repeatUntilRaw) {
+              throw new Error("Podaj datę końca powtarzania albo zaznacz „bezterminowo”.");
+            }
+            const createdOut = await bookingAdminApi("restaurant", "admin-catering-delivery-create", {
+              method: "POST",
+              body: {
+                recipientId,
+                reservationDate: formData.get("reservationDate"),
+                startTime: formData.get("startTime"),
+                durationHours,
+                description: String(formData.get("description") || "").trim(),
+                adminNote: String(formData.get("adminNoteCreate") || "").trim(),
+                repeatMode,
+                repeatIndefinite,
+                repeatUntil: repeatIndefinite ? undefined : repeatUntilRaw || undefined,
+                repeatWeekdays: repeatMode === "selected_days" ? repeatWeekdays : undefined,
+                status: "confirmed",
+                sendManualCreatedEmail: false,
+              },
+            });
+            const cnt = Number(createdOut?.count);
+            if (Number.isFinite(cnt) && cnt > 1) {
+              createSuccessMessage = `Utworzono ${cnt} terminów dostawy cateringu.`;
+            }
+            const cateringIds = Array.isArray(createdOut?.reservationIds)
+              ? createdOut.reservationIds.map((x) => String(x || "").trim()).filter(Boolean)
+              : [];
+            const rec = (state.schedule.cateringRecipients || []).find((r) => r.id === recipientId);
+            const recipientEmail = String(rec?.email || "").trim();
+            if (cateringIds.length && recipientEmail.includes("@")) {
+              afterCreateEmailPrompt = {
+                kind: "catering_confirmed",
+                reservationIds: cateringIds,
+                cateringMailMeta: {
+                  repeatMode,
+                  repeatWeekdays: repeatMode === "selected_days" ? repeatWeekdays : [],
+                  repeatIndefinite,
+                  repeatUntil: repeatIndefinite ? "" : repeatUntilRaw,
+                },
+              };
             }
           } else if (model.service === "hall") {
             if (model.mode === "block") {
@@ -3319,7 +3676,8 @@
                 },
               });
             } else {
-              await bookingAdminApi("hall", "admin-reservation-create", {
+              const emailTrimHall = String(formData.get("email") || "").trim();
+              const createdHall = await bookingAdminApi("hall", "admin-reservation-create", {
                 method: "POST",
                 body: {
                   hallId: formData.get("hallId"),
@@ -3330,7 +3688,7 @@
                   exclusive: scheduleHallIsSmall(formData.get("hallId")) ? true : formData.get("exclusive") === "1",
                   eventType: formData.get("eventType") || "Wydarzenie",
                   fullName: formData.get("fullName"),
-                  email: String(formData.get("email") || "").trim(),
+                  email: emailTrimHall,
                   phonePrefix: String(formData.get("phoneNational") || "").trim()
                     ? String(formData.get("phonePrefix") || "+48").trim()
                     : "",
@@ -3340,12 +3698,51 @@
                   status: "confirmed",
                 },
               });
+              const newHallId = String(createdHall?.reservationId || "").trim();
+              if (newHallId && emailTrimHall.includes("@")) {
+                afterCreateEmailPrompt = {
+                  kind: "confirm",
+                  service: "hall",
+                  reservationId: newHallId,
+                };
+              }
             }
           }
 
           closeScheduleModal();
           await loadScheduleData({ silent: true });
-          renderSchedulePanel(createSuccessMessage);
+          let finalPanelMessage = createSuccessMessage;
+          if (afterCreateEmailPrompt) {
+            const sendIt = await openScheduleYesNoModal(
+              "Czy wysłać wiadomość e-mail do klienta o utworzeniu rezerwacji?"
+            );
+            if (sendIt) {
+              try {
+                if (afterCreateEmailPrompt.kind === "confirm") {
+                  await bookingAdminApi(afterCreateEmailPrompt.service, "admin-reservation-confirm", {
+                    method: "POST",
+                    body: { id: afterCreateEmailPrompt.reservationId },
+                  });
+                } else if (afterCreateEmailPrompt.kind === "catering_confirmed") {
+                  const m = afterCreateEmailPrompt.cateringMailMeta || {};
+                  await bookingAdminApi("restaurant", "admin-catering-delivery-notify-confirmed", {
+                    method: "POST",
+                    body: {
+                      reservationIds: afterCreateEmailPrompt.reservationIds,
+                      repeatMode: m.repeatMode,
+                      repeatWeekdays: m.repeatWeekdays,
+                      repeatIndefinite: m.repeatIndefinite,
+                      repeatUntil: m.repeatUntil,
+                    },
+                  });
+                }
+                finalPanelMessage = `${createSuccessMessage} Wysłano wiadomość e-mail z potwierdzeniem do klienta.`;
+              } catch (mailErr) {
+                window.alert(mailErr.message || "Nie udało się wysłać wiadomości e-mail do klienta.");
+              }
+            }
+          }
+          renderSchedulePanel(finalPanelMessage);
         } catch (error) {
           window.alert(error.message || "Nie udało się utworzyć wpisu.");
         }
@@ -3559,6 +3956,15 @@
     if (tabKey === "restauracja" && tileKey === "hours") {
       return `<section class="panel col-12" id="restaurant-opening-hours-panel"></section>`;
     }
+    if (tabKey === "restauracja" && tileKey === "recipients") {
+      return `<div id="admin-panel-catering-recipients" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
+    }
+    if (tabKey === "restauracja" && tileKey === "templates") {
+      return `<div id="admin-panel-restaurant-templates" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
+    }
+    if (tabKey === "restauracja" && tileKey === "settings") {
+      return `<section class="panel col-12" id="restaurant-booking-settings-panel"></section>`;
+    }
     if (tabKey === "przyjecia" && tileKey === "oferta") {
       return `<section class="panel col-12" id="events-offer-panel"></section>`;
     }
@@ -3751,6 +4157,10 @@
       window.renderHotelAdminPanel(panel, options);
       return;
     }
+    if (service === "restaurant" && typeof window.renderRestaurantAdminPanel === "function") {
+      window.renderRestaurantAdminPanel(panel, options);
+      return;
+    }
     if (service === "hall" && typeof window.renderHallAdminPanel === "function") {
       window.renderHallAdminPanel(panel, options);
       return;
@@ -3808,6 +4218,17 @@
         renderRestaurantOrderPanel(statusMessage);
       } else if (tileKey === "hours") {
         renderRestaurantOpeningHoursPanel(statusMessage);
+      } else if (tileKey === "recipients") {
+        renderCateringRecipientsPanel(statusMessage);
+      } else if (tileKey === "templates") {
+        mountLegacyBookingModule(
+          "#admin-panel-restaurant-templates",
+          "restaurant",
+          { defaultTab: "templates", allowedTabs: ["templates"] },
+          statusMessage
+        );
+      } else if (tileKey === "settings") {
+        renderRestaurantBookingSettingsPanel(statusMessage);
       }
       return;
     }
@@ -4037,6 +4458,13 @@
               ? ""
               : '<p class="helper">W tej konfiguracji rezerwacje online sa celowo wylaczone. Strona korzysta z Cloudflare Worker i Firebase Auth, bez Firebase Functions.</p>'}
             <label class="checkbox-field">
+              <input type="checkbox" id="booking-enable-restaurant" ${content.booking?.restaurant !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} />
+              <span class="checkbox-copy">
+                <strong>Catering</strong>
+                <span>Włącza formularz rezerwacji stolika (gdy kafelek jest widoczny w modalu).</span>
+              </span>
+            </label>
+            <label class="checkbox-field">
               <input type="checkbox" id="booking-enable-hotel" ${content.booking?.hotel !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} />
               <span class="checkbox-copy">
                 <strong>Hotel</strong>
@@ -4050,7 +4478,7 @@
                 <span>Włącza formularz zapytania o sale i rezerwacje.</span>
               </span>
             </label>
-            <p class="helper" style="margin: 0.75rem 0 0.35rem;">Okresy przerw ustawisz nizej, osobno w panelach: Hotel / Przyjecia.</p>
+            <p class="helper" style="margin: 0.75rem 0 0.35rem;">Okresy przerw ustawisz nizej, osobno w panelach: Hotel / Catering / Przyjecia.</p>
           </div>
           <div class="panel-note">
             <strong>Uwaga:</strong> część treści poniżej pochodzi ze starszej wersji panelu. Aktualny front korzysta głównie z blokad sekcji, rezerwacji online, godzin dowozów, menu, galerii, dokumentów, kalendarza i modala „Oferta”.
@@ -4442,13 +4870,15 @@
     if (!content.booking) {
       content.booking = {};
     }
+    const br = document.querySelector("#booking-enable-restaurant");
     const bh = document.querySelector("#booking-enable-hotel");
     const be = document.querySelector("#booking-enable-events");
-    content.booking.restaurant = false;
     if (onlineBookingsEnabled) {
+      content.booking.restaurant = br ? br.checked : content.booking.restaurant !== false;
       content.booking.hotel = bh ? bh.checked : content.booking.hotel !== false;
       content.booking.events = be ? be.checked : content.booking.events !== false;
     } else {
+      content.booking.restaurant = false;
       content.booking.hotel = false;
       content.booking.events = false;
     }
@@ -4469,15 +4899,17 @@
       const allRanges = draftRange ? [...rangesFromList, draftRange] : rangesFromList;
       return filterCurrentAndFuturePauseRanges(allRanges);
     }
+    const restaurantRanges = onlineBookingsEnabled ? collectPauseRanges("restaurant") : [];
     const hotelRanges = onlineBookingsEnabled ? collectPauseRanges("hotel") : [];
     const eventsRanges = onlineBookingsEnabled ? collectPauseRanges("events") : [];
-    content.booking.restaurantPauseRanges = [];
-    content.booking.restaurantPauseFrom = "";
-    content.booking.restaurantPauseTo = "";
+    content.booking.restaurantPauseRanges = restaurantRanges;
     content.booking.hotelPauseRanges = hotelRanges;
     content.booking.eventsPauseRanges = eventsRanges;
+    const firstRestaurantRange = restaurantRanges[0] || { from: "", to: "" };
     const firstHotelRange = hotelRanges[0] || { from: "", to: "" };
     const firstEventsRange = eventsRanges[0] || { from: "", to: "" };
+    content.booking.restaurantPauseFrom = firstRestaurantRange.from;
+    content.booking.restaurantPauseTo = firstRestaurantRange.to;
     content.booking.hotelPauseFrom = firstHotelRange.from;
     content.booking.hotelPauseTo = firstHotelRange.to;
     content.booking.eventsPauseFrom = firstEventsRange.from;
@@ -4767,6 +5199,197 @@
     bindRepeaterButtons();
   }
 
+  async function refreshCateringRecipientsState() {
+    try {
+      const data = await bookingAdminApi("restaurant", "admin-catering-recipients-list");
+      state.schedule.cateringRecipients = Array.isArray(data?.recipients) ? data.recipients : [];
+    } catch {
+      /* grafik może ładować listę osobno */
+    }
+  }
+
+  function openCateringRecipientEditorModal(initial, onSaved) {
+    const r = initial && typeof initial === "object" ? initial : {};
+    const isEdit = Boolean(r.id);
+    openScheduleModal(
+      `
+        <form class="stack" id="catering-recipient-editor-form">
+          <div class="admin-modal-head">
+            <div>
+              <p class="pill">Catering</p>
+              <h3>${isEdit ? "Edycja odbiorcy" : "Nowy odbiorca"}</h3>
+            </div>
+            <button type="button" class="button secondary" data-schedule-modal-close>Zamknij</button>
+          </div>
+          ${isEdit ? `<input type="hidden" name="id" value="${escapeAttribute(String(r.id))}" />` : ""}
+          <div class="field-grid">
+            <label class="field-full"><span>Nazwa odbiorcy</span><input name="displayName" required value="${escapeAttribute(r.displayName || "")}" /></label>
+            <label class="field"><span>Imię</span><input name="contactFirstName" value="${escapeAttribute(r.contactFirstName || "")}" /></label>
+            <label class="field"><span>Nazwisko</span><input name="contactLastName" value="${escapeAttribute(r.contactLastName || "")}" /></label>
+            <label class="field"><span>E-mail</span><input name="email" type="email" required value="${escapeAttribute(r.email || "")}" /></label>
+            <label class="field"><span>Prefiks tel.</span><input name="phonePrefix" value="${escapeAttribute(r.phonePrefix || "+48")}" /></label>
+            <label class="field"><span>Numer telefonu</span><input name="phoneNational" value="${escapeAttribute(r.phoneNational || "")}" /></label>
+            <label class="field"><span>Ulica</span><input name="street" value="${escapeAttribute(r.street || "")}" /></label>
+            <label class="field"><span>Nr budynku / lokalu</span><input name="buildingNumber" value="${escapeAttribute(r.buildingNumber || "")}" /></label>
+            <label class="field"><span>Kod pocztowy</span><input name="postalCode" value="${escapeAttribute(r.postalCode || "")}" /></label>
+            <label class="field"><span>Miasto</span><input name="city" value="${escapeAttribute(r.city || "")}" /></label>
+            <label class="field-full"><span>Dodatkowe informacje</span><textarea name="extraInfo" rows="3">${escapeHtml(r.extraInfo || "")}</textarea></label>
+          </div>
+          <div class="admin-modal-footer">
+            <button type="button" class="button secondary" data-schedule-modal-close>Anuluj</button>
+            <button type="submit" class="button">Zapisz</button>
+          </div>
+        </form>
+      `,
+      (mount) => {
+        mount.querySelector("#catering-recipient-editor-form")?.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const form = event.currentTarget;
+          const fd = new FormData(form);
+          const body = {
+            id: fd.get("id") || undefined,
+            displayName: String(fd.get("displayName") || "").trim(),
+            contactFirstName: String(fd.get("contactFirstName") || "").trim(),
+            contactLastName: String(fd.get("contactLastName") || "").trim(),
+            email: String(fd.get("email") || "").trim(),
+            phonePrefix: String(fd.get("phonePrefix") || "+48").trim(),
+            phoneNational: String(fd.get("phoneNational") || "").trim(),
+            street: String(fd.get("street") || "").trim(),
+            buildingNumber: String(fd.get("buildingNumber") || "").trim(),
+            postalCode: String(fd.get("postalCode") || "").trim(),
+            city: String(fd.get("city") || "").trim(),
+            extraInfo: String(fd.get("extraInfo") || "").trim(),
+          };
+          try {
+            await bookingAdminApi("restaurant", "admin-catering-recipient-save", { method: "PUT", body });
+            closeScheduleModal();
+            await refreshCateringRecipientsState();
+            if (typeof onSaved === "function") await onSaved();
+          } catch (error) {
+            window.alert(error.message || "Nie udało się zapisać odbiorcy.");
+          }
+        });
+      },
+      { closeOnOverlayClick: false }
+    );
+  }
+
+  async function renderCateringRecipientsPanel(statusMessage = "") {
+    const root = document.querySelector("#admin-panel-catering-recipients");
+    if (!root) return;
+
+    if (!onlineBookingsEnabled) {
+      renderOnlineBookingsUnavailable("#admin-panel-catering-recipients", {
+        title: "Odbiorcy cateringu",
+        copy: "Ten widok wymaga włączonego backendu rezerwacji cateringu.",
+        statusMessage,
+      });
+      return;
+    }
+
+    root.innerHTML = `<section class="panel col-12"><p class="status">Ładowanie listy odbiorców…</p></section>`;
+
+    const paint = (recipients, message = "") => {
+      const list = Array.isArray(recipients) ? recipients : [];
+      const rows = list
+        .map((rec) => {
+          const person = [rec.contactFirstName, rec.contactLastName].filter(Boolean).join(" ");
+          const phone = `${rec.phonePrefix || ""} ${rec.phoneNational || ""}`.trim();
+          const addr = [rec.street, rec.buildingNumber].filter(Boolean).join(" ");
+          const cityLine = [rec.postalCode, rec.city].filter(Boolean).join(" ");
+          return `
+            <tr>
+              <td><strong>${escapeHtml(rec.displayName || rec.id || "—")}</strong></td>
+              <td>${escapeHtml(person || "—")}<br /><span class="helper">${escapeHtml(rec.email || "—")}</span><br /><span class="helper">${escapeHtml(phone || "—")}</span></td>
+              <td>${escapeHtml(addr || "—")}<br /><span class="helper">${escapeHtml(cityLine || "")}</span></td>
+              <td>
+                <div class="inline-actions">
+                  <button type="button" class="button secondary" data-catering-recipient-edit="${escapeAttribute(rec.id)}">Edytuj</button>
+                  <button type="button" class="button danger" data-catering-recipient-delete="${escapeAttribute(rec.id)}">Usuń</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        })
+        .join("");
+
+      root.innerHTML = `
+        <section class="panel col-12 catering-recipients-panel">
+          <p class="pill">Catering</p>
+          <div class="catering-recipients-head">
+            <div>
+              <h2>Odbiorcy</h2>
+              <p class="section-intro">Lista odbiorców dostaw: nazwa firmy lub miejsca, osoba kontaktowa, e-mail, telefon oraz adres. Tych odbiorców wybierasz też w grafiku przy ręcznej rezerwacji dostawy.</p>
+            </div>
+            <button type="button" class="button" data-catering-recipients-add>Dodaj odbiorcę</button>
+          </div>
+          <p class="status" data-catering-recipients-status>${escapeHtml(message || statusMessage || "")}</p>
+          ${
+            list.length
+              ? `<div class="table-scroll"><table class="hotel-table"><thead><tr><th>Nazwa</th><th>Kontakt</th><th>Adres</th><th>Akcje</th></tr></thead><tbody>${rows}</tbody></table></div>`
+              : `<p class="helper">Brak zapisanych odbiorców. Dodaj pierwszego, aby używać go przy dostawach w grafiku.</p>`
+          }
+        </section>
+      `;
+
+      root.querySelector("[data-catering-recipients-add]")?.addEventListener("click", () => {
+        openCateringRecipientEditorModal(null, async () => {
+          await renderCateringRecipientsPanel("");
+        });
+      });
+
+      root.querySelectorAll("[data-catering-recipient-edit]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-catering-recipient-edit");
+          const rec = list.find((x) => String(x.id) === String(id));
+          if (!rec) return;
+          openCateringRecipientEditorModal(rec, async () => {
+            await renderCateringRecipientsPanel("");
+          });
+        });
+      });
+
+      root.querySelectorAll("[data-catering-recipient-delete]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-catering-recipient-delete");
+          if (!id) return;
+          if (!window.confirm("Usunąć tego odbiorcę? Nie usuniesz odbiorcy, jeśli ma aktywne lub przyszłe rezerwacje dostawy.")) {
+            return;
+          }
+          try {
+            await bookingAdminApi("restaurant", "admin-catering-recipient-delete", {
+              method: "DELETE",
+              query: { id },
+            });
+            await refreshCateringRecipientsState();
+            await renderCateringRecipientsPanel("Odbiorca został usunięty.");
+          } catch (error) {
+            window.alert(error.message || "Nie udało się usunąć odbiorcy.");
+          }
+        });
+      });
+    };
+
+    try {
+      const data = await bookingAdminApi("restaurant", "admin-catering-recipients-list");
+      const recipients = data?.recipients || [];
+      state.schedule.cateringRecipients = Array.isArray(recipients) ? recipients : [];
+      paint(recipients, statusMessage);
+    } catch (error) {
+      root.innerHTML = `
+        <section class="panel col-12">
+          <p class="pill">Catering</p>
+          <h2>Odbiorcy</h2>
+          <p class="status">${escapeHtml(error.message || "Nie udało się pobrać listy odbiorców.")}</p>
+          <button type="button" class="button secondary" data-catering-recipients-retry>Spróbuj ponownie</button>
+        </section>
+      `;
+      root.querySelector("[data-catering-recipients-retry]")?.addEventListener("click", () => {
+        renderCateringRecipientsPanel("");
+      });
+    }
+  }
+
   function renderHotelBookingSettingsPanel(statusMessage = "") {
     renderDomainBookingSettingsPanel("#hotel-booking-settings-panel", {
       title: "Hotel",
@@ -4774,6 +5397,18 @@
       toggleLabel: "Hotel",
       pauseRangesKey: "hotelPauseRanges",
       pauseLabel: "Hotel",
+      statusMessage,
+      disabled: !onlineBookingsEnabled,
+    });
+  }
+
+  function renderRestaurantBookingSettingsPanel(statusMessage = "") {
+    renderDomainBookingSettingsPanel("#restaurant-booking-settings-panel", {
+      title: "Catering",
+      enabledId: "booking-enable-restaurant",
+      toggleLabel: "Catering",
+      pauseRangesKey: "restaurantPauseRanges",
+      pauseLabel: "Catering",
       statusMessage,
       disabled: !onlineBookingsEnabled,
     });
@@ -7769,6 +8404,7 @@
 
     const services = [
       { key: "hotel", label: "Hotel" },
+      { key: "restaurant", label: "Catering" },
       { key: "hall", label: "Przyjęcia" },
     ];
 
@@ -7789,9 +8425,16 @@
     `;
 
     function mountActive() {
-      const serviceMap = { hotel: "hotel", hall: "hall" };
+      const serviceMap = { hotel: "hotel", restaurant: "restaurant", hall: "hall" };
       const service = serviceMap[mailsSubTab] || "hotel";
-      const opts = { defaultTab: "templates", allowedTabs: ["templates"] };
+      const opts =
+        service === "restaurant"
+          ? {
+              defaultTab: "templates",
+              allowedTabs: ["templates"],
+              restaurantMailTemplateKeyFilter: ["restaurant_confirmed_client", "rest_confirmed_client"],
+            }
+          : { defaultTab: "templates", allowedTabs: ["templates"] };
       mountLegacyBookingModule("#mail-service-mount", service, opts, "");
     }
 

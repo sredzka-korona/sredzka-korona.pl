@@ -18,9 +18,9 @@
       confirmedLabel: "Rezerwacja została potwierdzona",
     },
     restaurant: {
-      noun: "rezerwacja stolika",
-      waitingLabel: "na decyzję restauracji",
-      confirmedLabel: "Rezerwacja została potwierdzona",
+      noun: "dostawa cateringu",
+      waitingLabel: "na decyzję cateringu",
+      confirmedLabel: "Dostawa została potwierdzona",
     },
     hall: {
       noun: "rezerwacja sali",
@@ -145,10 +145,6 @@
     const token = new URLSearchParams(window.location.search).get("token");
     if (!service || !SERVICE_META[service]) {
       renderError(out, "Konfiguracja", "Brak informacji o typie rezerwacji.");
-      return;
-    }
-    if (service === "restaurant") {
-      renderError(out, "Moduł niedostępny", "Rezerwacje cateringu zostały wyłączone.");
       return;
     }
     if (!token) {

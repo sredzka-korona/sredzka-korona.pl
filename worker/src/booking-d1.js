@@ -38,7 +38,12 @@ function escapeHtml(value) {
 
 function renderTemplate(template, vars) {
   if (!template) return "";
-  const rawHtmlKeys = new Set(["cateringWhenHtml", "cateringRecipientHtml", "cateringDescriptionHtml"]);
+  const rawHtmlKeys = new Set([
+    "cateringWhenHtml",
+    "cateringCycleHtml",
+    "cateringRecipientHtml",
+    "cateringDescriptionHtml",
+  ]);
   return String(template).replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
     const value = vars?.[key];
     if (value === undefined || value === null) return "";
@@ -177,15 +182,14 @@ function mailHeaderSecondLine(service, eventKey) {
     cancelled_admin: "Odwołanie rezerwacji — informacja dla obsługi",
   };
   const restaurant = {
-    confirm_email: "Potwierdzenie rezerwacji stolika",
-    pending_admin: "Rezerwacja stolika — powiadomienie dla obsługi",
-    confirmed_client: "Potwierdzenie rezerwacji stolika",
-    cancelled_client: "Odwołanie rezerwacji stolika",
-    changed_client: "Zmiana rezerwacji stolika",
-    expired_pending_client: "Wygaśnięcie rezerwacji stolika",
-    expired_pending_admin: "Wygaśnięcie rezerwacji — informacja dla obsługi",
-    expired_email_client: "Wygasłe potwierdzenie — rezerwacja stolika",
-    catering_manual_created_client: "Dostawa cateringu — utworzono rezerwację",
+    confirm_email: "Potwierdzenie dostawy cateringu",
+    pending_admin: "Dostawa cateringu — powiadomienie dla obsługi",
+    confirmed_client: "Przyjęcie rezerwacji dostawy cateringu",
+    cancelled_client: "Odwołanie dostawy cateringu",
+    changed_client: "Zmiana terminu dostawy cateringu",
+    expired_pending_client: "Wygaśnięcie oczekiwania — catering",
+    expired_pending_admin: "Wygaśnięcie — informacja dla obsługi (catering)",
+    expired_email_client: "Wygasłe potwierdzenie — catering",
   };
   const hall = {
     confirm_email: "Potwierdzenie rezerwacji sali",
@@ -872,7 +876,7 @@ function normalizeLegacyReservationSequence(sequence, service) {
 
 function reservationSubjectLabel(service, row) {
   if (service === "hotel") return "Pobyt hotelowy";
-  if (service === "restaurant") return "Rezerwacja stolika";
+  if (service === "restaurant") return "Dostawa cateringu";
   const hallName = cleanString(row?.hall_name_snapshot || row?.hallName || row?.hall_id || row?.hallId, 200);
   const eventType = cleanString(row?.event_type || row?.eventType, 200);
   if (hallName && eventType) return `Rezerwacja sali ${hallName} (${eventType})`;
@@ -1317,8 +1321,47 @@ async function ensureSchema(env) {
     await seedDefaults(env);
     await migrateHumanYearAndTemplates(env);
     await migrateCateringDeliverySchema(env);
+    await migrateCateringSeriesSchema(env);
   })();
   return schemaReadyPromise;
+}
+
+async function migrateCateringSeriesSchema(env) {
+  await env.DB
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS catering_repeat_series (
+        id TEXT PRIMARY KEY,
+        recipient_id TEXT NOT NULL,
+        repeat_mode TEXT NOT NULL,
+        repeat_weekdays_json TEXT NOT NULL DEFAULT '[]',
+        start_time TEXT NOT NULL,
+        duration_hours REAL NOT NULL,
+        customer_note TEXT NOT NULL DEFAULT '',
+        admin_note TEXT NOT NULL DEFAULT '',
+        human_slug TEXT NOT NULL,
+        human_year INTEGER NOT NULL,
+        repeat_indefinite INTEGER NOT NULL DEFAULT 0,
+        repeat_until_ymd TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`
+    )
+    .run();
+  try {
+    await env.DB
+      .prepare(
+        `CREATE INDEX IF NOT EXISTS idx_catering_series_active ON catering_repeat_series(status, repeat_indefinite)`
+      )
+      .run();
+  } catch {
+    /* ignore */
+  }
+  try {
+    await env.DB.prepare(`ALTER TABLE restaurant_reservations ADD COLUMN catering_series_id TEXT NOT NULL DEFAULT ''`).run();
+  } catch {
+    /* kolumna już istnieje */
+  }
 }
 
 async function migrateCateringDeliverySchema(env) {
@@ -1520,8 +1563,10 @@ async function upsertCateringRecipient(env, body) {
   return mapCateringRecipientApi(saved);
 }
 
-const MAX_CATERING_REPEAT_OCCURRENCES = 250;
-const CATERING_INDEFINITE_UNTIL_YEARS = 5;
+const MAX_CATERING_REPEAT_OCCURRENCES = 400;
+/** Dla „bezterminowo”: pierwsza partia terminów i docelowy zasięg w rolling extend — ok. rok do przodu od dziś / od ostatniego terminu. */
+const CATERING_INDEFINITE_ROLLING_HORIZON_YEARS = 1;
+const CATERING_SERIES_EXTEND_MAX_NEW = 200;
 
 function cateringDateFromYmd(ymd) {
   const [y, m, d] = String(ymd).split("-").map((x) => Number(x));
@@ -1547,12 +1592,15 @@ function cateringAddOneCalendarMonth(dt) {
 
 function cateringEffectiveRepeatUntil(reservationDate, repeatUntilRaw, repeatIndefinite) {
   const u = cleanString(repeatUntilRaw, 10);
-  if (repeatIndefinite || !u) {
+  if (repeatIndefinite) {
     const start = cateringDateFromYmd(reservationDate);
     if (!start) throw new Error("Nieprawidłowa data pierwszej dostawy.");
     const end = new Date(start);
-    end.setFullYear(end.getFullYear() + CATERING_INDEFINITE_UNTIL_YEARS);
+    end.setFullYear(end.getFullYear() + CATERING_INDEFINITE_ROLLING_HORIZON_YEARS);
     return cateringYmdFromDate(end);
+  }
+  if (!u) {
+    throw new Error("Podaj datę końca powtarzania albo zaznacz „bezterminowo”.");
   }
   return u;
 }
@@ -1629,6 +1677,185 @@ function expandCateringRepeatDates(reservationDate, repeatMode, repeatWeekday, r
   }
 
   throw new Error("Nieobsługiwany tryb powtarzania.");
+}
+
+function cateringExtensionDatesAfterLast(seriesRow, lastYmd, targetYmd, maxNew) {
+  const mode = cleanString(seriesRow.repeat_mode, 24).toLowerCase();
+  const cap = Math.max(1, Math.min(Math.floor(Number(maxNew) || 0) || CATERING_SERIES_EXTEND_MAX_NEW, 400));
+  const out = [];
+  const weekdaysJson = parseJson(seriesRow.repeat_weekdays_json, []);
+  if (!isYmd(lastYmd) || !isYmd(targetYmd)) return out;
+
+  if (mode === "weekly") {
+    let y = lastYmd;
+    while (out.length < cap) {
+      y = addDaysYmd(y, 7);
+      if (y > targetYmd) break;
+      out.push(y);
+    }
+    return out;
+  }
+  if (mode === "biweekly") {
+    let y = lastYmd;
+    while (out.length < cap) {
+      y = addDaysYmd(y, 14);
+      if (y > targetYmd) break;
+      out.push(y);
+    }
+    return out;
+  }
+  if (mode === "monthly") {
+    let cur = cateringDateFromYmd(lastYmd);
+    if (!cur) return out;
+    while (out.length < cap) {
+      cur = cateringAddOneCalendarMonth(cur);
+      const y = cateringYmdFromDate(cur);
+      if (y > targetYmd) break;
+      out.push(y);
+    }
+    return out;
+  }
+  if (mode === "selected_days") {
+    const set = new Set(
+      weekdaysJson.map((x) => Number(x)).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6)
+    );
+    if (!set.size) return out;
+    let y = addOneDayYmd(lastYmd);
+    while (y <= targetYmd && out.length < cap) {
+      const dt = cateringDateFromYmd(y);
+      if (dt && set.has(dt.getDay())) out.push(y);
+      y = addOneDayYmd(y);
+    }
+    return out;
+  }
+  return out;
+}
+
+function cateringInferRepeatModeFromSortedYmd(sortedYmds) {
+  if (!Array.isArray(sortedYmds) || sortedYmds.length < 2) return "";
+  const a = sortedYmds[0];
+  const b = sortedYmds[1];
+  if (!isYmd(a) || !isYmd(b)) return "";
+  const da = cateringDateFromYmd(a);
+  const db = cateringDateFromYmd(b);
+  if (!da || !db) return "";
+  const diffDays = Math.round((db - da) / 86400000);
+  if (diffDays === 7) return "weekly";
+  if (diffDays === 14) return "biweekly";
+  return "";
+}
+
+function cateringClientCycleDescription(mode, repeatWeekdays, repeatIndefinite, repeatUntilYmd) {
+  const m = cleanString(mode, 24).toLowerCase();
+  let cycle = "";
+  if (!m || m === "none") {
+    cycle = "";
+  } else if (m === "weekly") {
+    cycle = "Powtarzanie: co tydzień.";
+  } else if (m === "biweekly") {
+    cycle = "Powtarzanie: co dwa tygodnie.";
+  } else if (m === "monthly") {
+    cycle = "Powtarzanie: co miesiąc.";
+  } else if (m === "selected_days") {
+    const labels = ["niedz.", "pon.", "wt.", "śr.", "czw.", "pt.", "sob."];
+    const xs = [...new Set((Array.isArray(repeatWeekdays) ? repeatWeekdays : []).map(Number))].filter(
+      (n) => Number.isInteger(n) && n >= 0 && n <= 6
+    );
+    xs.sort((a, b) => a - b);
+    cycle = xs.length
+      ? `Powtarzanie: co tydzień w dni ${xs.map((i) => labels[i]).join(", ")}.`
+      : "Powtarzanie: wybrane dni tygodnia.";
+  } else {
+    cycle = "Powtarzanie: harmonogram cykliczny.";
+  }
+  if (repeatIndefinite) {
+    return `${cycle} Tryb bezterminowy — kolejne terminy są uzupełniane automatycznie w systemie z wyprzedzeniem ok. roku.`.trim();
+  }
+  const u = cleanString(repeatUntilYmd, 10);
+  if (u) {
+    return `${cycle} Zaplanowane terminy do ${u} (włącznie).`.trim();
+  }
+  return cycle.trim();
+}
+
+async function extendIndefiniteCateringSeries(env) {
+  const now = nowMs();
+  const todayYmd = todayYmdInWarsaw();
+  const targetYmd = addYearsYmd(todayYmd, CATERING_INDEFINITE_ROLLING_HORIZON_YEARS);
+  const seriesRes = await env.DB.prepare(
+    `SELECT * FROM catering_repeat_series WHERE status = 'active' AND repeat_indefinite = 1`
+  ).all();
+  const list = seriesRes.results || [];
+  let created = 0;
+  for (const s of list) {
+    try {
+      const sid = cleanString(s.id, 80);
+      const recipientId = cleanString(s.recipient_id, 80);
+      if (!sid || !recipientId) continue;
+      const maxRow = await env.DB.prepare(
+        `SELECT reservation_date FROM restaurant_reservations
+         WHERE catering_series_id = ? AND catering_delivery = 1
+           AND status IN ('email_verification_pending','pending','confirmed','manual_block')
+         ORDER BY reservation_date DESC LIMIT 1`
+      )
+        .bind(sid)
+        .first();
+      const lastYmd = cleanString(maxRow?.reservation_date, 10);
+      if (!lastYmd) continue;
+      if (lastYmd >= targetYmd) continue;
+      const newDates = cateringExtensionDatesAfterLast(s, lastYmd, targetYmd, CATERING_SERIES_EXTEND_MAX_NEW);
+      if (!newDates.length) continue;
+      const st = cleanString(s.start_time, 5);
+      const dur = Number(s.duration_hours || 1);
+      const humanSlug = cleanString(s.human_slug, 80);
+      const humanYear = Math.trunc(Number(s.human_year || 0));
+      if (!humanSlug || !Number.isInteger(humanYear) || humanYear < 2000) continue;
+      for (const reservationDate of newDates) {
+        if (!isYmd(reservationDate)) continue;
+        const exists = await env.DB.prepare(
+          `SELECT id FROM restaurant_reservations
+           WHERE catering_series_id = ? AND reservation_date = ? AND start_time = ? AND catering_delivery = 1 LIMIT 1`
+        )
+          .bind(sid, reservationDate, st)
+          .first();
+        if (exists) continue;
+        await createRestaurantReservation(
+          env,
+          {
+            reservationDate,
+            startTime: st,
+            durationHours: dur,
+            tablesCount: 1,
+            guestsCount: 1,
+            joinTables: false,
+            placePreference: "no_preference",
+            fullName: "",
+            email: "",
+            phonePrefix: "+48",
+            phoneNational: "",
+            customerNote: cleanString(s.customer_note, 2000),
+            adminNote: cleanString(s.admin_note, 2000),
+          },
+          {
+            cateringDelivery: true,
+            recipientId,
+            status: "confirmed",
+            withConfirmationToken: false,
+            skipAvailabilityCheck: true,
+            skipPublicBookingRules: true,
+            fixedHumanSlug: humanSlug,
+            fixedHumanYear: humanYear,
+            cateringSeriesId: sid,
+          }
+        );
+        created += 1;
+      }
+      await env.DB.prepare(`UPDATE catering_repeat_series SET updated_at=? WHERE id=?`).bind(now, sid).run();
+    } catch (err) {
+      console.error("extendIndefiniteCateringSeries row error:", err);
+    }
+  }
+  return { extendedOccurrences: created };
 }
 
 async function migrateBookingMailTemplatesActionLabel(env) {
@@ -2381,7 +2608,8 @@ async function restaurantBlockingRows(env, startMs, endMs, excludeId = null) {
             cleanup_buffer_minutes AS cleanupBufferMinutes,
             assigned_table_ids_json AS assignedTableIdsJson
      FROM restaurant_reservations
-     WHERE status IN ('email_verification_pending','pending','confirmed','manual_block')
+     WHERE COALESCE(catering_delivery, 0) = 0
+       AND status IN ('email_verification_pending','pending','confirmed','manual_block')
        AND start_ms < ?
        AND (end_ms + (COALESCE(cleanup_buffer_minutes, ${RESTAURANT_CLEANUP_BUFFER_MINUTES}) * 60000)) > ?
        ${excludeId ? "AND id != ?" : ""}`
@@ -2703,87 +2931,60 @@ function mapRestaurantReservation(row, tableMap, recipientRow = null) {
 }
 
 async function createRestaurantReservation(env, payload, options = {}) {
+  if (!options.cateringDelivery) {
+    throw new Error(
+      "Rezerwacje stolików w lokalu są wyłączone. Twórz wpisy jako dostawy cateringu (odbiorca + termin)."
+    );
+  }
   const now = nowMs();
-  const cateringDelivery = Boolean(options.cateringDelivery);
-  if (cateringDelivery) {
-    options.skipAvailabilityCheck = true;
-    options.skipPublicBookingRules = true;
-    if (payload.tablesCount == null) payload.tablesCount = 1;
-    if (payload.guestsCount == null) payload.guestsCount = 1;
+  if (payload.tablesCount == null) payload.tablesCount = 1;
+  if (payload.guestsCount == null) payload.guestsCount = 1;
+  const reservationDate = cleanString(payload.reservationDate, 10);
+  const startTime = cleanString(payload.startTime, 5);
+  const durationHours = Number(payload.durationHours || 2);
+  const tablesCount = Math.max(1, toInt(payload.tablesCount, 1));
+  if (!isYmd(reservationDate) || !isHm(startTime)) {
+    throw new Error("Nieprawidłowa data lub godzina.");
   }
-  let availability;
-  if (options.skipAvailabilityCheck) {
-    const reservationDate = cleanString(payload.reservationDate, 10);
-    const startTime = cleanString(payload.startTime, 5);
-    const durationHours = Number(payload.durationHours || 2);
-    const tablesCount = Math.max(1, toInt(payload.tablesCount, 1));
-    if (!isYmd(reservationDate) || !isHm(startTime)) {
-      throw new Error("Nieprawidłowa data lub godzina.");
-    }
-    if (!Number.isFinite(durationHours) || durationHours <= 0) {
-      throw new Error("Nieprawidłowy czas trwania.");
-    }
-    const startMs = ymdHmToMs(reservationDate, startTime);
-    const endMs = startMs + durationHours * 3600000;
-    availability = {
-      ok: true,
-      availableIds: [],
-      startMs,
-      endMs,
-      settings: await loadRestaurantSettings(env),
-      reservationDate,
-      startTime,
-      durationHours,
-      tablesCount,
-      dayWindow: { closed: false },
-    };
-  } else {
-    availability = await assertRestaurantAvailability(env, payload, options.excludeId || null, {
-      skipPublicBookingRules: Boolean(options.skipPublicBookingRules),
-    });
-    if (!availability.ok) {
-      throw new Error("Brak wolnych stolików w wybranym terminie.");
-    }
+  if (!Number.isFinite(durationHours) || durationHours <= 0) {
+    throw new Error("Nieprawidłowy czas trwania.");
   }
-  const settings = availability.settings;
-  const tablesCount = availability.tablesCount;
+  const startMs = ymdHmToMs(reservationDate, startTime);
+  const endMs = startMs + durationHours * 3600000;
+  const availability = {
+    ok: true,
+    availableIds: [],
+    startMs,
+    endMs,
+    reservationDate,
+    startTime,
+    durationHours,
+    tablesCount,
+    dayWindow: { closed: false },
+  };
   const guestsCount = Math.max(1, toInt(payload.guestsCount, 1));
-  const maxGuests = Math.max(1, toInt(settings.maxGuestsPerTable, 4)) * tablesCount;
-  if (!cateringDelivery && guestsCount > maxGuests) {
-    throw new Error(`Maksymalnie ${maxGuests} gości przy ${tablesCount} stolikach.`);
-  }
   const id = crypto.randomUUID();
-  let humanYear = yearFromMsWarsaw(now);
-  let humanNumber;
-  let humanSlug = "";
-  let recipientIdForInsert = null;
-  if (cateringDelivery) {
-    const rec = await getCateringRecipientRow(env, cleanString(options.recipientId, 80));
-    if (!rec) throw new Error("Nie znaleziono odbiorcy.");
-    recipientIdForInsert = rec.id;
-    humanNumber = 0;
-    humanYear = yearFromMsWarsaw(availability.startMs);
-    humanSlug = await allocateCateringHumanSlug(env, rec.display_name, humanYear);
-    payload.fullName = rec.display_name;
-    payload.email = rec.email;
-    payload.phonePrefix = rec.phone_prefix;
-    payload.phoneNational = rec.phone_national;
-    payload.joinTables = false;
-    payload.placePreference = "no_preference";
-  } else {
-    humanNumber = await nextHumanSequenceForYear(env, "restaurant", humanYear);
-  }
+  const rec = await getCateringRecipientRow(env, cleanString(options.recipientId, 80));
+  if (!rec) throw new Error("Nie znaleziono odbiorcy.");
+  const recipientIdForInsert = rec.id;
+  const humanNumber = 0;
+  const humanYear = Number.isInteger(Number(options.fixedHumanYear))
+    ? Math.trunc(Number(options.fixedHumanYear))
+    : yearFromMsWarsaw(startMs);
+  const preSlug = cleanString(options.fixedHumanSlug, 80);
+  const humanSlug = preSlug || (await allocateCateringHumanSlug(env, rec.display_name, humanYear));
+  const cateringSeriesId = cleanString(options.cateringSeriesId, 80);
+  payload.fullName = rec.display_name;
+  payload.email = rec.email;
+  payload.phonePrefix = rec.phone_prefix;
+  payload.phoneNational = rec.phone_national;
+  payload.joinTables = false;
+  payload.placePreference = "no_preference";
   const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
   const token = options.withConfirmationToken ? randomToken() : "";
   const tokenHash = token ? await sha256Hex(token) : null;
   const status = options.status || "email_verification_pending";
-  const assigned = cateringDelivery
-    ? []
-    : Array.isArray(options.assignedTableIds) && options.assignedTableIds.length
-      ? options.assignedTableIds
-      : Array.isArray(availability.availableIds)
-        ? availability.availableIds.slice(0, tablesCount)
-        : [];
+  const assigned = [];
   const emailExp = status === "email_verification_pending" ? now + EMAIL_LINK_MS : null;
   const pendingExp = status === "pending" ? now + RESTAURANT_PENDING_MS : null;
   const placePreference = normalizeRestaurantPlacePreference(payload.placePreference);
@@ -2793,8 +2994,8 @@ async function createRestaurantReservation(env, payload, options = {}) {
       reservation_date, start_time, duration_hours, start_ms, end_ms, tables_count, guests_count, join_tables, place_preference,
       assigned_table_ids_json, customer_note, admin_note, cleanup_buffer_minutes,
       confirmation_token_hash, email_verification_expires_at, pending_expires_at, created_at, updated_at,
-      recipient_id, catering_delivery, human_slug
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      recipient_id, catering_delivery, human_slug, catering_series_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       id,
@@ -2825,11 +3026,12 @@ async function createRestaurantReservation(env, payload, options = {}) {
       now,
       now,
       recipientIdForInsert,
-      cateringDelivery ? 1 : 0,
-      cleanString(cateringDelivery ? humanSlug : "", 80)
+      1,
+      cleanString(humanSlug, 80),
+      cateringSeriesId
     )
     .run();
-  return { id, humanNumber, humanSlug, token, availability };
+  return { id, humanNumber, humanSlug, humanYear, token, availability };
 }
 
 async function venueHalls(env) {
@@ -3462,126 +3664,115 @@ ${infoCard("Podsumowanie anulowania", [
 function buildRestaurantDefaultTemplates() {
   const base = {
     restaurant_confirm_email: {
-      subject: "Potwierdzenie rezerwacji stolika ({{reservationNumber}})",
+      subject: "Potwierdzenie adresu e-mail — dostawa cateringu ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>dziękujemy za wybór <strong>{{restaurantName}}</strong>. Otrzymaliśmy zgłoszenie rezerwacji stolika i przygotowaliśmy jego podsumowanie.</p>
-<p>Aby przekazać rezerwację do obsługi sali, potwierdź adres e-mail. Link pozostaje ważny przez <strong>2 godziny</strong>.</p>
-${infoCard("Podsumowanie rezerwacji stolika", [
-  ["Numer rezerwacji", "{{reservationNumber}}"],
+<p>dziękujemy za kontakt z <strong>{{restaurantName}}</strong>. Otrzymaliśmy zgłoszenie dotyczące dostawy cateringu.</p>
+<p>Aby przekazać je dalej do obsługi, potwierdź adres e-mail. Link pozostaje ważny przez <strong>2 godziny</strong>.</p>
+${infoCard("Podsumowanie", [
+  ["Numer w systemie", "{{reservationNumber}}"],
   ["Data", "{{date}}"],
   ["Godzina", "{{timeFrom}} — {{timeTo}}"],
-  ["Liczba gości", "{{guestsCount}}"],
-  ["Łączenie stolików", "{{joinTables}}"],
-  ["Preferencja miejsca", "{{placePreference}}"],
-  ["Przydział stolików", "{{tablesList}}"],
+  ["Opis / uwagi", "{{customerNote}}"],
 ])}
-${noteCard("Rezerwacja stolika nie wymaga przedpłaty. <strong>Płatność odbywa się na miejscu</strong>, zgodnie z aktualnym menu i zamówieniem złożonym podczas wizyty.")}
+${noteCard("Warunki płatności i realizacji ustalane są indywidualnie zgodnie z ofertą cateringu.")}
 <p>Jeżeli to nie Ty wysyłałeś formularz, zignoruj tę wiadomość.</p>`,
       actionLabel: "Potwierdź adres e-mail",
     },
     restaurant_pending_admin: {
-      subject: "Nowa rezerwacja stolika ({{reservationNumber}})",
-      bodyHtml: `<p>Do obsługi wpłynęła nowa rezerwacja stolika wymagająca decyzji.</p>
-${infoCard("Szczegóły rezerwacji", [
-  ["Numer rezerwacji", "{{reservationNumber}}"],
+      subject: "Catering — nowe zgłoszenie ({{reservationNumber}})",
+      bodyHtml: `<p>Do obsługi wpłynęło nowe zgłoszenie dostawy cateringu wymagające decyzji.</p>
+${infoCard("Szczegóły", [
+  ["Numer w systemie", "{{reservationNumber}}"],
   ["Dotyczy", "{{reservationSubject}}"],
   ["Decyzja do", "{{decisionDeadline}}"],
-  ["Klient", "{{fullName}}"],
+  ["Odbiorca / kontakt", "{{fullName}}"],
   ["E-mail", "{{email}}"],
   ["Telefon", "{{phone}}"],
   ["Data", "{{date}}"],
   ["Godzina", "{{timeFrom}} — {{timeTo}}"],
-  ["Liczba gości", "{{guestsCount}}"],
-  ["Przydział stolików", "{{tablesList}}"],
-  ["Łączenie stolików", "{{joinTables}}"],
-  ["Preferencja miejsca", "{{placePreference}}"],
-  ["Uwagi klienta", "{{customerNote}}"],
+  ["Uwagi", "{{customerNote}}"],
 ])}`,
     },
     restaurant_confirmed_client: {
-      subject: "Rezerwacja stolika potwierdzona ({{reservationNumber}})",
+      subject: "Przyjęcie rezerwacji dostawy cateringu ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>z przyjemnością potwierdzamy Twoją rezerwację stolika.</p>
-${infoCard("Potwierdzone spotkanie", [
-  ["Numer rezerwacji", "{{reservationNumber}}"],
-  ["Data", "{{date}}"],
-  ["Godzina", "{{timeFrom}} — {{timeTo}}"],
-  ["Liczba gości", "{{guestsCount}}"],
-  ["Łączenie stolików", "{{joinTables}}"],
-  ["Preferencja miejsca", "{{placePreference}}"],
-  ["Przydział stolików", "{{tablesList}}"],
-])}
-${noteCard("Rezerwacja nie wymaga przedpłaty. <strong>Płatność następuje na miejscu</strong> według zamówienia i aktualnej karty menu. W przypadku spóźnienia lub zmiany liczby gości prosimy o wcześniejszy kontakt.")}`,
+<p>potwierdzamy <strong>przyjęcie rezerwacji dostawy cateringu</strong> w <strong>{{restaurantName}}</strong>.</p>
+<p>W treści poniżej: pierwszy termin i godzina dostawy, cykl powtarzania (jeśli dotyczy), dane odbiorcy oraz ewentualny opis zamówienia.</p>
+<p><strong>Numer w systemie:</strong> {{reservationNumber}}</p>
+{{cateringWhenHtml}}
+{{cateringCycleHtml}}
+{{cateringRecipientHtml}}
+{{cateringDescriptionHtml}}
+${noteCard("Szczegóły realizacji, płatność i logistyka — zgodnie z ustaleniami z obsługą cateringu.")}
+<p>Pozdrawiamy,<br>{{restaurantName}}</p>`,
     },
     restaurant_cancelled_client: {
-      subject: "Rezerwacja stolika anulowana ({{reservationNumber}})",
+      subject: "Dostawa cateringu — anulowanie ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>informujemy, że rezerwacja stolika została anulowana.</p>
-${infoCard("Anulowana rezerwacja", [
-  ["Numer rezerwacji", "{{reservationNumber}}"],
+<p>informujemy, że zaplanowana dostawa cateringu została anulowana.</p>
+${infoCard("Anulowany termin", [
+  ["Numer w systemie", "{{reservationNumber}}"],
   ["Data", "{{date}}"],
   ["Godzina", "{{timeFrom}} — {{timeTo}}"],
-  ["Liczba gości", "{{guestsCount}}"],
 ])}
-${noteCard("Jeśli chcesz zarezerwować inny termin, będzie nam bardzo miło ponownie Cię ugościć. Wystarczy odpowiedzieć na tę wiadomość lub wysłać nowe zgłoszenie.")}`,
+${noteCard("W razie pytań odpowiedz na tę wiadomość lub skontaktuj się z obsługą cateringu.")}`,
     },
     restaurant_changed_client: {
-      subject: "Zaktualizowano rezerwację stolika ({{reservationNumber}})",
+      subject: "Dostawa cateringu — zmiana terminu ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>wprowadziliśmy zmiany w Twojej rezerwacji. Aktualne szczegóły wizyty znajdują się poniżej.</p>
-${infoCard("Aktualne podsumowanie", [
-  ["Numer rezerwacji", "{{reservationNumber}}"],
+<p>wprowadziliśmy zmiany w zapisanym terminie dostawy cateringu.</p>
+${infoCard("Aktualne dane", [
+  ["Numer w systemie", "{{reservationNumber}}"],
   ["Data", "{{date}}"],
   ["Godzina", "{{timeFrom}} — {{timeTo}}"],
-  ["Liczba gości", "{{guestsCount}}"],
-  ["Przydział stolików", "{{tablesList}}"],
-  ["Uwagi do rezerwacji", "{{customerNote}}"],
+  ["Uwagi", "{{customerNote}}"],
 ])}
-${noteCard("<strong>Płatność odbywa się na miejscu</strong>, zgodnie z zamówieniem złożonym podczas wizyty. Jeżeli potrzebujesz doprecyzować szczegóły rezerwacji, odpowiedz na tę wiadomość.")}`,
+${noteCard("Jeżeli coś wymaga doprecyzowania, odpowiedz na tę wiadomość.")}`,
     },
     restaurant_expired_pending_client: {
-      subject: "Rezerwacja stolika wygasła ({{reservationNumber}})",
+      subject: "Dostawa cateringu — wpis wygasł ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>rezerwacja wygasła, ponieważ nie została potwierdzona w wymaganym czasie.</p>
+<p>zgłoszenie wygasło, ponieważ nie zostało potwierdzone w wymaganym czasie.</p>
 ${infoCard("Wygasłe zgłoszenie", [
-  ["Numer rezerwacji", "{{reservationNumber}}"],
+  ["Numer w systemie", "{{reservationNumber}}"],
   ["Data", "{{date}}"],
   ["Godzina", "{{timeFrom}} — {{timeTo}}"],
-  ["Liczba gości", "{{guestsCount}}"],
 ])}
-${noteCard("Stolik wrócił do puli dostępności. Jeżeli chcesz zarezerwować wizytę ponownie, prześlij nowe zgłoszenie.")}`,
+${noteCard("Jeżeli nadal jesteś zainteresowany dostawą, skontaktuj się z obsługą cateringu.")}`,
     },
     restaurant_expired_pending_admin: {
-      subject: "Wygasła rezerwacja stolika ({{reservationNumber}})",
-      bodyHtml: `<p>Rezerwacja stolika wygasła automatycznie.</p>
-${infoCard("Dane wygasłego zgłoszenia", [
-  ["Numer rezerwacji", "{{reservationNumber}}"],
-  ["Klient", "{{fullName}}"],
+      subject: "Catering — wygasłe zgłoszenie ({{reservationNumber}})",
+      bodyHtml: `<p>Zgłoszenie dostawy cateringu wygasło automatycznie.</p>
+${infoCard("Dane", [
+  ["Numer w systemie", "{{reservationNumber}}"],
+  ["Kontakt", "{{fullName}}"],
   ["E-mail", "{{email}}"],
   ["Data", "{{date}}"],
   ["Godzina", "{{timeFrom}} — {{timeTo}}"],
 ])}`,
     },
     restaurant_expired_email_client: {
-      subject: "Link potwierdzający wygasł",
+      subject: "Link potwierdzający wygasł — catering",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>nie otrzymaliśmy potwierdzenia adresu e-mail w ciągu 2 godzin, dlatego zgłoszenie zostało anulowane.</p>
-${infoCard("Szczegóły zgłoszenia", [
-  ["Numer rezerwacji", "{{reservationNumber}}"],
+${infoCard("Szczegóły", [
+  ["Numer w systemie", "{{reservationNumber}}"],
   ["Data", "{{date}}"],
   ["Godzina", "{{timeFrom}} — {{timeTo}}"],
-  ["Liczba gości", "{{guestsCount}}"],
 ])}
-${noteCard("Stolik nie został zablokowany. Jeśli nadal chcesz dokonać rezerwacji, prześlij formularz ponownie.")}`,
+${noteCard("Jeśli nadal chcesz złożyć zgłoszenie, skontaktuj się z obsługą lub prześlij formularz ponownie.")}`,
     },
     catering_manual_created_client: {
-      subject: "{{restaurantName}} — utworzono dostawę cateringu",
+      subject: "Przyjęcie rezerwacji dostawy cateringu ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>informujemy, że <strong>dostawa cateringu została zapisana w naszym systemie</strong> (rezerwacja utworzona ręcznie przez obsługę).</p>
+<p>potwierdzamy <strong>przyjęcie rezerwacji dostawy cateringu</strong> w <strong>{{restaurantName}}</strong>.</p>
+<p>W treści poniżej: pierwszy termin i godzina dostawy, cykl powtarzania (jeśli dotyczy), dane odbiorcy oraz ewentualny opis zamówienia.</p>
+<p><strong>Numer w systemie:</strong> {{reservationNumber}}</p>
 {{cateringWhenHtml}}
+{{cateringCycleHtml}}
 {{cateringRecipientHtml}}
 {{cateringDescriptionHtml}}
-${noteCard("W razie pytań odpowiedz na tę wiadomość lub skontaktuj się bezpośrednio z obsługą cateringu.")}
+${noteCard("Szczegóły realizacji, płatność i logistyka — zgodnie z ustaleniami z obsługą cateringu.")}
 <p>Pozdrawiamy,<br>{{restaurantName}}</p>`,
     },
   };
@@ -3748,7 +3939,6 @@ const EVENT_TEMPLATE_KEYS = {
     confirmed_client: ["restaurant_confirmed_client", "rest_confirmed_client"],
     cancelled_client: ["restaurant_cancelled_client", "rest_cancelled_client"],
     changed_client: ["restaurant_changed_client", "rest_changed_client"],
-    catering_manual_created_client: ["catering_manual_created_client"],
   },
   hall: {
     confirm_email: ["hall_confirm_email"],
@@ -3917,11 +4107,12 @@ async function listHotelReservations(env, status) {
 }
 
 async function listRestaurantReservations(env, status) {
-  const tables = await restaurantTables(env, true);
-  const map = new Map(tables.map((t) => [t.id, t]));
+  const map = new Map();
   const { sql, binds } = listStatusWhere(status);
+  const whereCatering =
+    sql && sql.startsWith("WHERE ") ? `WHERE catering_delivery = 1 AND ${sql.slice(6)}` : "WHERE catering_delivery = 1";
   const rows = await env.DB.prepare(
-    `SELECT * FROM restaurant_reservations ${sql}
+    `SELECT * FROM restaurant_reservations ${whereCatering}
      ORDER BY CASE status
                 WHEN 'pending' THEN 0
                 WHEN 'confirmed' THEN 1
@@ -4227,7 +4418,10 @@ function cateringRepeatSummaryPhrase(repeatMode, repeatWeekdays) {
   return ", harmonogram cykliczny";
 }
 
-function buildCateringManualCreatedMailExtraVars(recipientSqlRow, { dates, startTime, repeatMode, repeatWeekdays, description }) {
+function buildCateringManualCreatedMailExtraVars(
+  recipientSqlRow,
+  { dates, startTime, repeatMode, repeatWeekdays, description, repeatIndefinite, repeatUntil }
+) {
   const sorted = [...(Array.isArray(dates) ? dates : [])].filter((d) => isYmd(cleanString(d, 10))).sort();
   const first = sorted[0] || "";
   const last = sorted[sorted.length - 1] || first;
@@ -4235,10 +4429,14 @@ function buildCateringManualCreatedMailExtraVars(recipientSqlRow, { dates, start
   const mode = cleanString(repeatMode, 24).toLowerCase();
   let cateringWhenHtml = "";
   let cateringWhenPlain = "";
-  if (sorted.length <= 1 || !mode || mode === "none") {
+  if (sorted.length === 1 || mode === "none") {
     const line = first && st ? `${first}, godz. ${st}` : first ? String(first) : "—";
-    cateringWhenHtml = infoCard("Na kiedy", [["Termin dostawy", escapeHtml(line)]]);
-    cateringWhenPlain = `Na kiedy: ${line}`;
+    cateringWhenHtml = infoCard("Termin i godzina", [
+      ["Pierwsza data dostawy", escapeHtml(first || "—")],
+      ["Godzina rozpoczęcia dostawy", escapeHtml(st || "—")],
+      ["Podsumowanie terminu", escapeHtml(line)],
+    ]);
+    cateringWhenPlain = `Pierwsza data: ${first || "—"}, godzina: ${st || "—"}`;
   } else {
     const tw = cateringDeliveryTerminWord(sorted.length);
     const summaryLine = `${sorted.length} ${tw} od ${first} do ${last} (włącznie)${cateringRepeatSummaryPhrase(
@@ -4249,9 +4447,18 @@ function buildCateringManualCreatedMailExtraVars(recipientSqlRow, { dates, start
       sorted.length <= 16
         ? `<p style="margin:14px 0 0 0;color:#5e4b39;font-size:14px;line-height:1.65;">Kolejne daty: ${sorted.map((d) => escapeHtml(d)).join(", ")}</p>`
         : "";
-    cateringWhenHtml = `${infoCard("Na kiedy", [["Harmonogram", escapeHtml(summaryLine)]])}${listNote}`;
-    cateringWhenPlain = `Na kiedy: ${summaryLine}`;
+    cateringWhenHtml = `${infoCard("Termin i godzina", [["Pierwszy termin (data i godzina)", escapeHtml(`${first}, godz. ${st}`)], ["Harmonogram dat", escapeHtml(summaryLine)]])}${listNote}`;
+    cateringWhenPlain = `Pierwszy termin: ${first}, godz. ${st}. ${summaryLine}`;
   }
+  const modeForCycle = cleanString(repeatMode, 24).toLowerCase();
+  const indef = Boolean(repeatIndefinite);
+  const untilY = cleanString(repeatUntil, 10);
+  const cycleText =
+    !modeForCycle || modeForCycle === "none"
+      ? "Dostawa jednorazowa (bez powtarzania)."
+      : cateringClientCycleDescription(modeForCycle, repeatWeekdays, indef, untilY);
+  const cateringCycleHtml = infoCard("Cykl / powtarzanie", [["Opis", escapeHtml(cycleText)]]);
+  cateringWhenPlain = `${cateringWhenPlain} | Cykl: ${cycleText}`;
   const r = recipientSqlRow || {};
   const person = [r.contact_first_name, r.contact_last_name].filter(Boolean).join(" ");
   const phone = `${r.phone_prefix || ""} ${r.phone_national || ""}`.trim();
@@ -4269,14 +4476,79 @@ function buildCateringManualCreatedMailExtraVars(recipientSqlRow, { dates, start
     recipientRows.push(["Dodatkowe informacje", String(r.extra_info).trim()]);
   }
   const cateringRecipientHtml = infoCard(
-    "Dla kogo (odbiorca)",
+    "Dane odbiorcy",
     recipientRows.map(([label, value]) => [label, escapeHtml(String(value ?? ""))])
   );
   const desc = cleanString(description, 2000);
   const cateringDescriptionHtml = desc
     ? noteCard(`<strong>Opis / uwagi do zamówienia:</strong><br>${escapeHtml(desc).replace(/\n/g, "<br>")}`)
     : "";
-  return { cateringWhenHtml, cateringRecipientHtml, cateringDescriptionHtml, cateringWhenPlain };
+  return {
+    cateringWhenHtml,
+    cateringCycleHtml,
+    cateringRecipientHtml,
+    cateringDescriptionHtml,
+    cateringWhenPlain,
+  };
+}
+
+async function buildCateringAcceptedMailExtraVarsFromReservation(env, row) {
+  if (!row || Number(row.catering_delivery) !== 1) return {};
+  const recId = cleanString(row.recipient_id, 80);
+  const recRow = recId ? await getCateringRecipientRow(env, recId) : null;
+  if (!recRow) return {};
+  const hy = Number(row.human_year);
+  const slug = cleanString(row.human_slug, 80);
+  let dates = [];
+  if (Number.isInteger(hy) && hy >= 2000 && hy <= 2100 && slug) {
+    const sib = await env.DB.prepare(
+      `SELECT reservation_date FROM restaurant_reservations
+       WHERE human_year = ? AND human_slug = ? AND catering_delivery = 1
+         AND status IN ('email_verification_pending','pending','confirmed')
+       ORDER BY start_ms ASC`
+    )
+      .bind(hy, slug)
+      .all();
+    const seen = new Set();
+    for (const x of sib.results || []) {
+      const d = cleanString(x.reservation_date, 10);
+      if (!isYmd(d) || seen.has(d)) continue;
+      seen.add(d);
+      dates.push(d);
+    }
+  }
+  if (!dates.length) {
+    const d = cleanString(row.reservation_date, 10);
+    dates = isYmd(d) ? [d] : [];
+  }
+  const seriesId = cleanString(row.catering_series_id, 80);
+  let repeatMode = "none";
+  let repeatWeekdays = [];
+  let repeatIndefinite = false;
+  let repeatUntil = "";
+  let startTime = cleanString(row.start_time, 5);
+  if (seriesId) {
+    const s = await env.DB.prepare(`SELECT * FROM catering_repeat_series WHERE id = ?`).bind(seriesId).first();
+    if (s) {
+      repeatMode = cleanString(s.repeat_mode, 24).toLowerCase() || "none";
+      repeatWeekdays = parseJson(s.repeat_weekdays_json, []);
+      repeatIndefinite = Boolean(Number(s.repeat_indefinite));
+      repeatUntil = cleanString(s.repeat_until_ymd, 10);
+      if (cleanString(s.start_time, 5)) startTime = cleanString(s.start_time, 5);
+    }
+  } else if (dates.length > 1) {
+    repeatMode = cateringInferRepeatModeFromSortedYmd(dates) || "none";
+  }
+  const description = cleanString(row.customer_note, 2000);
+  return buildCateringManualCreatedMailExtraVars(recRow, {
+    dates,
+    startTime,
+    repeatMode,
+    repeatWeekdays,
+    repeatIndefinite,
+    repeatUntil,
+    description,
+  });
 }
 
 async function buildHallMailVars(env, request, row, token = "") {
@@ -4428,11 +4700,9 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
     serviceUrl: `${siteUrl}${serviceLandingPath(service)}`,
     preheader: (() => {
       if (service === "restaurant") {
-        if (eventKey === "catering_manual_created_client") {
-          const w = cleanString(vars.cateringWhenPlain, 220);
-          return w || `Dostawa cateringu — ${vars.reservationNumber || ""}`.trim();
-        }
-        return `Rezerwacja stolika ${vars.reservationNumber || ""}`.trim();
+        const w = cleanString(vars.cateringWhenPlain, 220);
+        if (w) return w;
+        return `Dostawa cateringu — ${vars.reservationNumber || ""}`.trim();
       }
       return `Rezerwacja ${vars.reservationNumber || ""}`.trim();
     })(),
@@ -4442,7 +4712,7 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
         ? "Otwórz i potwierdź"
         : service === "hall"
           ? "Potwierdź zgłoszenie"
-          : eventKey === "catering_manual_created_client"
+          : service === "restaurant" && eventKey === "confirmed_client"
             ? ""
             : "Potwierdź adres e-mail",
   });
@@ -4700,170 +4970,19 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
   }
   const adminAction = await handlePublicAdminAction(env, op, request, "restaurant");
   if (adminAction) return adminAction;
-  if (op === "public-settings" && request.method === "GET") {
-    const url = new URL(request.url);
-    const requestedDate = cleanString(url.searchParams.get("reservationDate"), 10);
-    const reservationDate = isYmd(requestedDate) ? requestedDate : todayYmdInWarsaw();
-    const settings = await loadRestaurantSettings(env);
-    const tables = await restaurantTables(env, false);
-    const dayWindow = await resolveRestaurantWindowForDate(env, settings, reservationDate);
-    const slots = dayWindow.closed
-      ? []
-      : buildTimeSlotsFromMinutes(dayWindow.openMinutes, dayWindow.closeMinutes, settings.timeSlotMinutes);
+  /** Publiczna rezerwacja stolików — wyłączona; catering (panel admina, dostawy) pozostaje przez handleRestaurantAdmin. */
+  const restaurantPublicTableOps = new Set([
+    "public-settings",
+    "public-calendar",
+    "public-availability",
+    "public-reservation-draft",
+    "public-reservation-confirm",
+  ]);
+  if (restaurantPublicTableOps.has(op)) {
     return {
-      status: 200,
-      data: {
-        maxGuestsPerTable: Number(settings.maxGuestsPerTable || 4),
-        tableCount: tables.length,
-        selectedDate: reservationDate,
-        closedForDay: Boolean(dayWindow.closed),
-        reservationOpenTime: dayWindow.closed ? "" : dayWindow.openLabel,
-        reservationCloseTime: dayWindow.closed ? "" : dayWindow.closeLabel,
-        reservationHoursSource: dayWindow.source || "settings",
-        timeSlotMinutes: Number(settings.timeSlotMinutes || 30),
-        timeSlots: dayWindow.closed
-          ? []
-          : slots.length
-            ? slots
-            : ["12:00", "13:00", "14:00", "18:00", "19:00", "20:00"],
-        restaurantName: "Średzka Korona — Restauracja",
-      },
+      status: 410,
+      data: { error: "Rezerwacja stolików w lokalu online jest wyłączona." },
     };
-  }
-  if (op === "public-calendar" && request.method === "POST") {
-    const body = await readBody(request);
-    try {
-      const calendar = await restaurantCalendarAvailability(env, body);
-      return { status: 200, data: calendar };
-    } catch (error) {
-      return { status: 400, data: { error: error.message || "Nie udało się pobrać kalendarza restauracji." } };
-    }
-  }
-  if (op === "public-availability" && request.method === "POST") {
-    const body = await readBody(request);
-    try {
-      const chk = await assertRestaurantAvailability(env, body, null);
-      return { status: 200, data: { ok: chk.ok, available: chk.ok, message: chk.ok ? null : "Brak wolnych stolików." } };
-    } catch (error) {
-      return { status: 400, data: { error: error.message || "Błąd walidacji." } };
-    }
-  }
-  if (op === "public-reservation-draft" && request.method === "POST") {
-    const body = await readBody(request);
-    if (cleanString(body.hpCompanyWebsite, 200)) return { status: 200, data: { ok: true } };
-    if (verifyTurnstileToken && !(await verifyTurnstileToken(body.turnstileToken || ""))) {
-      return { status: 400, data: { error: "Weryfikacja anty-spam nie powiodła się." } };
-    }
-    try {
-      const smtpAvailable = hasSmtpConfig(env);
-      assertSession(body.sessionStartedAt);
-      assertTerms(body.termsAccepted);
-      if (!cleanString(body.fullName, 120) || !cleanString(body.email, 180).includes("@")) {
-        return { status: 400, data: { error: "Wypełnij imię i nazwisko oraz poprawny e-mail." } };
-      }
-      const out = await createRestaurantReservation(env, body, {
-        withConfirmationToken: smtpAvailable,
-        status: smtpAvailable ? "email_verification_pending" : "pending",
-      });
-      const row = await getRestaurantReservationRow(env, out.id);
-      let requiresEmailConfirmation = smtpAvailable;
-      if (smtpAvailable) {
-        try {
-          await sendTemplatedBookingMail(env, request, {
-            service: "restaurant",
-            eventKey: "confirm_email",
-            row,
-            token: out.token,
-            to: row?.email,
-          });
-        } catch (error) {
-          requiresEmailConfirmation = false;
-          console.error("Restaurant draft mail error:", error);
-          await env.DB.prepare(
-            "UPDATE restaurant_reservations SET status='pending', confirmation_token_hash=NULL, admin_action_token_hash=NULL, admin_action_expires_at=NULL, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
-          )
-            .bind(nowMs() + RESTAURANT_PENDING_MS, nowMs(), out.id)
-            .run();
-          try {
-            const pendingRow = await getRestaurantReservationRow(env, out.id);
-            await notifyPendingAdmins(env, request, "restaurant", pendingRow);
-          } catch (adminError) {
-            console.error("Restaurant admin notify fallback error:", adminError);
-          }
-        }
-      }
-      return {
-        status: 200,
-        data: {
-          ok: true,
-          reservationId: out.id,
-          humanNumber: out.humanNumber,
-          requiresEmailConfirmation,
-          message: requiresEmailConfirmation
-            ? "Wysłano wiadomość z linkiem potwierdzającym."
-            : "Rezerwacja została zapisana jako oczekująca. Jeśli nie widzisz e-maila, sprawdź także folder SPAM.",
-        },
-      };
-    } catch (error) {
-      return { status: 400, data: { error: error.message || "Błąd walidacji." } };
-    }
-  }
-  if (op === "public-reservation-confirm" && request.method === "POST") {
-    const body = await readBody(request);
-    const token = cleanString(body.token, 500);
-    if (!token) return { status: 400, data: { error: "Brak tokenu." } };
-    const tokenHash = await sha256Hex(token);
-    const row = await env.DB.prepare(
-      "SELECT * FROM restaurant_reservations WHERE confirmation_token_hash = ? LIMIT 1"
-    )
-      .bind(tokenHash)
-      .first();
-    if (!row) return { status: 400, data: { error: "Nieprawidłowy lub wygasły link." } };
-    if (row.status === "pending" || row.status === "confirmed") {
-      return { status: 200, data: { ok: true, reservationId: row.id, humanNumber: row.human_number, status: row.status } };
-    }
-    if (row.status !== "email_verification_pending") {
-      return { status: 400, data: { error: row.status === "expired" ? "Link potwierdzający wygasł." : "Ta rezerwacja została już przetworzona." } };
-    }
-    if (row.email_verification_expires_at && Number(row.email_verification_expires_at) < nowMs()) {
-      await notifyEmailVerificationExpiredClient(env, request, "restaurant", row);
-      await env.DB.prepare(
-        "UPDATE restaurant_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, email_verification_expires_at=NULL, updated_at=? WHERE id=?"
-      )
-        .bind(nowMs(), row.id)
-        .run();
-      return { status: 400, data: { error: "Link potwierdzający wygasł." } };
-    }
-    try {
-      const existingAssigned = parseJson(row.assigned_table_ids_json, []).filter(Boolean);
-      const assigned =
-        existingAssigned.length >= Number(row.tables_count)
-          ? existingAssigned.slice(0, Number(row.tables_count))
-          : await restaurantAvailableTableIds(
-              env,
-              Number(row.start_ms),
-              Number(row.end_ms),
-              Number(row.tables_count),
-              row.id
-            );
-      if (assigned.length < Number(row.tables_count)) {
-        return { status: 409, data: { error: "Brak wolnych stolików w tym terminie." } };
-      }
-      await env.DB.prepare(
-        "UPDATE restaurant_reservations SET status='pending', assigned_table_ids_json=?, admin_action_token_hash=NULL, admin_action_expires_at=NULL, email_verification_expires_at=NULL, pending_expires_at=?, updated_at=? WHERE id=?"
-      )
-        .bind(toJson(assigned), nowMs() + RESTAURANT_PENDING_MS, nowMs(), row.id)
-        .run();
-      try {
-        const pendingRow = await getRestaurantReservationRow(env, row.id);
-        await notifyPendingAdmins(env, request, "restaurant", pendingRow);
-      } catch (mailError) {
-        console.error("Restaurant pending mail error:", mailError);
-      }
-      return { status: 200, data: { ok: true, reservationId: row.id, humanNumber: row.human_number } };
-    } catch (error) {
-      return { status: 409, data: { error: error.message || "Konflikt terminów." } };
-    }
   }
   return null;
 }
@@ -5285,141 +5404,6 @@ async function handleHotelAdmin(env, op, request) {
 }
 
 async function handleRestaurantAdmin(env, op, request) {
-  if (op === "admin-settings" && request.method === "GET") {
-    return { status: 200, data: { settings: await loadRestaurantSettings(env) } };
-  }
-  if (op === "admin-settings-save" && request.method === "PUT") {
-    const body = await readBody(request);
-    const tableCount = Math.max(1, toInt(body.tableCount, 5));
-    const now = nowMs();
-    await env.DB.prepare(
-      "UPDATE restaurant_settings SET table_count=?, max_guests_per_table=?, reservation_open_time=?, reservation_close_time=?, time_slot_minutes=?, updated_at=? WHERE id='default'"
-    )
-      .bind(
-        tableCount,
-        Math.max(1, toInt(body.maxGuestsPerTable, 4)),
-        cleanString(body.reservationOpenTime, 5) || "12:00",
-        cleanString(body.reservationCloseTime, 5) || "22:00",
-        [15, 30, 60].includes(toInt(body.timeSlotMinutes, 30)) ? toInt(body.timeSlotMinutes, 30) : 30,
-        now
-      )
-      .run();
-    const existing = await restaurantTables(env, true);
-    const existingByNumber = new Map(existing.map((t) => [t.number, t]));
-    for (let n = 1; n <= tableCount; n += 1) {
-      if (!existingByNumber.has(n)) {
-        const id = `table-${n}`;
-        await env.DB.prepare(
-          "INSERT INTO restaurant_tables (id, number, zone, active, hidden, description, sort_order, updated_at) VALUES (?, ?, 'sala', 1, 0, '', ?, ?)"
-        )
-          .bind(id, n, n, now)
-          .run();
-      }
-    }
-    return { status: 200, data: { ok: true, warnings: [] } };
-  }
-  if (op === "admin-tables-list" && request.method === "GET") {
-    const out = await env.DB.prepare(
-      "SELECT id, number, zone, active, hidden, description, sort_order AS sortOrder FROM restaurant_tables ORDER BY sort_order ASC, number ASC"
-    ).all();
-    const tables = (out.results || []).map((t) => ({
-      id: t.id,
-      number: Number(t.number || 0),
-      zone: t.zone || "sala",
-      active: Boolean(t.active),
-      hidden: Boolean(t.hidden),
-      description: t.description || "",
-      sortOrder: Number(t.sortOrder || 0),
-    }));
-    return { status: 200, data: { tables } };
-  }
-  if (op === "admin-table-upsert" && request.method === "PUT") {
-    const body = await readBody(request);
-    const id = cleanString(body.id, 80);
-    await env.DB.prepare(
-      `INSERT INTO restaurant_tables (id, number, zone, active, hidden, description, sort_order, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET
-         number=excluded.number, zone=excluded.zone, active=excluded.active, hidden=excluded.hidden,
-         description=excluded.description, sort_order=excluded.sort_order, updated_at=excluded.updated_at`
-    )
-      .bind(
-        id,
-        Math.max(1, toInt(body.number, 1)),
-        cleanString(body.zone, 40) || "sala",
-        body.active === false ? 0 : 1,
-        body.hidden ? 1 : 0,
-        cleanString(body.description, 1000),
-        toInt(body.sortOrder, 0),
-        nowMs()
-      )
-      .run();
-    return { status: 200, data: { ok: true } };
-  }
-  if (op === "admin-table-create" && request.method === "POST") {
-    const now = nowMs();
-    const maxNumRow = await env.DB.prepare("SELECT COALESCE(MAX(number), 0) AS m FROM restaurant_tables").first();
-    const maxSortRow = await env.DB.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM restaurant_tables").first();
-    const nextNumber = Number(maxNumRow?.m || 0) + 1;
-    const nextSortOrder = Number(maxSortRow?.m || 0) + 1;
-    const suffix =
-      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `${now}-${Math.random().toString(36).slice(2, 10)}`;
-    const id = `table-${nextNumber}-${suffix}`;
-    try {
-      await env.DB.prepare(
-        "INSERT INTO restaurant_tables (id, number, zone, active, hidden, description, sort_order, updated_at) VALUES (?, ?, 'sala', 1, 0, '', ?, ?)"
-      )
-        .bind(id, nextNumber, nextSortOrder, now)
-        .run();
-    } catch (error) {
-      const msg = String(error?.message || "nie udało się dodać stolika.");
-      return {
-        status: 409,
-        data: {
-          error: msg.includes("UNIQUE") || msg.includes("constraint") ? "Konflikt zapisu stolika — odśwież listę i spróbuj ponownie." : msg,
-        },
-      };
-    }
-    const countRow = await env.DB.prepare("SELECT COUNT(*) AS c FROM restaurant_tables").first();
-    const tableCount = Math.max(1, Number(countRow?.c || 0));
-    await env.DB.prepare("UPDATE restaurant_settings SET table_count=?, updated_at=? WHERE id='default'")
-      .bind(tableCount, now)
-      .run();
-    return { status: 200, data: { ok: true, table: { id, number: nextNumber } } };
-  }
-  if (op === "admin-table-delete" && ["DELETE", "POST"].includes(request.method)) {
-    const url = new URL(request.url);
-    const body = await readBody(request).catch(() => ({}));
-    const id = cleanString(body.id || url.searchParams.get("id"), 80);
-    if (!id) return { status: 400, data: { error: "Brak id stolika." } };
-    const target = await env.DB.prepare("SELECT id FROM restaurant_tables WHERE id=?").bind(id).first();
-    if (!target) return { status: 404, data: { error: "Stolik nie istnieje." } };
-    const now = nowMs();
-    const futureRowsRes = await env.DB.prepare(
-      `SELECT assigned_table_ids_json AS assignedTableIdsJson
-       FROM restaurant_reservations
-       WHERE status IN ('email_verification_pending','pending','confirmed','manual_block')
-         AND (end_ms + (COALESCE(cleanup_buffer_minutes, ${RESTAURANT_CLEANUP_BUFFER_MINUTES}) * 60000)) > ?`
-    )
-      .bind(now)
-      .all();
-    const hasFutureAssignment = (futureRowsRes.results || []).some((row) => {
-      const ids = parseJson(row.assignedTableIdsJson, []);
-      return Array.isArray(ids) && ids.includes(id);
-    });
-    if (hasFutureAssignment) {
-      return { status: 409, data: { error: "Nie mozna usunac stolika z przyszla rezerwacja lub blokada." } };
-    }
-    await env.DB.prepare("DELETE FROM restaurant_tables WHERE id=?").bind(id).run();
-    const countRow = await env.DB.prepare("SELECT COUNT(*) AS c FROM restaurant_tables").first();
-    const tableCount = Math.max(1, Number(countRow?.c || 0));
-    await env.DB.prepare("UPDATE restaurant_settings SET table_count=?, updated_at=? WHERE id='default'")
-      .bind(tableCount, now)
-      .run();
-    return { status: 200, data: { ok: true } };
-  }
   if (op === "admin-reservations-list" && request.method === "GET") {
     const url = new URL(request.url);
     const status = cleanString(url.searchParams.get("status"), 40);
@@ -5431,9 +5415,14 @@ async function handleRestaurantAdmin(env, op, request) {
     const row = await env.DB.prepare("SELECT * FROM restaurant_reservations WHERE id=?")
       .bind(id)
       .first();
-    if (!row) return { status: 404, data: { error: "Brak rezerwacji." } };
-    const tables = await restaurantTables(env, true);
-    const map = new Map(tables.map((t) => [t.id, t]));
+    if (!row) return { status: 404, data: { error: "Brak wpisu." } };
+    if (Number(row.catering_delivery) !== 1) {
+      return {
+        status: 410,
+        data: { error: "Ten wpis dotyczy wyłączonej funkcji stolików. Widoczne są tylko dostawy cateringu." },
+      };
+    }
+    const map = new Map();
     const recRow = row.recipient_id ? await getCateringRecipientRow(env, row.recipient_id) : null;
     return { status: 200, data: { reservation: mapRestaurantReservation(row, map, recRow) } };
   }
@@ -5478,8 +5467,11 @@ async function handleRestaurantAdmin(env, op, request) {
       const recipientId = cleanString(body.recipientId, 80);
       if (!recipientId) return { status: 400, data: { error: "Wybierz odbiorcę." } };
       const startTime = cleanString(body.startTime, 5);
-      const durationHours = 1;
+      const durationHours = Number(body.durationHours);
       if (!isHm(startTime)) return { status: 400, data: { error: "Nieprawidłowa godzina." } };
+      if (!Number.isFinite(durationHours) || durationHours <= 0) {
+        return { status: 400, data: { error: "Nieprawidłowy czas trwania." } };
+      }
       const repeatModeRaw = cleanString(body.repeatMode, 24).toLowerCase();
       if (
         repeatModeRaw &&
@@ -5505,6 +5497,43 @@ async function handleRestaurantAdmin(env, op, request) {
       const description = cleanString(body.description, 2000);
       const adminNote = cleanString(body.adminNote, 2000);
       const status = ["pending", "confirmed"].includes(cleanString(body.status, 20)) ? body.status : "confirmed";
+      const repeatIndefinite = Boolean(body.repeatIndefinite);
+      const recRowEarly = await getCateringRecipientRow(env, recipientId);
+      if (!recRowEarly) return { status: 400, data: { error: "Nie znaleziono odbiorcy." } };
+      const firstDate = dates[0];
+      if (!firstDate || !isYmd(firstDate)) {
+        return { status: 400, data: { error: "Brak terminów do utworzenia." } };
+      }
+      const firstStartMs = ymdHmToMs(firstDate, startTime);
+      const humanYear = yearFromMsWarsaw(firstStartMs);
+      const humanSlug = await allocateCateringHumanSlug(env, recRowEarly.display_name, humanYear);
+      let seriesId = null;
+      const seriesNow = nowMs();
+      if (repeatIndefinite && repeatModeRaw && repeatModeRaw !== "none") {
+        seriesId = crypto.randomUUID();
+        await env.DB.prepare(
+          `INSERT INTO catering_repeat_series (
+            id, recipient_id, repeat_mode, repeat_weekdays_json, start_time, duration_hours,
+            customer_note, admin_note, human_slug, human_year, repeat_indefinite, repeat_until_ymd,
+            status, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, '', 'active', ?, ?)`
+        )
+          .bind(
+            seriesId,
+            recipientId,
+            repeatModeRaw,
+            toJson(Array.isArray(body.repeatWeekdays) ? body.repeatWeekdays : []),
+            startTime,
+            durationHours,
+            description,
+            adminNote,
+            humanSlug,
+            humanYear,
+            seriesNow,
+            seriesNow
+          )
+          .run();
+      }
       const createdIds = [];
       for (const reservationDate of dates) {
         if (!isYmd(reservationDate)) continue;
@@ -5532,13 +5561,22 @@ async function handleRestaurantAdmin(env, op, request) {
             withConfirmationToken: false,
             skipAvailabilityCheck: true,
             skipPublicBookingRules: true,
+            fixedHumanSlug: humanSlug,
+            fixedHumanYear: humanYear,
+            cateringSeriesId: seriesId,
           }
         );
         createdIds.push(out.id);
       }
+      const sendManualCreatedEmail = body.sendManualCreatedEmail !== false;
       const recRow = await getCateringRecipientRow(env, recipientId);
       const recipientEmail = cleanString(recRow?.email, 180).toLowerCase();
-      if (createdIds.length && recRow && recipientEmail.includes("@")) {
+      if (
+        sendManualCreatedEmail &&
+        createdIds.length &&
+        recRow &&
+        recipientEmail.includes("@")
+      ) {
         try {
           const firstId = createdIds[0];
           const resRow = await getRestaurantReservationRow(env, firstId);
@@ -5548,11 +5586,13 @@ async function handleRestaurantAdmin(env, op, request) {
               startTime,
               repeatMode: body.repeatMode,
               repeatWeekdays: body.repeatWeekdays,
+              repeatIndefinite,
+              repeatUntil: repeatIndefinite ? "" : cleanString(body.repeatUntil, 10),
               description,
             });
             await sendTemplatedBookingMail(env, request, {
               service: "restaurant",
-              eventKey: "catering_manual_created_client",
+              eventKey: "confirmed_client",
               row: resRow,
               to: recipientEmail,
               extraVars,
@@ -5567,90 +5607,80 @@ async function handleRestaurantAdmin(env, op, request) {
       return { status: 400, data: { error: error.message || "Błąd tworzenia dostaw." } };
     }
   }
-  if (op === "admin-reservation-create" && request.method === "POST") {
+  if (op === "admin-catering-delivery-notify-confirmed" && request.method === "POST") {
     const body = await readBody(request);
-    try {
-      const status = ["pending", "confirmed", "manual_block"].includes(body.status) ? body.status : "confirmed";
-      let assigned = [];
-      if (status === "manual_block") {
-        assigned = Array.isArray(body.assignedTableIds)
-          ? body.assignedTableIds.map((value) => cleanString(value, 80)).filter(Boolean)
-          : [];
-      } else if (status !== "email_verification_pending") {
-        const chk = await assertRestaurantAvailability(env, body, null, { skipPublicBookingRules: true });
-        if (!chk.ok) return { status: 409, data: { error: "Brak wolnych stolików." } };
-        assigned = chk.availableIds;
+    const rawIds = Array.isArray(body.reservationIds) ? body.reservationIds : [];
+    const ids = rawIds.map((x) => cleanString(x, 80)).filter(Boolean);
+    if (!ids.length) {
+      return { status: 400, data: { error: "Brak identyfikatorów rezerwacji." } };
+    }
+    const rows = [];
+    for (const id of ids) {
+      const row = await getRestaurantReservationRow(env, id);
+      if (!row) {
+        return { status: 404, data: { error: "Nie znaleziono rezerwacji." } };
       }
-      const out = await createRestaurantReservation(env, body, {
-        status,
-        withConfirmationToken: false,
-        assignedTableIds: assigned,
-        skipAvailabilityCheck: status === "manual_block",
-        skipPublicBookingRules: status !== "manual_block",
-      });
-      return { status: 200, data: { ok: true, reservationId: out.id, humanNumber: out.humanNumber } };
-    } catch (error) {
-      return { status: 400, data: { error: error.message || "Błąd tworzenia." } };
+      if (Number(row.catering_delivery) !== 1) {
+        return { status: 400, data: { error: "Ta operacja dotyczy tylko dostaw cateringu." } };
+      }
+      rows.push(row);
     }
-  }
-  if (op === "admin-manual-block" && request.method === "POST") {
-    const body = await readBody(request);
-    const reservationDate = cleanString(body.reservationDate, 10);
-    const startTime = cleanString(body.startTime, 5);
-    const endTime = cleanString(body.endTime, 5);
-    if (!isYmd(reservationDate) || !isHm(startTime) || !isHm(endTime)) {
-      return { status: 400, data: { error: "Nieprawidłowe dane daty/godziny." } };
+    const recipientId0 = cleanString(rows[0].recipient_id, 80);
+    if (!rows.every((r) => cleanString(r.recipient_id, 80) === recipientId0)) {
+      return { status: 400, data: { error: "Rezerwacje muszą mieć tego samego odbiorcę." } };
     }
-    const startMs = ymdHmToMs(reservationDate, startTime);
-    const endMs = ymdHmToMs(reservationDate, endTime);
-    if (endMs <= startMs) return { status: 400, data: { error: "Godzina końca musi być późniejsza." } };
-    const tableIds = Array.isArray(body.tableIds) ? body.tableIds.map((x) => cleanString(x, 80)).filter(Boolean) : [];
-    if (!tableIds.length) return { status: 400, data: { error: "Podaj stoliki do blokady." } };
-    const durationHours = Math.max(0.5, (endMs - startMs) / 3600000);
-    const payload = {
-      reservationDate,
-      startTime,
-      durationHours,
-      tablesCount: tableIds.length,
-      guestsCount: 1,
-      joinTables: false,
-      fullName: "Blokada stolików",
-      email: "",
-      phonePrefix: "+48",
-      phoneNational: "000000000",
-      customerNote: cleanString(body.note, 2000),
-      adminNote: cleanString(body.note, 2000),
-    };
+    rows.sort((a, b) => Number(a.start_ms || 0) - Number(b.start_ms || 0));
+    const first = rows[0];
+    const email = cleanString(first.email, 180).toLowerCase();
+    if (!email.includes("@")) {
+      return { status: 400, data: { error: "Brak adresu e-mail odbiorcy." } };
+    }
+    const sortedYmds = rows
+      .map((r) => cleanString(r.reservation_date, 10))
+      .filter((x) => isYmd(x))
+      .sort();
+    const inferredMode = cateringInferRepeatModeFromSortedYmd(sortedYmds);
+    const metaRepeatMode =
+      cleanString(body.repeatMode, 24).toLowerCase() || inferredMode || (rows.length > 1 ? "" : "none");
+    const recRowNotify = await getCateringRecipientRow(env, recipientId0);
+    if (!recRowNotify) {
+      return { status: 400, data: { error: "Nie znaleziono odbiorcy." } };
+    }
+    const extraVarsNotify = buildCateringManualCreatedMailExtraVars(recRowNotify, {
+      dates: sortedYmds,
+      startTime: cleanString(first.start_time, 5),
+      repeatMode: metaRepeatMode,
+      repeatWeekdays: Array.isArray(body.repeatWeekdays) ? body.repeatWeekdays : [],
+      repeatIndefinite: Boolean(body.repeatIndefinite),
+      repeatUntil: cleanString(body.repeatUntil, 10),
+      description: cleanString(first.customer_note, 2000),
+    });
     try {
-      const out = await createRestaurantReservation(env, payload, {
-        status: "manual_block",
-        withConfirmationToken: false,
-        assignedTableIds: tableIds,
-        skipAvailabilityCheck: true,
+      await sendTemplatedBookingMail(env, request, {
+        service: "restaurant",
+        eventKey: "confirmed_client",
+        row: first,
+        to: email,
+        extraVars: extraVarsNotify,
       });
-      return { status: 200, data: { ok: true, reservationId: out.id } };
     } catch (error) {
-      return { status: 400, data: { error: error.message || "Błąd blokady." } };
+      console.error("Catering notify confirmed mail error:", error);
+      return { status: 500, data: { error: "Nie udało się wysłać wiadomości e-mail." } };
     }
+    return { status: 200, data: { ok: true } };
   }
   if (op === "admin-reservation-update" && request.method === "PATCH") {
     const body = await readBody(request);
     const id = cleanString(body.id, 80);
     const row = await getRestaurantReservationRow(env, id);
-    if (!row) return { status: 404, data: { error: "Brak rezerwacji." } };
-    const notifyClient = Boolean(body.notifyClient);
+    if (!row) return { status: 404, data: { error: "Brak wpisu." } };
+    if (Number(row.catering_delivery) !== 1) {
+      return { status: 410, data: { error: "Edycja dotyczy tylko dostaw cateringu." } };
+    }
     const fullEdit =
       body.reservationDate != null ||
       body.startTime != null ||
       body.durationHours != null ||
-      body.tablesCount != null ||
-      body.guestsCount != null ||
-      body.joinTables != null ||
-      body.placePreference != null ||
-      body.fullName != null ||
-      body.email != null ||
-      body.phonePrefix != null ||
-      body.phoneNational != null ||
       body.customerNote != null ||
       Object.prototype.hasOwnProperty.call(body, "recipientId");
     if (!fullEdit) {
@@ -5660,138 +5690,68 @@ async function handleRestaurantAdmin(env, op, request) {
       return { status: 200, data: { ok: true } };
     }
     try {
-      if (Number(row.catering_delivery) === 1) {
-        const reservationDate = cleanString(body.reservationDate ?? row.reservation_date, 10);
-        const startTime = cleanString(body.startTime ?? row.start_time, 5);
-        const durationHours = Number(body.durationHours ?? row.duration_hours);
-        if (!isYmd(reservationDate) || !isHm(startTime)) {
-          return { status: 400, data: { error: "Nieprawidłowa data lub godzina." } };
-        }
-        if (!Number.isFinite(durationHours) || durationHours <= 0) {
-          return { status: 400, data: { error: "Nieprawidłowy czas trwania." } };
-        }
-        const startMs = ymdHmToMs(reservationDate, startTime);
-        const endMs = startMs + durationHours * 3600000;
-        const customerNote = cleanString(body.customerNote ?? row.customer_note, 2000);
-        const adminNote = cleanString(body.adminNote ?? row.admin_note, 2000);
-        let nextRecipientId = cleanString(row.recipient_id, 80);
-        if (body.recipientId != null && String(body.recipientId).trim() !== "") {
-          nextRecipientId = cleanString(body.recipientId, 80);
-        }
-        if (!nextRecipientId) {
-          return { status: 400, data: { error: "Wybierz odbiorcę." } };
-        }
-        let fullName = row.full_name;
-        let email = row.email;
-        let phonePrefix = row.phone_prefix;
-        let phoneNational = row.phone_national;
-        if (nextRecipientId) {
-          const rec = await getCateringRecipientRow(env, nextRecipientId);
-          if (!rec) return { status: 400, data: { error: "Nie znaleziono odbiorcy." } };
-          fullName = rec.display_name;
-          email = rec.email;
-          phonePrefix = rec.phone_prefix;
-          phoneNational = rec.phone_national;
-        }
-        const phone = normalizePhone(phonePrefix, phoneNational);
-        const newHumanYear = yearFromMsWarsaw(startMs);
-        const newSlug = await allocateCateringHumanSlug(env, fullName, newHumanYear, id);
-        await env.DB.prepare(
-          `UPDATE restaurant_reservations SET
+      const reservationDate = cleanString(body.reservationDate ?? row.reservation_date, 10);
+      const startTime = cleanString(body.startTime ?? row.start_time, 5);
+      const durationHours = Number(body.durationHours ?? row.duration_hours);
+      if (!isYmd(reservationDate) || !isHm(startTime)) {
+        return { status: 400, data: { error: "Nieprawidłowa data lub godzina." } };
+      }
+      if (!Number.isFinite(durationHours) || durationHours <= 0) {
+        return { status: 400, data: { error: "Nieprawidłowy czas trwania." } };
+      }
+      const startMs = ymdHmToMs(reservationDate, startTime);
+      const endMs = startMs + durationHours * 3600000;
+      const customerNote = cleanString(body.customerNote ?? row.customer_note, 2000);
+      const adminNote = cleanString(body.adminNote ?? row.admin_note, 2000);
+      let nextRecipientId = cleanString(row.recipient_id, 80);
+      if (body.recipientId != null && String(body.recipientId).trim() !== "") {
+        nextRecipientId = cleanString(body.recipientId, 80);
+      }
+      if (!nextRecipientId) {
+        return { status: 400, data: { error: "Wybierz odbiorcę." } };
+      }
+      let fullName = row.full_name;
+      let email = row.email;
+      let phonePrefix = row.phone_prefix;
+      let phoneNational = row.phone_national;
+      const rec = await getCateringRecipientRow(env, nextRecipientId);
+      if (!rec) return { status: 400, data: { error: "Nie znaleziono odbiorcy." } };
+      fullName = rec.display_name;
+      email = rec.email;
+      phonePrefix = rec.phone_prefix;
+      phoneNational = rec.phone_national;
+      const phone = normalizePhone(phonePrefix, phoneNational);
+      const newHumanYear = yearFromMsWarsaw(startMs);
+      const newSlug = await allocateCateringHumanSlug(env, fullName, newHumanYear, id);
+      await env.DB.prepare(
+        `UPDATE restaurant_reservations SET
             recipient_id=?, human_year=?, human_slug=?, human_number=0,
             full_name=?, email=?, phone_prefix=?, phone_national=?, phone_e164=?,
             reservation_date=?, start_time=?, duration_hours=?, start_ms=?, end_ms=?,
             customer_note=?, admin_note=?, assigned_table_ids_json='[]', tables_count=1, guests_count=1,
             join_tables=0, place_preference='no_preference', updated_at=?
            WHERE id=?`
-        )
-          .bind(
-            nextRecipientId || null,
-            newHumanYear,
-            newSlug,
-            fullName,
-            String(email || "").toLowerCase(),
-            phone.prefix,
-            phone.national,
-            phone.e164,
-            reservationDate,
-            startTime,
-            durationHours,
-            startMs,
-            endMs,
-            customerNote,
-            adminNote,
-            nowMs(),
-            id
-          )
-          .run();
-        return { status: 200, data: { ok: true } };
-      }
-      const payload = {
-        reservationDate: cleanString(body.reservationDate ?? row.reservation_date, 10),
-        startTime: cleanString(body.startTime ?? row.start_time, 5),
-        durationHours: Number(body.durationHours ?? row.duration_hours),
-        tablesCount: Math.max(1, toInt(body.tablesCount ?? row.tables_count, 1)),
-        guestsCount: Math.max(1, toInt(body.guestsCount ?? row.guests_count, 1)),
-        joinTables: body.joinTables != null ? Boolean(body.joinTables) : Boolean(row.join_tables),
-        placePreference:
-          body.placePreference != null
-            ? normalizeRestaurantPlacePreference(body.placePreference)
-            : normalizeRestaurantPlacePreference(row.place_preference),
-        fullName: cleanString(body.fullName ?? row.full_name, 120),
-        email: cleanString(body.email ?? row.email, 180),
-        phonePrefix: cleanString(body.phonePrefix ?? row.phone_prefix, 8),
-        phoneNational: cleanString(body.phoneNational ?? row.phone_national, 32),
-        customerNote: cleanString(body.customerNote ?? row.customer_note, 2000),
-        adminNote: cleanString(body.adminNote ?? row.admin_note, 2000),
-      };
-      const chk = await assertRestaurantAvailability(env, payload, id, { skipPublicBookingRules: true });
-      if (!chk.ok) return { status: 409, data: { error: "Brak wolnych stolików w wybranym terminie." } };
-      const assigned = chk.availableIds;
-      const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
-      await env.DB.prepare(
-        `UPDATE restaurant_reservations SET
-          full_name=?, email=?, phone_prefix=?, phone_national=?, phone_e164=?,
-          reservation_date=?, start_time=?, duration_hours=?, start_ms=?, end_ms=?,
-          tables_count=?, guests_count=?, join_tables=?, place_preference=?,
-          assigned_table_ids_json=?, customer_note=?, admin_note=?, updated_at=?
-         WHERE id=?`
       )
         .bind(
-          payload.fullName,
-          payload.email.toLowerCase(),
+          nextRecipientId || null,
+          newHumanYear,
+          newSlug,
+          fullName,
+          String(email || "").toLowerCase(),
           phone.prefix,
           phone.national,
           phone.e164,
-          chk.reservationDate,
-          chk.startTime,
-          chk.durationHours,
-          chk.startMs,
-          chk.endMs,
-          chk.tablesCount,
-          payload.guestsCount,
-          payload.joinTables ? 1 : 0,
-          payload.placePreference,
-          toJson(assigned),
-          payload.customerNote,
-          payload.adminNote,
+          reservationDate,
+          startTime,
+          durationHours,
+          startMs,
+          endMs,
+          customerNote,
+          adminNote,
           nowMs(),
           id
         )
         .run();
-      if (notifyClient) {
-        try {
-          const updated = await getRestaurantReservationRow(env, id);
-          await sendTemplatedBookingMail(env, request, {
-            service: "restaurant",
-            eventKey: "changed_client",
-            row: updated,
-            to: updated?.email,
-          });
-        } catch (error) {
-          console.error("Restaurant changed mail error:", error);
-        }
-      }
       return { status: 200, data: { ok: true } };
     } catch (error) {
       return { status: 400, data: { error: error.message || "Błąd zapisu." } };
@@ -5800,6 +5760,17 @@ async function handleRestaurantAdmin(env, op, request) {
   if (op === "admin-reservation-confirm" && request.method === "POST") {
     const body = await readBody(request);
     const id = cleanString(body.id, 80);
+    const existingConfirm = await getRestaurantReservationRow(env, id);
+    if (!existingConfirm) return { status: 404, data: { error: "Brak wpisu." } };
+    if (Number(existingConfirm.catering_delivery) !== 1) {
+      return { status: 410, data: { error: "Operacja dotyczy tylko dostaw cateringu." } };
+    }
+    let confirmExtraVars = {};
+    try {
+      confirmExtraVars = await buildCateringAcceptedMailExtraVarsFromReservation(env, existingConfirm);
+    } catch (metaErr) {
+      console.error("Catering confirm mail extra vars error:", metaErr);
+    }
     await env.DB.prepare(
       "UPDATE restaurant_reservations SET status='confirmed', pending_expires_at=NULL, admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE id=?"
     )
@@ -5812,6 +5783,7 @@ async function handleRestaurantAdmin(env, op, request) {
         eventKey: "confirmed_client",
         row,
         to: row?.email,
+        extraVars: confirmExtraVars,
       });
     } catch (error) {
       console.error("Restaurant confirm mail error:", error);
@@ -5823,12 +5795,15 @@ async function handleRestaurantAdmin(env, op, request) {
     const id = cleanString(body.id, 80);
     const cancelReason = cleanString(body.cancelReason, 2000);
     const existing = await getRestaurantReservationRow(env, id);
-    if (!existing) return { status: 404, data: { error: "Brak rezerwacji." } };
-    if (existing.status !== "manual_block" && Number(existing.end_ms || 0) <= nowMs()) {
-      return { status: 400, data: { error: "Nie można odwołać rezerwacji, która już minęła." } };
+    if (!existing) return { status: 404, data: { error: "Brak wpisu." } };
+    if (Number(existing.catering_delivery) !== 1) {
+      return { status: 410, data: { error: "Operacja dotyczy tylko dostaw cateringu." } };
     }
-    if (existing.status !== "manual_block" && !cancelReason) {
-      return { status: 400, data: { error: "Podaj powód anulowania rezerwacji." } };
+    if (Number(existing.end_ms || 0) <= nowMs()) {
+      return { status: 400, data: { error: "Nie można anulować dostawy, która już minęła." } };
+    }
+    if (!cancelReason) {
+      return { status: 400, data: { error: "Podaj powód anulowania dostawy." } };
     }
     await env.DB.prepare(
       "UPDATE restaurant_reservations SET status='cancelled', pending_expires_at=NULL, admin_action_token_hash=NULL, admin_action_expires_at=NULL, updated_at=? WHERE id=?"
@@ -6142,18 +6117,14 @@ export async function handleD1BookingApi({ service, op, request, env, isAdmin, v
   await ensureSchema(env);
   await expireReservations(env);
   try {
-    if (service === "restaurant") {
-      return {
-        status: 410,
-        data: { error: "Rezerwacje cateringu są wyłączone." },
-      };
-    }
     if (isAdmin) {
       if (service === "hotel") return await handleHotelAdmin(env, op, request);
+      if (service === "restaurant") return await handleRestaurantAdmin(env, op, request);
       if (service === "hall") return await handleHallAdmin(env, op, request);
       return null;
     }
     if (service === "hotel") return await handleHotelPublic(env, op, request, verifyTurnstileToken);
+    if (service === "restaurant") return await handleRestaurantPublic(env, op, request, verifyTurnstileToken);
     if (service === "hall") return await handleHallPublic(env, op, request, verifyTurnstileToken);
     return null;
   } catch (error) {
@@ -6166,5 +6137,12 @@ export async function handleD1BookingApi({ service, op, request, env, isAdmin, v
 
 export async function runBookingMaintenance(env) {
   await ensureSchema(env);
-  return expireReservations(env);
+  const result = await expireReservations(env);
+  let cateringSeries = { extendedOccurrences: 0 };
+  try {
+    cateringSeries = await extendIndefiniteCateringSeries(env);
+  } catch (error) {
+    console.error("extendIndefiniteCateringSeries failed:", error);
+  }
+  return { ...result, cateringSeries };
 }

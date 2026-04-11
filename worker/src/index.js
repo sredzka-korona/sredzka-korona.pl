@@ -1304,6 +1304,11 @@ function unifyPublicGastronomyMenu(content) {
 
 function sanitizeContent(content) {
   const rawBooking = content.booking || {};
+  const restaurantPauseRanges = normalizeBookingPauseRanges(
+    rawBooking.restaurantPauseRanges,
+    rawBooking.restaurantPauseFrom,
+    rawBooking.restaurantPauseTo
+  );
   const hotelPauseRanges = normalizeBookingPauseRanges(
     rawBooking.hotelPauseRanges,
     rawBooking.hotelPauseFrom,
@@ -1314,6 +1319,7 @@ function sanitizeContent(content) {
     rawBooking.eventsPauseFrom,
     rawBooking.eventsPauseTo
   );
+  const firstRestaurantPause = restaurantPauseRanges[0] || { from: "", to: "" };
   const firstHotelPause = hotelPauseRanges[0] || { from: "", to: "" };
   const firstEventsPause = eventsPauseRanges[0] || { from: "", to: "" };
 
@@ -1360,12 +1366,11 @@ function sanitizeContent(content) {
     booking: {
       ...DEFAULT_CONTENT.booking,
       ...rawBooking,
-      restaurant: false,
-      restaurantPauseRanges: [],
-      restaurantPauseFrom: "",
-      restaurantPauseTo: "",
+      restaurantPauseRanges,
       hotelPauseRanges,
       eventsPauseRanges,
+      restaurantPauseFrom: firstRestaurantPause.from,
+      restaurantPauseTo: firstRestaurantPause.to,
       hotelPauseFrom: firstHotelPause.from,
       hotelPauseTo: firstHotelPause.to,
       eventsPauseFrom: firstEventsPause.from,
