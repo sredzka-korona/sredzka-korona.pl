@@ -1612,19 +1612,15 @@
       yearSel.appendChild(opt);
     }
 
-    const monthField = document.createElement("label");
+    monthSel.setAttribute("aria-label", "Miesiąc");
+    const monthField = document.createElement("div");
     monthField.className = "schedule-calendar-field schedule-calendar-field--month";
-    const monthLegend = document.createElement("span");
-    monthLegend.className = "schedule-calendar-field-label";
-    monthLegend.textContent = "Miesiąc";
-    monthField.append(monthLegend, monthSel);
+    monthField.append(monthSel);
 
-    const yearField = document.createElement("label");
+    yearSel.setAttribute("aria-label", "Rok");
+    const yearField = document.createElement("div");
     yearField.className = "schedule-calendar-field schedule-calendar-field--year";
-    const yearLegend = document.createElement("span");
-    yearLegend.className = "schedule-calendar-field-label";
-    yearLegend.textContent = "Rok";
-    yearField.append(yearLegend, yearSel);
+    yearField.append(yearSel);
 
     mountEl.append(monthField, yearField);
 
