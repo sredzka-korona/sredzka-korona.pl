@@ -3,6 +3,7 @@
  */
 (function () {
   const config = window.SREDZKA_CONFIG || {};
+  const CATERING_CREATE_DEFAULT_DURATION_HOURS = 1;
 
   function restaurantApiBase() {
     if (config.apiBase) {
@@ -147,8 +148,8 @@
     restaurant_pending_admin: "Obsługa — nowe zgłoszenie dostawy cateringu.",
     rest_pending_admin: "To samo — wariant skrócony.",
     restaurant_confirmed_client:
-      "Jedyny mail do odbiorcy o przyjęciu rezerwacji: pierwszy termin, godzina, cykl, dane odbiorcy (zmienne catering*).",
-    rest_confirmed_client: "To samo — wariant skrócony klucza szablonu.",
+      "Mail do odbiorcy po utworzeniu dostawy / potwierdzeniu — ten sam szablon co przy wysyłce z grafiku (termin, cykl, odbiorca: {{cateringWhenHtml}} itd.).",
+    rest_confirmed_client: "Kopia techniczna — synchronizowana z powyższym przy zapisie; w wysyłce używany jest klucz restaurant_confirmed_client.",
     restaurant_cancelled_client: "Odbiorca — anulowana dostawa (opcjonalnie; osobny szablon).",
     rest_cancelled_client: "To samo — wariant skrócony.",
     restaurant_changed_client: "(Nieużywane — edycja nie wysyła maila do odbiorcy.)",
@@ -156,8 +157,6 @@
     restaurant_expired_pending_client: "Odbiorca — wygasłe oczekiwanie na decyzję.",
     restaurant_expired_pending_admin: "Obsługa — automatyczne wygaśnięcie zgłoszenia.",
     restaurant_expired_email_client: "Odbiorca — niepotwierdzony e-mail w 2 godziny.",
-    catering_manual_created_client:
-      "(Przestarzały klucz — wysyłka używa szablonu restaurant_confirmed_client / confirmed_client.)",
   };
 
   const REST_TEMPLATE_PREVIEW_VARS = Object.freeze({
@@ -175,7 +174,7 @@
     guestsCount: "6",
     customerNote: "Zestaw lunchowy dla 12 osób, bez orzechów.",
     confirmationLink: "https://www.sredzkakorona.pl/restauracja/potwierdzenie?token=podglad",
-    restaurantName: "Catering Średzka Korona",
+    restaurantName: "Średzka Korona — Catering",
   });
 
   const REST_CATERING_TEMPLATE_PREVIEW_EXTRA = Object.freeze({
@@ -224,7 +223,6 @@
       expired_pending_client: "Wygasłe zgłoszenie cateringu",
       expired_pending_admin: "Catering — informacja dla obsługi",
       expired_email_client: "Wygasłe potwierdzenie — catering",
-      catering_manual_created_client: "(Szablon zbędny — używany jest confirmed_client)",
     };
     return map[k] || "Wiadomość — catering";
   }
@@ -789,7 +787,6 @@
               ${cateringRecipientOptionsMarkup("")}
               <label>Data<input name="reservationDate" type="date" required /></label>
               <label>Godzina dostawy<input name="startTime" type="time" min="00:00" max="23:59" step="60" required /></label>
-              <label>Czas trwania (h)<input name="durationHours" type="number" step="0.5" min="0.5" value="1" required /></label>
               <label>Opis / zamówienie<textarea name="description" rows="3"></textarea></label>
               <label>Notatka wewn.<textarea name="adminNote" rows="2"></textarea></label>
               <label class="admin-check-line"><input type="checkbox" name="asPending" /> <span>Oczekuje na akceptację</span></label>
@@ -817,18 +814,13 @@
           return;
         }
         try {
-          const durationHours = Number(fd.get("durationHours") || 0);
-          if (!Number.isFinite(durationHours) || durationHours <= 0) {
-            alert("Podaj poprawny czas trwania dostawy (w godzinach).");
-            return;
-          }
           await restaurantApi("admin-catering-delivery-create", {
             method: "POST",
             body: {
               recipientId,
               reservationDate: fd.get("reservationDate"),
               startTime: fd.get("startTime"),
-              durationHours,
+              durationHours: CATERING_CREATE_DEFAULT_DURATION_HOURS,
               description: String(fd.get("description") || "").trim(),
               adminNote: String(fd.get("adminNote") || "").trim(),
               repeatMode: "none",

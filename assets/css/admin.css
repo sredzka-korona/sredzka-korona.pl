@@ -2261,6 +2261,53 @@ body.admin-modal-open {
   gap: 1rem;
 }
 
+.schedule-registry-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1.25rem;
+  align-items: center;
+}
+
+.schedule-registry-search {
+  width: 100%;
+  min-width: 0;
+}
+
+.schedule-registry-search-label {
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.schedule-registry-search-label-text {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+
+.schedule-registry-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid rgba(200, 170, 120, 0.34);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.schedule-registry-search-input::placeholder {
+  color: rgba(68, 50, 36, 0.45);
+}
+
+.schedule-registry-search-input:focus {
+  outline: 2px solid rgba(98, 120, 184, 0.35);
+  outline-offset: 1px;
+}
+
 .schedule-registry-columns {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

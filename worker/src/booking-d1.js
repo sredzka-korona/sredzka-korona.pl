@@ -2927,6 +2927,7 @@ function mapRestaurantReservation(row, tableMap, recipientRow = null) {
     cateringDelivery: Boolean(Number(row.catering_delivery)),
     recipientId: row.recipient_id || null,
     recipient,
+    cateringSeriesId: cleanString(row.catering_series_id, 80),
   };
 }
 
@@ -3694,7 +3695,7 @@ ${infoCard("Szczegóły", [
 ])}`,
     },
     restaurant_confirmed_client: {
-      subject: "Przyjęcie rezerwacji dostawy cateringu ({{reservationNumber}})",
+      subject: "{{restaurantName}} — potwierdzenie dostawy cateringu ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
 <p>potwierdzamy <strong>przyjęcie rezerwacji dostawy cateringu</strong> w <strong>{{restaurantName}}</strong>.</p>
 <p>W treści poniżej: pierwszy termin i godzina dostawy, cykl powtarzania (jeśli dotyczy), dane odbiorcy oraz ewentualny opis zamówienia.</p>
@@ -3761,19 +3762,6 @@ ${infoCard("Szczegóły", [
   ["Godzina", "{{timeFrom}} — {{timeTo}}"],
 ])}
 ${noteCard("Jeśli nadal chcesz złożyć zgłoszenie, skontaktuj się z obsługą lub prześlij formularz ponownie.")}`,
-    },
-    catering_manual_created_client: {
-      subject: "Przyjęcie rezerwacji dostawy cateringu ({{reservationNumber}})",
-      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>potwierdzamy <strong>przyjęcie rezerwacji dostawy cateringu</strong> w <strong>{{restaurantName}}</strong>.</p>
-<p>W treści poniżej: pierwszy termin i godzina dostawy, cykl powtarzania (jeśli dotyczy), dane odbiorcy oraz ewentualny opis zamówienia.</p>
-<p><strong>Numer w systemie:</strong> {{reservationNumber}}</p>
-{{cateringWhenHtml}}
-{{cateringCycleHtml}}
-{{cateringRecipientHtml}}
-{{cateringDescriptionHtml}}
-${noteCard("Szczegóły realizacji, płatność i logistyka — zgodnie z ustaleniami z obsługą cateringu.")}
-<p>Pozdrawiamy,<br>{{restaurantName}}</p>`,
     },
   };
   return {
@@ -3936,7 +3924,8 @@ const EVENT_TEMPLATE_KEYS = {
   restaurant: {
     confirm_email: ["restaurant_confirm_email", "rest_confirm_email"],
     pending_admin: ["restaurant_pending_admin", "rest_pending_admin"],
-    confirmed_client: ["restaurant_confirmed_client", "rest_confirmed_client"],
+    /** Jeden kanoniczny szablon — unikamy drugiego klucza z inną treścią i „wygranej” po updated_at. */
+    confirmed_client: ["restaurant_confirmed_client"],
     cancelled_client: ["restaurant_cancelled_client", "rest_cancelled_client"],
     changed_client: ["restaurant_changed_client", "rest_changed_client"],
   },
@@ -4183,6 +4172,15 @@ function restaurantDisplayName(env) {
   return cleanString(env.RESTAURANT_NAME, 140) || cleanString(env.HOTEL_NAME, 140) || "Średzka Korona — Restauracja";
 }
 
+/** Nazwa marki w mailach i szablonach dla dostaw cateringu (nie „Restauracja”). */
+function cateringDisplayName(env) {
+  const explicit = cleanString(env.CATERING_NAME, 140);
+  if (explicit) return explicit;
+  const hotel = cleanString(env.HOTEL_NAME, 140);
+  if (hotel) return `${hotel} — Catering`;
+  return "Średzka Korona — Catering";
+}
+
 function hallDisplayName(env) {
   return cleanString(env.VENUE_NAME, 140) || cleanString(env.HOTEL_NAME, 140) || "Średzka Korona";
 }
@@ -4368,6 +4366,7 @@ async function buildRestaurantMailVars(env, request, row, token = "") {
       return t ? `Stół ${t.number}${t.zone ? ` (${t.zone})` : ""}` : id;
     })
     .join(", ");
+  const isCateringDelivery = Number(row.catering_delivery) === 1;
   return {
     reservationId: row.id,
     reservationNumber: reservationNumberForRow(row, "restaurant"),
@@ -4388,7 +4387,7 @@ async function buildRestaurantMailVars(env, request, row, token = "") {
     adminNote: row.admin_note || "",
     decisionDeadline: formatDateTimeWarsaw(Number(row.pending_expires_at || 0)),
     confirmationLink: token ? buildConfirmationLink(env, request, "restaurant", token) : "",
-    restaurantName: restaurantDisplayName(env),
+    restaurantName: isCateringDelivery ? cateringDisplayName(env) : restaurantDisplayName(env),
   };
 }
 
@@ -4688,6 +4687,8 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
         ? vars.restaurantName || "Średzka Korona"
         : vars.venueName || "Średzka Korona";
   const reservationNo = cleanString(vars.reservationNumber, 120);
+  const footerServiceLabel =
+    service === "restaurant" && Number(row?.catering_delivery) === 1 ? "Catering" : serviceLabel(service);
   const email = buildBrandedEmail({
     subject,
     htmlFragment: html,
@@ -4695,7 +4696,7 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
     headerBrandLine: "Średzka Korona",
     headerContextLine: mailHeaderSecondLine(service, eventKey),
     headerNumberLine: reservationNo ? `nr ${reservationNo}` : "",
-    serviceLabel: serviceLabel(service),
+    serviceLabel: footerServiceLabel,
     siteUrl,
     serviceUrl: `${siteUrl}${serviceLandingPath(service)}`,
     preheader: (() => {
@@ -5482,10 +5483,18 @@ async function handleRestaurantAdmin(env, op, request) {
       const recipientId = cleanString(body.recipientId, 80);
       if (!recipientId) return { status: 400, data: { error: "Wybierz odbiorcę." } };
       const startTime = cleanString(body.startTime, 5);
-      const durationHours = Number(body.durationHours);
       if (!isHm(startTime)) return { status: 400, data: { error: "Nieprawidłowa godzina." } };
-      if (!Number.isFinite(durationHours) || durationHours <= 0) {
+      const durationRaw = body.durationHours;
+      const durationParsed = Number(durationRaw);
+      const durationMissing =
+        durationRaw === undefined || durationRaw === null || String(durationRaw).trim() === "";
+      let durationHours;
+      if (durationMissing) {
+        durationHours = 1;
+      } else if (!Number.isFinite(durationParsed) || durationParsed <= 0) {
         return { status: 400, data: { error: "Nieprawidłowy czas trwania." } };
+      } else {
+        durationHours = durationParsed;
       }
       const repeatModeRaw = cleanString(body.repeatMode, 24).toLowerCase();
       if (
@@ -5524,7 +5533,8 @@ async function handleRestaurantAdmin(env, op, request) {
       const humanSlug = await allocateCateringHumanSlug(env, recRowEarly.display_name, humanYear);
       let seriesId = null;
       const seriesNow = nowMs();
-      if (repeatIndefinite && repeatModeRaw && repeatModeRaw !== "none") {
+      const isRepeating = Boolean(repeatModeRaw && repeatModeRaw !== "none");
+      if (repeatIndefinite && isRepeating) {
         seriesId = crypto.randomUUID();
         await env.DB.prepare(
           `INSERT INTO catering_repeat_series (
@@ -5548,6 +5558,9 @@ async function handleRestaurantAdmin(env, op, request) {
             seriesNow
           )
           .run();
+      } else if (isRepeating || dates.length > 1) {
+        /** Wspólny id dla wszystkich terminów partii (spis rezerwacji pokazuje jeden wiersz). Bez wiersza w catering_repeat_series — cron tylko dla repeat_indefinite. */
+        seriesId = crypto.randomUUID();
       }
       const createdIds = [];
       for (const reservationDate of dates) {
@@ -5844,7 +5857,11 @@ async function handleRestaurantAdmin(env, op, request) {
   }
   if (op === "admin-mail-template-save" && request.method === "PUT") {
     const body = await readBody(request);
-    await saveTemplate(env, "restaurant", body.key, body.subject, body.bodyHtml, body.actionLabel);
+    const key = cleanString(body.key, 120);
+    await saveTemplate(env, "restaurant", key, body.subject, body.bodyHtml, body.actionLabel);
+    if (key === "restaurant_confirmed_client") {
+      await saveTemplate(env, "restaurant", "rest_confirmed_client", body.subject, body.bodyHtml, body.actionLabel);
+    }
     return { status: 200, data: { ok: true } };
   }
   return null;

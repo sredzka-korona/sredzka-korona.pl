@@ -580,6 +580,9 @@
       knownPendingKeys: null,
       watchBaselineReady: false,
       lastLoadedAt: 0,
+      registryShowPast: false,
+      registryShowCancelledExpired: false,
+      registrySearchQuery: "",
     },
   };
   (function warnApiBaseIfMisconfigured() {
@@ -2080,6 +2083,88 @@
       .toLowerCase() === "expired";
   }
 
+  /** Spis rezerwacji: domyślnie ukrywa przeszłe oraz anulowane/wygasłe; checkboxy w panelu rozszerzają widok. */
+  function scheduleRegistryItemMatchesFilters(item) {
+    if (!state.schedule.registryShowPast && scheduleIsPast(item)) return false;
+    if (
+      !state.schedule.registryShowCancelledExpired &&
+      (scheduleIsCancelled(item) || scheduleIsExpired(item))
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  function scheduleRegistryFilteredItems(items) {
+    return (Array.isArray(items) ? items : []).filter(scheduleRegistryItemMatchesFilters);
+  }
+
+  function scheduleRegistryDigitsOnly(value) {
+    return String(value || "").replace(/\D/g, "");
+  }
+
+  function scheduleRegistryItemSearchHaystack(item) {
+    const r = item?.raw || {};
+    const rec = r.recipient && typeof r.recipient === "object" ? r.recipient : null;
+    const parts = [
+      item?.humanNumberLabel,
+      item?.id,
+      r.humanNumber != null ? String(r.humanNumber) : "",
+      r.humanYear != null ? String(r.humanYear) : "",
+      r.humanSlug,
+      r.customerName,
+      r.fullName,
+      rec?.displayName,
+      rec?.contactFirstName,
+      rec?.contactLastName,
+      rec?.email,
+      rec?.phonePrefix,
+      rec?.phoneNational,
+      r.email,
+      r.phone,
+      r.phonePrefix,
+      r.phoneNational,
+      item?.title,
+      item?.subtitle,
+    ];
+    const text = normalizeComparableText(parts.filter(Boolean).join(" "));
+    const phoneDigits = scheduleRegistryDigitsOnly(
+      [r.phone, r.phonePrefix, r.phoneNational, rec?.phonePrefix, rec?.phoneNational].filter(Boolean).join("")
+    );
+    return { text, phoneDigits };
+  }
+
+  function scheduleRegistryMatchesSearch(item, queryRaw) {
+    const q = String(queryRaw || "").trim();
+    if (!q) return true;
+    const qNorm = normalizeComparableText(q);
+    const qDigits = scheduleRegistryDigitsOnly(q);
+    const { text, phoneDigits } = scheduleRegistryItemSearchHaystack(item);
+    if (qNorm && text.includes(qNorm)) return true;
+    if (qDigits.length >= 3 && phoneDigits.includes(qDigits)) return true;
+    return false;
+  }
+
+  function scheduleRegistryApplySearch(items, queryRaw) {
+    return (Array.isArray(items) ? items : []).filter((item) => scheduleRegistryMatchesSearch(item, queryRaw));
+  }
+
+  function scheduleRegistryVisibleItems() {
+    const filtered = scheduleRegistryFilteredItems(state.schedule.allItems);
+    return scheduleRegistryApplySearch(filtered, state.schedule.registrySearchQuery);
+  }
+
+  function scheduleRegistryRefreshListBody(panel) {
+    if (!panel) return;
+    const body = panel.querySelector("[data-schedule-registry-body]");
+    if (!body) return;
+    const visibleItems = scheduleRegistryVisibleItems();
+    const registryCounts = scheduleRegistryDisplayCounts(visibleItems);
+    body.innerHTML = scheduleReservationIndexMarkup(visibleItems);
+    const pill = panel.querySelector(".schedule-registry-head .pill");
+    if (pill) pill.textContent = String(registryCounts.total);
+  }
+
   function scheduleCanCancel(item) {
     const status = String(item?.status || "")
       .trim()
@@ -2128,10 +2213,54 @@
     `;
   }
 
-  function scheduleReservationIndexMarkup(items) {
+  /** W spisie rezerwacji: jeden wiersz na serię cateringu (wspólne cateringSeriesId z API). */
+  function scheduleDedupeRestaurantRegistryItems(items) {
+    const seriesCounts = new Map();
+    for (const item of items) {
+      const sid = String(item.raw?.cateringSeriesId || "").trim();
+      if (!sid) continue;
+      seriesCounts.set(sid, (seriesCounts.get(sid) || 0) + 1);
+    }
+    const earliestBySeries = new Map();
+    for (const item of items) {
+      const sid = String(item.raw?.cateringSeriesId || "").trim();
+      if (!sid) continue;
+      const cur = earliestBySeries.get(sid);
+      if (!cur || item.startMs < cur.startMs) {
+        earliestBySeries.set(sid, item);
+      }
+    }
+    const singles = items.filter((item) => !String(item.raw?.cateringSeriesId || "").trim());
+    const seriesReps = [];
+    for (const [sid, rep] of earliestBySeries) {
+      const cnt = seriesCounts.get(sid) || 1;
+      if (cnt > 1) {
+        seriesReps.push({
+          ...rep,
+          subtitle: `${rep.subtitle} · cykl: ${cnt} terminów`,
+        });
+      } else {
+        seriesReps.push(rep);
+      }
+    }
+    return [...singles, ...seriesReps].sort(
+      (a, b) =>
+        (Number(b.createdAtMs || 0) - Number(a.createdAtMs || 0)) ||
+        (Number(b.startMs || 0) - Number(a.startMs || 0))
+    );
+  }
+
+  function scheduleRegistryDisplayCounts(items) {
     const hotelItems = items.filter((item) => item.service === "hotel");
-    const restaurantItems = items.filter((item) => item.service === "restaurant");
+    const restaurantRaw = items.filter((item) => item.service === "restaurant");
     const hallItems = items.filter((item) => item.service === "hall");
+    const restaurantItems = scheduleDedupeRestaurantRegistryItems(restaurantRaw);
+    const total = hotelItems.length + restaurantItems.length + hallItems.length;
+    return { hotelItems, restaurantItems, hallItems, total };
+  }
+
+  function scheduleReservationIndexMarkup(items) {
+    const { hotelItems, restaurantItems, hallItems } = scheduleRegistryDisplayCounts(items);
     return `
       <div class="schedule-registry-columns">
         ${scheduleRegistryColumnMarkup("hotel", hotelItems)}
@@ -2258,14 +2387,10 @@
   }
 
   function scheduleListItemBottomActionsMarkup(kind, item) {
-    const cancelBtn = scheduleCanCancel(item)
-      ? `<button type="button" class="button secondary danger-muted schedule-inline-cancel schedule-card-action-cancel" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`
-      : "";
     if (kind === "pending") {
-      const confirmBtn = `<button type="button" class="button secondary schedule-card-action-confirm" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>`;
-      return `${cancelBtn}${confirmBtn}`;
+      return `<button type="button" class="button secondary schedule-card-action-confirm" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>`;
     }
-    return cancelBtn;
+    return "";
   }
 
   function scheduleGroupedListMarkup(items, kind, { emptyText = "", floorYmd = "" } = {}) {
@@ -2282,8 +2407,9 @@
             </div>
             <div class="schedule-day-list">
               ${group.items
-                .map(
-                  (item) => `
+                .map((item) => {
+                  const bottomActions = scheduleListItemBottomActionsMarkup(kind, item);
+                  return `
                     <article class="schedule-day-item schedule-modal-list-item">
                       ${scheduleListItemDetailsButton(item)}
                       <div class="schedule-day-item-head">
@@ -2296,10 +2422,10 @@
                       <p>${escapeHtml(item.title || "Rezerwacja")}</p>
                       <p class="helper">${escapeHtml(item.subtitle || "")}</p>
                       ${scheduleCountdownInlineMarkup(item)}
-                      <div class="schedule-card-actions-bottom">${scheduleListItemBottomActionsMarkup(kind, item)}</div>
+                      ${bottomActions ? `<div class="schedule-card-actions-bottom">${bottomActions}</div>` : ""}
                     </article>
-                  `
-                )
+                  `;
+                })
                 .join("")}
             </div>
           </section>
@@ -2500,18 +2626,9 @@
                           <p class="helper">${escapeHtml(item.subtitle || "")}</p>
                           ${scheduleCountdownInlineMarkup(item)}
                           ${
-                            item.status !== "manual_block"
+                            item.status !== "manual_block" && item.status === "pending"
                               ? `<div class="schedule-card-actions-bottom">
-                            ${
-                              scheduleCanCancel(item)
-                                ? `<button type="button" class="button secondary danger-muted schedule-inline-cancel schedule-card-action-cancel" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`
-                                : ""
-                            }
-                            ${
-                              item.status === "pending"
-                                ? `<button type="button" class="button secondary schedule-card-action-confirm" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>`
-                                : ""
-                            }
+                            <button type="button" class="button secondary schedule-card-action-confirm" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>
                           </div>`
                               : ""
                           }
@@ -2575,27 +2692,69 @@
       return;
     }
 
+    const visibleItems = scheduleRegistryVisibleItems();
+    const registryCounts = scheduleRegistryDisplayCounts(visibleItems);
     panel.innerHTML = `
       <div class="schedule-shell">
         <section class="schedule-calendar-card schedule-registry-card">
           <div class="schedule-calendar-head schedule-registry-head">
-            <p class="pill">${escapeHtml(String(state.schedule.allItems.length))}</p>
+            <p class="pill">${escapeHtml(String(registryCounts.total))}</p>
             <button type="button" class="schedule-refresh-button" data-schedule-refresh aria-label="Odśwież">${scheduleIconMarkup("refresh")}</button>
+          </div>
+          <div class="schedule-registry-filters">
+            <label class="admin-check-line">
+              <input type="checkbox" data-schedule-registry-show-past ${state.schedule.registryShowPast ? "checked" : ""} />
+              <span>Pokaż przeszłe</span>
+            </label>
+            <label class="admin-check-line">
+              <input type="checkbox" data-schedule-registry-show-cancelled ${state.schedule.registryShowCancelledExpired ? "checked" : ""} />
+              <span>Pokaż anulowane (wygasłe)</span>
+            </label>
+          </div>
+          <div class="schedule-registry-search">
+            <label class="schedule-registry-search-label">
+              <span class="schedule-registry-search-label-text">Szukaj</span>
+              <input
+                type="search"
+                class="schedule-registry-search-input"
+                data-schedule-registry-search
+                placeholder="Numer rezerwacji, imię i nazwisko, e-mail lub telefon…"
+                value="${escapeAttribute(state.schedule.registrySearchQuery)}"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </label>
           </div>
           ${statusMessage ? `<p class="status">${escapeHtml(statusMessage)}</p>` : ""}
           ${state.schedule.lastError ? `<p class="status">${escapeHtml(state.schedule.lastError)}</p>` : ""}
-          ${scheduleReservationIndexMarkup(state.schedule.allItems)}
+          <div data-schedule-registry-body>
+            ${scheduleReservationIndexMarkup(visibleItems)}
+          </div>
         </section>
       </div>
     `;
 
+    const registryCard = panel.querySelector(".schedule-registry-card");
+    registryCard?.addEventListener("click", (event) => {
+      const details = event.target.closest("[data-schedule-action='details']");
+      if (!details || !registryCard.contains(details)) return;
+      openScheduleDetailsModal(details.dataset.scheduleService, details.dataset.scheduleId);
+    });
+
+    panel.querySelector("[data-schedule-registry-show-past]")?.addEventListener("change", (event) => {
+      state.schedule.registryShowPast = Boolean(event.currentTarget.checked);
+      renderReservationIndexPanel();
+    });
+    panel.querySelector("[data-schedule-registry-show-cancelled]")?.addEventListener("change", (event) => {
+      state.schedule.registryShowCancelledExpired = Boolean(event.currentTarget.checked);
+      renderReservationIndexPanel();
+    });
+    panel.querySelector("[data-schedule-registry-search]")?.addEventListener("input", (event) => {
+      state.schedule.registrySearchQuery = String(event.currentTarget.value || "");
+      scheduleRegistryRefreshListBody(panel);
+    });
     panel.querySelector("[data-schedule-refresh]")?.addEventListener("click", () => {
       loadScheduleData();
-    });
-    panel.querySelectorAll("[data-schedule-action='details']").forEach((button) => {
-      button.addEventListener("click", () => {
-        openScheduleDetailsModal(button.dataset.scheduleService, button.dataset.scheduleId);
-      });
     });
   }
 
@@ -2747,7 +2906,6 @@
 
   function scheduleReservationDetailsMarkup(item) {
     const isBlock = item.status === "manual_block";
-    const canCancelReservation = scheduleCanCancel(item);
     const rows = [];
     const notes = [];
 
@@ -2885,26 +3043,27 @@
           </div>
           <div class="schedule-modal-head-actions">
             <button type="button" class="button secondary" data-schedule-details-action="edit">Edytuj</button>
+            ${
+              isBlock || canCancelReservation
+                ? `<button type="button" class="button secondary danger-muted${isBlock ? " icon-button" : ""}" data-schedule-details-action="delete" aria-label="${escapeAttribute(
+                    isBlock ? "Usuń blokadę" : "Odwołaj rezerwację"
+                  )}">${isBlock ? scheduleIconMarkup("trash") : "Odwołaj"}</button>`
+                : ""
+            }
             <button type="button" class="button secondary icon-button" data-schedule-modal-close aria-label="Zamknij">${scheduleIconMarkup("close")}</button>
           </div>
         </div>
         ${scheduleReservationDetailsMarkup(item)}
+        ${
+          item.status === "pending"
+            ? `
         <div class="admin-modal-footer schedule-modal-footer">
           <div class="schedule-details-footer-actions">
-            ${
-              isBlock || canCancelReservation
-                ? `<button type="button" class="button ${isBlock ? "danger icon-button" : "danger"}" data-schedule-details-action="delete" aria-label="${escapeAttribute(
-                    isBlock ? "Usuń blokadę" : "Odwołaj rezerwację"
-                  )}">${isBlock ? scheduleIconMarkup("trash") : "Odwołaj rezerwację"}</button>`
-                : ""
-            }
-            ${
-              item.status === "pending"
-                ? `<button type="button" class="button secondary" data-schedule-details-action="confirm">Potwierdź</button>`
-                : ""
-            }
+            <button type="button" class="button secondary" data-schedule-details-action="confirm">Potwierdź</button>
           </div>
-        </div>
+        </div>`
+            : ""
+        }
       `,
       (mount) => {
         mount.querySelectorAll("[data-schedule-details-action]").forEach((button) => {
@@ -2964,6 +3123,8 @@
     { value: 6, label: "Sobota" },
     { value: 0, label: "Niedziela" },
   ];
+  /** Przy tworzeniu dostawy w grafiku — bez pola w formularzu; edycja wpisu nadal pozwala zmienić czas trwania. */
+  const SCHEDULE_CATERING_CREATE_DEFAULT_DURATION_HOURS = 1;
 
   function scheduleCateringRecipientSelectMarkup(selectedId) {
     const list = Array.isArray(state.schedule.cateringRecipients) ? state.schedule.cateringRecipients : [];
@@ -3354,7 +3515,6 @@
               <div class="field-grid">
                 <label class="field"><span>Data pierwszej dostawy</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
                 <label class="field"><span>Godzina</span><input type="time" name="startTime" min="00:00" max="23:59" step="60" value="12:00" required /></label>
-                <label class="field"><span>Czas trwania (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="1" required /></label>
               </div>
               <div class="field-grid schedule-catering-recipient-line">
                 ${scheduleCateringRecipientSelectMarkup("")}
@@ -3400,7 +3560,7 @@
                 <label class="field field-checkbox">
                   <span>
                     <input type="checkbox" name="repeatIndefinite" value="1" data-catering-repeat-indefinite />
-                    Bezterminowo (pierwsza partia ok. roku; potem automatyczne przedłużanie)
+                    Bezterminowo
                   </span>
                 </label>
                 <label class="field">
@@ -3591,10 +3751,7 @@
             if (!recipientId) {
               throw new Error("Wybierz odbiorcę lub dodaj nowego.");
             }
-            const durationHours = Number(formData.get("durationHours") || 0);
-            if (!Number.isFinite(durationHours) || durationHours <= 0) {
-              throw new Error("Podaj poprawny czas trwania dostawy (w godzinach).");
-            }
+            const durationHours = SCHEDULE_CATERING_CREATE_DEFAULT_DURATION_HOURS;
             const repeatMode = String(formData.get("repeatMode") || "none");
             const repeatIndefinite = formData.get("repeatIndefinite") === "1";
             const repeatUntilRaw = String(formData.get("repeatUntil") || "").trim();
@@ -4227,7 +4384,11 @@
         mountLegacyBookingModule(
           "#admin-panel-restaurant-templates",
           "restaurant",
-          { defaultTab: "templates", allowedTabs: ["templates"] },
+          {
+            defaultTab: "templates",
+            allowedTabs: ["templates"],
+            restaurantMailTemplateKeyFilter: ["restaurant_confirmed_client"],
+          },
           statusMessage
         );
       } else if (tileKey === "settings") {
@@ -8437,7 +8598,7 @@
           ? {
               defaultTab: "templates",
               allowedTabs: ["templates"],
-              restaurantMailTemplateKeyFilter: ["restaurant_confirmed_client", "rest_confirmed_client"],
+              restaurantMailTemplateKeyFilter: ["restaurant_confirmed_client"],
             }
           : { defaultTab: "templates", allowedTabs: ["templates"] };
       mountLegacyBookingModule("#mail-service-mount", service, opts, "");
