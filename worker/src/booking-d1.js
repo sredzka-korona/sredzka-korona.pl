@@ -1745,37 +1745,65 @@ function cateringInferRepeatModeFromSortedYmd(sortedYmds) {
   return "";
 }
 
-function cateringClientCycleDescription(mode, repeatWeekdays, repeatIndefinite, repeatUntilYmd) {
+function cateringRepeatKindSentence(mode, repeatWeekdays) {
   const m = cleanString(mode, 24).toLowerCase();
-  let cycle = "";
   if (!m || m === "none") {
-    cycle = "";
-  } else if (m === "weekly") {
-    cycle = "Powtarzanie: co tydzień.";
-  } else if (m === "biweekly") {
-    cycle = "Powtarzanie: co dwa tygodnie.";
-  } else if (m === "monthly") {
-    cycle = "Powtarzanie: co miesiąc.";
-  } else if (m === "selected_days") {
+    return "Dostawa jednorazowa — bez cyklu powtarzania.";
+  }
+  if (m === "weekly") {
+    return "Dostawy powtarzane co tydzień.";
+  }
+  if (m === "biweekly") {
+    return "Dostawy powtarzane co dwa tygodnie.";
+  }
+  if (m === "monthly") {
+    return "Dostawy powtarzane co miesiąc.";
+  }
+  if (m === "selected_days") {
     const labels = ["niedz.", "pon.", "wt.", "śr.", "czw.", "pt.", "sob."];
     const xs = [...new Set((Array.isArray(repeatWeekdays) ? repeatWeekdays : []).map(Number))].filter(
       (n) => Number.isInteger(n) && n >= 0 && n <= 6
     );
     xs.sort((a, b) => a - b);
-    cycle = xs.length
-      ? `Powtarzanie: co tydzień w dni ${xs.map((i) => labels[i]).join(", ")}.`
-      : "Powtarzanie: wybrane dni tygodnia.";
-  } else {
-    cycle = "Powtarzanie: harmonogram cykliczny.";
+    return xs.length
+      ? `Dostawy co tydzień w wybrane dni: ${xs.map((i) => labels[i]).join(", ")}.`
+      : "Dostawy w wybrane dni tygodnia (harmonogram cykliczny).";
+  }
+  return "Dostawy w harmonogramie cyklicznym.";
+}
+
+function cateringScheduleEndSentence(mode, repeatIndefinite, repeatUntilYmd, lastScheduledYmd, firstScheduledYmd) {
+  const m = cleanString(mode, 24).toLowerCase();
+  if (!m || m === "none") {
+    const d = cleanString(lastScheduledYmd || firstScheduledYmd, 10);
+    return d ? `Jednorazowa dostawa — data: ${d}.` : "Jednorazowa dostawa.";
   }
   if (repeatIndefinite) {
-    return `${cycle} Tryb bezterminowy — kolejne terminy są uzupełniane automatycznie w systemie z wyprzedzeniem ok. roku.`.trim();
+    return "Bezterminowo — kolejne terminy są uzupełniane automatycznie (horyzont ok. roku do przodu).";
   }
   const u = cleanString(repeatUntilYmd, 10);
   if (u) {
-    return `${cycle} Zaplanowane terminy do ${u} (włącznie).`.trim();
+    return `Ostatnia zaplanowana data w serii: ${u} (włącznie).`;
   }
-  return cycle.trim();
+  const last = cleanString(lastScheduledYmd, 10);
+  if (last) {
+    return `Ostatnia data na załączonej liście terminów: ${last}.`;
+  }
+  return "—";
+}
+
+/** Jedna linia do preheadera / skrótu tekstowego. */
+function cateringClientCycleDescription(
+  mode,
+  repeatWeekdays,
+  repeatIndefinite,
+  repeatUntilYmd,
+  lastScheduledYmd,
+  firstScheduledYmd
+) {
+  const a = cateringRepeatKindSentence(mode, repeatWeekdays);
+  const b = cateringScheduleEndSentence(mode, repeatIndefinite, repeatUntilYmd, lastScheduledYmd, firstScheduledYmd);
+  return `${a} ${b}`.replace(/\s+/g, " ").trim();
 }
 
 async function extendIndefiniteCateringSeries(env) {
@@ -3697,9 +3725,15 @@ ${infoCard("Szczegóły", [
     restaurant_confirmed_client: {
       subject: "{{restaurantName}} — potwierdzenie dostawy cateringu ({{reservationNumber}})",
       bodyHtml: `<p>Dzień dobry {{fullName}},</p>
-<p>potwierdzamy <strong>przyjęcie rezerwacji dostawy cateringu</strong> w <strong>{{restaurantName}}</strong>.</p>
-<p>W treści poniżej: pierwszy termin i godzina dostawy, cykl powtarzania (jeśli dotyczy), dane odbiorcy oraz ewentualny opis zamówienia.</p>
-<p><strong>Numer w systemie:</strong> {{reservationNumber}}</p>
+<p>potwierdzamy zaplanowaną <strong>dostawę cateringu</strong> w ramach <strong>{{restaurantName}}</strong>.</p>
+<p>W tej wiadomości:</p>
+<ul style="margin:0 0 14px 0;padding-left:1.2em;line-height:1.6;">
+<li><strong>numer rezerwacji</strong>,</li>
+<li><strong>data pierwszej dostawy</strong> (i lista zaplanowanych terminów, jeśli jest kilka),</li>
+<li><strong>cykl powtarzania</strong> oraz <strong>ostatnia planowana data</strong> albo tryb <strong>bezterminowy</strong>,</li>
+<li><strong>dane odbiorcy</strong> (oraz ewentualny opis zamówienia).</li>
+</ul>
+<p><strong>Numer rezerwacji:</strong> {{reservationNumber}}</p>
 {{cateringWhenHtml}}
 {{cateringCycleHtml}}
 {{cateringRecipientHtml}}
@@ -3987,7 +4021,12 @@ async function loadTemplates(env, service) {
         .run();
       continue;
     }
-    if (matchesAnyTemplateShape(existing, [legacyDefaults[key], ultraLegacyDefaults[key]])) {
+    const staleCateringConfirmedTemplate =
+      service === "restaurant" &&
+      (key === "restaurant_confirmed_client" || key === "rest_confirmed_client") &&
+      (!/\{\{\s*cateringWhenHtml\s*\}\}/iu.test(String(existing.bodyHtml || "")) ||
+        /stolik/i.test(String(existing.subject || "")));
+    if (matchesAnyTemplateShape(existing, [legacyDefaults[key], ultraLegacyDefaults[key]]) || staleCateringConfirmedTemplate) {
       out[key] = {
         subject: template.subject || "",
         bodyHtml: template.bodyHtml || "",
@@ -4073,6 +4112,112 @@ function listStatusWhere(status) {
   return { sql: "WHERE status = ?", binds: [s] };
 }
 
+const CATERING_SCHEDULE_ACTIVE_STATUSES =
+  "('email_verification_pending','pending','confirmed','manual_block')";
+
+async function cateringDeliveryBoundsBySeriesId(env, seriesIds) {
+  const out = new Map();
+  if (!Array.isArray(seriesIds) || !seriesIds.length) return out;
+  const placeholders = seriesIds.map(() => "?").join(",");
+  const res = await env.DB.prepare(
+    `SELECT catering_series_id AS sid,
+            MIN(reservation_date) AS min_d,
+            MAX(reservation_date) AS max_d
+     FROM restaurant_reservations
+     WHERE catering_delivery = 1
+       AND catering_series_id IN (${placeholders})
+       AND status IN ${CATERING_SCHEDULE_ACTIVE_STATUSES}
+     GROUP BY catering_series_id`
+  )
+    .bind(...seriesIds)
+    .all();
+  for (const r of res.results || []) {
+    const sid = cleanString(r.sid, 80);
+    if (!sid) continue;
+    out.set(sid, { min: cleanString(r.min_d, 10), max: cleanString(r.max_d, 10) });
+  }
+  return out;
+}
+
+async function cateringSeriesRowsById(env, seriesIds) {
+  const out = new Map();
+  if (!Array.isArray(seriesIds) || !seriesIds.length) return out;
+  const placeholders = seriesIds.map(() => "?").join(",");
+  const res = await env.DB.prepare(`SELECT * FROM catering_repeat_series WHERE id IN (${placeholders})`)
+    .bind(...seriesIds)
+    .all();
+  for (const r of res.results || []) {
+    const id = cleanString(r.id, 80);
+    if (id) out.set(id, r);
+  }
+  return out;
+}
+
+function inferCateringRepeatModeFromMappedList(mapped, sid) {
+  const dates = mapped
+    .filter((x) => x.cateringDelivery && cleanString(x.cateringSeriesId, 80) === sid)
+    .map((x) => cleanString(x.reservationDate, 10))
+    .filter(Boolean)
+    .sort();
+  return cateringInferRepeatModeFromSortedYmd(dates) || "none";
+}
+
+async function enrichMappedRestaurantCateringSchedule(env, mapped) {
+  if (!Array.isArray(mapped) || !mapped.length) return;
+  const cateringItems = mapped.filter((x) => x && x.cateringDelivery);
+  if (!cateringItems.length) return;
+  const seriesIds = [
+    ...new Set(cateringItems.map((x) => cleanString(x.cateringSeriesId, 80)).filter(Boolean)),
+  ];
+  const boundsMap = await cateringDeliveryBoundsBySeriesId(env, seriesIds);
+  const seriesMap = await cateringSeriesRowsById(env, seriesIds);
+
+  for (const item of mapped) {
+    if (!item || !item.cateringDelivery) continue;
+    const sid = cleanString(item.cateringSeriesId, 80);
+    const rowYmd = cleanString(item.reservationDate, 10);
+    if (!sid) {
+      item.cateringScheduleSummary = {
+        firstYmd: rowYmd,
+        cycleLabel: cateringRepeatKindSentence("none", []),
+        lastIsIndefinite: false,
+        lastYmd: rowYmd,
+      };
+      continue;
+    }
+    const b = boundsMap.get(sid) || {};
+    const firstYmd = cleanString(b.min || rowYmd, 10);
+    const lastScheduledYmd = cleanString(b.max || rowYmd, 10);
+    const s = seriesMap.get(sid);
+    let repeatMode = "none";
+    let repeatWeekdays = [];
+    let repeatIndefinite = false;
+    let repeatUntilYmd = "";
+    if (s) {
+      repeatMode = cleanString(s.repeat_mode, 24).toLowerCase() || "none";
+      repeatWeekdays = parseJson(s.repeat_weekdays_json, []);
+      repeatIndefinite = Number(s.repeat_indefinite) === 1;
+      repeatUntilYmd = cleanString(s.repeat_until_ymd, 10);
+    } else {
+      repeatMode = inferCateringRepeatModeFromMappedList(mapped, sid);
+    }
+    const cycleLabel = cateringRepeatKindSentence(repeatMode, repeatWeekdays);
+    const m = cleanString(repeatMode, 24).toLowerCase();
+    let lastIsIndefinite = false;
+    let lastYmd = "";
+    if (!m || m === "none") {
+      lastYmd = lastScheduledYmd;
+    } else if (repeatIndefinite) {
+      lastIsIndefinite = true;
+    } else if (repeatUntilYmd) {
+      lastYmd = repeatUntilYmd;
+    } else {
+      lastYmd = lastScheduledYmd;
+    }
+    item.cateringScheduleSummary = { firstYmd, cycleLabel, lastIsIndefinite, lastYmd };
+  }
+}
+
 async function listHotelReservations(env, status) {
   const { sql, binds } = listStatusWhere(status);
   const rows = await env.DB.prepare(
@@ -4129,7 +4274,9 @@ async function listRestaurantReservations(env, status) {
       recipientById.set(rec.id, rec);
     }
   }
-  return list.map((r) => mapRestaurantReservation(r, map, recipientById.get(r.recipient_id) || null));
+  const mapped = list.map((r) => mapRestaurantReservation(r, map, recipientById.get(r.recipient_id) || null));
+  await enrichMappedRestaurantCateringSchedule(env, mapped);
+  return mapped;
 }
 
 async function listHallReservations(env, status) {
@@ -4430,12 +4577,12 @@ function buildCateringManualCreatedMailExtraVars(
   let cateringWhenPlain = "";
   if (sorted.length === 1 || mode === "none") {
     const line = first && st ? `${first}, godz. ${st}` : first ? String(first) : "—";
-    cateringWhenHtml = infoCard("Termin i godzina", [
-      ["Pierwsza data dostawy", escapeHtml(first || "—")],
-      ["Godzina rozpoczęcia dostawy", escapeHtml(st || "—")],
-      ["Podsumowanie terminu", escapeHtml(line)],
+    cateringWhenHtml = infoCard("Pierwsza dostawa", [
+      ["Data pierwszego terminu", escapeHtml(first || "—")],
+      ["Godzina rozpoczęcia", escapeHtml(st || "—")],
+      ["Podsumowanie", escapeHtml(line)],
     ]);
-    cateringWhenPlain = `Pierwsza data: ${first || "—"}, godzina: ${st || "—"}`;
+    cateringWhenPlain = `Pierwsza data dostawy: ${first || "—"}, godzina: ${st || "—"}`;
   } else {
     const tw = cateringDeliveryTerminWord(sorted.length);
     const summaryLine = `${sorted.length} ${tw} od ${first} do ${last} (włącznie)${cateringRepeatSummaryPhrase(
@@ -4446,18 +4593,24 @@ function buildCateringManualCreatedMailExtraVars(
       sorted.length <= 16
         ? `<p style="margin:14px 0 0 0;color:#5e4b39;font-size:14px;line-height:1.65;">Kolejne daty: ${sorted.map((d) => escapeHtml(d)).join(", ")}</p>`
         : "";
-    cateringWhenHtml = `${infoCard("Termin i godzina", [["Pierwszy termin (data i godzina)", escapeHtml(`${first}, godz. ${st}`)], ["Harmonogram dat", escapeHtml(summaryLine)]])}${listNote}`;
-    cateringWhenPlain = `Pierwszy termin: ${first}, godz. ${st}. ${summaryLine}`;
+    cateringWhenHtml = `${infoCard("Pierwsza dostawa i lista terminów", [
+      ["Data i godzina pierwszej dostawy", escapeHtml(`${first}, godz. ${st}`)],
+      ["Zakres dat w tej wiadomości", escapeHtml(`${first} — ${last} (włącznie)`)],
+      ["Opis harmonogramu", escapeHtml(summaryLine)],
+    ])}${listNote}`;
+    cateringWhenPlain = `Pierwsza dostawa: ${first}, godz. ${st}. ${summaryLine}`;
   }
   const modeForCycle = cleanString(repeatMode, 24).toLowerCase();
   const indef = Boolean(repeatIndefinite);
   const untilY = cleanString(repeatUntil, 10);
-  const cycleText =
-    !modeForCycle || modeForCycle === "none"
-      ? "Dostawa jednorazowa (bez powtarzania)."
-      : cateringClientCycleDescription(modeForCycle, repeatWeekdays, indef, untilY);
-  const cateringCycleHtml = infoCard("Cykl / powtarzanie", [["Opis", escapeHtml(cycleText)]]);
-  cateringWhenPlain = `${cateringWhenPlain} | Cykl: ${cycleText}`;
+  const repeatSentence = cateringRepeatKindSentence(modeForCycle, repeatWeekdays);
+  const endSentence = cateringScheduleEndSentence(modeForCycle, indef, untilY, last, first);
+  const cyclePlain = cateringClientCycleDescription(modeForCycle, repeatWeekdays, indef, untilY, last, first);
+  const cateringCycleHtml = infoCard("Cykl powtarzania i zakończenie", [
+    ["Powtarzanie", escapeHtml(repeatSentence)],
+    ["Ostatnia dostawa / zakończenie", escapeHtml(endSentence)],
+  ]);
+  cateringWhenPlain = `${cateringWhenPlain} | ${cyclePlain}`;
   const r = recipientSqlRow || {};
   const person = [r.contact_first_name, r.contact_last_name].filter(Boolean).join(" ");
   const phone = `${r.phone_prefix || ""} ${r.phone_national || ""}`.trim();
@@ -4494,8 +4647,22 @@ function buildCateringManualCreatedMailExtraVars(
 async function buildCateringAcceptedMailExtraVarsFromReservation(env, row) {
   if (!row || Number(row.catering_delivery) !== 1) return {};
   const recId = cleanString(row.recipient_id, 80);
-  const recRow = recId ? await getCateringRecipientRow(env, recId) : null;
-  if (!recRow) return {};
+  let recRow = recId ? await getCateringRecipientRow(env, recId) : null;
+  if (!recRow) {
+    recRow = {
+      display_name: cleanString(row.full_name, 200) || "—",
+      email: cleanString(row.email, 180),
+      phone_prefix: row.phone_prefix || "",
+      phone_national: row.phone_national || "",
+      contact_first_name: "",
+      contact_last_name: "",
+      street: "",
+      building_number: "",
+      postal_code: "",
+      city: "",
+      extra_info: "",
+    };
+  }
   const hy = Number(row.human_year);
   const slug = cleanString(row.human_slug, 80);
   let dates = [];
@@ -4662,9 +4829,23 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
     return { skipped: true };
   }
   const template = await resolveTemplateForEvent(env, service, eventKey);
+  let mergedExtra = extraVars && typeof extraVars === "object" ? { ...extraVars } : {};
+  if (
+    service === "restaurant" &&
+    eventKey === "confirmed_client" &&
+    Number(row.catering_delivery) === 1 &&
+    (!mergedExtra.cateringWhenHtml || String(mergedExtra.cateringWhenHtml).trim() === "")
+  ) {
+    try {
+      const inferred = await buildCateringAcceptedMailExtraVarsFromReservation(env, row);
+      mergedExtra = { ...inferred, ...mergedExtra };
+    } catch (fillErr) {
+      console.error("Catering confirmed mail: uzupełnianie bloków HTML", fillErr);
+    }
+  }
   const vars = {
     ...(await buildMailVarsForService(env, request, service, row, token || "")),
-    ...(extraVars && typeof extraVars === "object" ? extraVars : {}),
+    ...mergedExtra,
   };
   const subject = normalizeRenderedReservationSubject(renderTemplate(template.subject, vars), vars, row);
   const templateBodyRaw = String(template.bodyHtml || "");

@@ -1613,14 +1613,14 @@
     }
 
     const monthField = document.createElement("label");
-    monthField.className = "schedule-calendar-field";
+    monthField.className = "schedule-calendar-field schedule-calendar-field--month";
     const monthLegend = document.createElement("span");
     monthLegend.className = "schedule-calendar-field-label";
     monthLegend.textContent = "Miesiąc";
     monthField.append(monthLegend, monthSel);
 
     const yearField = document.createElement("label");
-    yearField.className = "schedule-calendar-field";
+    yearField.className = "schedule-calendar-field schedule-calendar-field--year";
     const yearLegend = document.createElement("span");
     yearLegend.className = "schedule-calendar-field-label";
     yearLegend.textContent = "Rok";
@@ -2129,10 +2129,11 @@
   function scheduleCardHeading(item) {
     if (item?.status === "manual_block") return "Blokada";
     const candidate = String(item?.humanNumberLabel || "").trim();
-    if (candidate && candidate.length <= 18 && !/^[0-9a-f-]{24,}$/i.test(candidate)) {
-      return candidate;
-    }
-    return "Rezerwacja";
+    if (!candidate) return "Rezerwacja";
+    // Numery cateringu: „odbiorca/CATERING/rok” — dłuższe niż stary limit 18 znaków (np. hotel „2/2026/HOTEL”).
+    if (/^[0-9a-f-]{24,}$/i.test(candidate)) return "Rezerwacja";
+    if (candidate.length > 120) return `${candidate.slice(0, 117)}…`;
+    return candidate;
   }
 
   function scheduleIsPast(item) {
@@ -3117,6 +3118,19 @@
           rows.push(scheduleDetailSheetRowMarkup("Odbiorca", "Brak danych odbiorcy w systemie."));
         }
         rows.push(scheduleDetailSheetRowMarkup("Numer rezerwacji", item.humanNumberLabel || item.raw.humanNumberLabel || "—"));
+        const cs = item.raw.cateringScheduleSummary;
+        if (cs && typeof cs === "object") {
+          rows.push(scheduleDetailSheetRowMarkup("Pierwszy dowóz", scheduleFormatCompactDate(cs.firstYmd)));
+          rows.push(scheduleDetailSheetRowMarkup("Cykl dostaw", cs.cycleLabel || "—"));
+          rows.push(
+            scheduleDetailSheetRowMarkup(
+              "Ostatni dowóz / koniec serii",
+              cs.lastIsIndefinite
+                ? "Bezterminowo (kolejne terminy uzupełniane automatycznie w harmonogramie)"
+                : scheduleFormatCompactDate(cs.lastYmd)
+            )
+          );
+        }
       } else {
         rows.push(
           scheduleDetailSheetRowMarkup(
