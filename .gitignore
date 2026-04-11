@@ -2,5 +2,10 @@
 .dev.vars.*
 worker/.dev.vars
 worker/.dev.vars.*
+!worker/.dev.vars.example
 .env
 .env.*
+
+# Worker (Cloudflare): zależności i cache — tylko package.json + lock + kod źródłowy w repo
+worker/node_modules/
+worker/.wrangler/

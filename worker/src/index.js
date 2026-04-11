@@ -286,14 +286,9 @@ export default {
           request,
           env,
           isAdmin: false,
-          verifyTurnstileToken: env.TURNSTILE_SECRET
-            ? async (token) => verifyTurnstile(token, request, env)
-            : null,
+          verifyTurnstileToken: async (token) => verifyTurnstile(token, request, env),
         });
-        if (native) {
-          return jsonResponse(native.data, native.status || 200, request, env);
-        }
-        return proxyLegacyBookingApi(service, request, url, env);
+        return respondLegacyBookingNativeOrProxy(native, service, request, url, env);
       }
 
       if (
@@ -311,10 +306,7 @@ export default {
           isAdmin: true,
           verifyTurnstileToken: null,
         });
-        if (native) {
-          return jsonResponse(native.data, native.status || 200, request, env);
-        }
-        return proxyLegacyBookingApi(service, request, url, env);
+        return respondLegacyBookingNativeOrProxy(native, service, request, url, env);
       }
 
       return jsonResponse({ error: "Nie znaleziono zasobu." }, 404, request, env);
@@ -729,11 +721,9 @@ async function handleContactSubmission(payload, request, env) {
   if (!email.includes("@")) {
     throw badRequest("Nieprawidlowy adres e-mail.");
   }
-  if (env.TURNSTILE_SECRET) {
-    const ok = await verifyTurnstile(payload.turnstileToken, request, env);
-    if (!ok) {
-      throw badRequest("Nie udalo sie potwierdzic formularza.");
-    }
+  const turnstileOk = await verifyTurnstile(payload.turnstileToken, request, env);
+  if (!turnstileOk) {
+    throw badRequest("Nie udalo sie potwierdzic formularza.");
   }
   await env.DB.prepare(
     "INSERT INTO contact_submissions (full_name, email, phone, event_type, preferred_date, message, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'new', ?)"
@@ -749,6 +739,9 @@ async function handleContactSubmission(payload, request, env) {
 }
 
 async function verifyTurnstile(token, request, env) {
+  if (!env.TURNSTILE_SECRET) {
+    return false;
+  }
   if (!token) {
     return false;
   }
@@ -1497,6 +1490,35 @@ function assertBrowserLikePublicRequest(request, url) {
   throw Object.assign(new Error(`Publiczny endpoint ${url.pathname} wymaga naglowkow przegladarki.`), {
     status: 403,
   });
+}
+
+function legacyFirebaseBookingsProxyEnabled(env) {
+  const v = String(env.LEGACY_FIREBASE_BOOKINGS_PROXY || "")
+    .trim()
+    .toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
+
+/**
+ * Domyślnie tylko D1 (bez Firebase Cloud Functions — nie wymaga planu Blaze).
+ * Proxy do Functions włącz: LEGACY_FIREBASE_BOOKINGS_PROXY=true w zmiennych Workera.
+ */
+function respondLegacyBookingNativeOrProxy(native, service, request, url, env) {
+  if (native) {
+    return jsonResponse(native.data, native.status || 200, request, env);
+  }
+  if (legacyFirebaseBookingsProxyEnabled(env)) {
+    return proxyLegacyBookingApi(service, request, url, env);
+  }
+  return jsonResponse(
+    {
+      error:
+        "Ta operacja nie jest zaimplementowana w module rezerwacji na Workerze (D1). Jeśli nadal używasz Firebase Cloud Functions, ustaw w Workerze LEGACY_FIREBASE_BOOKINGS_PROXY=true (wymaga wdrożonych funkcji i planu Blaze).",
+    },
+    501,
+    request,
+    env
+  );
 }
 
 function getLegacyBookingApiBase(service, env) {

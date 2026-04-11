@@ -39,7 +39,7 @@ function randomToken() {
 async function verifyTurnstile(token, remoteIp) {
   const secret = process.env.TURNSTILE_SECRET;
   if (!secret) {
-    return true;
+    return false;
   }
   if (!token) {
     return false;

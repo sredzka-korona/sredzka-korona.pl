@@ -4071,6 +4071,22 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
   if (op === "health" && request.method === "GET") {
     return { status: 200, data: { ok: true, service: "hotelApi-d1" } };
   }
+  if (op === "public-rooms" && request.method === "GET") {
+    const rooms = (await hotelRooms(env))
+      .filter((r) => r.active)
+      .map((r) => ({
+        id: r.id,
+        name: r.name,
+        pricePerNight: r.pricePerNight,
+        maxGuests: r.maxGuests,
+        bedsSingle: r.bedsSingle ?? 0,
+        bedsDouble: r.bedsDouble ?? 0,
+        bedsChild: r.bedsChild ?? 0,
+        description: r.description || "",
+        imageUrls: r.imageUrls || [],
+      }));
+    return { status: 200, data: { rooms } };
+  }
   const adminAction = await handlePublicAdminAction(env, op, request, "hotel");
   if (adminAction) return adminAction;
   if (op === "public-availability" && request.method === "POST") {

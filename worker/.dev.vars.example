@@ -1,0 +1,9 @@
+# Skopiuj do pliku .dev.vars w tym katalogu (jest w .gitignore).
+#
+# TURNSTILE_SECRET — "Secret key" z Cloudflare Dashboard → Turnstile → Twoja witryna
+# (to NIE jest site key z assets/js/config.js).
+TURNSTILE_SECRET=
+
+# Opcjonalnie przy lokalnym teście SMTP (jak w wrangler.jsonc):
+# SMTP_USER=
+# SMTP_PASS=

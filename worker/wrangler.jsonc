@@ -1,3 +1,7 @@
+// Turnstile: ustaw sekret po stronie Cloudflare (nie commituj wartości w tym pliku).
+//   cd worker && npm install && npm run secret:turnstile
+// Albo: Dashboard → Workers → sredzka-korona-api → Settings → Variables → Secrets → TURNSTILE_SECRET
+// Wartość: Dashboard → Turnstile → (witryna) → Secret key (para do turnstileSiteKey w assets/js/config.js).
 {
   "name": "sredzka-korona-api",
   "main": "src/index.js",
