@@ -1582,25 +1582,49 @@
     return { yMin, yMax };
   }
 
-  function scheduleCalendarNavSelectsMarkup(monthCursor) {
+  /** Listy miesiąc/rok przez DOM (nie innerHTML), żeby zawsze trafiły do drzewa dokumentu. */
+  function scheduleMountCalendarMonthYearPickers(mountEl, monthCursor) {
+    if (!mountEl) return;
     const { year, month } = scheduleParseMonthCursor(monthCursor);
     const ym = `${year}-${String(month).padStart(2, "0")}`;
     const { yMin, yMax } = scheduleCalendarYearBounds(ym);
-    const monthOptions = Array.from({ length: 12 }, (_, i) => {
-      const m = i + 1;
-      const label = new Date(2000, m - 1, 1).toLocaleDateString("pl-PL", { month: "long" });
-      const selected = m === month ? " selected" : "";
-      return `<option value="${String(m).padStart(2, "0")}"${selected}>${escapeHtml(label)}</option>`;
-    }).join("");
-    const yearOptions = [];
-    for (let y = yMin; y <= yMax; y += 1) {
-      const selected = y === year ? " selected" : "";
-      yearOptions.push(`<option value="${y}"${selected}>${escapeHtml(String(y))}</option>`);
+    mountEl.replaceChildren();
+
+    const monthSel = document.createElement("select");
+    monthSel.className = "schedule-calendar-select";
+    monthSel.setAttribute("data-schedule-calendar-part", "month");
+    monthSel.setAttribute("aria-label", "Miesiąc");
+    for (let m = 1; m <= 12; m += 1) {
+      const opt = document.createElement("option");
+      opt.value = String(m).padStart(2, "0");
+      opt.textContent = new Date(2000, m - 1, 1).toLocaleDateString("pl-PL", { month: "long" });
+      if (m === month) opt.selected = true;
+      monthSel.appendChild(opt);
     }
-    return `<div class="schedule-calendar-picker">
-      <select class="schedule-calendar-select" data-schedule-calendar-part="month" aria-label="Miesiąc">${monthOptions}</select>
-      <select class="schedule-calendar-select" data-schedule-calendar-part="year" aria-label="Rok">${yearOptions.join("")}</select>
-    </div>`;
+
+    const yearSel = document.createElement("select");
+    yearSel.className = "schedule-calendar-select";
+    yearSel.setAttribute("data-schedule-calendar-part", "year");
+    yearSel.setAttribute("aria-label", "Rok");
+    for (let y = yMin; y <= yMax; y += 1) {
+      const opt = document.createElement("option");
+      opt.value = String(y);
+      opt.textContent = String(y);
+      if (y === year) opt.selected = true;
+      yearSel.appendChild(opt);
+    }
+
+    mountEl.append(monthSel, yearSel);
+
+    const apply = () => {
+      const y = Number(yearSel.value);
+      const m = Number(monthSel.value);
+      if (!y || !m) return;
+      state.schedule.monthCursor = `${y}-${String(m).padStart(2, "0")}`;
+      renderSchedulePanel();
+    };
+    monthSel.addEventListener("change", apply);
+    yearSel.addEventListener("change", apply);
   }
 
   function scheduleShiftMonth(monthCursor, direction) {
@@ -2247,20 +2271,33 @@
 
   /**
    * Spis rezerwacji: jeden wiersz na serię dostaw cateringu.
-   * Grupa: cateringSeriesId z API; gdy puste (np. starsze dane) — ten sam odbiorca + humanYear + humanSlug.
+   * — cateringSeriesId z API (najpewniejsze).
+   * — bez niego: ten sam odbiorca + godzina + czas trwania + uwagi (klient/admin) — bez human_slug / human_year,
+   *   bo przy wielu terminach często każdy wpis ma inny slug albo rok z daty, co psuje zgrupowanie.
    */
+  function scheduleRegistryRestaurantSlotDurationHours(item, r) {
+    let dur = Number(r?.durationHours);
+    if (Number.isFinite(dur) && dur > 0) return dur;
+    const sm = Number(item?.startMs);
+    const em = Number(item?.endMs);
+    if (sm && em && em > sm) return (em - sm) / 3600000;
+    return NaN;
+  }
+
   function scheduleRegistryRestaurantCycleGroupKey(item) {
     const r = item?.raw || {};
     const sid = String(r.cateringSeriesId || "").trim();
     if (sid) return `series:${sid}`;
     if (!r.cateringDelivery) return `one:${item.id}`;
-    const slug = String(r.humanSlug || "").trim();
-    const hy = Number(r.humanYear);
     const rec = String(r.recipientId || "").trim();
-    if (slug && Number.isInteger(hy) && hy >= 2000 && hy <= 2100 && rec) {
-      return `slug:${rec}:${hy}:${slug}`;
-    }
-    return `one:${item.id}`;
+    if (!rec) return `one:${item.id}`;
+    const st = String(r.startTime || "").trim();
+    const dur = scheduleRegistryRestaurantSlotDurationHours(item, r);
+    if (!st || !Number.isFinite(dur) || dur <= 0) return `one:${item.id}`;
+    const noteKey = normalizeComparableText(
+      `${String(r.customerNote || "")}\n${String(r.adminNote || "")}`
+    ).slice(0, 200);
+    return `slot:${rec}:${st}:${dur}:${noteKey}`;
   }
 
   function scheduleDedupeRestaurantRegistryItems(items) {
@@ -2612,7 +2649,7 @@
             <div class="schedule-calendar-head-spacer" aria-hidden="true"></div>
             <div class="schedule-calendar-nav">
               <button type="button" class="button secondary icon-button" data-schedule-month="-1" aria-label="Poprzedni miesiąc">←</button>
-              ${scheduleCalendarNavSelectsMarkup(monthCursor)}
+              <div class="schedule-calendar-picker" data-schedule-month-year-mount></div>
               <button type="button" class="button secondary icon-button" data-schedule-month="1" aria-label="Następny miesiąc">→</button>
             </div>
             <button type="button" class="schedule-refresh-button" data-schedule-refresh aria-label="Odśwież">${scheduleIconMarkup("refresh")}</button>
@@ -2702,21 +2739,11 @@
       )}</p>
     `;
 
+    scheduleMountCalendarMonthYearPickers(panel.querySelector("[data-schedule-month-year-mount]"), monthCursor);
+
     panel.querySelectorAll("[data-schedule-month]").forEach((button) => {
       button.addEventListener("click", () => {
         state.schedule.monthCursor = scheduleShiftMonth(state.schedule.monthCursor, Number(button.dataset.scheduleMonth || 0));
-        renderSchedulePanel();
-      });
-    });
-    panel.querySelectorAll("[data-schedule-calendar-part]").forEach((el) => {
-      el.addEventListener("change", () => {
-        const monthEl = panel.querySelector('[data-schedule-calendar-part="month"]');
-        const yearEl = panel.querySelector('[data-schedule-calendar-part="year"]');
-        if (!monthEl || !yearEl) return;
-        const y = Number(yearEl.value);
-        const m = Number(monthEl.value);
-        if (!y || !m) return;
-        state.schedule.monthCursor = `${y}-${String(m).padStart(2, "0")}`;
         renderSchedulePanel();
       });
     });
@@ -2769,16 +2796,6 @@
             <p class="pill">${escapeHtml(String(registryCounts.total))}</p>
             <button type="button" class="schedule-refresh-button" data-schedule-refresh aria-label="Odśwież">${scheduleIconMarkup("refresh")}</button>
           </div>
-          <div class="schedule-registry-filters">
-            <label class="admin-check-line">
-              <input type="checkbox" data-schedule-registry-show-past ${state.schedule.registryShowPast ? "checked" : ""} />
-              <span>Pokaż przeszłe</span>
-            </label>
-            <label class="admin-check-line">
-              <input type="checkbox" data-schedule-registry-show-cancelled ${state.schedule.registryShowCancelledExpired ? "checked" : ""} />
-              <span>Pokaż anulowane (wygasłe)</span>
-            </label>
-          </div>
           <div class="schedule-registry-search">
             <label class="schedule-registry-search-label">
               <span class="schedule-registry-search-label-text">Szukaj</span>
@@ -2791,6 +2808,16 @@
                 autocomplete="off"
                 spellcheck="false"
               />
+            </label>
+          </div>
+          <div class="schedule-registry-filters">
+            <label class="admin-check-line">
+              <input type="checkbox" data-schedule-registry-show-past ${state.schedule.registryShowPast ? "checked" : ""} />
+              <span>Pokaż przeszłe</span>
+            </label>
+            <label class="admin-check-line">
+              <input type="checkbox" data-schedule-registry-show-cancelled ${state.schedule.registryShowCancelledExpired ? "checked" : ""} />
+              <span>Pokaż anulowane (wygasłe)</span>
             </label>
           </div>
           ${statusMessage ? `<p class="status">${escapeHtml(statusMessage)}</p>` : ""}

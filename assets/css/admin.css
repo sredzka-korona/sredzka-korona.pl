@@ -2266,13 +2266,13 @@ body.admin-modal-open {
   flex-wrap: wrap;
   gap: 0.65rem 1.25rem;
   align-items: center;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(93, 110, 143, 0.28);
 }
 
 .schedule-registry-search {
   width: 100%;
   min-width: 0;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid rgba(93, 110, 143, 0.28);
 }
 
 .schedule-registry-search-label {
