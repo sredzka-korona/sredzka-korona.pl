@@ -287,7 +287,7 @@ export default {
         const service = legacyBookingsPath.split("/").pop();
         const op = String(url.searchParams.get("op") || "").trim();
         if (!isAllowedPublicLegacyBookingOp(op)) {
-          return jsonResponse({ error: "Niedozwolona operacja publiczna." }, 403, request, env);
+          return jsonResponse({ error: "Niedozwolona operacja publiczna." }, 403, request, env, NO_STORE_JSON_HEADERS);
         }
         const native = await handleD1BookingApi({
           service,
@@ -1541,6 +1541,11 @@ function assertBrowserLikePublicRequest(request, url) {
   });
 }
 
+/** Zapobiega cache'owaniu błędów 4xx/410 w Safari (Disk Cache) dla tego samego path+origin. */
+const NO_STORE_JSON_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+};
+
 /** Włącz tylko przy faktycznie wdrożonych Functions; inaczej proxy zwróci HTML 404 z Google (restaurantApi itd.). */
 function legacyFirebaseBookingsProxyEnabled(env) {
   const v = String(env.LEGACY_FIREBASE_BOOKINGS_PROXY || "")
@@ -1555,7 +1560,7 @@ function legacyFirebaseBookingsProxyEnabled(env) {
  */
 function respondLegacyBookingNativeOrProxy(native, service, request, url, env) {
   if (native) {
-    return jsonResponse(native.data, native.status || 200, request, env);
+    return jsonResponse(native.data, native.status || 200, request, env, NO_STORE_JSON_HEADERS);
   }
   if (legacyFirebaseBookingsProxyEnabled(env)) {
     return proxyLegacyBookingApi(service, request, url, env);
@@ -1567,7 +1572,8 @@ function respondLegacyBookingNativeOrProxy(native, service, request, url, env) {
     },
     501,
     request,
-    env
+    env,
+    NO_STORE_JSON_HEADERS
   );
 }
 
@@ -1596,7 +1602,7 @@ function isAllowedPublicLegacyBookingOp(op) {
 async function proxyLegacyBookingApi(service, request, url, env) {
   const base = getLegacyBookingApiBase(service, env);
   if (!base) {
-    return jsonResponse({ error: "Brak konfiguracji adresu API rezerwacji." }, 500, request, env);
+    return jsonResponse({ error: "Brak konfiguracji adresu API rezerwacji." }, 500, request, env, NO_STORE_JSON_HEADERS);
   }
 
   const targetUrl = new URL(base);
@@ -1619,6 +1625,7 @@ async function proxyLegacyBookingApi(service, request, url, env) {
   });
 
   const responseHeaders = new Headers(corsHeaders(request, env));
+  responseHeaders.set("Cache-Control", "private, no-store, max-age=0, must-revalidate");
   const upstreamContentType = upstream.headers.get("Content-Type");
   if (upstreamContentType) {
     responseHeaders.set("Content-Type", upstreamContentType);

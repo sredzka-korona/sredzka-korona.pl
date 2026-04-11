@@ -1187,6 +1187,7 @@
       response = await fetch(state.apiBase + path, {
         ...options,
         credentials: "include",
+        cache: "no-store",
         headers: {
           ...authHeaders,
           ...(options.headers || {}),
