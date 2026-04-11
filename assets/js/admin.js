@@ -3151,6 +3151,10 @@
             <button type="button" class="button secondary" data-schedule-modal-close>Zamknij</button>
           </div>
           ${fieldsMarkup}
+          ${
+            item.service === "restaurant" && raw.cateringDelivery
+              ? ""
+              : `
           <label class="checkbox-field">
             <input type="checkbox" name="notifyClient" />
             <span class="checkbox-copy">
@@ -3158,6 +3162,8 @@
               <span>Zadziała tylko dla standardowych rezerwacji.</span>
             </span>
           </label>
+          `
+          }
           <div class="admin-modal-footer">
             <button type="button" class="button secondary" data-schedule-modal-close>Anuluj</button>
             <button type="submit" class="button">Zapisz</button>
@@ -8305,12 +8311,15 @@
     function mountActive() {
       const serviceMap = { hotel: "hotel", restaurant: "restaurant", hall: "hall" };
       const service = serviceMap[mailsSubTab] || "hotel";
-      mountLegacyBookingModule(
-        "#mail-service-mount",
-        service,
-        { defaultTab: "templates", allowedTabs: ["templates"] },
-        ""
-      );
+      const opts =
+        service === "restaurant"
+          ? {
+              defaultTab: "templates",
+              allowedTabs: ["templates"],
+              restaurantMailTemplateKeyFilter: ["catering_manual_created_client"],
+            }
+          : { defaultTab: "templates", allowedTabs: ["templates"] };
+      mountLegacyBookingModule("#mail-service-mount", service, opts, "");
     }
 
     panel.querySelectorAll("[data-mail-service]").forEach((btn) => {

@@ -38,9 +38,11 @@ function escapeHtml(value) {
 
 function renderTemplate(template, vars) {
   if (!template) return "";
+  const rawHtmlKeys = new Set(["cateringWhenHtml", "cateringRecipientHtml", "cateringDescriptionHtml"]);
   return String(template).replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
     const value = vars?.[key];
     if (value === undefined || value === null) return "";
+    if (rawHtmlKeys.has(key)) return String(value);
     return escapeHtml(String(value));
   });
 }
@@ -183,6 +185,7 @@ function mailHeaderSecondLine(service, eventKey) {
     expired_pending_client: "Wygaśnięcie rezerwacji stolika",
     expired_pending_admin: "Wygaśnięcie rezerwacji — informacja dla obsługi",
     expired_email_client: "Wygasłe potwierdzenie — rezerwacja stolika",
+    catering_manual_created_client: "Dostawa cateringu — utworzono rezerwację",
   };
   const hall = {
     confirm_email: "Potwierdzenie rezerwacji sali",
@@ -3508,6 +3511,16 @@ ${infoCard("Szczegóły zgłoszenia", [
 ])}
 ${noteCard("Stolik nie został zablokowany. Jeśli nadal chcesz dokonać rezerwacji, prześlij formularz ponownie.")}`,
     },
+    catering_manual_created_client: {
+      subject: "{{restaurantName}} — utworzono dostawę cateringu",
+      bodyHtml: `<p>Dzień dobry {{fullName}},</p>
+<p>informujemy, że <strong>dostawa cateringu została zapisana w naszym systemie</strong> (rezerwacja utworzona ręcznie przez obsługę).</p>
+{{cateringWhenHtml}}
+{{cateringRecipientHtml}}
+{{cateringDescriptionHtml}}
+${noteCard("W razie pytań odpowiedz na tę wiadomość lub skontaktuj się bezpośrednio z obsługą cateringu.")}
+<p>Pozdrawiamy,<br>{{restaurantName}}</p>`,
+    },
   };
   return {
     ...base,
@@ -3672,6 +3685,7 @@ const EVENT_TEMPLATE_KEYS = {
     confirmed_client: ["restaurant_confirmed_client", "rest_confirmed_client"],
     cancelled_client: ["restaurant_cancelled_client", "rest_cancelled_client"],
     changed_client: ["restaurant_changed_client", "rest_changed_client"],
+    catering_manual_created_client: ["catering_manual_created_client"],
   },
   hall: {
     confirm_email: ["hall_confirm_email"],
@@ -4124,6 +4138,74 @@ async function buildRestaurantMailVars(env, request, row, token = "") {
   };
 }
 
+function cateringDeliveryTerminWord(n) {
+  const c = Math.floor(Number(n) || 0);
+  if (c === 1) return "termin";
+  const m10 = c % 10;
+  const m100 = c % 100;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return "terminy";
+  return "terminów";
+}
+
+function buildCateringManualCreatedMailExtraVars(recipientSqlRow, { dates, startTime, durationHours, repeatMode, repeatWeekday, description }) {
+  const sorted = [...(Array.isArray(dates) ? dates : [])].filter((d) => isYmd(cleanString(d, 10))).sort();
+  const first = sorted[0] || "";
+  const last = sorted[sorted.length - 1] || first;
+  const dh = Number(durationHours || 1);
+  const st = cleanString(startTime, 5);
+  let timeTo = "";
+  if (first && st && Number.isFinite(dh) && dh > 0) {
+    const startMs = ymdHmToMs(first, st);
+    timeTo = formatHm(startMs + dh * 3600000);
+  }
+  const mode = cleanString(repeatMode, 20).toLowerCase();
+  let cateringWhenHtml = "";
+  let cateringWhenPlain = "";
+  if (sorted.length <= 1 || !mode || mode === "none") {
+    const line = first ? `${first}, godz. ${st}–${timeTo} (ok. ${dh} h)` : "—";
+    cateringWhenHtml = infoCard("Na kiedy", [["Termin dostawy", escapeHtml(line)]]);
+    cateringWhenPlain = `Na kiedy: ${line}`;
+  } else {
+    const wd = Number(repeatWeekday);
+    const dayCo = ["niedzielę", "poniedziałek", "wtorek", "środę", "czwartek", "piątek", "sobotę"];
+    const dayPart =
+      Number.isInteger(wd) && wd >= 0 && wd <= 6 ? `, dostawy co ${dayCo[wd]}` : ", dostawy co tydzień w ustalonym dniu";
+    const tw = cateringDeliveryTerminWord(sorted.length);
+    const summaryLine = `${sorted.length} ${tw} od ${first} do ${last} (włącznie)${dayPart}, zawsze o ${st}–${timeTo} (ok. ${dh} h)`;
+    const listNote =
+      sorted.length <= 16
+        ? `<p style="margin:14px 0 0 0;color:#5e4b39;font-size:14px;line-height:1.65;">Kolejne daty: ${sorted.map((d) => escapeHtml(d)).join(", ")}</p>`
+        : "";
+    cateringWhenHtml = `${infoCard("Na kiedy", [["Harmonogram", escapeHtml(summaryLine)]])}${listNote}`;
+    cateringWhenPlain = `Na kiedy: ${summaryLine}`;
+  }
+  const r = recipientSqlRow || {};
+  const person = [r.contact_first_name, r.contact_last_name].filter(Boolean).join(" ");
+  const phone = `${r.phone_prefix || ""} ${r.phone_national || ""}`.trim();
+  const addr = [r.street, r.building_number].filter(Boolean).join(" ");
+  const cityLine = [r.postal_code, r.city].filter(Boolean).join(" ");
+  const recipientRows = [
+    ["Nazwa odbiorcy", r.display_name || "—"],
+    ["Osoba kontaktowa", person || "—"],
+    ["E-mail", r.email || "—"],
+    ["Telefon", phone || "—"],
+    ["Adres", addr || "—"],
+    ["Miejscowość", cityLine || "—"],
+  ];
+  if (String(r.extra_info || "").trim()) {
+    recipientRows.push(["Dodatkowe informacje", String(r.extra_info).trim()]);
+  }
+  const cateringRecipientHtml = infoCard(
+    "Dla kogo (odbiorca)",
+    recipientRows.map(([label, value]) => [label, escapeHtml(String(value ?? ""))])
+  );
+  const desc = cleanString(description, 2000);
+  const cateringDescriptionHtml = desc
+    ? noteCard(`<strong>Opis / uwagi do zamówienia:</strong><br>${escapeHtml(desc).replace(/\n/g, "<br>")}`)
+    : "";
+  return { cateringWhenHtml, cateringRecipientHtml, cateringDescriptionHtml, cateringWhenPlain };
+}
+
 async function buildHallMailVars(env, request, row, token = "") {
   const hall = await env.DB.prepare("SELECT name FROM venue_halls WHERE id = ?").bind(row.hall_id).first();
   return {
@@ -4271,17 +4353,25 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
     serviceLabel: serviceLabel(service),
     siteUrl,
     serviceUrl: `${siteUrl}${serviceLandingPath(service)}`,
-    preheader:
-      service === "restaurant"
-        ? `Rezerwacja stolika ${vars.reservationNumber || ""}`.trim()
-        : `Rezerwacja ${vars.reservationNumber || ""}`.trim(),
+    preheader: (() => {
+      if (service === "restaurant") {
+        if (eventKey === "catering_manual_created_client") {
+          const w = cleanString(vars.cateringWhenPlain, 220);
+          return w || `Dostawa cateringu — ${vars.reservationNumber || ""}`.trim();
+        }
+        return `Rezerwacja stolika ${vars.reservationNumber || ""}`.trim();
+      }
+      return `Rezerwacja ${vars.reservationNumber || ""}`.trim();
+    })(),
     actionUrl: eventKey === "pending_admin" ? vars.adminActionLink || "" : "",
     actionLabel:
       eventKey === "pending_admin"
         ? "Otwórz i potwierdź"
         : service === "hall"
           ? "Potwierdź zgłoszenie"
-          : "Potwierdź adres e-mail",
+          : eventKey === "catering_manual_created_client"
+            ? ""
+            : "Potwierdź adres e-mail",
   });
   try {
     const result = await sendMailViaSmtpWithRetry(
@@ -5360,6 +5450,33 @@ async function handleRestaurantAdmin(env, op, request) {
         );
         createdIds.push(out.id);
       }
+      const recRow = await getCateringRecipientRow(env, recipientId);
+      const recipientEmail = cleanString(recRow?.email, 180).toLowerCase();
+      if (createdIds.length && recRow && recipientEmail.includes("@")) {
+        try {
+          const firstId = createdIds[0];
+          const resRow = await getRestaurantReservationRow(env, firstId);
+          if (resRow) {
+            const extraVars = buildCateringManualCreatedMailExtraVars(recRow, {
+              dates,
+              startTime,
+              durationHours,
+              repeatMode: body.repeatMode,
+              repeatWeekday: body.repeatWeekday,
+              description,
+            });
+            await sendTemplatedBookingMail(env, request, {
+              service: "restaurant",
+              eventKey: "catering_manual_created_client",
+              row: resRow,
+              to: recipientEmail,
+              extraVars,
+            });
+          }
+        } catch (mailErr) {
+          console.error("Catering manual created client mail error:", mailErr);
+        }
+      }
       return { status: 200, data: { ok: true, reservationIds: createdIds, count: createdIds.length } };
     } catch (error) {
       return { status: 400, data: { error: error.message || "Błąd tworzenia dostaw." } };
@@ -5523,19 +5640,6 @@ async function handleRestaurantAdmin(env, op, request) {
             id
           )
           .run();
-        if (notifyClient) {
-          try {
-            const updated = await getRestaurantReservationRow(env, id);
-            await sendTemplatedBookingMail(env, request, {
-              service: "restaurant",
-              eventKey: "changed_client",
-              row: updated,
-              to: updated?.email,
-            });
-          } catch (error) {
-            console.error("Restaurant changed mail error:", error);
-          }
-        }
         return { status: 200, data: { ok: true } };
       }
       const payload = {

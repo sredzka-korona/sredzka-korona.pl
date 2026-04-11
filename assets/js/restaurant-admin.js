@@ -123,6 +123,7 @@
   }
 
   let restSubTab = "reservations";
+  let restTemplateKeyFilter = null;
   let restResFilter = "active";
   let settingsData = {};
   let tablesData = [];
@@ -145,6 +146,8 @@
     restaurant_expired_pending_client: "Klient — wygasło oczekiwanie na decyzję cateringu.",
     restaurant_expired_pending_admin: "Obsługa — informacja o automatycznym wygaśnięciu rezerwacji.",
     restaurant_expired_email_client: "Klient — nie potwierdzono adresu e-mail w terminie 2 godzin.",
+    catering_manual_created_client:
+      "Klient (e-mail odbiorcy) — po ręcznym utworzeniu dostawy cateringu w grafiku (jedna lub wiele dat / cyklicznie).",
   };
 
   const REST_TEMPLATE_PREVIEW_VARS = Object.freeze({
@@ -165,10 +168,21 @@
     restaurantName: "Catering Średzka Korona",
   });
 
+  const REST_CATERING_TEMPLATE_PREVIEW_EXTRA = Object.freeze({
+    cateringWhenHtml:
+      '<table role="presentation" width="100%"><tr><td style="padding:8px 0;"><strong>Na kiedy (przykład):</strong> 2026-05-08, godz. 12:00–14:00 (ok. 2 h)</td></tr></table>',
+    cateringRecipientHtml:
+      '<table role="presentation" width="100%"><tr><td style="padding:8px 0;"><strong>Dla kogo:</strong> Przykładowa firma · kontakt@example.com</td></tr></table>',
+    cateringDescriptionHtml: "",
+    cateringWhenPlain: "Na kiedy: 2026-05-08, godz. 12:00–14:00 (ok. 2 h)",
+  });
+
   function renderTemplatePreviewString(template, vars) {
+    const rawHtmlKeys = new Set(["cateringWhenHtml", "cateringRecipientHtml", "cateringDescriptionHtml"]);
     return String(template || "").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
       const value = vars?.[key];
       if (value === undefined || value === null) return "";
+      if (rawHtmlKeys.has(key)) return String(value);
       return escapeHtml(String(value));
     });
   }
@@ -193,6 +207,7 @@
       expired_pending_client: "Wygaśnięcie rezerwacji stolika",
       expired_pending_admin: "Wygaśnięcie rezerwacji — informacja dla obsługi",
       expired_email_client: "Wygasłe potwierdzenie — rezerwacja stolika",
+      catering_manual_created_client: "Dostawa cateringu — utworzono rezerwację",
     };
     return map[k] || "Wiadomość o rezerwacji";
   }
@@ -298,10 +313,12 @@
     const previewHost = document.querySelector(`[data-rest-preview-key="${key}"]`);
     if (!subjectField || !previewHost) return;
     const bodyHtml = editor?.innerHTML || hidden?.value || "";
-    const renderedSubject = renderTemplatePreviewString(subjectField.value, REST_TEMPLATE_PREVIEW_VARS);
-    const renderedBody = sanitizeTemplatePreviewHtml(
-      renderTemplatePreviewString(bodyHtml, REST_TEMPLATE_PREVIEW_VARS)
-    );
+    const previewVars =
+      String(key || "").startsWith("catering_") ?
+        { ...REST_TEMPLATE_PREVIEW_VARS, ...REST_CATERING_TEMPLATE_PREVIEW_EXTRA }
+      : REST_TEMPLATE_PREVIEW_VARS;
+    const renderedSubject = renderTemplatePreviewString(subjectField.value, previewVars);
+    const renderedBody = sanitizeTemplatePreviewHtml(renderTemplatePreviewString(bodyHtml, previewVars));
     previewHost.innerHTML = buildMailPreviewMarkup({
       inboxSubject: renderedSubject,
       headerContext: restaurantMailHeaderContext(key),
@@ -528,11 +545,20 @@
   }
 
   function renderTemplates() {
-    const keys = Object.keys(templatesData);
+    const allKeys = Object.keys(templatesData);
+    const keys =
+      Array.isArray(restTemplateKeyFilter) && restTemplateKeyFilter.length ?
+        allKeys.filter((k) => restTemplateKeyFilter.includes(k))
+      : allKeys;
+    const helperBlock =
+      Array.isArray(restTemplateKeyFilter) && restTemplateKeyFilter.length ?
+        `<p class="helper">Ten widok pokazuje szablony używane przy <strong>dostawach cateringu utworzonych ręcznie w grafiku</strong>. Dostępna jest jedna wiadomość do adresu e-mail odbiorcy (jeśli jest podany w kartotece odbiorcy).</p>
+        <p class="helper">Zmienne tekstowe: <code>{{fullName}}</code> (nazwa odbiorcy), <code>{{email}}</code>, <code>{{phone}}</code>, <code>{{restaurantName}}</code>, <code>{{reservationNumber}}</code> (numer pierwszej utworzonej dostawy). Bloki uzupełniane automatycznie: <code>{{cateringWhenHtml}}</code> (termin jednorazowy lub opis cyklu i lista dat), <code>{{cateringRecipientHtml}}</code> (dane odbiorcy), <code>{{cateringDescriptionHtml}}</code> (opis z formularza — może być pusty).</p>`
+      : `<p class="helper">Zmienne: <code>{{reservationNumber}}</code> (np. 5/2026/RESTAURACJA), <code>{{reservationSubject}}</code>, <code>{{decisionDeadline}}</code>, <code>{{adminActionLink}}</code>, <code>{{fullName}}</code>, <code>{{email}}</code>, <code>{{phone}}</code>, <code>{{date}}</code>, <code>{{timeFrom}}</code>, <code>{{timeTo}}</code>, <code>{{durationHours}}</code>, <code>{{tablesList}}</code>, <code>{{guestsCount}}</code>, <code>{{customerNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{restaurantName}}</code>.</p>`;
     return `
       <div class="hotel-subpanel">
         <h3>Szablony mailingowe — catering</h3>
-        <p class="helper">Zmienne: <code>{{reservationNumber}}</code> (np. 5/2026/RESTAURACJA), <code>{{reservationSubject}}</code>, <code>{{decisionDeadline}}</code>, <code>{{adminActionLink}}</code>, <code>{{fullName}}</code>, <code>{{email}}</code>, <code>{{phone}}</code>, <code>{{date}}</code>, <code>{{timeFrom}}</code>, <code>{{timeTo}}</code>, <code>{{durationHours}}</code>, <code>{{tablesList}}</code>, <code>{{guestsCount}}</code>, <code>{{customerNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{restaurantName}}</code>.</p>
+        ${helperBlock}
         <p class="helper">Logo, przycisk akcji i premium-layout wiadomości są dodawane automatycznie przy wysyłce. W polu poniżej edytujesz główną treść maila.</p>
         <p class="helper">Podgląd pokazuje od razu, jak mail będzie wyglądał po podstawieniu danych rezerwacji cateringu. Przy szablonie potwierdzenia adresu e-mail możesz ustawić tekst na przycisku (gdy treść nie zawiera linku <code>{{confirmationLink}}</code>, przycisk zostanie zbudowany z tego pola).</p>
         <div id="rest-template-forms">
@@ -562,7 +588,11 @@
               <div class="mail-preview-panel">
                 <div class="mail-preview-panel-head">
                   <strong>Podgląd wiadomości</strong>
-                  <span class="helper">Wersja z przykładową rezerwacją stolika i realnym brandingiem.</span>
+                  <span class="helper">${
+                    String(k || "").startsWith("catering_") ?
+                      "Przykładowe dane dostawy cateringu i branding jak w wysyłce."
+                    : "Wersja z przykładową rezerwacją stolika i realnym brandingiem."
+                  }</span>
                 </div>
                 <div class="mail-preview-render" data-rest-preview-key="${escapeHtml(k)}"></div>
               </div>
@@ -634,6 +664,10 @@
     }
     const allowedTabs = Array.isArray(options.allowedTabs) && options.allowedTabs.length
       ? options.allowedTabs.map((tab) => String(tab || "").trim()).filter(Boolean)
+      : null;
+    restTemplateKeyFilter =
+      Array.isArray(options.restaurantMailTemplateKeyFilter) && options.restaurantMailTemplateKeyFilter.length ?
+        options.restaurantMailTemplateKeyFilter
       : null;
     container.innerHTML = `<p class="status">Ładowanie modułu Catering…</p>`;
     try {
