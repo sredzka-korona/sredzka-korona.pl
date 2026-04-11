@@ -2271,6 +2271,8 @@ body.admin-modal-open {
 .schedule-registry-search {
   width: 100%;
   min-width: 0;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(93, 110, 143, 0.28);
 }
 
 .schedule-registry-search-label {
@@ -2580,6 +2582,35 @@ body.admin-modal-open {
   text-align: center;
   text-transform: capitalize;
   max-width: 100%;
+}
+
+.schedule-calendar-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.55rem;
+  max-width: 100%;
+}
+
+.schedule-calendar-select {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid rgba(200, 170, 120, 0.34);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--text);
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.schedule-calendar-select[data-schedule-calendar-part="month"] {
+  flex: 1 1 9.5rem;
+}
+
+.schedule-calendar-select[data-schedule-calendar-part="year"] {
+  flex: 0 1 5.5rem;
 }
 
 .schedule-refresh-button {

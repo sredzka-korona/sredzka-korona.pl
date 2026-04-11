@@ -1564,13 +1564,43 @@
     });
   }
 
-  function scheduleMonthLabel(monthCursor) {
-    const [year, month] = String(monthCursor || "").split("-").map((value) => Number(value));
-    if (!year || !month) return "";
-    return new Date(year, month - 1, 1).toLocaleDateString("pl-PL", {
-      month: "long",
-      year: "numeric",
-    });
+  function scheduleParseMonthCursor(monthCursor) {
+    const raw = String(monthCursor || "").split("-");
+    let year = Number(raw[0]);
+    let month = Number(raw[1]);
+    const now = new Date();
+    if (!year || year < 1900 || year > 2100) year = now.getFullYear();
+    if (!month || month < 1 || month > 12) month = now.getMonth() + 1;
+    return { year, month };
+  }
+
+  function scheduleCalendarYearBounds(monthCursor) {
+    const { year } = scheduleParseMonthCursor(monthCursor);
+    const nowY = new Date().getFullYear();
+    const yMin = Math.min(year, nowY) - 12;
+    const yMax = Math.max(year, nowY) + 6;
+    return { yMin, yMax };
+  }
+
+  function scheduleCalendarNavSelectsMarkup(monthCursor) {
+    const { year, month } = scheduleParseMonthCursor(monthCursor);
+    const ym = `${year}-${String(month).padStart(2, "0")}`;
+    const { yMin, yMax } = scheduleCalendarYearBounds(ym);
+    const monthOptions = Array.from({ length: 12 }, (_, i) => {
+      const m = i + 1;
+      const label = new Date(2000, m - 1, 1).toLocaleDateString("pl-PL", { month: "long" });
+      const selected = m === month ? " selected" : "";
+      return `<option value="${String(m).padStart(2, "0")}"${selected}>${escapeHtml(label)}</option>`;
+    }).join("");
+    const yearOptions = [];
+    for (let y = yMin; y <= yMax; y += 1) {
+      const selected = y === year ? " selected" : "";
+      yearOptions.push(`<option value="${y}"${selected}>${escapeHtml(String(y))}</option>`);
+    }
+    return `<div class="schedule-calendar-picker">
+      <select class="schedule-calendar-select" data-schedule-calendar-part="month" aria-label="Miesiąc">${monthOptions}</select>
+      <select class="schedule-calendar-select" data-schedule-calendar-part="year" aria-label="Rok">${yearOptions.join("")}</select>
+    </div>`;
   }
 
   function scheduleShiftMonth(monthCursor, direction) {
@@ -1707,8 +1737,10 @@
     });
     const path = `/api/admin/legacy-bookings/${encodeURIComponent(service)}?${queryParams.toString()}`;
     const requestOptions = { method };
+    const opTrim = String(op || "").trim();
+    requestOptions.headers = { "X-Booking-Op": opTrim };
     if (options.body !== undefined) {
-      requestOptions.headers = { "Content-Type": "application/json" };
+      requestOptions.headers["Content-Type"] = "application/json";
       requestOptions.body = JSON.stringify(options.body);
     }
     return api(path, requestOptions);
@@ -2213,37 +2245,52 @@
     `;
   }
 
-  /** W spisie rezerwacji: jeden wiersz na serię cateringu (wspólne cateringSeriesId z API). */
-  function scheduleDedupeRestaurantRegistryItems(items) {
-    const seriesCounts = new Map();
-    for (const item of items) {
-      const sid = String(item.raw?.cateringSeriesId || "").trim();
-      if (!sid) continue;
-      seriesCounts.set(sid, (seriesCounts.get(sid) || 0) + 1);
+  /**
+   * Spis rezerwacji: jeden wiersz na serię dostaw cateringu.
+   * Grupa: cateringSeriesId z API; gdy puste (np. starsze dane) — ten sam odbiorca + humanYear + humanSlug.
+   */
+  function scheduleRegistryRestaurantCycleGroupKey(item) {
+    const r = item?.raw || {};
+    const sid = String(r.cateringSeriesId || "").trim();
+    if (sid) return `series:${sid}`;
+    if (!r.cateringDelivery) return `one:${item.id}`;
+    const slug = String(r.humanSlug || "").trim();
+    const hy = Number(r.humanYear);
+    const rec = String(r.recipientId || "").trim();
+    if (slug && Number.isInteger(hy) && hy >= 2000 && hy <= 2100 && rec) {
+      return `slug:${rec}:${hy}:${slug}`;
     }
-    const earliestBySeries = new Map();
-    for (const item of items) {
-      const sid = String(item.raw?.cateringSeriesId || "").trim();
-      if (!sid) continue;
-      const cur = earliestBySeries.get(sid);
+    return `one:${item.id}`;
+  }
+
+  function scheduleDedupeRestaurantRegistryItems(items) {
+    const list = Array.isArray(items) ? items : [];
+    const counts = new Map();
+    for (const item of list) {
+      const k = scheduleRegistryRestaurantCycleGroupKey(item);
+      counts.set(k, (counts.get(k) || 0) + 1);
+    }
+    const repByKey = new Map();
+    for (const item of list) {
+      const k = scheduleRegistryRestaurantCycleGroupKey(item);
+      const cur = repByKey.get(k);
       if (!cur || item.startMs < cur.startMs) {
-        earliestBySeries.set(sid, item);
+        repByKey.set(k, item);
       }
     }
-    const singles = items.filter((item) => !String(item.raw?.cateringSeriesId || "").trim());
-    const seriesReps = [];
-    for (const [sid, rep] of earliestBySeries) {
-      const cnt = seriesCounts.get(sid) || 1;
+    const out = [];
+    for (const [k, rep] of repByKey) {
+      const cnt = counts.get(k) || 1;
       if (cnt > 1) {
-        seriesReps.push({
+        out.push({
           ...rep,
           subtitle: `${rep.subtitle} · cykl: ${cnt} terminów`,
         });
       } else {
-        seriesReps.push(rep);
+        out.push(rep);
       }
     }
-    return [...singles, ...seriesReps].sort(
+    return out.sort(
       (a, b) =>
         (Number(b.createdAtMs || 0) - Number(a.createdAtMs || 0)) ||
         (Number(b.startMs || 0) - Number(a.startMs || 0))
@@ -2388,7 +2435,11 @@
 
   function scheduleListItemBottomActionsMarkup(kind, item) {
     if (kind === "pending") {
-      return `<button type="button" class="button secondary schedule-card-action-confirm" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>`;
+      const cancelBtn = scheduleCanCancel(item)
+        ? `<button type="button" class="button secondary danger-muted schedule-inline-cancel schedule-card-action-cancel" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`
+        : "";
+      const confirmBtn = `<button type="button" class="button secondary schedule-card-action-confirm" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>`;
+      return `${cancelBtn}${confirmBtn}`;
     }
     return "";
   }
@@ -2561,7 +2612,7 @@
             <div class="schedule-calendar-head-spacer" aria-hidden="true"></div>
             <div class="schedule-calendar-nav">
               <button type="button" class="button secondary icon-button" data-schedule-month="-1" aria-label="Poprzedni miesiąc">←</button>
-              <h3 class="schedule-calendar-title">${escapeHtml(scheduleMonthLabel(monthCursor))}</h3>
+              ${scheduleCalendarNavSelectsMarkup(monthCursor)}
               <button type="button" class="button secondary icon-button" data-schedule-month="1" aria-label="Następny miesiąc">→</button>
             </div>
             <button type="button" class="schedule-refresh-button" data-schedule-refresh aria-label="Odśwież">${scheduleIconMarkup("refresh")}</button>
@@ -2628,6 +2679,11 @@
                           ${
                             item.status !== "manual_block" && item.status === "pending"
                               ? `<div class="schedule-card-actions-bottom">
+                            ${
+                              scheduleCanCancel(item)
+                                ? `<button type="button" class="button secondary danger-muted schedule-inline-cancel schedule-card-action-cancel" data-schedule-action="cancel" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Odwołaj</button>`
+                                : ""
+                            }
                             <button type="button" class="button secondary schedule-card-action-confirm" data-schedule-action="confirm" data-schedule-service="${escapeAttribute(item.service)}" data-schedule-id="${escapeAttribute(item.id)}">Potwierdź</button>
                           </div>`
                               : ""
@@ -2649,6 +2705,18 @@
     panel.querySelectorAll("[data-schedule-month]").forEach((button) => {
       button.addEventListener("click", () => {
         state.schedule.monthCursor = scheduleShiftMonth(state.schedule.monthCursor, Number(button.dataset.scheduleMonth || 0));
+        renderSchedulePanel();
+      });
+    });
+    panel.querySelectorAll("[data-schedule-calendar-part]").forEach((el) => {
+      el.addEventListener("change", () => {
+        const monthEl = panel.querySelector('[data-schedule-calendar-part="month"]');
+        const yearEl = panel.querySelector('[data-schedule-calendar-part="year"]');
+        if (!monthEl || !yearEl) return;
+        const y = Number(yearEl.value);
+        const m = Number(monthEl.value);
+        if (!y || !m) return;
+        state.schedule.monthCursor = `${y}-${String(m).padStart(2, "0")}`;
         renderSchedulePanel();
       });
     });
@@ -3044,7 +3112,7 @@
           <div class="schedule-modal-head-actions">
             <button type="button" class="button secondary" data-schedule-details-action="edit">Edytuj</button>
             ${
-              isBlock || canCancelReservation
+              isBlock || (canCancelReservation && item.status !== "pending")
                 ? `<button type="button" class="button secondary danger-muted${isBlock ? " icon-button" : ""}" data-schedule-details-action="delete" aria-label="${escapeAttribute(
                     isBlock ? "Usuń blokadę" : "Odwołaj rezerwację"
                   )}">${isBlock ? scheduleIconMarkup("trash") : "Odwołaj"}</button>`
@@ -3059,6 +3127,11 @@
             ? `
         <div class="admin-modal-footer schedule-modal-footer">
           <div class="schedule-details-footer-actions">
+            ${
+              canCancelReservation
+                ? `<button type="button" class="button secondary danger-muted" data-schedule-details-action="delete">Odwołaj</button>`
+                : ""
+            }
             <button type="button" class="button secondary" data-schedule-details-action="confirm">Potwierdź</button>
           </div>
         </div>`

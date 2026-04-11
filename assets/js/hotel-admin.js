@@ -39,6 +39,7 @@
       method: options.method || "GET",
       headers: {
         "Content-Type": "application/json",
+        "X-Booking-Op": op,
         Authorization: `Bearer ${token}`,
         ...(options.headers || {}),
       },

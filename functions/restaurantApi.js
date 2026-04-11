@@ -55,7 +55,11 @@ if (!getApps().length) {
 const db = getFirestore();
 
 function restaurantName() {
-  return process.env.RESTAURANT_NAME || process.env.HOTEL_NAME || "Średzka Korona — Restauracja";
+  const catering = String(process.env.CATERING_NAME || "").trim();
+  if (catering) return catering;
+  const hotel = String(process.env.HOTEL_NAME || "").trim();
+  if (hotel) return `${hotel} — Catering`;
+  return process.env.RESTAURANT_NAME || "Średzka Korona — Catering";
 }
 
 function publicSiteUrl() {
@@ -1500,7 +1504,7 @@ const restaurantApi = onRequest(
         return;
       }
 
-      if (req.method === "PUT" && op === "admin-mail-template-save") {
+      if ((req.method === "PUT" || req.method === "POST") && op === "admin-mail-template-save") {
         const body = typeof req.body === "object" && req.body ? req.body : JSON.parse(req.body || "{}");
         const { key, subject, bodyHtml } = body;
         if (!key) {

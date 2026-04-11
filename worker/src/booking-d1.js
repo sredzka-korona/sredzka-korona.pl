@@ -4181,6 +4181,13 @@ function cateringDisplayName(env) {
   return "Średzka Korona — Catering";
 }
 
+/** Catering w mailu: flaga DB lub odbiorca (zabezpieczenie przed błędnym catering_delivery). */
+function useCateringMailBranding(row) {
+  if (!row) return false;
+  if (Number(row.catering_delivery) === 1) return true;
+  return Boolean(cleanString(row.recipient_id, 80));
+}
+
 function hallDisplayName(env) {
   return cleanString(env.VENUE_NAME, 140) || cleanString(env.HOTEL_NAME, 140) || "Średzka Korona";
 }
@@ -4366,7 +4373,7 @@ async function buildRestaurantMailVars(env, request, row, token = "") {
       return t ? `Stół ${t.number}${t.zone ? ` (${t.zone})` : ""}` : id;
     })
     .join(", ");
-  const isCateringDelivery = Number(row.catering_delivery) === 1;
+  const cateringMail = useCateringMailBranding(row);
   return {
     reservationId: row.id,
     reservationNumber: reservationNumberForRow(row, "restaurant"),
@@ -4387,7 +4394,7 @@ async function buildRestaurantMailVars(env, request, row, token = "") {
     adminNote: row.admin_note || "",
     decisionDeadline: formatDateTimeWarsaw(Number(row.pending_expires_at || 0)),
     confirmationLink: token ? buildConfirmationLink(env, request, "restaurant", token) : "",
-    restaurantName: isCateringDelivery ? cateringDisplayName(env) : restaurantDisplayName(env),
+    restaurantName: cateringMail ? cateringDisplayName(env) : restaurantDisplayName(env),
   };
 }
 
@@ -4688,7 +4695,7 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
         : vars.venueName || "Średzka Korona";
   const reservationNo = cleanString(vars.reservationNumber, 120);
   const footerServiceLabel =
-    service === "restaurant" && Number(row?.catering_delivery) === 1 ? "Catering" : serviceLabel(service);
+    service === "restaurant" && useCateringMailBranding(row) ? "Catering" : serviceLabel(service);
   const email = buildBrandedEmail({
     subject,
     htmlFragment: html,
@@ -4982,7 +4989,7 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
         reservationCloseTime: "22:00",
         timeSlotMinutes: 30,
         timeSlots: [],
-        restaurantName: "Średzka Korona — Restauracja",
+        restaurantName: cateringDisplayName(env),
         onlineTableBookingDisabled: true,
       },
     };
@@ -5411,7 +5418,7 @@ async function handleHotelAdmin(env, op, request) {
   if (op === "admin-mail-templates" && request.method === "GET") {
     return { status: 200, data: { templates: await loadTemplates(env, "hotel") } };
   }
-  if (op === "admin-mail-template-save" && request.method === "PUT") {
+  if (op === "admin-mail-template-save" && ["PUT", "POST"].includes(request.method)) {
     const body = await readBody(request);
     await saveTemplate(env, "hotel", body.key, body.subject, body.bodyHtml, body.actionLabel);
     return { status: 200, data: { ok: true } };
@@ -5855,7 +5862,7 @@ async function handleRestaurantAdmin(env, op, request) {
   if (op === "admin-mail-templates" && request.method === "GET") {
     return { status: 200, data: { templates: await loadTemplates(env, "restaurant") } };
   }
-  if (op === "admin-mail-template-save" && request.method === "PUT") {
+  if (op === "admin-mail-template-save" && ["PUT", "POST"].includes(request.method)) {
     const body = await readBody(request);
     const key = cleanString(body.key, 120);
     await saveTemplate(env, "restaurant", key, body.subject, body.bodyHtml, body.actionLabel);
@@ -6100,7 +6107,7 @@ async function handleHallAdmin(env, op, request) {
   if (op === "admin-mail-templates" && request.method === "GET") {
     return { status: 200, data: { templates: await loadTemplates(env, "hall") } };
   }
-  if (op === "admin-mail-template-save" && request.method === "PUT") {
+  if (op === "admin-mail-template-save" && ["PUT", "POST"].includes(request.method)) {
     const body = await readBody(request);
     await saveTemplate(env, "hall", body.key, body.subject, body.bodyHtml, body.actionLabel);
     return { status: 200, data: { ok: true } };

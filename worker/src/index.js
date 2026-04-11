@@ -306,7 +306,9 @@ export default {
       ) {
         await requireFirebaseAdmin(request, env);
         const service = legacyBookingsPath.split("/").pop();
-        const op = String(url.searchParams.get("op") || "").trim();
+        const op = String(
+          url.searchParams.get("op") || request.headers.get("X-Booking-Op") || request.headers.get("x-booking-op") || ""
+        ).trim();
         const native = await handleD1BookingApi({
           service,
           op,
@@ -1518,7 +1520,7 @@ function corsHeaders(request, env) {
     "Access-Control-Allow-Origin": canUseOrigin,
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Booking-Op",
     Vary: "Origin",
   };
 }

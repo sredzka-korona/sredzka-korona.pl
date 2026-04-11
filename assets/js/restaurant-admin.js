@@ -41,6 +41,7 @@
       method: options.method || "GET",
       headers: {
         "Content-Type": "application/json",
+        "X-Booking-Op": op,
         Authorization: `Bearer ${token}`,
         ...(options.headers || {}),
       },
@@ -557,9 +558,15 @@
         options.restaurantMailTemplateKeyFilter
       : null;
     container.innerHTML = `<p class="status">Ładowanie modułu Catering…</p>`;
+    const templatesOnly =
+      Array.isArray(allowedTabs) &&
+      allowedTabs.length === 1 &&
+      String(allowedTabs[0] || "").trim() === "templates";
     try {
-      await loadReservations("active");
-      await loadCateringRecipients();
+      if (!templatesOnly) {
+        await loadReservations("active");
+        await loadCateringRecipients();
+      }
       await loadTemplates();
     } catch (e) {
       container.innerHTML = `<p class="status">${escapeHtml(e.message)}</p>`;
@@ -662,7 +669,7 @@
           const bodyHidden = document.querySelector(`[data-rest-tpl-key="${key}"][data-field="bodyHtml-hidden"]`);
           const newBodyHtml = bodyHidden?.value || "";
           restaurantApi("admin-mail-template-save", {
-            method: "PUT",
+            method: "POST",
             body: {
               key,
               subject: subj?.value || "",
