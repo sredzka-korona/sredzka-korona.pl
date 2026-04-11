@@ -108,13 +108,13 @@
               });
               const d = await r.json().catch(() => ({}));
               if (!r.ok) {
-                out.innerHTML =
-                  BRAND +
-                  '<h1 class="confirm-err-title">Nie udało się potwierdzić</h1>' +
-                  "<p class=\"confirm-err-text\">" +
-                  (d.error || "Spróbuj ponownie później albo skontaktuj się z restauracją.") +
-                  "</p>" +
-                  CTA;
+                const isGone = r.status === 410;
+                const title = isGone ? "Link nieaktualny" : "Nie udało się potwierdzić";
+                const lead =
+                  isGone
+                    ? "Publiczna rezerwacja stolików w lokalu została wyłączona. Ten link pochodzi ze starej wiadomości. Catering i dostawy obsługujemy indywidualnie — napisz na kontakt@sredzka-korona.pl lub zadzwoń."
+                    : d.error || "Spróbuj ponownie później albo skontaktuj się z restauracją.";
+                out.innerHTML = BRAND + `<h1 class="confirm-err-title">${title}</h1>` + `<p class="confirm-err-text">${lead}</p>` + CTA;
                 return;
               }
               out.innerHTML =

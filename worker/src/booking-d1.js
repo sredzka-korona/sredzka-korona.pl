@@ -4970,9 +4970,24 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
   }
   const adminAction = await handlePublicAdminAction(env, op, request, "restaurant");
   if (adminAction) return adminAction;
+  /** Odpowiedź zgodna z Firebase restaurantApi — bez 410 w konsoli; klienci mogą sprawdzić `onlineTableBookingDisabled`. */
+  if (op === "public-settings" && request.method === "GET") {
+    return {
+      status: 200,
+      data: {
+        maxGuestsPerTable: 4,
+        tableCount: 0,
+        reservationOpenTime: "12:00",
+        reservationCloseTime: "22:00",
+        timeSlotMinutes: 30,
+        timeSlots: [],
+        restaurantName: "Średzka Korona — Restauracja",
+        onlineTableBookingDisabled: true,
+      },
+    };
+  }
   /** Publiczna rezerwacja stolików — wyłączona; catering (panel admina, dostawy) pozostaje przez handleRestaurantAdmin. */
   const restaurantPublicTableOps = new Set([
-    "public-settings",
     "public-calendar",
     "public-availability",
     "public-reservation-draft",

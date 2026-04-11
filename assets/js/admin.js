@@ -5,12 +5,14 @@
   const isLocalPreview =
     window.location.protocol === "file:" || hostname === "127.0.0.1" || hostname === "localhost";
   const isGithubPages = hostname.endsWith("github.io");
-  const onlineBookingsEnabled = config.enableOnlineBookings === true;
   const fallbackApiBase = isLocalPreview
     ? ""
     : hostname && !isGithubPages
       ? "https://api." + hostname.replace(/^www\./, "")
       : "";
+  /** Grafik i catering na Workerze: wystarczy `apiBase` w config lub domyślny https://api.domena (bez osobnej flagi). */
+  const adminLegacyBookingsEnabled =
+    config.enableOnlineBookings === true || Boolean(String(config.apiBase || fallbackApiBase || "").trim());
   const OPENING_HOURS_DAYS = [
     { key: "monday", label: "Poniedziałek", aliases: ["poniedzialek", "poniedziałek"] },
     { key: "tuesday", label: "Wtorek", aliases: ["wtorek"] },
@@ -1716,7 +1718,7 @@
   }
 
   function scheduleStartPendingWatch() {
-    if (!onlineBookingsEnabled) return;
+    if (!adminLegacyBookingsEnabled) return;
     if (state.schedule.watchTimer) {
       return;
     }
@@ -1840,7 +1842,7 @@
   }
 
   async function loadScheduleData({ silent = false, watchPoll = false } = {}) {
-    if (!onlineBookingsEnabled) {
+    if (!adminLegacyBookingsEnabled) {
       state.schedule.allItems = [];
       state.schedule.items = [];
       state.schedule.pendingItems = [];
@@ -2410,7 +2412,7 @@
   function renderSchedulePanel(statusMessage = "") {
     const panel = document.querySelector("#schedule-panel");
     if (!panel) return;
-    if (!onlineBookingsEnabled) {
+    if (!adminLegacyBookingsEnabled) {
       panel.innerHTML = `
         <p class="status">Ten widok wymaga włączenia backendu rezerwacji online.</p>
       `;
@@ -2565,7 +2567,7 @@
   function renderReservationIndexPanel(statusMessage = "") {
     const panel = document.querySelector("#schedule-panel");
     if (!panel) return;
-    if (!onlineBookingsEnabled) {
+    if (!adminLegacyBookingsEnabled) {
       panel.innerHTML = `
         <p class="status">Ten widok wymaga włączenia backendu rezerwacji online.</p>
       `;
@@ -4121,9 +4123,9 @@
         <p class="section-intro">${escapeHtml(copy)}</p>
         <div class="stack">
           <p class="panel-note">
-            Ten modul probowalby laczyc sie z Firebase Functions, ale w tej konfiguracji strony rezerwacje online sa wylaczone.
+            Brak polaczenia z backendem rezerwacji: ustaw w <code>assets/js/config.js</code> adres Workera w polu <code>apiBase</code> albo wlacz <code>enableOnlineBookings: true</code>.
           </p>
-          <p class="helper">Aby uruchomic ten widok, trzeba wlaczyc <code>enableOnlineBookings</code> i wdrozyc odpowiedni backend rezerwacji.</p>
+          <p class="helper">Panel grafiku i cateringu na D1 wymaga poprawnego <code>apiBase</code> (np. https://api.sredzka-korona.pl), bez cloudfunctions.net.</p>
           <p class="status">${escapeHtml(statusMessage)}</p>
         </div>
       </section>
@@ -4131,7 +4133,7 @@
   }
 
   function mountLegacyBookingModule(panelSelector, service, options = {}, statusMessage = "") {
-    if (!onlineBookingsEnabled) {
+    if (!adminLegacyBookingsEnabled) {
       const titleMap = {
         hotel: "Rezerwacje hotelu",
         restaurant: "Rezerwacje cateringu",
@@ -4454,25 +4456,27 @@
           </div>
           <div class="admin-toggle-group" style="margin-bottom: 1rem; padding-top: 0.75rem; border-top: 1px solid rgba(200, 170, 120, 0.25);">
             <p class="helper">Rezerwacje online na stronach publicznych.</p>
-            ${onlineBookingsEnabled
-              ? ""
-              : '<p class="helper">W tej konfiguracji rezerwacje online sa celowo wylaczone. Strona korzysta z Cloudflare Worker i Firebase Auth, bez Firebase Functions.</p>'}
+            ${!adminLegacyBookingsEnabled
+              ? '<p class="helper">Brak jawnego <code>apiBase</code> i wylaczony <code>enableOnlineBookings</code> — ustaw adres Workera w <code>config.js</code> lub wlacz flage.</p>'
+              : !config.enableOnlineBookings
+                ? '<p class="helper">Strona publiczna: moduly rezerwacji sa wylaczone (<code>enableOnlineBookings: false</code> w booking-flags). Grafik w panelu dziala przy ustawionym <code>apiBase</code>.</p>'
+                : ""}
             <label class="checkbox-field">
-              <input type="checkbox" id="booking-enable-restaurant" ${content.booking?.restaurant !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} />
+              <input type="checkbox" id="booking-enable-restaurant" ${content.booking?.restaurant !== false ? "checked" : ""} ${adminLegacyBookingsEnabled ? "" : "disabled"} />
               <span class="checkbox-copy">
                 <strong>Catering</strong>
                 <span>Włącza formularz rezerwacji stolika (gdy kafelek jest widoczny w modalu).</span>
               </span>
             </label>
             <label class="checkbox-field">
-              <input type="checkbox" id="booking-enable-hotel" ${content.booking?.hotel !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} />
+              <input type="checkbox" id="booking-enable-hotel" ${content.booking?.hotel !== false ? "checked" : ""} ${adminLegacyBookingsEnabled ? "" : "disabled"} />
               <span class="checkbox-copy">
                 <strong>Hotel</strong>
                 <span>Włącza formularz rezerwacji pokoi.</span>
               </span>
             </label>
             <label class="checkbox-field">
-              <input type="checkbox" id="booking-enable-events" ${content.booking?.events !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} />
+              <input type="checkbox" id="booking-enable-events" ${content.booking?.events !== false ? "checked" : ""} ${adminLegacyBookingsEnabled ? "" : "disabled"} />
               <span class="checkbox-copy">
                 <strong>Przyjecia / sale</strong>
                 <span>Włącza formularz zapytania o sale i rezerwacje.</span>
@@ -4873,7 +4877,7 @@
     const br = document.querySelector("#booking-enable-restaurant");
     const bh = document.querySelector("#booking-enable-hotel");
     const be = document.querySelector("#booking-enable-events");
-    if (onlineBookingsEnabled) {
+    if (adminLegacyBookingsEnabled) {
       content.booking.restaurant = br ? br.checked : content.booking.restaurant !== false;
       content.booking.hotel = bh ? bh.checked : content.booking.hotel !== false;
       content.booking.events = be ? be.checked : content.booking.events !== false;
@@ -4899,9 +4903,9 @@
       const allRanges = draftRange ? [...rangesFromList, draftRange] : rangesFromList;
       return filterCurrentAndFuturePauseRanges(allRanges);
     }
-    const restaurantRanges = onlineBookingsEnabled ? collectPauseRanges("restaurant") : [];
-    const hotelRanges = onlineBookingsEnabled ? collectPauseRanges("hotel") : [];
-    const eventsRanges = onlineBookingsEnabled ? collectPauseRanges("events") : [];
+    const restaurantRanges = adminLegacyBookingsEnabled ? collectPauseRanges("restaurant") : [];
+    const hotelRanges = adminLegacyBookingsEnabled ? collectPauseRanges("hotel") : [];
+    const eventsRanges = adminLegacyBookingsEnabled ? collectPauseRanges("events") : [];
     content.booking.restaurantPauseRanges = restaurantRanges;
     content.booking.hotelPauseRanges = hotelRanges;
     content.booking.eventsPauseRanges = eventsRanges;
@@ -5278,7 +5282,7 @@
     const root = document.querySelector("#admin-panel-catering-recipients");
     if (!root) return;
 
-    if (!onlineBookingsEnabled) {
+    if (!adminLegacyBookingsEnabled) {
       renderOnlineBookingsUnavailable("#admin-panel-catering-recipients", {
         title: "Odbiorcy cateringu",
         copy: "Ten widok wymaga włączonego backendu rezerwacji cateringu.",
@@ -5398,7 +5402,7 @@
       pauseRangesKey: "hotelPauseRanges",
       pauseLabel: "Hotel",
       statusMessage,
-      disabled: !onlineBookingsEnabled,
+      disabled: !adminLegacyBookingsEnabled,
     });
   }
 
@@ -5410,7 +5414,7 @@
       pauseRangesKey: "restaurantPauseRanges",
       pauseLabel: "Catering",
       statusMessage,
-      disabled: !onlineBookingsEnabled,
+      disabled: !adminLegacyBookingsEnabled,
     });
   }
 
@@ -5422,7 +5426,7 @@
       pauseRangesKey: "eventsPauseRanges",
       pauseLabel: "Przyjecia / sale",
       statusMessage,
-      disabled: !onlineBookingsEnabled,
+      disabled: !adminLegacyBookingsEnabled,
     });
   }
 
