@@ -4181,13 +4181,6 @@ function cateringDisplayName(env) {
   return "Średzka Korona — Catering";
 }
 
-/** Catering w mailu: flaga DB lub odbiorca (zabezpieczenie przed błędnym catering_delivery). */
-function useCateringMailBranding(row) {
-  if (!row) return false;
-  if (Number(row.catering_delivery) === 1) return true;
-  return Boolean(cleanString(row.recipient_id, 80));
-}
-
 function hallDisplayName(env) {
   return cleanString(env.VENUE_NAME, 140) || cleanString(env.HOTEL_NAME, 140) || "Średzka Korona";
 }
@@ -4373,7 +4366,6 @@ async function buildRestaurantMailVars(env, request, row, token = "") {
       return t ? `Stół ${t.number}${t.zone ? ` (${t.zone})` : ""}` : id;
     })
     .join(", ");
-  const cateringMail = useCateringMailBranding(row);
   return {
     reservationId: row.id,
     reservationNumber: reservationNumberForRow(row, "restaurant"),
@@ -4394,7 +4386,8 @@ async function buildRestaurantMailVars(env, request, row, token = "") {
     adminNote: row.admin_note || "",
     decisionDeadline: formatDateTimeWarsaw(Number(row.pending_expires_at || 0)),
     confirmationLink: token ? buildConfirmationLink(env, request, "restaurant", token) : "",
-    restaurantName: cateringMail ? cateringDisplayName(env) : restaurantDisplayName(env),
+    /** Tylko catering (stoliki online wyłączone) — zawsze marka cateringu, nie „Restauracja”. */
+    restaurantName: cateringDisplayName(env),
   };
 }
 
@@ -4694,8 +4687,7 @@ async function sendTemplatedBookingMail(env, request, { service, eventKey, row, 
         ? vars.restaurantName || "Średzka Korona"
         : vars.venueName || "Średzka Korona";
   const reservationNo = cleanString(vars.reservationNumber, 120);
-  const footerServiceLabel =
-    service === "restaurant" && useCateringMailBranding(row) ? "Catering" : serviceLabel(service);
+  const footerServiceLabel = service === "restaurant" ? "Catering" : serviceLabel(service);
   const email = buildBrandedEmail({
     subject,
     htmlFragment: html,
@@ -4994,7 +4986,7 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
       },
     };
   }
-  /** Publiczna rezerwacja stolików — wyłączona; catering (panel admina, dostawy) pozostaje przez handleRestaurantAdmin. */
+  /** Publiczna rezerwacja stolików — wyłączona; 200 + flaga (bez 410 w konsoli przeglądarki). */
   const restaurantPublicTableOps = new Set([
     "public-calendar",
     "public-availability",
@@ -5002,10 +4994,39 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
     "public-reservation-confirm",
   ]);
   if (restaurantPublicTableOps.has(op)) {
-    return {
-      status: 410,
-      data: { error: "Rezerwacja stolików w lokalu online jest wyłączona." },
-    };
+    const err = "Rezerwacja stolików w lokalu online jest wyłączona.";
+    const name = cateringDisplayName(env);
+    if (op === "public-calendar" && request.method === "POST") {
+      return {
+        status: 200,
+        data: {
+          onlineTableBookingDisabled: true,
+          error: err,
+          days: [],
+          maxGuestsPerTable: 4,
+          tableCount: 0,
+          timeSlotMinutes: 30,
+          timeSlots: [],
+          restaurantName: name,
+        },
+      };
+    }
+    if (op === "public-availability" && request.method === "POST") {
+      return {
+        status: 200,
+        data: { ok: false, available: false, onlineTableBookingDisabled: true, error: err, maxGuests: 0 },
+      };
+    }
+    if (op === "public-reservation-draft" && request.method === "POST") {
+      return {
+        status: 200,
+        data: { ok: false, onlineTableBookingDisabled: true, error: err, requiresEmailConfirmation: false },
+      };
+    }
+    if (op === "public-reservation-confirm" && request.method === "POST") {
+      return { status: 200, data: { ok: false, onlineTableBookingDisabled: true, error: err } };
+    }
+    return { status: 200, data: { onlineTableBookingDisabled: true, error: err } };
   }
   return null;
 }

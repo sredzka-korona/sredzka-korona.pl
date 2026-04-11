@@ -1177,12 +1177,17 @@
           tablesCount: state.restaurant.tablesCount,
         },
       });
+      if (data?.onlineTableBookingDisabled) {
+        state.restaurant.calendarDays = [];
+        setError(data.error || "Rezerwacja stolików w lokalu online jest wyłączona.");
+        return;
+      }
       state.restaurant.publicSettings = {
         ...(state.restaurant.publicSettings || {}),
         maxGuestsPerTable: Number(data?.maxGuestsPerTable || 4),
         tableCount: Number(data?.tableCount || 0),
         timeSlotMinutes: Number(data?.timeSlotMinutes || 30),
-        restaurantName: data?.restaurantName || "Średzka Korona — Restauracja",
+        restaurantName: data?.restaurantName || "Średzka Korona — Catering",
       };
       state.restaurant.calendarDays = Array.isArray(data?.days) ? data.days : [];
       const resolvedDate = String(data?.selectedDate || data?.firstAvailableDate || state.restaurant.reservationDate || "");
@@ -2605,6 +2610,10 @@
                 tablesCount: state.restaurant.tablesCount,
               },
             });
+            if (check?.onlineTableBookingDisabled) {
+              setError(check.error || "Rezerwacja stolików w lokalu online jest wyłączona.");
+              return;
+            }
             if (!check?.available) {
               setError("Ten termin właśnie przestał być dostępny. Wybierz inny dzień lub godzinę.");
               await loadRestaurantCalendar({ reservationDate: state.restaurant.reservationDate });
@@ -3095,6 +3104,10 @@
         method: "POST",
         body: payload,
       });
+
+      if (response?.onlineTableBookingDisabled) {
+        throw new Error(response.error || "Rezerwacja stolików w lokalu online jest wyłączona.");
+      }
 
       state.pendingEmailSent = true;
       state.requiresEmailConfirmation = response?.requiresEmailConfirmation !== false;

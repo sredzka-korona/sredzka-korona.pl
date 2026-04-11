@@ -1593,7 +1593,6 @@
     const monthSel = document.createElement("select");
     monthSel.className = "schedule-calendar-select";
     monthSel.setAttribute("data-schedule-calendar-part", "month");
-    monthSel.setAttribute("aria-label", "Miesiąc");
     for (let m = 1; m <= 12; m += 1) {
       const opt = document.createElement("option");
       opt.value = String(m).padStart(2, "0");
@@ -1605,7 +1604,6 @@
     const yearSel = document.createElement("select");
     yearSel.className = "schedule-calendar-select";
     yearSel.setAttribute("data-schedule-calendar-part", "year");
-    yearSel.setAttribute("aria-label", "Rok");
     for (let y = yMin; y <= yMax; y += 1) {
       const opt = document.createElement("option");
       opt.value = String(y);
@@ -1614,7 +1612,21 @@
       yearSel.appendChild(opt);
     }
 
-    mountEl.append(monthSel, yearSel);
+    const monthField = document.createElement("label");
+    monthField.className = "schedule-calendar-field";
+    const monthLegend = document.createElement("span");
+    monthLegend.className = "schedule-calendar-field-label";
+    monthLegend.textContent = "Miesiąc";
+    monthField.append(monthLegend, monthSel);
+
+    const yearField = document.createElement("label");
+    yearField.className = "schedule-calendar-field";
+    const yearLegend = document.createElement("span");
+    yearLegend.className = "schedule-calendar-field-label";
+    yearLegend.textContent = "Rok";
+    yearField.append(yearLegend, yearSel);
+
+    mountEl.append(monthField, yearField);
 
     const apply = () => {
       const y = Number(yearSel.value);
@@ -2272,9 +2284,19 @@
   /**
    * Spis rezerwacji: jeden wiersz na serię dostaw cateringu.
    * — cateringSeriesId z API (najpewniejsze).
-   * — bez niego: ten sam odbiorca + godzina + czas trwania + uwagi (klient/admin) — bez human_slug / human_year,
-   *   bo przy wielu terminach często każdy wpis ma inny slug albo rok z daty, co psuje zgrupowanie.
+   * — bez niego (np. stare wpisy): ten sam numer „ludzki” cateringu (slug + rok) + odbiorca + godzina + czas trwania
+   *   — w D1 ta sama seria cykliczna ma wspólny human_slug / human_year na wszystkich terminach.
+   * — dalej: odbiorca + znormalizowana godzina + zaokrąglony czas trwania + uwagi.
    */
+  function scheduleRegistryNormalizeHm(hm) {
+    const s = String(hm || "").trim();
+    const m = /^(\d{1,2}):(\d{2})$/.exec(s);
+    if (!m) return s;
+    const h = Math.min(23, Math.max(0, Number(m[1])));
+    const min = Math.min(59, Math.max(0, Number(m[2])));
+    return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+  }
+
   function scheduleRegistryRestaurantSlotDurationHours(item, r) {
     let dur = Number(r?.durationHours);
     if (Number.isFinite(dur) && dur > 0) return dur;
@@ -2284,20 +2306,42 @@
     return NaN;
   }
 
+  function scheduleRegistryRoundedDurationHours(item, r) {
+    const dur = scheduleRegistryRestaurantSlotDurationHours(item, r);
+    if (!Number.isFinite(dur) || dur <= 0) return NaN;
+    return Math.round(dur * 10000) / 10000;
+  }
+
   function scheduleRegistryRestaurantCycleGroupKey(item) {
     const r = item?.raw || {};
-    const sid = String(r.cateringSeriesId || "").trim();
+    const sid = String(r.cateringSeriesId || r.catering_series_id || "").trim();
     if (sid) return `series:${sid}`;
     if (!r.cateringDelivery) return `one:${item.id}`;
     const rec = String(r.recipientId || "").trim();
     if (!rec) return `one:${item.id}`;
-    const st = String(r.startTime || "").trim();
-    const dur = scheduleRegistryRestaurantSlotDurationHours(item, r);
+    const st = scheduleRegistryNormalizeHm(r.startTime || "");
+    const dur = scheduleRegistryRoundedDurationHours(item, r);
     if (!st || !Number.isFinite(dur) || dur <= 0) return `one:${item.id}`;
+    const slug = String(r.humanSlug || r.human_slug || "").trim();
+    const hy = Number(r.humanYear ?? r.human_year);
+    if (slug && Number.isInteger(hy) && hy >= 2000 && hy <= 2100) {
+      return `cater:${rec}:${st}:${dur}:${slug}:${hy}`;
+    }
     const noteKey = normalizeComparableText(
       `${String(r.customerNote || "")}\n${String(r.adminNote || "")}`
     ).slice(0, 200);
     return `slot:${rec}:${st}:${dur}:${noteKey}`;
+  }
+
+  /** Dla zgrupowanej serii: najbliższy przyszły termin, inaczej ostatni przeszły — czytelniejszy podtytuł niż „pierwszy kiedykolwiek”. */
+  function scheduleRegistryPickSeriesRepresentative(cur, cand) {
+    if (!cur) return cand;
+    const now = Date.now();
+    const curFut = Number(cur.startMs || 0) >= now;
+    const candFut = Number(cand.startMs || 0) >= now;
+    if (candFut !== curFut) return candFut ? cand : cur;
+    if (candFut) return Number(cand.startMs || 0) < Number(cur.startMs || 0) ? cand : cur;
+    return Number(cand.startMs || 0) > Number(cur.startMs || 0) ? cand : cur;
   }
 
   function scheduleDedupeRestaurantRegistryItems(items) {
@@ -2311,9 +2355,7 @@
     for (const item of list) {
       const k = scheduleRegistryRestaurantCycleGroupKey(item);
       const cur = repByKey.get(k);
-      if (!cur || item.startMs < cur.startMs) {
-        repByKey.set(k, item);
-      }
+      repByKey.set(k, scheduleRegistryPickSeriesRepresentative(cur, item));
     }
     const out = [];
     for (const [k, rep] of repByKey) {
@@ -2820,6 +2862,7 @@
               <span>Pokaż anulowane (wygasłe)</span>
             </label>
           </div>
+          <hr class="schedule-registry-divider" aria-hidden="true" />
           ${statusMessage ? `<p class="status">${escapeHtml(statusMessage)}</p>` : ""}
           ${state.schedule.lastError ? `<p class="status">${escapeHtml(state.schedule.lastError)}</p>` : ""}
           <div data-schedule-registry-body>

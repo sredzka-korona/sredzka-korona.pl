@@ -2266,8 +2266,13 @@ body.admin-modal-open {
   flex-wrap: wrap;
   gap: 0.65rem 1.25rem;
   align-items: center;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid rgba(93, 110, 143, 0.28);
+}
+
+.schedule-registry-divider {
+  border: 0;
+  border-top: 1px solid rgba(93, 110, 143, 0.28);
+  margin: 0;
+  width: 100%;
 }
 
 .schedule-registry-search {
@@ -2586,11 +2591,32 @@ body.admin-modal-open {
 
 .schedule-calendar-picker {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 0.45rem 0.55rem;
+  gap: 0.45rem 0.65rem;
   max-width: 100%;
+}
+
+.schedule-calendar-field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.2rem;
+  min-width: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.schedule-calendar-field-label {
+  font-family: Manrope, system-ui, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: rgba(90, 70, 45, 0.88);
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .schedule-calendar-select {
