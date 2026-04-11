@@ -13,22 +13,22 @@
     <meta name="robots" content="index,follow,max-image-preview:large" />
     <meta name="geo.region" content="PL-DS" />
     <meta name="geo.placename" content="Środa Śląska" />
-    <title>Sredzka Korona - Hotel | Restauracja | Imprezy</title>
+    <title>Sredzka Korona - Hotel | Catering | Imprezy</title>
     <meta
       name="description"
-      content="Restauracja w Środzie Śląskiej — autorska kuchnia i rezerwacja stolika. Zapraszamy gości z Dolnego Śląska, Wrocławia oraz okolic: Lutynia, Miękinia, Źródła, Szczepanów."
+      content="Catering w Środzie Śląskiej — smaczne jedzenie, dowóz i obsługa okolic Wrocławia oraz Dolnego Śląska: Lutynia, Miękinia, Źródła, Szczepanów."
     />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pl_PL" />
     <meta property="og:url" content="https://www.sredzkakorona.pl/Restauracja/" />
-    <meta property="og:title" content="Restauracja Środa Śląska | Średzka Korona" />
+    <meta property="og:title" content="Catering Środa Śląska | Średzka Korona" />
     <meta
       property="og:description"
-      content="Restauracja przy Średzkiej Koronie — Środa Śląska, obsługa okolic Wrocławia i Dolnego Śląska."
+      content="Catering przy Średzkiej Koronie — Środa Śląska, obsługa okolic Wrocławia i Dolnego Śląska."
     />
     <meta property="og:image" content="https://www.sredzkakorona.pl/ikony/logo-korona.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Restauracja Środa Śląska | Średzka Korona" />
+    <meta name="twitter:title" content="Catering Środa Śląska | Średzka Korona" />
     <meta name="twitter:image" content="https://www.sredzkakorona.pl/ikony/logo-korona.png" />
     <script type="application/ld+json">
       {
@@ -37,7 +37,7 @@
           {
             "@type": "Restaurant",
             "@id": "https://www.sredzkakorona.pl/Restauracja/#restaurant",
-            "name": "Restauracja Średzka Korona",
+            "name": "Catering Średzka Korona",
             "url": "https://www.sredzkakorona.pl/Restauracja/",
             "parentOrganization": { "@id": "https://www.sredzkakorona.pl/#organization" },
             "address": {
@@ -51,7 +51,7 @@
             "telephone": "+48-600-700-800",
             "email": "kontakt@sredzkakorona.pl",
             "servesCuisine": "Polska",
-            "acceptsReservations": true
+            "acceptsReservations": false
           },
           {
             "@type": "BreadcrumbList",
@@ -65,7 +65,7 @@
               {
                 "@type": "ListItem",
                 "position": 2,
-                "name": "Restauracja",
+                "name": "Catering",
                 "item": "https://www.sredzkakorona.pl/Restauracja/"
               }
             ]
@@ -74,7 +74,7 @@
             "@type": "WebPage",
             "@id": "https://www.sredzkakorona.pl/Restauracja/#webpage",
             "url": "https://www.sredzkakorona.pl/Restauracja/",
-            "name": "Restauracja Środa Śląska | Średzka Korona",
+            "name": "Catering Środa Śląska | Średzka Korona",
             "isPartOf": { "@id": "https://www.sredzkakorona.pl/#website" },
             "about": { "@id": "https://www.sredzkakorona.pl/Restauracja/#restaurant" },
             "inLanguage": "pl-PL"
@@ -321,13 +321,21 @@
         display: block;
       }
 
-      button.reservation-info {
+      button.reservation-info,
+      a.reservation-info {
         font: inherit;
         width: 100%;
         max-width: 600px;
         text-align: center;
         border: 1px solid rgba(255, 255, 255, 0.2);
         appearance: none;
+      }
+
+      a.reservation-info {
+        text-decoration: none;
+        color: inherit;
+        display: block;
+        box-sizing: border-box;
       }
 
       .floating-nav {
@@ -1708,9 +1716,14 @@
         let selectedCategoryIndex = 0;
         let companyPhone = "+48 600 700 800";
         let companyEmail = "kontakt@sredzkakorona.pl";
-        let restaurantOrderButtonText = "Rezerwacja stolika";
+        let restaurantOrderButtonText = "Zamów catering";
         let restaurantOrdersInfoText =
           "Zamówienia indywidualne są tymczasowo wstrzymane. Catering zamawiany poprzez kontakt telefoniczny i mailowy.";
+
+        function menuPriceHtml(price) {
+          const t = String(price ?? "").trim();
+          return t ? `<span class="menu-item-price">${escapeHtml(t)}</span>` : "";
+        }
 
         function renderMenuItems(section) {
           const items = Array.isArray(section?.items) ? section.items : [];
@@ -1728,7 +1741,7 @@
                 <div class="menu-item-content">
                   <div class="menu-item-header">
                     <h4 class="menu-item-name">${escapeHtml(item.name)}</h4>
-                    <span class="menu-item-price">${escapeHtml(item.price || '')}</span>
+                    ${menuPriceHtml(item.price)}
                   </div>
                   ${item.description ? `<p class="menu-item-description">${escapeHtml(item.description)}</p>` : ''}
                   ${item.ingredients && item.ingredients.length ? `
@@ -1776,7 +1789,7 @@
                       <div class="menu-item-content">
                         <div class="menu-item-header">
                           <h4 class="menu-item-name">${escapeHtml(item.name)}</h4>
-                          <span class="menu-item-price">${escapeHtml(item.price || '')}</span>
+                          ${menuPriceHtml(item.price)}
                         </div>
                         ${item.description ? `<p class="menu-item-description">${escapeHtml(item.description)}</p>` : ''}
                         ${item.ingredients && item.ingredients.length ? `
@@ -1798,7 +1811,7 @@
             return `
               <div class="modal-body">
                 <div class="modal-header">
-                  <h2>Menu Restauracji</h2>
+                  <h2>Menu cateringu</h2>
                   <button class="modal-close" id="close-menu" aria-label="Zamknij menu">×</button>
                 </div>
                 <div class="menu-container">
@@ -1818,7 +1831,7 @@
           return `
             <div class="modal-body">
               <div class="modal-header">
-                <h2>Menu Restauracji</h2>
+                <h2>Menu cateringu</h2>
                 <button class="modal-close" id="close-menu" aria-label="Zamknij menu">×</button>
               </div>
               <div class="menu-container">
@@ -1850,13 +1863,13 @@
           return `
             <div class="modal-body">
               <div class="modal-header">
-                <h2>Galeria Restauracji</h2>
+                <h2>Galeria cateringu</h2>
                 <button class="modal-close" id="close-gallery" aria-label="Zamknij galerię">×</button>
               </div>
               <div class="gallery-grid">
                 ${(restaurantGallery || []).map(img => 
                   `<div class="gallery-item">
-                    <img src="${escapeHtml(img.url || img)}" alt="${escapeHtml(img.alt || "Restauracja")}" loading="lazy" />
+                    <img src="${escapeHtml(img.url || img)}" alt="${escapeHtml(img.alt || "Catering")}" loading="lazy" />
                   </div>`
                 ).join('')}
               </div>
@@ -1926,9 +1939,9 @@
             </nav>
             <div class="restaurant-content">
               <div class="restaurant-info">
-                <h1 class="restaurant-title">Restauracja</h1>
+                <h1 class="restaurant-title">Catering</h1>
                 <p class="restaurant-description">
-                  Jedzenie, obsługa i klimat - to sprawia, że to odpowiednie miejsce na kolacje we dwoje oraz większe spotkania.
+                  Smaczne jedzenie, profesjonalna obsługa i terminowy dowóz.
                 </p>
                 <div class="action-buttons">
                   <button class="action-button" id="menu-button">
@@ -1938,7 +1951,7 @@
                     <div class="action-button-title">GALERIA</div>
                   </button>
                   <button class="action-button" id="orders-button">
-                    <div class="action-button-title">ZAMÓWIENIA<br />CATERING</div>
+                    <div class="action-button-title">ZAMÓWIENIA</div>
                   </button>
                   <button class="action-button" id="hours-button">
                     <div class="action-button-title">GODZINY</div>
@@ -1946,9 +1959,12 @@
                   </button>
                 </div>
               </div>
-              <button type="button" class="reservation-info" id="rb-open-booking" data-open-global-booking>
-                ${escapeHtml(restaurantOrderButtonText)}
-              </button>
+              <a
+                href="../kontakt/index.html"
+                class="reservation-info"
+                id="rb-order-catering"
+                aria-label="Zamów catering — przejdź do strony kontaktu"
+              >${escapeHtml(restaurantOrderButtonText)}</a>
             </div>
           </div>
           <div class="modal" id="restaurant-modal"></div>
@@ -2051,8 +2067,6 @@
       })();
     </script>
     <script src="../assets/js/config.js"></script>
-    <script src="../assets/js/booking-flags.js"></script>
-    <script src="../assets/js/global-booking-modal.js?v=20260407-8"></script>
     <a href="../kontakt/index.html" class="floating-contact-button" aria-label="Kontakt">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>

@@ -1422,6 +1422,16 @@
             }
           }
 
+          if (config.turnstileSiteKey && !String(payload.turnstileToken || "").trim()) {
+            status.textContent =
+              "Poczekaj chwilę, aż zabezpieczenie antyspamowe się załaduje (pole nad przyciskiem), potem wyślij ponownie.";
+            status.className = "form-status error";
+            status.style.display = "block";
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Wyślij wiadomość";
+            return;
+          }
+
           try {
             if (!apiBase) {
               throw new Error("Brak konfiguracji API. Ustaw apiBase na adres Workera Cloudflare.");
@@ -1433,7 +1443,14 @@
             });
 
             if (!response.ok) {
-              throw new Error("Nie udało się wysłać formularza.");
+              let msg = "Nie udało się wysłać formularza.";
+              try {
+                const errBody = await response.json();
+                if (errBody && typeof errBody.error === "string" && errBody.error.trim()) {
+                  msg = errBody.error.trim();
+                }
+              } catch (_) {}
+              throw new Error(msg);
             }
 
             form.reset();

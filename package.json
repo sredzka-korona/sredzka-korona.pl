@@ -5,7 +5,7 @@
   "scripts": {
     "preview": "node scripts/preview.mjs",
     "seo:generate": "node scripts/generate-seo.mjs",
-    "d1:clear-reservations": "cd worker && npx --yes wrangler@4 d1 execute sredzka-korona --remote --file ../scripts/d1/clear-reservations.sql",
+    "d1:clear-reservations": "cd worker && set -a && test -f ../.env.cloudflare && . ../.env.cloudflare; set +a && npx --yes wrangler@4 d1 execute sredzka-korona --remote --file ../scripts/d1/clear-reservations.sql",
     "worker:dev": "cd worker && npm run dev",
     "worker:deploy": "cd worker && npm run deploy",
     "worker:secret-turnstile": "cd worker && npm run secret:turnstile"

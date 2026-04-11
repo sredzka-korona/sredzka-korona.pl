@@ -14,6 +14,22 @@ function dtFromDateAndTime(dateStr, timeStr) {
 }
 
 /** Data kalendarzowa YYYY-MM-DD nie wcześniejsza niż dziś (strefa Europe/Warsaw). */
+/** Start imprezy: co 30 min, 00:00 … 23:30 (spójnie z frontendem). */
+function assertHallStartTimeSlot(reservationDate, startTime) {
+  const st = String(startTime || "").trim();
+  if (!/^\d{2}:\d{2}$/.test(st)) {
+    return { ok: false, error: "Nieprawidłowa godzina rozpoczęcia (format HH:MM)." };
+  }
+  const hh = parseInt(st.slice(0, 2), 10);
+  const mm = parseInt(st.slice(3, 5), 10);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm) || hh < 0 || hh > 23 || (mm !== 0 && mm !== 30)) {
+    return { ok: false, error: "Godzina rozpoczęcia musi być od 00:00 do 23:30, co 30 minut." };
+  }
+  const start = dtFromDateAndTime(reservationDate, st);
+  if (!start) return { ok: false, error: "Nieprawidłowa data lub godzina." };
+  return { ok: true };
+}
+
 function assertNotPastCalendarDateWarsaw(dateStr) {
   const d = String(dateStr || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) {
@@ -249,6 +265,7 @@ module.exports = {
   WARSAW,
   BLOCKING,
   dtFromDateAndTime,
+  assertHallStartTimeSlot,
   assertNotPastCalendarDateWarsaw,
   computeBlockEndMs,
   rangesOverlap,

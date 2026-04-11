@@ -1,7 +1,7 @@
 window.SREDZKA_DEFAULT_CONTENT = {
   company: {
     name: "Sredzka Korona",
-    tagline: "Restauracja, hotel i przyjecia w oprawie premium",
+    tagline: "Catering, hotel i przyjecia w oprawie premium",
     phone: "+48 600 700 800",
     email: "kontakt@sredzkakorona.pl",
     address: "ul. Wrocławska 11, 55-300 Środa Śląska",
@@ -24,7 +24,7 @@ window.SREDZKA_DEFAULT_CONTENT = {
   home: {
     aboutTitle: "O wlascicielu i zespole",
     aboutText:
-      "Wlasciciel prowadzi obiekt z mysla o gosciach, ktorzy oczekuja klasy, spokoju i sprawnej obslugi. Zespol laczy doswiadczenie restauracyjne, hotelowe i eventowe, dzieki czemu kazdy etap wizyty jest dopracowany.",
+      "Wlasciciel prowadzi obiekt z mysla o gosciach, ktorzy oczekuja klasy, spokoju i sprawnej obslugi. Zespol laczy doswiadczenie cateringowe, hotelowe i eventowe, dzieki czemu kazdy etap wizyty jest dopracowany.",
     owner:
       "Wlasciciel odpowiada za standard obiektu, rozwoj oferty oraz kontakt z klientami biznesowymi i prywatnymi.",
     staff: [
@@ -34,7 +34,7 @@ window.SREDZKA_DEFAULT_CONTENT = {
     ],
     highlights: [
       {
-        title: "Restauracja",
+        title: "Catering",
         text: "Karta laczaca klasyke kuchni polskiej z nowoczesnym podaniem i starannie dobranym winem.",
       },
       {
@@ -71,7 +71,7 @@ window.SREDZKA_DEFAULT_CONTENT = {
       },
       restaurant: {
         imageUrl: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=80",
-        imageAlt: "Restauracja — Średzka Korona, Środa Śląska",
+        imageAlt: "Catering — Średzka Korona, Środa Śląska",
         focusX: 50,
         focusY: 50,
         zoom: 1,
@@ -87,9 +87,8 @@ window.SREDZKA_DEFAULT_CONTENT = {
   },
   restaurant: {
     heroTitle: "Autorska kuchnia i atmosfera wieczoru premium",
-    heroText:
-      "Restauracja Średzka Korona łączy elegancję sali, staranną obsługę i kuchnię, która dobrze sprawdza się zarówno podczas codziennych kolacji, jak i okazji specjalnych.",
-    orderButtonText: "Rezerwacja stolika",
+    heroText: "Smaczne jedzenie, profesjonalna obsługa i terminowy dowóz.",
+    orderButtonText: "Zamów catering",
     ordersInfoText:
       "Zamówienia indywidualne są tymczasowo wstrzymane. Catering zamawiany poprzez kontakt telefoniczny i mailowy.",
     menuSections: [

@@ -69,13 +69,31 @@
     return ["pending", "confirmed", "email_verification_pending"].includes(String(status || "").trim().toLowerCase());
   }
 
+  function hallStartTimeOptions() {
+    const out = [];
+    for (let h = 0; h <= 23; h++) {
+      for (let m = 0; m < 60; m += 30) {
+        out.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+      }
+    }
+    return out;
+  }
+
+  function hallStartTimeSelectHtml(name, selectedValue) {
+    const options = hallStartTimeOptions();
+    let sel = String(selectedValue || "").trim();
+    if (!options.includes(sel)) sel = "12:00";
+    return `<select name="${escapeHtml(name)}" required aria-label="Godzina rozpoczęcia">${options
+      .map((t) => `<option value="${escapeHtml(t)}" ${t === sel ? "selected" : ""}>${escapeHtml(t)}</option>`)
+      .join("")}</select>`;
+  }
+
   let hallSubTab = "reservations";
   let hallResFilter = "active";
   let hallsData = [];
   let reservationsData = [];
   let blockListData = [];
   let templatesData = {};
-  let venueSettings = {};
   let countdownTimer = null;
 
   const HALL_TEMPLATE_LABELS = {
@@ -336,11 +354,6 @@
     templatesData = d.templates || {};
   }
 
-  async function loadVenueSettings() {
-    const d = await hallApi("admin-venue-settings", { method: "GET" });
-    venueSettings = d.settings || {};
-  }
-
   function getHallById(hallId) {
     const current = String(hallId || "");
     return hallsData.find((hall) => String(hall.id) === current) || hallsData[0] || null;
@@ -389,21 +402,6 @@
             <tbody>${body || "<tr><td colspan='7'>Brak</td></tr>"}</tbody>
           </table>
         </div>
-      </div>`;
-  }
-
-  function renderVenueSettings() {
-    const s = venueSettings;
-    return `
-      <div class="hotel-subpanel">
-        <h3>Godziny rezerwacji sal (frontend)</h3>
-        <form id="hall-venue-form" class="stack">
-          <div class="field-grid">
-            <label>Od (HH:MM)<input name="hallOpenTime" value="${escapeHtml(s.hallOpenTime || "08:00")}" required /></label>
-            <label>Do (HH:MM)<input name="hallCloseTime" value="${escapeHtml(s.hallCloseTime || "23:00")}" required /></label>
-          </div>
-          <button type="submit" class="button">Zapisz godziny</button>
-        </form>
       </div>`;
   }
 
@@ -545,7 +543,7 @@
           <label>Sala<select name="hallId" required>${hallOpts || "<option value=\"\">—</option>"}</select></label>
           <label>Data<input name="reservationDate" type="date" required /></label>
           <div class="field-grid">
-            <label>Start (HH:MM)<input name="startTime" required placeholder="12:00" /></label>
+            <label>Start (co 30 min, 00:00–23:30)${hallStartTimeSelectHtml("startTime", "12:00")}</label>
             <label>Czas trwania (h)<input name="durationHours" type="number" step="0.5" min="0.5" value="3" required /></label>
           </div>
           <label>Notatka<input name="note" /></label>
@@ -574,7 +572,6 @@
       await loadHalls();
       await loadReservations("active");
       await loadTemplates();
-      await loadVenueSettings();
     } catch (e) {
       container.innerHTML = `<p class="status">${escapeHtml(e.message)}</p>`;
       return;
@@ -584,7 +581,7 @@
       const sub = {
         reservations: renderReservations(),
         block: renderHallBlockForm(),
-        halls: renderHalls() + renderVenueSettings(),
+        halls: renderHalls(),
         templates: renderTemplates(),
       };
       const availableTabs = [
@@ -644,24 +641,6 @@
         clearInterval(countdownTimer);
         countdownTimer = null;
       }
-
-      document.querySelector("#hall-venue-form")?.addEventListener("submit", async (ev) => {
-        ev.preventDefault();
-        const fd = new FormData(ev.target);
-        try {
-          await hallApi("admin-venue-settings-save", {
-            method: "PUT",
-            body: {
-              hallOpenTime: fd.get("hallOpenTime"),
-              hallCloseTime: fd.get("hallCloseTime"),
-            },
-          });
-          alert("Zapisano godziny.");
-          await loadVenueSettings();
-        } catch (err) {
-          alert(err.message);
-        }
-      });
 
       document.querySelectorAll(".hall-edit").forEach((btn) => {
         btn.addEventListener("click", async () => {
@@ -841,7 +820,7 @@
               <label>Sala<select name="hallId" required>${hallOpts}</select></label>
               <label>Data<input name="reservationDate" type="date" required /></label>
               <div class="field-grid">
-                <label>Start (HH:MM)<input name="startTime" required placeholder="12:00" /></label>
+                <label>Start (co 30 min)${hallStartTimeSelectHtml("startTime", "12:00")}</label>
                 <label>Czas (h)<input name="durationHours" type="number" step="0.5" min="0.5" value="3" required /></label>
               </div>
               <label>Goście<input name="guestsCount" type="number" min="1" value="20" required /></label>
@@ -939,7 +918,7 @@
               <label>Sala<select name="hallId" required>${hallOpts}</select></label>
               <label>Data<input name="reservationDate" type="date" value="${escapeHtml(r.reservationDate || "")}" required /></label>
               <div class="field-grid">
-                <label>Start<input name="startTime" value="${escapeHtml(r.startTime || "")}" required /></label>
+                <label>Start (co 30 min)${hallStartTimeSelectHtml("startTime", r.startTime || "12:00")}</label>
                 <label>Czas (h)<input name="durationHours" type="number" step="0.5" min="0.5" value="${escapeHtml(String(r.durationHours || 2))}" required /></label>
               </div>
               <label>Goście<input name="guestsCount" type="number" min="0" value="${escapeHtml(String(r.guestsCount ?? 0))}" required /></label>

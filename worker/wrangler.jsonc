@@ -2,6 +2,7 @@
 //   cd worker && npm install && npm run secret:turnstile
 // Albo: Dashboard → Workers → sredzka-korona-api → Settings → Variables → Secrets → TURNSTILE_SECRET
 // Wartość: Dashboard → Turnstile → (witryna) → Secret key (para do turnstileSiteKey w assets/js/config.js).
+// Na produkcji NIE ustawiaj TURNSTILE_SKIP_VERIFY — to tylko jawne obejście captcha na lokalnym dev (.dev.vars).
 {
   "name": "sredzka-korona-api",
   "main": "src/index.js",

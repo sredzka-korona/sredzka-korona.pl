@@ -8,7 +8,12 @@
   const PAGE_VISIT_ID =
     window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   /** Podbij przy zmianach w modalu — wymusza odświeżenie cache CSS po wdrożeniu. */
-  const GB_MODAL_ASSET_VERSION = "20260407-8";
+  const GB_MODAL_ASSET_VERSION = "20260407-9";
+  /**
+   * Gdy true, w pierwszym kroku modala pojawia się kafelek rezerwacji stolika (restaurant).
+   * Logika przepływu i API pozostają w kodzie — wystarczy ustawić na true, aby przywrócić.
+   */
+  const SHOW_RESTAURANT_BOOKING_IN_MODAL = false;
   const SERVICE_KEYS = ["hotel", "restaurant", "events"];
   const requestLocks = Object.create(null);
   const RESTAURANT_DURATION_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4];
@@ -21,7 +26,7 @@
       confirmPath: "../dokumenty/index.html#regulamin-rezerwacji-hotel",
     },
     restaurant: {
-      label: "Restauracja",
+      label: "Catering",
       subtitle: "Rezerwacja stolika",
       apiService: "restaurant",
       confirmPath: "../dokumenty/index.html#regulamin-rezerwacji-restauracja",
@@ -40,6 +45,18 @@
     events: ["service", "eventsGuests", "eventsDateTime", "eventsHall", "eventsDetails", "personal", "summary", "success"],
   };
   const RESTAURANT_PLACE_OPTIONS = ["no_preference", "inside", "terrace"];
+
+  function serviceKeysForModalTiles() {
+    if (SHOW_RESTAURANT_BOOKING_IN_MODAL) return SERVICE_KEYS;
+    return SERVICE_KEYS.filter((key) => key !== "restaurant");
+  }
+
+  function clearRestaurantModalSelectionIfHidden() {
+    if (SHOW_RESTAURANT_BOOKING_IN_MODAL) return;
+    if (state.selectedService === "restaurant") state.selectedService = "";
+    const step = String(state.step || "");
+    if (step.startsWith("restaurant")) state.step = "service";
+  }
 
   const state = {
     isOpen: false,
@@ -312,6 +329,7 @@
     return RESTAURANT_DURATION_OPTIONS.filter((hours) => hours * 60 <= availableMinutes);
   }
 
+  /** Godziny startu imprezy na sali: co 30 min, ostatni slot 23:30 (zgodnie z backendem). */
   function eventTimeOptions() {
     const out = [];
     for (let hour = 0; hour <= 23; hour += 1) {
@@ -1043,6 +1061,7 @@
           state.step = flow[0];
         }
       }
+      clearRestaurantModalSelectionIfHidden();
       return true;
     } catch {
       return false;
@@ -1461,7 +1480,7 @@
     return `
       <section>
         <div class="gb-service-tiles">
-          ${SERVICE_KEYS.map((serviceKey) => {
+          ${serviceKeysForModalTiles().map((serviceKey) => {
             const enabled = state.bookingFlags[serviceKey] !== false;
             const selected = state.selectedService === serviceKey;
             const meta = SERVICE_META[serviceKey];
@@ -3126,6 +3145,7 @@
       renewSession();
     }
     await loadBookingFlags();
+    clearRestaurantModalSelectionIfHidden();
     if (!state.selectedService && state.step !== "service") {
       state.step = "service";
     }

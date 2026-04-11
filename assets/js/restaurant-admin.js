@@ -1,5 +1,5 @@
 /**
- * Panel admina — moduł Restauracja (restaurantApi).
+ * Panel admina — moduł Catering / restauracja (restaurantApi).
  */
 (function () {
   const config = window.SREDZKA_CONFIG || {};
@@ -84,7 +84,7 @@
         data.error ||
         data.message ||
         (data._nonJson ? `Odpowiedź serwera (${res.status}): ${data._nonJson}` : "");
-      throw new Error(hint || `Błąd API restauracji (HTTP ${res.status}).`);
+      throw new Error(hint || `Błąd API cateringu (HTTP ${res.status}).`);
     }
     return data;
   }
@@ -142,7 +142,7 @@
     rest_cancelled_client: "To samo — wariant skrócony.",
     restaurant_changed_client: "Po edycji rezerwacji przez admina (opcjonalna wysyłka).",
     rest_changed_client: "To samo — wariant skrócony.",
-    restaurant_expired_pending_client: "Klient — wygasło oczekiwanie na decyzję restauracji.",
+    restaurant_expired_pending_client: "Klient — wygasło oczekiwanie na decyzję cateringu.",
     restaurant_expired_pending_admin: "Obsługa — informacja o automatycznym wygaśnięciu rezerwacji.",
     restaurant_expired_email_client: "Klient — nie potwierdzono adresu e-mail w terminie 2 godzin.",
   };
@@ -162,7 +162,7 @@
     guestsCount: "6",
     customerNote: "Prosimy o spokojne miejsce, krzesełko dla dziecka i możliwość wniesienia tortu.",
     confirmationLink: "https://www.sredzkakorona.pl/restauracja/potwierdzenie?token=podglad",
-    restaurantName: "Restauracja Średzka Korona",
+    restaurantName: "Catering Średzka Korona",
   });
 
   function renderTemplatePreviewString(template, vars) {
@@ -307,7 +307,7 @@
       headerContext: restaurantMailHeaderContext(key),
       headerNumber: REST_TEMPLATE_PREVIEW_VARS.reservationNumber,
       bodyHtml: renderedBody,
-      footerLabel: "Restauracja Średzka Korona",
+      footerLabel: "Catering Średzka Korona",
       actionLabel: restaurantPreviewActionLabel(key),
     });
   }
@@ -412,7 +412,7 @@
     const s = settingsData;
     return `
       <div class="hotel-subpanel">
-        <h3>Ustawienia restauracji</h3>
+        <h3>Ustawienia cateringu</h3>
         <p class="helper">Aktualnie aktywnych stolików: <strong>${currentRestaurantTableCount()}</strong>. Dodawanie i usuwanie stolików znajdziesz w zakładce „Stoliki”.</p>
         <form id="rest-settings-form" class="stack">
           <div class="field-grid">
@@ -498,7 +498,7 @@
       .join("");
     return `
       <div class="hotel-subpanel">
-        <h3>Rezerwacje restauracji</h3>
+        <h3>Rezerwacje cateringu</h3>
         <p class="helper">Domyślnie: rezerwacje <strong>oczekujące</strong> i <strong>zarezerwowane</strong>. Pozostałe statusy — z listy.</p>
         <div class="admin-toolbar-row hotel-filters">
           <div class="admin-toolbar-filters">
@@ -531,10 +531,10 @@
     const keys = Object.keys(templatesData);
     return `
       <div class="hotel-subpanel">
-        <h3>Szablony mailingowe — restauracja</h3>
+        <h3>Szablony mailingowe — catering</h3>
         <p class="helper">Zmienne: <code>{{reservationNumber}}</code> (np. 5/2026/RESTAURACJA), <code>{{reservationSubject}}</code>, <code>{{decisionDeadline}}</code>, <code>{{adminActionLink}}</code>, <code>{{fullName}}</code>, <code>{{email}}</code>, <code>{{phone}}</code>, <code>{{date}}</code>, <code>{{timeFrom}}</code>, <code>{{timeTo}}</code>, <code>{{durationHours}}</code>, <code>{{tablesList}}</code>, <code>{{guestsCount}}</code>, <code>{{customerNote}}</code>, <code>{{confirmationLink}}</code>, <code>{{restaurantName}}</code>.</p>
         <p class="helper">Logo, przycisk akcji i premium-layout wiadomości są dodawane automatycznie przy wysyłce. W polu poniżej edytujesz główną treść maila.</p>
-        <p class="helper">Podgląd pokazuje od razu, jak mail będzie wyglądał po podstawieniu danych rezerwacji restauracyjnej. Przy szablonie potwierdzenia adresu e-mail możesz ustawić tekst na przycisku (gdy treść nie zawiera linku <code>{{confirmationLink}}</code>, przycisk zostanie zbudowany z tego pola).</p>
+        <p class="helper">Podgląd pokazuje od razu, jak mail będzie wyglądał po podstawieniu danych rezerwacji cateringu. Przy szablonie potwierdzenia adresu e-mail możesz ustawić tekst na przycisku (gdy treść nie zawiera linku <code>{{confirmationLink}}</code>, przycisk zostanie zbudowany z tego pola).</p>
         <div id="rest-template-forms">
           ${keys
             .map(
@@ -635,7 +635,7 @@
     const allowedTabs = Array.isArray(options.allowedTabs) && options.allowedTabs.length
       ? options.allowedTabs.map((tab) => String(tab || "").trim()).filter(Boolean)
       : null;
-    container.innerHTML = `<p class="status">Ładowanie modułu Restauracja…</p>`;
+    container.innerHTML = `<p class="status">Ładowanie modułu Catering…</p>`;
     try {
       await loadSettings();
       await loadTables();
@@ -671,7 +671,7 @@
       const activeSubTab = availableTabs.find((tab) => tab.key === restSubTab) || availableTabs[0];
       container.innerHTML = `
         <section class="panel col-12">
-          <p class="pill">Restauracja</p>
+          <p class="pill">Catering</p>
           <h2>${escapeHtml(availableTabs.length === 1 ? activeSubTab.label : "Rezerwacje stolików")}</h2>
           ${
             availableTabs.length > 1

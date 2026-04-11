@@ -353,9 +353,35 @@
       }));
     }
 
+    if (!Array.isArray(content.restaurant.menu)) {
+      content.restaurant.menu = [];
+    }
+
     if (!content.events) {
       content.events = {};
     }
+
+    if (
+      content.restaurant.menu.length === 0 &&
+      Array.isArray(content.events.menu) &&
+      content.events.menu.length > 0
+    ) {
+      content.restaurant.menu = structuredClone(content.events.menu);
+    }
+
+    content.restaurant.menu.forEach((section) => {
+      if (!section || !Array.isArray(section.items)) {
+        return;
+      }
+      section.items.forEach((item) => {
+        if (item && typeof item === "object") {
+          item.price = String(item.price != null ? item.price : "").trim();
+        }
+      });
+    });
+
+    content.events.menu = structuredClone(content.restaurant.menu);
+
     content.events.halls = normalizeEventHalls(content.events.halls);
     content.events.hallGalleries = normalizeEventHallGalleries(content.events.hallGalleries);
     if (!content.hotel) {
@@ -464,7 +490,7 @@
     },
     restaurant: {
       imageUrl: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=80",
-      imageAlt: "Restauracja — Średzka Korona, Środa Śląska",
+      imageAlt: "Catering — Średzka Korona, Środa Śląska",
       focusX: 50,
       focusY: 50,
       zoom: 1,
@@ -577,15 +603,15 @@
     },
     {
       key: "restauracja",
-      label: "Restauracja",
-      description: "Menu, media i konfiguracja systemu rezerwacji restauracji.",
+      label: "Catering",
+      description: "Menu, media i konfiguracja systemu rezerwacji stolików (obecnie ukryty na stronie — do przywrócenia).",
       tiles: [
         { key: "menu", label: "Menu", description: "Kategorie, pozycje, składniki i kolejność." },
-        { key: "gallery", label: "Galeria", description: "Zdjęcia restauracji i ich kolejność." },
-        { key: "orders", label: "Zamówienia i catering", description: "Edycja treści modala zamówień i cateringu widocznej na stronie restauracji." },
-        { key: "hours", label: "Godziny otwarcia", description: "Dni i godziny widoczne na stronie restauracji." },
+        { key: "gallery", label: "Galeria", description: "Zdjęcia cateringu i ich kolejność." },
+        { key: "orders", label: "Zamówienia", description: "Edycja treści modala zamówień widocznej na stronie cateringu." },
+        { key: "hours", label: "Godziny otwarcia", description: "Dni i godziny widoczne na stronie cateringu." },
         { key: "tables", label: "Stoliki", description: "Konfiguracja stolików i godzin systemu rezerwacji." },
-        { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Restauracja na stronie głównej (pozycja i zoom)." },
+        { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Catering na stronie głównej (pozycja i zoom)." },
         { key: "settings", label: "Ustawienia rezerwacji", description: "Włączenie i przerwy w przyjmowaniu rezerwacji." },
       ],
     },
@@ -614,7 +640,7 @@
         {
           key: "maile",
           label: "Maile",
-          description: "Szablony wiadomosci e-mail wysylanych do gosci i obslugi dla hotelu, restauracji i przyjec.",
+          description: "Szablony wiadomosci e-mail wysylanych do gosci i obslugi dla hotelu, cateringu i przyjec.",
         },
       ],
     },
@@ -1145,7 +1171,7 @@
   const SCHEDULE_POLISH_HOLIDAY_CACHE = new Map();
   const SCHEDULE_SERVICE_LABELS = {
     hotel: "Hotel",
-    restaurant: "Restauracja",
+    restaurant: "Catering",
     hall: "Przyjęcia",
   };
   const SCHEDULE_STATUS_LABELS = {
@@ -1547,7 +1573,7 @@
         status: row.status,
         statusLabel: scheduleStatusLabel(row.status, row.statusLabel || row.status),
         humanNumberLabel: row.humanNumberLabel || row.id,
-        title: row.status === "manual_block" ? "Blokada terminu" : row.fullName || "Rezerwacja restauracji",
+        title: row.status === "manual_block" ? "Blokada terminu" : row.fullName || "Rezerwacja cateringu",
         subtitle: `${row.reservationDate || ""} ${scheduleFormatTime(startMs)} - ${scheduleFormatTime(endMs)}`.trim(),
         dateFrom: String(row.reservationDate || "").slice(0, 10),
         dateTo: String(row.reservationDate || "").slice(0, 10),
@@ -2588,7 +2614,8 @@
     syncScheduleCountdownTicker();
   }
 
-  function openScheduleModal(contentMarkup, bindEvents) {
+  function openScheduleModal(contentMarkup, bindEvents, options = {}) {
+    const closeOnOverlayClick = options.closeOnOverlayClick !== false;
     closeScheduleModal();
     const mount = document.createElement("div");
     mount.id = "schedule-modal-mount";
@@ -2600,11 +2627,13 @@
     document.body.appendChild(mount);
     document.body.classList.add("admin-modal-open");
 
-    mount.querySelector("[data-schedule-modal-overlay]")?.addEventListener("click", (event) => {
-      if (event.target === event.currentTarget) {
-        closeScheduleModal();
-      }
-    });
+    if (closeOnOverlayClick) {
+      mount.querySelector("[data-schedule-modal-overlay]")?.addEventListener("click", (event) => {
+        if (event.target === event.currentTarget) {
+          closeScheduleModal();
+        }
+      });
+    }
     mount.querySelectorAll("[data-schedule-modal-close]").forEach((button) => {
       button.addEventListener("click", closeScheduleModal);
     });
@@ -2896,7 +2925,7 @@
       fieldsMarkup = `
         <div class="field-grid">
           <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(raw.reservationDate || "")}" required /></label>
-          <label class="field"><span>Start</span><input type="time" name="startTime" value="${escapeAttribute(raw.startTime || "")}" required /></label>
+          <label class="field"><span>Start</span><input type="time" name="startTime" min="00:00" max="23:59" value="${escapeAttribute(raw.startTime || "")}" required /></label>
           <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="${escapeAttribute(String(raw.durationHours || 2))}" required /></label>
           <label class="field"><span>Liczba stolików</span><input type="number" min="1" max="${escapeAttribute(String(Math.max(1, restaurantTableLimit)))}" name="tablesCount" value="${escapeAttribute(String(raw.tablesCount || 1))}" required /></label>
           <label class="field"><span>Liczba gości</span><input type="number" min="1" name="guestsCount" value="${escapeAttribute(String(raw.guestsCount || 1))}" required /></label>
@@ -2920,7 +2949,7 @@
         <div class="field-grid">
           ${scheduleHallOptionsMarkup(raw.hallId || "")}
           <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(raw.reservationDate || "")}" required /></label>
-          <label class="field"><span>Start</span><input type="time" name="startTime" value="${escapeAttribute(raw.startTime || "")}" required /></label>
+          <label class="field"><span>Start</span><input type="time" name="startTime" min="00:00" max="23:30" step="1800" value="${escapeAttribute(raw.startTime || "")}" required /></label>
           <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="${escapeAttribute(String(raw.durationHours || 2))}" required /></label>
           <label class="field"><span>Liczba gości</span><input type="number" min="0" name="guestsCount" value="${escapeAttribute(String(raw.guestsCount || 0))}" required /></label>
           ${scheduleHallExclusiveFieldMarkup(raw.hallId || "", raw.exclusive ? "1" : "0")}
@@ -2982,7 +3011,7 @@
             body.durationHours = Number(formData.get("durationHours") || 0);
             body.tablesCount = Number(formData.get("tablesCount") || 1);
             if (!restaurantTableLimit) {
-              throw new Error("Brak aktywnych stolików w restauracji.");
+              throw new Error("Brak aktywnych stolików w cateringu.");
             }
             if (body.tablesCount > restaurantTableLimit) {
               throw new Error(`Mozesz wybrac maksymalnie ${restaurantTableLimit} stolikow.`);
@@ -3020,7 +3049,8 @@
             window.alert(error.message || "Nie udało się zapisać zmian.");
           }
         });
-      }
+      },
+      { closeOnOverlayClick: false }
     );
   }
 
@@ -3057,7 +3087,7 @@
           </div>
           <div class="schedule-create-services">
             <button type="button" class="schedule-create-service" data-create-service="hotel"><strong>Hotel</strong><span>Pokoje i pobyty.</span></button>
-            <button type="button" class="schedule-create-service" data-create-service="restaurant"><strong>Restauracja</strong><span>Stoliki i godziny.</span></button>
+            <button type="button" class="schedule-create-service" data-create-service="restaurant"><strong>Catering</strong><span>Stoliki i godziny.</span></button>
             <button type="button" class="schedule-create-service" data-create-service="hall"><strong>Przyjęcia</strong><span>Sale i wydarzenia.</span></button>
           </div>
         `;
@@ -3100,8 +3130,8 @@
             ? `
               <div class="field-grid">
                 <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
-                <label class="field"><span>Od</span><input type="time" name="startTime" value="12:00" required /></label>
-                <label class="field"><span>Do</span><input type="time" name="endTime" value="14:00" required /></label>
+                <label class="field"><span>Od</span><input type="time" name="startTime" min="00:00" max="23:59" value="12:00" required /></label>
+                <label class="field"><span>Do</span><input type="time" name="endTime" min="00:00" max="23:59" value="14:00" required /></label>
               </div>
               ${scheduleRestaurantTableOptionsMarkup([])}
               <label class="field-full"><span>Notatka blokady</span><textarea name="note"></textarea></label>
@@ -3109,7 +3139,7 @@
             : `
               <div class="field-grid">
                 <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
-                <label class="field"><span>Start</span><input type="time" name="startTime" value="12:00" required /></label>
+                <label class="field"><span>Start</span><input type="time" name="startTime" min="00:00" max="23:59" value="12:00" required /></label>
                 <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="2" required /></label>
                 <label class="field"><span>Liczba stolików</span><input type="number" min="1" max="${escapeAttribute(String(Math.max(1, restaurantTableLimit)))}" name="tablesCount" value="1" required /></label>
                 <label class="field"><span>Liczba gości</span><input type="number" min="1" name="guestsCount" value="2" required /></label>
@@ -3134,7 +3164,7 @@
               <div class="field-grid">
                 ${scheduleHallOptionsMarkup(model.hallId || state.schedule.hallOptions[0]?.id || "")}
                 <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
-                <label class="field"><span>Start</span><input type="time" name="startTime" value="12:00" required /></label>
+                <label class="field"><span>Start</span><input type="time" name="startTime" min="00:00" max="23:30" step="1800" value="12:00" required /></label>
                 <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="3" required /></label>
               </div>
               <label class="field-full"><span>Notatka blokady</span><textarea name="note"></textarea></label>
@@ -3143,7 +3173,7 @@
               <div class="field-grid">
                 ${scheduleHallOptionsMarkup(model.hallId || state.schedule.hallOptions[0]?.id || "")}
                 <label class="field"><span>Data</span><input type="date" name="reservationDate" value="${escapeAttribute(model.date)}" required /></label>
-                <label class="field"><span>Start</span><input type="time" name="startTime" value="12:00" required /></label>
+                <label class="field"><span>Start</span><input type="time" name="startTime" min="00:00" max="23:30" step="1800" value="12:00" required /></label>
                 <label class="field"><span>Czas (h)</span><input type="number" step="0.5" min="0.5" name="durationHours" value="3" required /></label>
                 <label class="field"><span>Liczba gości</span><input type="number" min="1" name="guestsCount" value="40" required /></label>
                 ${scheduleHallExclusiveFieldMarkup(model.hallId || state.schedule.hallOptions[0]?.id || "", "0")}
@@ -3279,7 +3309,7 @@
             } else {
               const tablesCount = Number(formData.get("tablesCount") || 1);
               if (!restaurantTableLimit) {
-                throw new Error("Brak aktywnych stolików w restauracji.");
+                throw new Error("Brak aktywnych stolików w cateringu.");
               }
               if (tablesCount > restaurantTableLimit) {
                 throw new Error(`Mozesz wybrac maksymalnie ${restaurantTableLimit} stolikow.`);
@@ -3379,7 +3409,7 @@
       attachEvents(mount);
     };
 
-    openScheduleModal(renderContent(), attachEvents);
+    openScheduleModal(renderContent(), attachEvents, { closeOnOverlayClick: false });
     if (
       (!state.schedule.roomOptions.length || !state.schedule.tableOptions.length || !state.schedule.hallOptions.length) &&
       !state.schedule.isLoading
@@ -3754,12 +3784,12 @@
     if (!onlineBookingsEnabled) {
       const titleMap = {
         hotel: "Rezerwacje hotelu",
-        restaurant: "Rezerwacje restauracji",
+        restaurant: "Rezerwacje cateringu",
         hall: "Rezerwacje przyjec",
       };
       const copyMap = {
         hotel: "Ten widok wymaga wlaczonego backendu rezerwacji hotelu.",
-        restaurant: "Ten widok wymaga wlaczonego backendu rezerwacji restauracji.",
+        restaurant: "Ten widok wymaga wlaczonego backendu rezerwacji cateringu (stoliki).",
         hall: "Ten widok wymaga wlaczonego backendu rezerwacji przyjec.",
       };
       renderOnlineBookingsUnavailable(panelSelector, {
@@ -3829,7 +3859,7 @@
 
     if (topTab === "restauracja") {
       if (tileKey === "home") {
-        renderHomeSectionMediaPanel("restaurant", "#restaurant-home-media-panel", "Restauracja", statusMessage);
+        renderHomeSectionMediaPanel("restaurant", "#restaurant-home-media-panel", "Catering", statusMessage);
       } else if (tileKey === "menu") {
         renderRestaurantMenuPanel(statusMessage);
       } else if (tileKey === "gallery") {
@@ -4065,7 +4095,7 @@
             <label class="checkbox-field">
               <input type="checkbox" id="section-block-restaurant" ${content.home.sectionBlocks?.restaurant ? "checked" : ""} />
               <span class="checkbox-copy">
-                <strong>Zablokuj Restauracje</strong>
+                <strong>Zablokuj Catering</strong>
                 <span>Wyszarza kafelek i blokuje wejscie na adres /Restauracja/.</span>
               </span>
             </label>
@@ -4085,8 +4115,8 @@
             <label class="checkbox-field">
               <input type="checkbox" id="booking-enable-restaurant" ${content.booking?.restaurant !== false ? "checked" : ""} ${onlineBookingsEnabled ? "" : "disabled"} />
               <span class="checkbox-copy">
-                <strong>Restauracja</strong>
-                <span>Włącza formularz rezerwacji stolika.</span>
+                <strong>Catering</strong>
+                <span>Włącza formularz rezerwacji stolika (gdy kafelek jest widoczny w modalu).</span>
               </span>
             </label>
             <label class="checkbox-field">
@@ -4103,7 +4133,7 @@
                 <span>Włącza formularz zapytania o sale i rezerwacje.</span>
               </span>
             </label>
-            <p class="helper" style="margin: 0.75rem 0 0.35rem;">Okresy przerw ustawisz nizej, osobno w panelach: Hotel / Restauracja / Przyjecia.</p>
+            <p class="helper" style="margin: 0.75rem 0 0.35rem;">Okresy przerw ustawisz nizej, osobno w panelach: Hotel / Catering / Przyjecia.</p>
           </div>
           <div class="panel-note">
             <strong>Uwaga:</strong> część treści poniżej pochodzi ze starszej wersji panelu. Aktualny front korzysta głównie z blokad sekcji, rezerwacji online, godzin otwarcia, menu, galerii, dokumentów, kalendarza i modala „Oferta”.
@@ -4129,14 +4159,14 @@
         <div class="repeater-item">
           <div class="repeater-head">
             <div>
-              <h3>Restauracja</h3>
+              <h3>Catering</h3>
               <p class="helper">Sekcje menu i dodatki.</p>
             </div>
           </div>
           <div class="field-grid">
             <label class="field-full"><span>Naglowek</span><input id="restaurant-hero-title" value="${escapeAttribute(content.restaurant.heroTitle)}" /></label>
             <label class="field-full"><span>Opis</span><textarea id="restaurant-hero-text">${escapeHtml(content.restaurant.heroText)}</textarea></label>
-            <label class="field-full"><span>Dodatki restauracji, jedna pozycja w linii</span><textarea id="restaurant-extras">${escapeHtml((content.restaurant.extras || []).join("\n"))}</textarea></label>
+            <label class="field-full"><span>Dodatki cateringu, jedna pozycja w linii</span><textarea id="restaurant-extras">${escapeHtml((content.restaurant.extras || []).join("\n"))}</textarea></label>
           </div>
           <div class="repeater-head">
             <strong>Sekcje menu</strong>
@@ -4570,8 +4600,15 @@
       content.restaurant.ordersInfoText = restaurantOrdersInfoText;
     }
 
-    if (document.querySelector("#restaurant-menu-panel")) {
+    if (document.querySelector("#restaurant-menu-panel") || document.querySelector("#events-menu-panel")) {
+      if (!content.restaurant) {
+        content.restaurant = {};
+      }
       content.restaurant.menu = collectMenuFromPanel();
+      if (!content.events) {
+        content.events = {};
+      }
+      content.events.menu = structuredClone(content.restaurant.menu);
     } else if (document.querySelector("[data-menu-title]")) {
       content.restaurant.menuSections = Array.from(document.querySelectorAll("[data-menu-title]")).map(
         (element, index) => ({
@@ -4639,13 +4676,6 @@
       ];
     }
 
-    if (document.querySelector("#events-menu-panel")) {
-      if (!content.events) {
-        content.events = {};
-      }
-      content.events.menu = collectEventsMenuFromPanel();
-    }
-
     if (document.querySelector("#documents-page-list")) {
       content.documentsPage = collectDocumentsPageFromPanel();
     }
@@ -4665,17 +4695,15 @@
   function captureDraftIfPossible() {
     try {
       state.content = collectContentFromForm();
-      if (document.querySelector("#restaurant-menu-panel")) {
+      if (document.querySelector("#restaurant-menu-panel") || document.querySelector("#events-menu-panel")) {
         if (!state.content.restaurant) {
           state.content.restaurant = {};
         }
         state.content.restaurant.menu = collectMenuFromPanel();
-      }
-      if (document.querySelector("#events-menu-panel")) {
         if (!state.content.events) {
           state.content.events = {};
         }
-        state.content.events.menu = collectEventsMenuFromPanel();
+        state.content.events.menu = structuredClone(state.content.restaurant.menu);
       }
     } catch (error) {
       // Ignore incomplete drafts while the panel is rerendering.
@@ -4702,17 +4730,15 @@
     try {
       const content = collectContentFromForm();
       // Zbierz menu z panelu zarządzania menu jeśli istnieje
-      if (document.querySelector("#restaurant-menu-panel")) {
+      if (document.querySelector("#restaurant-menu-panel") || document.querySelector("#events-menu-panel")) {
         if (!content.restaurant) {
           content.restaurant = {};
         }
         content.restaurant.menu = collectMenuFromPanel();
-      }
-      if (document.querySelector("#events-menu-panel")) {
         if (!content.events) {
           content.events = {};
         }
-        content.events.menu = collectEventsMenuFromPanel();
+        content.events.menu = structuredClone(content.restaurant.menu);
       }
       // Zbierz galerię restauracji jeśli istnieje
       if (state.content.restaurant?.gallery) {
@@ -4842,11 +4868,11 @@
 
   function renderRestaurantBookingSettingsPanel(statusMessage = "") {
     renderDomainBookingSettingsPanel("#restaurant-booking-settings-panel", {
-      title: "Restauracja",
+      title: "Catering",
       enabledId: "booking-enable-restaurant",
-      toggleLabel: "Restauracja",
+      toggleLabel: "Catering",
       pauseRangesKey: "restaurantPauseRanges",
-      pauseLabel: "Restauracja",
+      pauseLabel: "Catering",
       statusMessage,
       disabled: !onlineBookingsEnabled,
     });
@@ -5026,9 +5052,9 @@
     if (!panel) return;
 
     panel.innerHTML = `
-      <p class="pill">Restauracja</p>
+      <p class="pill">Catering</p>
       <h2>Godziny otwarcia</h2>
-      <p class="section-intro">Te godziny pojawiaja sie w kafelku "Godziny" na stronie restauracji.</p>
+      <p class="section-intro">Te godziny pojawiaja sie w kafelku "Godziny" na stronie cateringu.</p>
       <div class="stack">
         ${renderOpeningHoursEditorMarkup(state.content.company?.openingHours, {
           intro: "Ustaw godzine otwarcia i zamkniecia dla kazdego dnia osobno. Puste pola zapisza dzien jako nieczynny.",
@@ -5043,12 +5069,12 @@
     if (!panel) return;
     const currentInfoText =
       state.content.restaurant?.ordersInfoText ||
-      "Dowozimy za darmo w odleglosci do 5 km od restauracji.";
+      "Dowozimy za darmo w odleglosci do 5 km od obiektu.";
 
     panel.innerHTML = `
-      <p class="pill">Restauracja</p>
-      <h2>Zamowienia i catering</h2>
-      <p class="section-intro">Edytuj tresc modala widocznego po kliknieciu kafelka "Zamowienia i catering" na stronie restauracji.</p>
+      <p class="pill">Catering</p>
+      <h2>Zamówienia</h2>
+      <p class="section-intro">Edytuj tresc modala widocznego po kliknieciu kafelka "Zamówienia" na stronie cateringu.</p>
       <div class="stack">
         <div class="field-full">
           <span>Tresc modala</span>
@@ -5469,10 +5495,10 @@
     if (kind === "restaurant") {
       return {
         panelSelector: "#restaurant-menu-panel",
-        pill: "Restauracja",
-        title: "Menu Restauracji",
+        pill: "Catering",
+        title: "Menu cateringu",
         intro:
-          "Najpierw wybierasz kategorie, a potem w modalach przechodzisz do edycji kategorii i pojedynczych produktow.",
+          "Wspolna karta z menu na stronie Przyjec — zmiany tutaj i tam sa identyczne. Najpierw wybierasz kategorie, potem edytujesz je i produkty w modalach.",
         includePrice: true,
         emptyState: "Nie ma jeszcze zadnej kategorii. Dodaj pierwsza i uzupelnij ja w osobnym oknie.",
         categoryLabel: "Kategoria",
@@ -5485,11 +5511,11 @@
       pill: "Przyjecia",
       title: "Menu okolicznosciowe",
       intro:
-        "Edycja odbywa sie modalami: lista kategorii na glownej planszy, a szczegoly kategorii i produktow w osobnych oknach.",
-      includePrice: false,
+        "To samo menu co w zakladce Catering — zmiany tutaj i tam zapisuja jedna wspolna karte (w tym ceny). Edycja modalami: kategorie na planszy, szczegoly w osobnych oknach.",
+      includePrice: true,
       emptyState: "Nie ma jeszcze zadnej kategorii. Dodaj pierwsza i uzupelnij ja w osobnym oknie.",
       categoryLabel: "Kategoria",
-      productLabel: "Pozycja",
+      productLabel: "Produkt",
     };
   }
 
@@ -5519,38 +5545,27 @@
   const MENU_EDITOR_UNCATEGORIZED_KEY = "__menu_editor_uncategorized__";
 
   function getMenuSectionsByKind(kind) {
-    if (kind === "restaurant") {
-      if (!state.content.restaurant) {
-        state.content.restaurant = {};
-      }
-      if (!Array.isArray(state.content.restaurant.menu)) {
-        state.content.restaurant.menu = [];
-      }
-      state.content.restaurant.menu.forEach((section) => {
-        syncMenuEditorSectionSubcategories(section);
-        syncMenuEditorSectionSubcategoryOrder(section);
-      });
-      return state.content.restaurant.menu;
+    if (!state.content.restaurant) {
+      state.content.restaurant = {};
     }
-
-    if (!state.content.events) {
-      state.content.events = {};
+    if (!Array.isArray(state.content.restaurant.menu)) {
+      state.content.restaurant.menu = [];
     }
-    if (!Array.isArray(state.content.events.menu)) {
-      state.content.events.menu = [];
-    }
-    state.content.events.menu.forEach((section) => {
+    state.content.restaurant.menu.forEach((section) => {
       syncMenuEditorSectionSubcategories(section);
       syncMenuEditorSectionSubcategoryOrder(section);
     });
-    return state.content.events.menu;
+    if (kind === "events") {
+      if (!state.content.events) {
+        state.content.events = {};
+      }
+      state.content.events.menu = state.content.restaurant.menu;
+    }
+    return state.content.restaurant.menu;
   }
 
   function createMenuEditorItem(kind, overrides = {}) {
-    const baseItem =
-      kind === "restaurant"
-        ? { name: "", price: "", description: "", ingredients: [] }
-        : { name: "", description: "", ingredients: [] };
+    const baseItem = { name: "", price: "", description: "", ingredients: [] };
     return { ...baseItem, ...overrides };
   }
 
@@ -6836,19 +6851,15 @@
     renderMenuEditorPanel("events", statusMessage);
   }
 
-  function collectEventsMenuFromPanel() {
-    return collectMenuEditorFromPanel("events");
-  }
-
   function renderRestaurantGalleryPanel(statusMessage = "") {
     const panel = document.querySelector("#restaurant-gallery-panel");
     if (!panel) return;
     const gallery = state.content.restaurant?.gallery || [];
 
     panel.innerHTML = `
-      <p class="pill">Restauracja</p>
-      <h2>Galeria Restauracji</h2>
-      <p class="section-intro">Zarzadzaj zdjeciami galerii restauracji. Mozesz dodawac, usuwac i zmieniac kolejnosc zdjec.</p>
+      <p class="pill">Catering</p>
+      <h2>Galeria cateringu</h2>
+      <p class="section-intro">Zarzadzaj zdjeciami galerii cateringu. Mozesz dodawac, usuwac i zmieniac kolejnosc zdjec.</p>
       <p class="status">${escapeHtml(statusMessage)}</p>
       <div class="stack">
         <form class="repeater-item" data-upload-restaurant-gallery>
@@ -6865,7 +6876,7 @@
                   .map(
                     (image, index) => `
                       <article class="thumb-card">
-                        <img src="${escapeAttribute(image.url || image)}" alt="${escapeAttribute(image.alt || "Restauracja")}" />
+                        <img src="${escapeAttribute(image.url || image)}" alt="${escapeAttribute(image.alt || "Catering")}" />
                         <div class="inline-actions">
                           <button class="button secondary" type="button" data-move-restaurant-image-up="${index}" aria-label="Przesun w lewo" ${index === 0 ? 'disabled' : ''}>←</button>
                           <button class="button secondary" type="button" data-move-restaurant-image-down="${index}" aria-label="Przesun w prawo" ${index === gallery.length - 1 ? 'disabled' : ''}>→</button>
@@ -6904,7 +6915,7 @@
     }
 
     try {
-      const images = await filesToInlineGalleryImages(files, INLINE_IMAGE_MAX_BYTES, "Restauracja");
+      const images = await filesToInlineGalleryImages(files, INLINE_IMAGE_MAX_BYTES, "Catering");
 
       if (!state.content.restaurant) {
         state.content.restaurant = {};
@@ -7859,7 +7870,7 @@
 
     const services = [
       { key: "hotel", label: "Hotel" },
-      { key: "restaurant", label: "Restauracja" },
+      { key: "restaurant", label: "Catering" },
       { key: "hall", label: "Przyjęcia" },
     ];
 

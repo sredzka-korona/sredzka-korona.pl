@@ -739,10 +739,16 @@ async function handleContactSubmission(payload, request, env) {
 }
 
 async function verifyTurnstile(token, request, env) {
-  if (!env.TURNSTILE_SECRET) {
+  const secret = String(env.TURNSTILE_SECRET || "").trim();
+  if (!secret) {
+    const skip = String(env.TURNSTILE_SKIP_VERIFY || "").trim().toLowerCase();
+    if (skip === "1" || skip === "true" || skip === "yes") {
+      console.warn("verifyTurnstile: pomijam weryfikacje (TURNSTILE_SKIP_VERIFY — tylko lokalny dev)");
+      return true;
+    }
     return false;
   }
-  if (!token) {
+  if (!String(token || "").trim()) {
     return false;
   }
   const ip = request.headers.get("CF-Connecting-IP") || "";
@@ -750,7 +756,7 @@ async function verifyTurnstile(token, request, env) {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      secret: env.TURNSTILE_SECRET,
+      secret,
       response: token,
       remoteip: ip,
     }),
@@ -1261,6 +1267,32 @@ function normalizeHomeSectionMedia(sectionMedia, fallbackMedia = DEFAULT_CONTENT
   return result;
 }
 
+function normalizeGastronomyMenuItemPrices(menu) {
+  if (!Array.isArray(menu)) {
+    return;
+  }
+  for (const section of menu) {
+    const items = Array.isArray(section?.items) ? section.items : [];
+    for (const item of items) {
+      if (item && typeof item === "object") {
+        item.price = String(item.price != null ? item.price : "").trim();
+      }
+    }
+  }
+}
+
+/** Jedna wspolna karta: restauracja + przyjecia. Gdy brak obu tablic w DB, zwraca null (zostaja domyslne z merge). */
+function unifyPublicGastronomyMenu(content) {
+  const rest = Array.isArray(content.restaurant?.menu) ? content.restaurant.menu : [];
+  const ev = Array.isArray(content.events?.menu) ? content.events.menu : [];
+  if (!rest.length && !ev.length) {
+    return null;
+  }
+  const base = structuredClone(rest.length ? rest : ev);
+  normalizeGastronomyMenuItemPrices(base);
+  return base;
+}
+
 function sanitizeContent(content) {
   const rawBooking = content.booking || {};
   const restaurantPauseRanges = normalizeBookingPauseRanges(
@@ -1282,6 +1314,14 @@ function sanitizeContent(content) {
   const firstHotelPause = hotelPauseRanges[0] || { from: "", to: "" };
   const firstEventsPause = eventsPauseRanges[0] || { from: "", to: "" };
 
+  const sharedMenu = unifyPublicGastronomyMenu(content);
+  const restaurantMerged = { ...DEFAULT_CONTENT.restaurant, ...(content.restaurant || {}) };
+  const eventsMerged = { ...DEFAULT_CONTENT.events, ...(content.events || {}) };
+  if (sharedMenu) {
+    restaurantMerged.menu = sharedMenu;
+    eventsMerged.menu = structuredClone(sharedMenu);
+  }
+
   return {
     ...DEFAULT_CONTENT,
     ...content,
@@ -1295,14 +1335,14 @@ function sanitizeContent(content) {
       },
       sectionMedia: normalizeHomeSectionMedia(content.home?.sectionMedia, DEFAULT_CONTENT.home?.sectionMedia),
     },
-    restaurant: { ...DEFAULT_CONTENT.restaurant, ...(content.restaurant || {}) },
+    restaurant: restaurantMerged,
     hotel: {
       ...DEFAULT_CONTENT.hotel,
       ...(content.hotel || {}),
       // Galerie pokoi sa utrzymywane poza content_json (tabela hotel_room_images).
       roomGalleries: emptyHotelRoomGalleries(),
     },
-    events: { ...DEFAULT_CONTENT.events, ...(content.events || {}) },
+    events: eventsMerged,
     services: Array.isArray(content.services) ? content.services : DEFAULT_CONTENT.services,
     gallery: { ...DEFAULT_CONTENT.gallery, ...(content.gallery || {}) },
     documentsPage: {

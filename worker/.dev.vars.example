@@ -4,6 +4,10 @@
 # (to NIE jest site key z assets/js/config.js).
 TURNSTILE_SECRET=
 
+# Tylko lokalnie, gdy nie chcesz wklejać sekretu: TURNSTILE_SKIP_VERIFY=true
+# (na produkcji w Workerze TEGO NIE ustawiaj — otworzyłoby formularz dla botów).
+# TURNSTILE_SKIP_VERIFY=true
+
 # Opcjonalnie przy lokalnym teście SMTP (jak w wrangler.jsonc):
 # SMTP_USER=
 # SMTP_PASS=

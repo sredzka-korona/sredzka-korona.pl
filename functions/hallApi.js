@@ -17,9 +17,9 @@ const {
 const {
   checkHallAvailability,
   allocateHallReservationNumber,
-  dtFromDateAndTime,
   WARSAW,
   assertNotPastCalendarDateWarsaw,
+  assertHallStartTimeSlot,
 } = require("./lib/hallLogic");
 const { ensureFormattedReservationNumber, formatHumanReservationNumber } = require("./lib/humanNumber");
 const {
@@ -42,8 +42,6 @@ if (!getApps().length) {
 }
 
 const db = getFirestore();
-const FIXED_HALL_OPEN_TIME = "00:00";
-const FIXED_HALL_CLOSE_TIME = "00:00";
 
 function venueName() {
   return process.env.VENUE_NAME || process.env.HOTEL_NAME || "Średzka Korona";
@@ -107,8 +105,6 @@ async function ensureVenueSettings(db) {
   const s = await ref.get();
   if (!s.exists) {
     await ref.set({
-      hallOpenTime: FIXED_HALL_OPEN_TIME,
-      hallCloseTime: FIXED_HALL_CLOSE_TIME,
       nextHallHumanNumber: 3000,
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -148,30 +144,6 @@ async function ensureHallDefaults(db) {
       updatedAt: FieldValue.serverTimestamp(),
     });
   }
-}
-
-function assertEventWithinHallHours(settings, reservationDate, startTime, durationHours) {
-  const openT = FIXED_HALL_OPEN_TIME;
-  const closeT = FIXED_HALL_CLOSE_TIME;
-  const start = dtFromDateAndTime(reservationDate, startTime);
-  if (!start) return { ok: false, error: "Nieprawidłowa data lub godzina." };
-  const end = start.plus({ hours: Number(durationHours) || 0 });
-  if (end.day !== start.day || end.month !== start.month || end.year !== start.year) {
-    return { ok: false, error: "Rezerwacja musi zakończyć się tego samego dnia." };
-  }
-  const [oh, om] = openT.split(":").map((x) => parseInt(x, 10));
-  const [ch, cm] = closeT.split(":").map((x) => parseInt(x, 10));
-  const openM = oh * 60 + (om || 0);
-  let closeM = ch * 60 + (cm || 0);
-  if (closeM <= openM) {
-    closeM += 24 * 60;
-  }
-  const sm = start.hour * 60 + start.minute;
-  const em = end.hour * 60 + end.minute;
-  if (sm < openM || em > closeM) {
-    return { ok: false, error: `Rezerwacje tylko w godzinach ${openT}–${closeT}.` };
-  }
-  return { ok: true };
 }
 
 function buildHallMailVars(res, hall, extra = {}) {
@@ -349,8 +321,7 @@ const hallApi = onRequest(
           json(res, { error: "Sala niedostępna." }, 400);
           return;
         }
-        const settings = (await db.collection("venueSettings").doc("default").get()).data() || {};
-        const hv = assertEventWithinHallHours(settings, reservationDate, startTime, durationHours);
+        const hv = assertHallStartTimeSlot(reservationDate, startTime);
         if (!hv.ok) {
           json(res, { ok: false, available: false, error: hv.error, maxGuests: 0 });
           return;
@@ -427,7 +398,6 @@ const hallApi = onRequest(
 
         await ensureHallDefaults(db);
         await ensureVenueSettings(db);
-        const settings = (await db.collection("venueSettings").doc("default").get()).data() || {};
 
         const {
           hallId,
@@ -465,7 +435,7 @@ const hallApi = onRequest(
         const gc = Number(guestsCount || 0);
         const excl = hall.hallKind === "small" ? true : Boolean(exclusive);
 
-        const hv = assertEventWithinHallHours(settings, reservationDate, startTime, durationHours);
+        const hv = assertHallStartTimeSlot(reservationDate, startTime);
         if (!hv.ok) {
           json(res, { error: hv.error }, 400);
           return;
@@ -974,6 +944,12 @@ const hallApi = onRequest(
         const exclusive =
           hall.hallKind === "small" ? true : rest.exclusive != null ? Boolean(rest.exclusive) : cur.exclusive;
 
+        const hv = assertHallStartTimeSlot(reservationDate, startTime);
+        if (!hv.ok) {
+          json(res, { error: hv.error }, 400);
+          return;
+        }
+
         const chk = await checkHallAvailability(
           db,
           hall,
@@ -1068,8 +1044,7 @@ const hallApi = onRequest(
           return;
         }
         const hall = { id: hallSnap.id, ...hallSnap.data() };
-        const settings = (await db.collection("venueSettings").doc("default").get()).data() || {};
-        const hv = assertEventWithinHallHours(settings, reservationDate, startTime, durationHours);
+        const hv = assertHallStartTimeSlot(reservationDate, startTime);
         if (!hv.ok) {
           json(res, { error: hv.error }, 400);
           return;
@@ -1161,37 +1136,6 @@ const hallApi = onRequest(
           details: { humanNumber, status: st },
         });
         json(res, { ok: true, id: ref.id, humanNumber });
-        return;
-      }
-
-      if (req.method === "GET" && op === "admin-venue-settings") {
-        await ensureVenueSettings(db);
-        json(res, {
-          settings: {
-            hallOpenTime: FIXED_HALL_OPEN_TIME,
-            hallCloseTime: FIXED_HALL_CLOSE_TIME,
-          },
-        });
-        return;
-      }
-
-      if (req.method === "PUT" && op === "admin-venue-settings-save") {
-        await ensureVenueSettings(db);
-        await db.collection("venueSettings").doc("default").set(
-          {
-            hallOpenTime: FIXED_HALL_OPEN_TIME,
-            hallCloseTime: FIXED_HALL_CLOSE_TIME,
-            updatedAt: FieldValue.serverTimestamp(),
-            updatedBy: adminUser.email,
-          },
-          { merge: true }
-        );
-        await appendVenueAudit(db, {
-          action: "venue_settings_save",
-          actorEmail: adminUser.email,
-          details: {},
-        });
-        json(res, { ok: true });
         return;
       }
 

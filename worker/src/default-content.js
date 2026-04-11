@@ -90,7 +90,7 @@ export const DEFAULT_CONTENT = {
     heroTitle: "Autorska kuchnia i atmosfera wieczoru premium",
     heroText:
       "Restauracja Sredzka Korona laczy elegancje sali, staranna obsluge i kuchnie, ktora dobrze sprawdza sie zarowno podczas codziennych kolacji, jak i okazji specjalnych.",
-    orderButtonText: "Rezerwacja stolika",
+    orderButtonText: "Zamów catering",
     ordersInfoText:
       "Zamówienia indywidualne są tymczasowo wstrzymane. Catering zamawiany poprzez kontakt telefoniczny i mailowy.",
     menuSections: [

@@ -713,7 +713,24 @@
       }
 
       #modal.modal--occasion-menu .menu-item-header {
-        display: block;
+        display: flex;
+        align-items: baseline;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+        justify-content: space-between;
+      }
+
+      #modal.modal--occasion-menu .menu-item-price {
+        font-size: clamp(1.2rem, 1.8vw, 1.5rem);
+        font-weight: 700;
+        color: var(--gold);
+        white-space: nowrap;
+        background: linear-gradient(135deg, rgba(200, 170, 120, 0.1), rgba(232, 216, 184, 0.15));
+        padding: 0.4rem 1rem;
+        border-radius: 12px;
+        border: 1px solid rgba(200, 170, 120, 0.2);
+        font-family: "Manrope", sans-serif;
+        letter-spacing: 0.05em;
       }
 
       #modal.modal--occasion-menu .menu-item-name {
@@ -2604,7 +2621,7 @@
     <script src="../assets/js/default-content.js"></script>
     <script src="../assets/js/config.js"></script>
     <script src="../assets/js/booking-flags.js"></script>
-    <script src="../assets/js/global-booking-modal.js?v=20260407-8"></script>
+    <script src="../assets/js/global-booking-modal.js?v=20260407-9"></script>
     <script>
       (async () => {
         const app = document.querySelector("#app");
@@ -2726,9 +2743,12 @@
                   { url: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=800&q=80", alt: "Sala Mała" },
                 ],
               };
-              occasionMenu = Array.isArray(window.SREDZKA_DEFAULT_CONTENT?.events?.menu)
-                ? window.SREDZKA_DEFAULT_CONTENT.events.menu
-                : [];
+              {
+                const dc = window.SREDZKA_DEFAULT_CONTENT;
+                const r = Array.isArray(dc?.restaurant?.menu) ? dc.restaurant.menu : [];
+                const e = Array.isArray(dc?.events?.menu) ? dc.events.menu : [];
+                occasionMenu = r.length ? r : e;
+              }
               eventAlbums = Array.isArray(window.SREDZKA_DEFAULT_CONTENT?.gallery?.albums)
                 ? window.SREDZKA_DEFAULT_CONTENT.gallery.albums
                 : [];
@@ -2741,8 +2761,10 @@
             if (typeof payload.content?.events?.ofertaModalBodyHtml === "string") {
               ofertaModalBodyHtml = payload.content.events.ofertaModalBodyHtml;
             }
-            if (Array.isArray(payload.content?.events?.menu)) {
-              occasionMenu = payload.content.events.menu;
+            {
+              const r = Array.isArray(payload.content?.restaurant?.menu) ? payload.content.restaurant.menu : [];
+              const e = Array.isArray(payload.content?.events?.menu) ? payload.content.events.menu : [];
+              occasionMenu = r.length ? r : e;
             }
             if (Array.isArray(payload.galleryAlbums)) {
               eventAlbums = payload.galleryAlbums;
@@ -2998,6 +3020,11 @@
         let occasionMenu = [];
         let selectedOccasionCategoryIndex = 0;
 
+        function occasionMenuPriceHtml(price) {
+          const t = String(price ?? "").trim();
+          return t ? `<span class="menu-item-price">${escapeHtml(t)}</span>` : "";
+        }
+
         function renderOccasionMenuItems(section) {
           const items = Array.isArray(section?.items) ? section.items : [];
           if (!items || items.length === 0) {
@@ -3012,6 +3039,7 @@
                 <div class="menu-item-content">
                   <div class="menu-item-header">
                     <h4 class="menu-item-name">${escapeHtml(item.name)}</h4>
+                    ${occasionMenuPriceHtml(item.price)}
                   </div>
                   ${item.description ? `<p class="menu-item-description">${escapeHtml(item.description)}</p>` : ""}
                   ${
@@ -3062,6 +3090,7 @@
                       <div class="menu-item-content">
                         <div class="menu-item-header">
                           <h4 class="menu-item-name">${escapeHtml(item.name)}</h4>
+                          ${occasionMenuPriceHtml(item.price)}
                         </div>
                         ${item.description ? `<p class="menu-item-description">${escapeHtml(item.description)}</p>` : ""}
                         ${

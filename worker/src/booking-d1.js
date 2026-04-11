@@ -694,6 +694,20 @@ function isHm(value) {
   return /^\d{2}:\d{2}$/.test(String(value || ""));
 }
 
+/** Start imprezy na sali: co 30 min, 00:00 … 23:30 (zgodnie z frontendem). */
+function isHallStartSlotHm(value) {
+  if (!isHm(value)) return false;
+  const hh = toInt(String(value).slice(0, 2), -1);
+  const mm = toInt(String(value).slice(3, 5), -1);
+  return hh >= 0 && hh <= 23 && (mm === 0 || mm === 30);
+}
+
+function assertHallStartSlotTime(startTime) {
+  if (!isHallStartSlotHm(startTime)) {
+    throw new Error("Godzina rozpoczęcia musi być od 00:00 do 23:30, co 30 minut.");
+  }
+}
+
 function nightsCount(dateFrom, dateTo) {
   const [fy, fm, fd] = String(dateFrom).split("-").map((x) => Number(x));
   const [ty, tm, td] = String(dateTo).split("-").map((x) => Number(x));
@@ -1460,6 +1474,26 @@ function maintenanceRequestLike(env) {
   return { url: fallbackUrl };
 }
 
+/** Powiadomienie klienta o wygaśnięciu linku weryfikacji e-mail (np. ścieżka kliknięcia w wygasły link). */
+async function notifyEmailVerificationExpiredClient(env, requestLike, service, row) {
+  const eventKey =
+    service === "restaurant"
+      ? "restaurant_expired_email_client"
+      : service === "hall"
+        ? "hall_expired_email_client"
+        : "expired_email_client";
+  try {
+    await sendTemplatedBookingMail(env, requestLike, {
+      service,
+      eventKey,
+      row: { ...row, status: "expired", pending_expires_at: null },
+      to: row.email || "",
+    });
+  } catch (error) {
+    console.error(`${service} ${eventKey} (wygasły link potwierdzenia) mail error:`, error);
+  }
+}
+
 async function expireGroupAndNotify(env, { service, table, initialStatus, expiresColumn, clientEventKey, notifyAdmin }) {
   const now = nowMs();
   const rows = await env.DB.prepare(
@@ -1477,6 +1511,7 @@ async function expireGroupAndNotify(env, { service, table, initialStatus, expire
   const requestLike = maintenanceRequestLike(env);
   const adminRecipients = notifyAdmin ? parseAdminNotifyEmails(env) : [];
   let changed = 0;
+  const maxClientMailAttempts = 3;
   for (const row of expiredRows) {
     const update = await env.DB.prepare(
       `UPDATE ${table}
@@ -1490,15 +1525,26 @@ async function expireGroupAndNotify(env, { service, table, initialStatus, expire
       continue;
     }
     changed += rowChanged;
-    try {
-      await sendTemplatedBookingMail(env, requestLike, {
-        service,
-        eventKey: clientEventKey,
-        row: { ...row, status: "expired", pending_expires_at: null },
-        to: row.email || "",
-      });
-    } catch (error) {
-      console.error(`${service} ${clientEventKey} mail error:`, error);
+    const rowForMail = { ...row, status: "expired", pending_expires_at: null };
+    const clientPayload = {
+      service,
+      eventKey: clientEventKey,
+      row: rowForMail,
+      to: row.email || "",
+    };
+    for (let attempt = 1; attempt <= maxClientMailAttempts; attempt += 1) {
+      try {
+        await sendTemplatedBookingMail(env, requestLike, clientPayload);
+        break;
+      } catch (error) {
+        console.error(
+          `${service} ${clientEventKey} mail error (próba ${attempt}/${maxClientMailAttempts}):`,
+          error
+        );
+        if (attempt < maxClientMailAttempts) {
+          await sleepMs(500 * attempt);
+        }
+      }
     }
     if (adminRecipients.length) {
       for (const adminEmail of adminRecipients) {
@@ -2073,28 +2119,31 @@ function restaurantFreeTableCount(blockingRows, startMs, endMs, allTableIds) {
   return Math.max(0, allTableIds.length - blocked.size - anonymousReservedCount);
 }
 
-async function restaurantAvailabilityForSlot(env, settings, allTables, payload, excludeId = null) {
+async function restaurantAvailabilityForSlot(env, settings, allTables, payload, excludeId = null, slotOptions = {}) {
   const reservationDate = cleanString(payload.reservationDate, 10);
   const startTime = cleanString(payload.startTime, 5);
   const durationHours = Number(payload.durationHours || 2);
   const tablesCount = Math.max(1, toInt(payload.tablesCount, 1));
+  const skipPublicBookingRules = Boolean(slotOptions.skipPublicBookingRules);
   if (!isYmd(reservationDate) || !isHm(startTime)) {
     throw new Error("Nieprawidłowa data lub godzina.");
   }
   const today = todayYmdInWarsaw();
   const maxRestaurantDate = addMonthsYmd(today, 1);
-  if (reservationDate > maxRestaurantDate) {
+  if (!skipPublicBookingRules && reservationDate > maxRestaurantDate) {
     throw new Error("Rezerwację stolika można złożyć maksymalnie na miesiąc do przodu.");
   }
   if (!Number.isFinite(durationHours) || durationHours <= 0) {
     throw new Error("Nieprawidłowy czas trwania.");
   }
   const dayWindow = await resolveRestaurantWindowForDate(env, settings, reservationDate);
-  if (dayWindow.closed) {
-    throw new Error("Restauracja jest nieczynna w wybranym dniu.");
+  if (!skipPublicBookingRules) {
+    if (dayWindow.closed) {
+      throw new Error("Restauracja jest nieczynna w wybranym dniu.");
+    }
+    assertRestaurantStartLeadTime(reservationDate, startTime);
+    restaurantWindowWithinDay(dayWindow, startTime, durationHours);
   }
-  assertRestaurantStartLeadTime(reservationDate, startTime);
-  restaurantWindowWithinDay(dayWindow, startTime, durationHours);
   const startMs = ymdHmToMs(reservationDate, startTime);
   const endMs = startMs + durationHours * 3600000;
   const availableIds = await restaurantAvailableTableIds(env, startMs, endMs, tablesCount, excludeId);
@@ -2263,10 +2312,10 @@ async function restaurantCalendarAvailability(env, payload = {}) {
   };
 }
 
-async function assertRestaurantAvailability(env, payload, excludeId = null) {
+async function assertRestaurantAvailability(env, payload, excludeId = null, options = {}) {
   const settings = await loadRestaurantSettings(env);
   const allTables = await restaurantTables(env, false);
-  return restaurantAvailabilityForSlot(env, settings, allTables, payload, excludeId);
+  return restaurantAvailabilityForSlot(env, settings, allTables, payload, excludeId, options);
 }
 
 const RESTAURANT_PLACE_PREFS = new Set(["no_preference", "inside", "terrace"]);
@@ -2352,7 +2401,9 @@ async function createRestaurantReservation(env, payload, options = {}) {
       dayWindow: { closed: false },
     };
   } else {
-    availability = await assertRestaurantAvailability(env, payload, options.excludeId || null);
+    availability = await assertRestaurantAvailability(env, payload, options.excludeId || null, {
+      skipPublicBookingRules: Boolean(options.skipPublicBookingRules),
+    });
     if (!availability.ok) {
       throw new Error("Brak wolnych stolików w wybranym terminie.");
     }
@@ -2421,10 +2472,6 @@ async function createRestaurantReservation(env, payload, options = {}) {
   return { id, humanNumber, token, availability };
 }
 
-async function venueSettings(env) {
-  return { hallOpenTime: "00:00", hallCloseTime: "00:00" };
-}
-
 async function venueHalls(env) {
   const out = await env.DB.prepare(
     "SELECT id, name, capacity, active, hall_kind AS hallKind, description, exclusive_rule AS exclusiveRule, buffer_minutes AS bufferMinutes, full_block_guest_threshold AS fullBlockGuestThreshold, sort_order AS sortOrder FROM venue_halls ORDER BY sort_order ASC, id ASC"
@@ -2446,22 +2493,6 @@ async function venueHalls(env) {
 function hallFullBlock(hall, guestsCount, exclusive) {
   const thr = Number(hall.fullBlockGuestThreshold || 100);
   return Boolean(exclusive) || Number(guestsCount || 0) >= thr;
-}
-
-function hallTimeWindow(settings, startTime, durationHours) {
-  const [openH, openM] = String(settings.hallOpenTime || "00:00").split(":").map((x) => Number(x));
-  const [closeH, closeM] = String(settings.hallCloseTime || "00:00").split(":").map((x) => Number(x));
-  const startMinutes = toInt(startTime.slice(0, 2), 0) * 60 + toInt(startTime.slice(3, 5), 0);
-  const endMinutes = startMinutes + Math.round(Number(durationHours || 0) * 60);
-  const openMinutes = openH * 60 + openM;
-  let closeMinutes = closeH * 60 + closeM;
-  if (closeMinutes <= openMinutes) {
-    closeMinutes += 24 * 60;
-  }
-  if (startMinutes < openMinutes || endMinutes > closeMinutes) {
-    throw new Error(`Rezerwacje tylko w godzinach ${settings.hallOpenTime}-${settings.hallCloseTime}.`);
-  }
-  return { openMinutes, closeMinutes, startMinutes, endMinutes };
 }
 
 async function hallReservationRows(env, hallId, excludeId = null) {
@@ -2523,48 +2554,32 @@ function hallAvailabilityFromRows(hall, rows, payload) {
   return { ok: available, available, maxGuests, hall, startMs, endMs, guestsCount, exclusive, fullBlock };
 }
 
-async function hallAvailabilityAtSlot(env, hall, settings, payload, excludeId = null, options = {}) {
+async function hallAvailabilityAtSlot(env, hall, payload, excludeId = null, options = {}) {
   const reservationDate = cleanString(payload.reservationDate, 10);
   const startTime = cleanString(payload.startTime, 5);
   const durationHours = Number(payload.durationHours || 2);
+  const skipPublicBookingRules = Boolean(options.skipPublicBookingRules);
   if (!isYmd(reservationDate) || !isHm(startTime) || !Number.isFinite(durationHours) || durationHours <= 0) {
     throw new Error("Nieprawidłowa data lub godzina.");
   }
+  assertHallStartSlotTime(startTime);
   const today = todayYmdInWarsaw();
   const maxHallDate = addYearsYmd(today, 3);
-  if (reservationDate > maxHallDate) {
+  if (!skipPublicBookingRules && reservationDate > maxHallDate) {
     throw new Error("Rezerwację sali można złożyć maksymalnie na 3 lata do przodu.");
   }
-  if (reservationDate < today) {
+  if (!skipPublicBookingRules && reservationDate < today) {
     throw new Error("Nie można rezerwować terminu z przeszłości.");
   }
   const startMs = ymdHmToMsWarsaw(reservationDate, startTime);
   const endMs = startMs + durationHours * 3600000;
   if (!Number.isFinite(startMs)) throw new Error("Nieprawidłowa data lub godzina.");
-  hallTimeWindow(settings, startTime, durationHours);
   const rows = Array.isArray(options.rows) ? options.rows : await hallReservationRows(env, hall.id, excludeId);
   return hallAvailabilityFromRows(hall, rows, {
     ...payload,
     startMs,
     endMs,
   });
-}
-
-function buildHallCandidateSlots(settings, durationHours) {
-  const openMinutes = parseHmToMinutes(settings.hallOpenTime || "00:00");
-  const closeMinutesRaw = parseHmToMinutes(settings.hallCloseTime || "00:00", { allow24: true });
-  const safeOpen = openMinutes == null ? 0 : openMinutes;
-  let safeClose = closeMinutesRaw == null ? 0 : closeMinutesRaw;
-  if (safeClose <= safeOpen) {
-    safeClose += 24 * 60;
-  }
-  const durationMinutes = Math.max(PUBLIC_CALENDAR_STEP_MINUTES, Math.round(Number(durationHours || 0) * 60));
-  const latestStart = Math.min(1440, safeClose - durationMinutes);
-  const slots = [];
-  for (let minutes = safeOpen; minutes <= latestStart; minutes += PUBLIC_CALENDAR_STEP_MINUTES) {
-    slots.push(normalizeHmLabel(minutes));
-  }
-  return slots;
 }
 
 function dayCapacityForSmallHall(hall, rows, reservationDate) {
@@ -2606,8 +2621,6 @@ function pickLargeHall(halls) {
 
 async function hallCalendarAvailability(env, payload = {}) {
   const halls = (await venueHalls(env)).filter((hall) => hall.active);
-  const settings = await venueSettings(env);
-  const calendarCheckTime = "12:00";
   const requestedDate = cleanString(payload.reservationDate, 10);
   const startDateRaw = cleanString(payload.startDate, 10);
   const today = todayYmdInWarsaw();
@@ -2673,8 +2686,7 @@ async function hallAvailability(env, payload, excludeId = null, options = {}) {
   const halls = await venueHalls(env);
   const hall = halls.find((h) => h.id === cleanString(payload.hallId, 80) && h.active);
   if (!hall) throw new Error("Sala niedostępna.");
-  const settings = await venueSettings(env);
-  return hallAvailabilityAtSlot(env, hall, settings, payload, excludeId, options);
+  return hallAvailabilityAtSlot(env, hall, payload, excludeId, options);
 }
 
 async function createHallReservation(env, payload, options = {}) {
@@ -2692,6 +2704,7 @@ async function createHallReservation(env, payload, options = {}) {
     if (!isYmd(reservationDate) || !isHm(startTime) || !Number.isFinite(durationHours) || durationHours <= 0) {
       throw new Error("Nieprawidłowa data lub godzina.");
     }
+    assertHallStartSlotTime(startTime);
     const startMs = ymdHmToMsWarsaw(reservationDate, startTime);
     const endMs = startMs + durationHours * 3600000;
     const guestsCount = Math.max(0, toInt(payload.guestsCount, hall.hallKind === "small" ? 1 : 10));
@@ -2701,6 +2714,7 @@ async function createHallReservation(env, payload, options = {}) {
   } else {
     avail = await hallAvailability(env, payload, options.excludeId || null, {
       skipMinAdvance: Boolean(options.skipMinAdvance),
+      skipPublicBookingRules: Boolean(options.skipPublicBookingRules),
     });
     if (!avail.ok) {
       throw new Error("Termin niedostępny.");
@@ -4172,6 +4186,7 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
       return { status: 400, data: { error: row.status === "expired" ? "Link potwierdzający wygasł." : "Ta rezerwacja została już przetworzona." } };
     }
     if (row.email_verification_expires_at && Number(row.email_verification_expires_at) < nowMs()) {
+      await notifyEmailVerificationExpiredClient(env, request, "hotel", row);
       await env.DB.prepare(
         "UPDATE hotel_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, email_verification_expires_at=NULL, updated_at=? WHERE id=?"
       )
@@ -4333,6 +4348,7 @@ async function handleRestaurantPublic(env, op, request, verifyTurnstileToken) {
       return { status: 400, data: { error: row.status === "expired" ? "Link potwierdzający wygasł." : "Ta rezerwacja została już przetworzona." } };
     }
     if (row.email_verification_expires_at && Number(row.email_verification_expires_at) < nowMs()) {
+      await notifyEmailVerificationExpiredClient(env, request, "restaurant", row);
       await env.DB.prepare(
         "UPDATE restaurant_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, email_verification_expires_at=NULL, updated_at=? WHERE id=?"
       )
@@ -4497,6 +4513,7 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
       return { status: 400, data: { error: row.status === "expired" ? "Link potwierdzający wygasł." : "Ta rezerwacja została już przetworzona." } };
     }
     if (row.email_verification_expires_at && Number(row.email_verification_expires_at) < nowMs()) {
+      await notifyEmailVerificationExpiredClient(env, request, "hall", row);
       await env.DB.prepare(
         "UPDATE venue_reservations SET status='expired', admin_action_token_hash=NULL, admin_action_expires_at=NULL, email_verification_expires_at=NULL, updated_at=? WHERE id=?"
       )
@@ -4951,7 +4968,7 @@ async function handleRestaurantAdmin(env, op, request) {
           ? body.assignedTableIds.map((value) => cleanString(value, 80)).filter(Boolean)
           : [];
       } else if (status !== "email_verification_pending") {
-        const chk = await assertRestaurantAvailability(env, body, null);
+        const chk = await assertRestaurantAvailability(env, body, null, { skipPublicBookingRules: true });
         if (!chk.ok) return { status: 409, data: { error: "Brak wolnych stolików." } };
         assigned = chk.availableIds;
       }
@@ -4960,6 +4977,7 @@ async function handleRestaurantAdmin(env, op, request) {
         withConfirmationToken: false,
         assignedTableIds: assigned,
         skipAvailabilityCheck: status === "manual_block",
+        skipPublicBookingRules: status !== "manual_block",
       });
       return { status: 200, data: { ok: true, reservationId: out.id, humanNumber: out.humanNumber } };
     } catch (error) {
@@ -5050,7 +5068,7 @@ async function handleRestaurantAdmin(env, op, request) {
         customerNote: cleanString(body.customerNote ?? row.customer_note, 2000),
         adminNote: cleanString(body.adminNote ?? row.admin_note, 2000),
       };
-      const chk = await assertRestaurantAvailability(env, payload, id);
+      const chk = await assertRestaurantAvailability(env, payload, id, { skipPublicBookingRules: true });
       if (!chk.ok) return { status: 409, data: { error: "Brak wolnych stolików w wybranym terminie." } };
       const assigned = chk.availableIds;
       const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
@@ -5169,16 +5187,6 @@ async function handleHallAdmin(env, op, request) {
   if (op === "admin-halls-list" && request.method === "GET") {
     return { status: 200, data: { halls: await venueHalls(env) } };
   }
-  if (op === "admin-venue-settings" && request.method === "GET") {
-    return { status: 200, data: { settings: await venueSettings(env) } };
-  }
-  if (op === "admin-venue-settings-save" && request.method === "PUT") {
-    const body = await readBody(request);
-    await env.DB.prepare("UPDATE venue_settings SET hall_open_time=?, hall_close_time=?, updated_at=? WHERE id='default'")
-      .bind(cleanString(body.hallOpenTime, 5) || "00:00", cleanString(body.hallCloseTime, 5) || "00:00", nowMs())
-      .run();
-    return { status: 200, data: { ok: true } };
-  }
   if (op === "admin-hall-upsert" && request.method === "PUT") {
     const body = await readBody(request);
     const id = cleanString(body.id, 80);
@@ -5231,6 +5239,7 @@ async function handleHallAdmin(env, op, request) {
         withConfirmationToken: false,
         skipAvailabilityCheck: status === "manual_block",
         skipMinAdvance: true,
+        skipPublicBookingRules: status !== "manual_block",
       });
       return { status: 200, data: { ok: true, reservationId: out.id, humanNumber: out.humanNumber } };
     } catch (error) {
@@ -5278,7 +5287,7 @@ async function handleHallAdmin(env, op, request) {
         customerNote: cleanString(body.customerNote ?? row.customer_note, 2000),
         adminNote: cleanString(body.adminNote ?? row.admin_note, 2000),
       };
-      const avail = await hallAvailability(env, payload, id, { skipMinAdvance: true });
+      const avail = await hallAvailability(env, payload, id, { skipMinAdvance: true, skipPublicBookingRules: true });
       if (!avail.ok) return { status: 409, data: { error: "Termin niedostępny." } };
       const phone = normalizePhone(payload.phonePrefix, payload.phoneNational);
       await env.DB.prepare(
