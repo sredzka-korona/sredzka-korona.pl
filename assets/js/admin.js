@@ -1157,7 +1157,22 @@
     }
 
     if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
+      const raw = await response.text();
+      let data = {};
+      if (raw) {
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          const snippet = raw.replace(/\s+/g, " ").trim().slice(0, 240);
+          data = {
+            error: snippet
+              ? `Odpowiedz serwera (HTTP ${response.status}): ${snippet}`
+              : `Blad HTTP ${response.status}.`,
+          };
+        }
+      } else {
+        data = { error: `Blad HTTP ${response.status} (pusta odpowiedz).` };
+      }
       throw new Error(data.error || "Operacja nie powiodla sie.");
     }
 
@@ -5667,8 +5682,6 @@
           <label class="field"><span>Telefon</span><input id="company-phone" value="${escapeAttribute(company.phone || "")}" /></label>
           <label class="field"><span>E-mail</span><input id="company-email" value="${escapeAttribute(company.email || "")}" /></label>
           <label class="field"><span>Adres</span><input id="company-address" value="${escapeAttribute(company.address || "")}" /></label>
-          <label class="field-full"><span>Haslo pod logo</span><input id="company-tagline" value="${escapeAttribute(company.tagline || "")}" /></label>
-          <p class="helper field-full" style="margin:0;">Na stronie glownej w tym układzie nie jest obecnie wyswietlane (pole zostaje w CMS na przyszły podpis pod logo).</p>
           <label class="field-full"><span>Naglowek sekcji właściciel (modal Kontakt)</span><input id="home-about-title" value="${escapeAttribute(home.aboutTitle || "")}" /></label>
           <label class="field-full"><span>Tekst o firmie (pierwszy akapit)</span><textarea id="home-about-text">${escapeHtml(home.aboutText || "")}</textarea></label>
           <label class="field-full"><span>Tekst o wlascicielu (drugi akapit)</span><textarea id="home-owner">${escapeHtml(home.owner || "")}</textarea></label>
@@ -6401,12 +6414,12 @@
             <span>Kategorie</span>
           </div>
           <div class="menu-editor-stat">
-            <strong>${itemCount}</strong>
-            <span>Pozycje</span>
-          </div>
-          <div class="menu-editor-stat">
             <strong>${subcategoryCount}</strong>
             <span>Podkategorie</span>
+          </div>
+          <div class="menu-editor-stat">
+            <strong>${itemCount}</strong>
+            <span>Pozycje</span>
           </div>
         </div>
         <div class="inline-actions menu-editor-toolbar-actions">

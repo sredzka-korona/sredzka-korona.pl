@@ -6,6 +6,14 @@ const MAX_MEDIA_FILE_BYTES = 1_700_000;
 const BOOTSTRAP_EDGE_CACHE_TTL_MS = 30 * 1000;
 const bootstrapPayloadCache = new Map();
 
+/** Końcowy slash w URL powodował pusty segment i 404 (np. .../restaurant/). */
+function stripTrailingSlashes(pathname) {
+  if (!pathname || pathname === "/") {
+    return pathname || "/";
+  }
+  return pathname.replace(/\/+$/, "") || "/";
+}
+
 function invalidateBootstrapPayloadCache() {
   bootstrapPayloadCache.clear();
 }
@@ -270,12 +278,13 @@ export default {
         return jsonResponse({ ok: true }, 200, request, env);
       }
 
+      const legacyBookingsPath = stripTrailingSlashes(url.pathname);
       if (
-        url.pathname.match(/^\/api\/public\/legacy-bookings\/(hotel|restaurant|hall)$/) &&
+        legacyBookingsPath.match(/^\/api\/public\/legacy-bookings\/(hotel|restaurant|hall)$/) &&
         ["GET", "POST"].includes(request.method)
       ) {
         assertBrowserLikePublicRequest(request, url);
-        const service = url.pathname.split("/").pop();
+        const service = legacyBookingsPath.split("/").pop();
         const op = String(url.searchParams.get("op") || "").trim();
         if (!isAllowedPublicLegacyBookingOp(op)) {
           return jsonResponse({ error: "Niedozwolona operacja publiczna." }, 403, request, env);
@@ -292,11 +301,11 @@ export default {
       }
 
       if (
-        url.pathname.match(/^\/api\/admin\/legacy-bookings\/(hotel|restaurant|hall)$/) &&
+        legacyBookingsPath.match(/^\/api\/admin\/legacy-bookings\/(hotel|restaurant|hall)$/) &&
         ["GET", "POST", "PUT", "PATCH", "DELETE"].includes(request.method)
       ) {
         await requireFirebaseAdmin(request, env);
-        const service = url.pathname.split("/").pop();
+        const service = legacyBookingsPath.split("/").pop();
         const op = String(url.searchParams.get("op") || "").trim();
         const native = await handleD1BookingApi({
           service,
