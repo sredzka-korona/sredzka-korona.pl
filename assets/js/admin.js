@@ -7849,52 +7849,81 @@
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
-    const files = formData.getAll("images");
+    const files = formData.getAll("images").filter((entry) => entry instanceof File && entry.size);
 
-    if (files.length === 0 || !files[0].size) {
+    if (!files.length) {
       renderRestaurantGalleryPanel("Wybierz pliki do wgrania.");
       return;
     }
 
     try {
-      const images = await filesToInlineGalleryImages(files, INLINE_IMAGE_MAX_BYTES, "Catering");
+      const authHeaders = await getFirebaseAuthHeaders();
+      const compressed = await Promise.all(
+        files.map((file) => compressImageFile(file, { maxBytes: API_IMAGE_MAX_BYTES }))
+      );
 
-      if (!state.content.restaurant) {
-        state.content.restaurant = {};
-      }
-      if (!state.content.restaurant.gallery) {
-        state.content.restaurant.gallery = [];
+      for (let i = 0; i < compressed.length; i += 1) {
+        const prepared = new FormData();
+        prepared.append("images", compressed[i], compressed[i].name);
+        await fetch(state.apiBase + `/api/admin/restaurant/gallery-images`, {
+          method: "POST",
+          body: prepared,
+          credentials: "include",
+          headers: authHeaders,
+        }).then(async (response) => {
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || "Nie udało się wgrać zdjęcie " + (i + 1) + ".");
+          }
+        });
       }
 
-      state.content.restaurant.gallery.push(...images);
-      await saveContent();
-      await loadDashboard("Zdjecia zostaly dodane.");
+      await loadDashboard("Wszystkie zdjęcia zostały wgrane.");
     } catch (error) {
-      renderRestaurantGalleryPanel(error.message || "Blad podczas wgrywania zdjec.");
+      renderRestaurantGalleryPanel(error.message || "Błąd podczas wgrywania zdjęć.");
     }
   }
 
   async function removeRestaurantImage(index) {
-    if (!state.content.restaurant?.gallery) {
+    const gallery = state.content.restaurant?.gallery;
+    if (!gallery || !gallery[index]) {
       return;
     }
-    state.content.restaurant.gallery.splice(index, 1);
-    await saveContent();
-    await loadDashboard("Zdjecie zostalo usuniete.");
+    const imageId = gallery[index]?.id;
+    if (!imageId) return;
+
+    try {
+      await api(`/api/admin/restaurant/gallery-images/${imageId}`, {
+        method: "DELETE",
+      });
+      await loadDashboard("Zdjęcie zostało usunięte.");
+    } catch (error) {
+      renderRestaurantGalleryPanel(error.message || "Nie udało się usunąć zdjęcia.");
+    }
   }
 
   async function moveRestaurantImage(index, direction) {
-    if (!state.content.restaurant?.gallery) {
+    const images = state.content.restaurant?.gallery;
+    if (!images || !images[index]) {
       return;
     }
-    const images = state.content.restaurant.gallery;
+    const imageList = [...images];
     const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= images.length) {
+    if (newIndex < 0 || newIndex >= imageList.length) {
       return;
     }
-    [images[index], images[newIndex]] = [images[newIndex], images[index]];
-    await saveContent();
-    await loadDashboard("Kolejnosc zdjec zostala zmieniona.");
+    [imageList[index], imageList[newIndex]] = [imageList[newIndex], imageList[index]];
+
+    try {
+      await api(`/api/admin/restaurant/gallery-images/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageIds: imageList.map((img) => Number(img.id)) }),
+      });
+      await loadDashboard("Kolejność zdjęć została zmieniona.");
+    } catch (error) {
+      renderRestaurantGalleryPanel(error.message || "Nie udało się zmienić kolejności.");
+    }
   }
 
   function renderHotelRoomGalleriesPanel(statusMessage = "") {
@@ -8200,54 +8229,81 @@
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
-    const files = formData.getAll("images");
+    const files = formData.getAll("images").filter((entry) => entry instanceof File && entry.size);
 
-    if (files.length === 0 || !files[0].size) {
+    if (!files.length) {
       renderEventsHallGalleriesPanel("Wybierz pliki do wgrania.");
       return;
     }
 
     try {
-      const images = await filesToInlineGalleryImages(files, INLINE_IMAGE_MAX_BYTES, hallNumber);
+      const authHeaders = await getFirebaseAuthHeaders();
+      const compressed = await Promise.all(
+        files.map((file) => compressImageFile(file, { maxBytes: API_IMAGE_MAX_BYTES }))
+      );
 
-      if (!state.content.events) {
-        state.content.events = {};
+      for (let i = 0; i < compressed.length; i += 1) {
+        const prepared = new FormData();
+        prepared.append("images", compressed[i], compressed[i].name);
+        await fetch(state.apiBase + `/api/admin/venue/hall-galleries/${encodeURIComponent(hallNumber)}/images`, {
+          method: "POST",
+          body: prepared,
+          credentials: "include",
+          headers: authHeaders,
+        }).then(async (response) => {
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || "Nie udało się wgrać zdjęcie " + (i + 1) + ".");
+          }
+        });
       }
-      state.content.events.hallGalleries = normalizeEventHallGalleries(state.content.events.hallGalleries);
 
-      if (!state.content.events.hallGalleries[hallNumber]) {
-        state.content.events.hallGalleries[hallNumber] = [];
-      }
-
-      state.content.events.hallGalleries[hallNumber].push(...images);
-      await saveContent();
-      await loadDashboard("Zdjecia zostaly dodane.");
+      await loadDashboard("Wszystkie zdjęcia zostały wgrane.");
     } catch (error) {
-      renderEventsHallGalleriesPanel(error.message || "Blad podczas wgrywania zdjec.");
+      renderEventsHallGalleriesPanel(error.message || "Błąd podczas wgrywania zdjęć.");
     }
   }
 
   async function removeHallImage(hallNumber, index) {
-    if (!state.content.events?.hallGalleries?.[hallNumber]) {
+    const hallGalleries = state.content.events?.hallGalleries;
+    if (!hallGalleries || !hallGalleries[hallNumber] || !hallGalleries[hallNumber][index]) {
       return;
     }
-    state.content.events.hallGalleries[hallNumber].splice(index, 1);
-    await saveContent();
-    await loadDashboard("Zdjecie zostalo usuniete.");
+    const imageId = hallGalleries[hallNumber][index]?.id;
+    if (!imageId) return;
+
+    try {
+      await api(`/api/admin/venue/hall-images/${imageId}`, {
+        method: "DELETE",
+      });
+      await loadDashboard("Zdjęcie zostało usunięte.");
+    } catch (error) {
+      renderEventsHallGalleriesPanel(error.message || "Nie udało się usunąć zdjęcia.");
+    }
   }
 
   async function moveHallImage(hallNumber, index, direction) {
-    if (!state.content.events?.hallGalleries?.[hallNumber]) {
+    const hallGalleries = state.content.events?.hallGalleries?.[hallNumber];
+    if (!hallGalleries || !hallGalleries[index]) {
       return;
     }
-    const images = state.content.events.hallGalleries[hallNumber];
+    const images = [...hallGalleries];
     const newIndex = index + direction;
     if (newIndex < 0 || newIndex >= images.length) {
       return;
     }
     [images[index], images[newIndex]] = [images[newIndex], images[index]];
-    await saveContent();
-    await loadDashboard("Kolejnosc zdjec zostala zmieniona.");
+
+    try {
+      await api(`/api/admin/venue/hall-galleries/${encodeURIComponent(hallNumber)}/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageIds: images.map((img) => Number(img.id)) }),
+      });
+      await loadDashboard("Kolejność zdjęć została zmieniona.");
+    } catch (error) {
+      renderEventsHallGalleriesPanel(error.message || "Nie udało się zmienić kolejności.");
+    }
   }
 
   function renderDocumentsPanel(statusMessage = "") {

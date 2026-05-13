@@ -96,6 +96,29 @@ CREATE TABLE IF NOT EXISTS hotel_room_images (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS venue_hall_images (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  hall_key TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  alt_text TEXT DEFAULT '',
+  mime_type TEXT NOT NULL,
+  blob_data BLOB NOT NULL,
+  byte_size INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS restaurant_gallery_images (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  file_name TEXT NOT NULL,
+  alt_text TEXT DEFAULT '',
+  mime_type TEXT NOT NULL,
+  blob_data BLOB NOT NULL,
+  byte_size INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS booking_counters (
   key TEXT PRIMARY KEY,
   value INTEGER NOT NULL

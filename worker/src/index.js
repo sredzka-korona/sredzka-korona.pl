@@ -86,6 +86,7 @@ export default {
           hallName: hallMap.get(block.hallKey) || block.hallKey,
         }));
         const notifications = await listAllSiteNotifications(env);
+
         return jsonResponse(
           {
             content,
@@ -243,6 +244,74 @@ export default {
         const payload = await request.json();
         await reorderHotelRoomImages(roomType, payload.imageIds, env);
         return jsonResponse({ roomGalleries: await listHotelRoomGalleries(env, url) }, 200, request, env);
+      }
+
+      if (url.pathname === "/api/admin/venue/hall-galleries" && request.method === "GET") {
+        await requireFirebaseAdmin(request, env);
+        return jsonResponse({ hallGalleries: await listVenueHallGalleries(env, url) }, 200, request, env);
+      }
+
+      if (
+        url.pathname.match(/^\/api\/admin\/venue\/hall-galleries\/[^/]+\/images$/) &&
+        request.method === "POST"
+      ) {
+        await requireFirebaseAdmin(request, env);
+        const hallKey = decodeURIComponent(url.pathname.split("/")[5]);
+        await uploadVenueHallImages(hallKey, request, env);
+        return jsonResponse({ hallGalleries: await listVenueHallGalleries(env, url) }, 201, request, env);
+      }
+
+      if (
+        url.pathname.match(/^\/api\/admin\/venue\/hall-galleries\/[^/]+\/reorder$/) &&
+        request.method === "POST"
+      ) {
+        await requireFirebaseAdmin(request, env);
+        const hallKey = decodeURIComponent(url.pathname.split("/")[5]);
+        const payload = await request.json();
+        await reorderVenueHallImages(hallKey, payload.imageIds, env);
+        return jsonResponse({ hallGalleries: await listVenueHallGalleries(env, url) }, 200, request, env);
+      }
+
+      if (url.pathname.match(/^\/api\/admin\/venue\/hall-images\/\d+$/) && request.method === "DELETE") {
+        await requireFirebaseAdmin(request, env);
+        const imageId = Number(url.pathname.split("/")[5]);
+        await deleteVenueHallImage(imageId, env);
+        return jsonResponse({ hallGalleries: await listVenueHallGalleries(env, url) }, 200, request, env);
+      }
+
+      if (url.pathname.match(/^\/api\/public\/venue-hall-images\//) && request.method === "GET") {
+        const imageId = url.pathname.split("/").pop();
+        return streamVenueHallImage(imageId, env, request);
+      }
+
+      if (url.pathname === "/api/admin/restaurant/gallery-images" && request.method === "GET") {
+        await requireFirebaseAdmin(request, env);
+        return jsonResponse({ galleryImages: await listRestaurantGalleryImages(env, url) }, 200, request, env);
+      }
+
+      if (url.pathname === "/api/admin/restaurant/gallery-images" && request.method === "POST") {
+        await requireFirebaseAdmin(request, env);
+        await uploadRestaurantGalleryImages(request, env);
+        return jsonResponse({ galleryImages: await listRestaurantGalleryImages(env, url) }, 201, request, env);
+      }
+
+      if (url.pathname === "/api/admin/restaurant/gallery-images/reorder" && request.method === "POST") {
+        await requireFirebaseAdmin(request, env);
+        const payload = await request.json();
+        await reorderRestaurantGalleryImages(payload.imageIds, env);
+        return jsonResponse({ galleryImages: await listRestaurantGalleryImages(env, url) }, 200, request, env);
+      }
+
+      if (url.pathname.match(/^\/api\/admin\/restaurant\/gallery-images\/\d+$/) && request.method === "DELETE") {
+        await requireFirebaseAdmin(request, env);
+        const imageId = Number(url.pathname.split("/")[5]);
+        await deleteRestaurantGalleryImage(imageId, env);
+        return jsonResponse({ galleryImages: await listRestaurantGalleryImages(env, url) }, 200, request, env);
+      }
+
+      if (url.pathname.match(/^\/api\/public\/restaurant-gallery-images\//) && request.method === "GET") {
+        const imageId = url.pathname.split("/").pop();
+        return streamRestaurantGalleryImage(imageId, env, request);
       }
 
       if (url.pathname.match(/^\/api\/admin\/documents\/\d+$/) && request.method === "DELETE") {
@@ -527,14 +596,21 @@ async function getContent(env, url = null) {
   if (!record) {
     await saveContent(env, DEFAULT_CONTENT);
     const fallback = structuredClone(DEFAULT_CONTENT);
-    return url ? withHotelRoomGalleries(fallback, await listHotelRoomGalleries(env, url)) : fallback;
+    if (!url) return fallback;
+    const withHotel = withHotelRoomGalleries(fallback, await listHotelRoomGalleries(env, url));
+    const hallGalleries = await listVenueHallGalleries(env, url);
+    const restaurantGalleryImages = await listRestaurantGalleryImages(env, url);
+    return withVenueHallAndRestaurantGalleries(withHotel, hallGalleries, restaurantGalleryImages);
   }
   const parsed = JSON.parse(record.content_json);
   const content = sanitizeContent(parsed);
   if (!url) {
     return content;
   }
-  return withHotelRoomGalleries(content, await listHotelRoomGalleries(env, url));
+  const withHotel = withHotelRoomGalleries(content, await listHotelRoomGalleries(env, url));
+  const hallGalleries = await listVenueHallGalleries(env, url);
+  const restaurantGalleryImages = await listRestaurantGalleryImages(env, url);
+  return withVenueHallAndRestaurantGalleries(withHotel, hallGalleries, restaurantGalleryImages);
 }
 
 async function saveContent(env, content) {
@@ -644,6 +720,24 @@ function withHotelRoomGalleries(content, roomGalleries) {
       roomGalleries,
     },
   };
+}
+
+function withVenueHallAndRestaurantGalleries(content, hallGalleries, restaurantGalleryImages) {
+  const updated = {
+    ...content,
+    events: {
+      ...(content.events || {}),
+      hallGalleries: {},
+    },
+    restaurant: {
+      ...(content.restaurant || {}),
+      gallery: restaurantGalleryImages,
+    },
+  };
+  for (const [hallKey, images] of hallGalleries) {
+    updated.events.hallGalleries[hallKey] = images;
+  }
+  return updated;
 }
 
 function isMissingHotelRoomImagesTableError(error) {
@@ -1346,14 +1440,14 @@ function sanitizeContent(content) {
       },
       sectionMedia: normalizeHomeSectionMedia(content.home?.sectionMedia, DEFAULT_CONTENT.home?.sectionMedia),
     },
-    restaurant: restaurantMerged,
+    restaurant: { ...restaurantMerged, gallery: [] },
     hotel: {
       ...DEFAULT_CONTENT.hotel,
       ...(content.hotel || {}),
       // Galerie pokoi sa utrzymywane poza content_json (tabela hotel_room_images).
       roomGalleries: emptyHotelRoomGalleries(),
     },
-    events: eventsMerged,
+    events: { ...eventsMerged, hallGalleries: {} },
     services: Array.isArray(content.services) ? content.services : DEFAULT_CONTENT.services,
     gallery: { ...DEFAULT_CONTENT.gallery, ...(content.gallery || {}) },
     documentsPage: {
@@ -1687,6 +1781,209 @@ function assertMatchingOrderSet(existingIds, receivedIds, message) {
   if (expected !== received) {
     throw badRequest(message);
   }
+}
+
+async function listVenueHallGalleries(env, url) {
+  const result = await env.DB.prepare(
+    "SELECT id, hall_key AS hallKey, alt_text AS altText FROM venue_hall_images ORDER BY hall_key ASC, sort_order ASC, id ASC"
+  ).all();
+  const imagesByHall = new Map();
+  for (const image of result.results || []) {
+    if (!imagesByHall.has(image.hallKey)) {
+      imagesByHall.set(image.hallKey, []);
+    }
+    imagesByHall.get(image.hallKey).push({
+      id: image.id,
+      url: absoluteUrl(url, `/api/public/venue-hall-images/${image.id}`),
+      alt: image.altText,
+    });
+  }
+  return imagesByHall;
+}
+
+async function uploadVenueHallImages(hallKey, request, env) {
+  const formData = await request.formData();
+  const files = formData.getAll("images").filter((entry) => entry instanceof File);
+  if (!files.length) {
+    throw badRequest("Wybierz co najmniej jedno zdjecie.");
+  }
+
+  try {
+    for (const file of files) {
+      assertFileWithinLimit(file, "Zdjecie");
+      const safeName = sanitizeFileName(file.name);
+      const blobData = new Uint8Array(await file.arrayBuffer());
+      await env.DB.prepare(
+        "INSERT INTO venue_hall_images (hall_key, file_name, alt_text, mime_type, blob_data, byte_size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      )
+        .bind(
+          hallKey,
+          file.name,
+          hallKey,
+          normalizeImageMimeType(file.type, file.name),
+          blobData,
+          blobData.byteLength,
+          nowIso()
+        )
+        .run();
+    }
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function reorderVenueHallImages(hallKey, imageIds, env) {
+  const ids = Array.isArray(imageIds)
+    ? imageIds.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)
+    : [];
+  if (!ids.length) {
+    throw badRequest("Brak listy zdjec do ustawienia kolejnosci.");
+  }
+  const existing = await env.DB.prepare(
+    "SELECT id FROM venue_hall_images WHERE hall_key = ? ORDER BY sort_order ASC, id ASC"
+  )
+    .bind(hallKey)
+    .all();
+  const existingIds = (existing.results || []).map((row) => Number(row.id));
+  assertMatchingOrderSet(existingIds, ids, "Lista zdjec jest nieprawidlowa.");
+
+  for (let index = 0; index < ids.length; index += 1) {
+    await env.DB.prepare("UPDATE venue_hall_images SET sort_order = ? WHERE id = ?")
+      .bind(index, ids[index])
+      .run();
+  }
+}
+
+async function deleteVenueHallImage(imageId, env) {
+  const image = await env.DB.prepare(
+    "SELECT id FROM venue_hall_images WHERE id = ?"
+  )
+    .bind(imageId)
+    .first();
+  if (!image) {
+    throw badRequest("Zdjecie nie istnieje.");
+  }
+  await env.DB.prepare("DELETE FROM venue_hall_images WHERE id = ?").bind(imageId).run();
+}
+
+async function streamVenueHallImage(imageId, env, request) {
+  const image = await env.DB.prepare(
+    "SELECT blob_data AS blobData, mime_type AS mimeType, file_name AS fileName FROM venue_hall_images WHERE id = ?"
+  )
+    .bind(Number(imageId))
+    .first();
+  if (!image) {
+    return jsonResponse({ error: "Zdjecie nie istnieje." }, 404, request, env);
+  }
+  const object = normalizeBlobData(image.blobData);
+  if (!object) {
+    return jsonResponse({ error: "Plik nie istnieje." }, 404, request, env);
+  }
+  return binaryResponse(object, normalizeImageMimeType(image.mimeType, image.fileName), request, env);
+}
+
+async function listRestaurantGalleryImages(env, url) {
+  const result = await env.DB.prepare(
+    "SELECT id, alt_text AS altText FROM restaurant_gallery_images ORDER BY sort_order ASC, id ASC"
+  ).all();
+  return (result.results || []).map((image) => ({
+    id: image.id,
+    url: absoluteUrl(url, `/api/public/restaurant-gallery-images/${image.id}`),
+    alt: image.altText,
+  }));
+}
+
+async function uploadRestaurantGalleryImages(request, env) {
+  const formData = await request.formData();
+  const files = formData.getAll("images").filter((entry) => entry instanceof File);
+  if (!files.length) {
+    throw badRequest("Wybierz co najmniej jedno zdjecie.");
+  }
+
+  try {
+    const maxOrder = await env.DB.prepare(
+      "SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM restaurant_gallery_images"
+    ).first();
+    let nextOrder = Number(maxOrder?.maxOrder ?? -1) + 1;
+
+    for (const file of files) {
+      assertFileWithinLimit(file, "Zdjecie");
+      const blobData = new Uint8Array(await file.arrayBuffer());
+      await env.DB.prepare(
+        "INSERT INTO restaurant_gallery_images (file_name, alt_text, mime_type, blob_data, byte_size, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      )
+        .bind(
+          file.name,
+          "Catering",
+          normalizeImageMimeType(file.type, file.name),
+          blobData,
+          blobData.byteLength,
+          nextOrder,
+          nowIso()
+        )
+        .run();
+      nextOrder += 1;
+    }
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function reorderRestaurantGalleryImages(imageIds, env) {
+  const ids = Array.isArray(imageIds)
+    ? imageIds.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)
+    : [];
+  if (!ids.length) {
+    throw badRequest("Brak listy zdjec do ustawienia kolejnosci.");
+  }
+  const existing = await env.DB.prepare(
+    "SELECT id FROM restaurant_gallery_images ORDER BY sort_order ASC, id ASC"
+  ).all();
+  const existingIds = (existing.results || []).map((row) => Number(row.id));
+  assertMatchingOrderSet(existingIds, ids, "Lista zdjec jest nieprawidlowa.");
+
+  for (let index = 0; index < ids.length; index += 1) {
+    await env.DB.prepare("UPDATE restaurant_gallery_images SET sort_order = ? WHERE id = ?")
+      .bind(index, ids[index])
+      .run();
+  }
+}
+
+async function deleteRestaurantGalleryImage(imageId, env) {
+  const image = await env.DB.prepare(
+    "SELECT id FROM restaurant_gallery_images WHERE id = ?"
+  )
+    .bind(imageId)
+    .first();
+  if (!image) {
+    throw badRequest("Zdjecie nie istnieje.");
+  }
+  await env.DB.prepare("DELETE FROM restaurant_gallery_images WHERE id = ?").bind(imageId).run();
+  const result = await env.DB.prepare(
+    "SELECT id FROM restaurant_gallery_images ORDER BY sort_order ASC, id ASC"
+  ).all();
+  const ids = (result.results || []).map((row) => Number(row.id));
+  for (let index = 0; index < ids.length; index += 1) {
+    await env.DB.prepare("UPDATE restaurant_gallery_images SET sort_order = ? WHERE id = ?")
+      .bind(index, ids[index])
+      .run();
+  }
+}
+
+async function streamRestaurantGalleryImage(imageId, env, request) {
+  const image = await env.DB.prepare(
+    "SELECT blob_data AS blobData, mime_type AS mimeType, file_name AS fileName FROM restaurant_gallery_images WHERE id = ?"
+  )
+    .bind(Number(imageId))
+    .first();
+  if (!image) {
+    return jsonResponse({ error: "Zdjecie nie istnieje." }, 404, request, env);
+  }
+  const object = normalizeBlobData(image.blobData);
+  if (!object) {
+    return jsonResponse({ error: "Plik nie istnieje." }, 404, request, env);
+  }
+  return binaryResponse(object, normalizeImageMimeType(image.mimeType, image.fileName), request, env);
 }
 
 function badRequest(message) {
