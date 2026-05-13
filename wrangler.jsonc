@@ -5,6 +5,12 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  "routes": [
+    {
+      "pattern": "api.sredzka-korona.pl/api/*",
+      "zone_name": "sredzka-korona.pl"
+    }
+  ],
   "triggers": {
     "crons": [
       "*/15 * * * *"
