@@ -6345,23 +6345,28 @@
     }
     try {
       const authHeaders = await getFirebaseAuthHeaders();
-      const prepared = new FormData();
       const compressed = await Promise.all(
         files.map((file) => compressImageFile(file, { maxBytes: API_IMAGE_MAX_BYTES }))
       );
-      compressed.forEach((file) => prepared.append("images", file, file.name));
-      await fetch(state.apiBase + `/api/admin/gallery/albums/${albumId}/images`, {
-        method: "POST",
-        body: prepared,
-        credentials: "include",
-        headers: authHeaders,
-      }).then(async (response) => {
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.error || "Nie udalo sie wgrac zdjec.");
-        }
-      });
-      await loadDashboard("Zdjecia zostaly wgrane.");
+
+      // Wysyłaj zdjęcia jedno po jednym, aby uniknąć limitu rozmiaru request body
+      for (let i = 0; i < compressed.length; i += 1) {
+        const prepared = new FormData();
+        prepared.append("images", compressed[i], compressed[i].name);
+        await fetch(state.apiBase + `/api/admin/gallery/albums/${albumId}/images`, {
+          method: "POST",
+          body: prepared,
+          credentials: "include",
+          headers: authHeaders,
+        }).then(async (response) => {
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || "Nie udalo sie wgrac zdjecie " + (i + 1) + ".");
+          }
+        });
+      }
+
+      await loadDashboard("Wszystkie zdjecia zostaly wgrane.");
     } catch (error) {
       renderGalleryPanel(error.message);
     }
@@ -8043,25 +8048,29 @@
     }
 
     try {
-      const payload = new FormData();
       const compressedFiles = await Promise.all(
         files
           .filter((file) => file instanceof File && file.size)
           .map((file) => compressImageFile(file, { maxBytes: API_IMAGE_MAX_BYTES }))
       );
-      compressedFiles.forEach((file) => {
-        payload.append("images", file, file.name);
-      });
-      if (!payload.getAll("images").length) {
+      if (!compressedFiles.length) {
         renderHotelRoomGalleriesPanel({ tone: "error", text: "Wybierz pliki do wgrania." });
         return;
       }
-      const response = await api(`/api/admin/hotel/room-galleries/${encodeURIComponent(roomType)}/images`, {
-        method: "POST",
-        body: payload,
-      });
-      setHotelRoomGalleries(response?.roomGalleries);
-      renderHotelRoomGalleriesPanel({ tone: "success", text: "Zdjecia zostaly wgrane poprawnie." });
+
+      // Wysyłaj zdjęcia jedno po jednym, aby uniknąć limitu rozmiaru request body
+      let finalResponse = null;
+      for (let i = 0; i < compressedFiles.length; i += 1) {
+        const payload = new FormData();
+        payload.append("images", compressedFiles[i], compressedFiles[i].name);
+        finalResponse = await api(`/api/admin/hotel/room-galleries/${encodeURIComponent(roomType)}/images`, {
+          method: "POST",
+          body: payload,
+        });
+      }
+
+      setHotelRoomGalleries(finalResponse?.roomGalleries);
+      renderHotelRoomGalleriesPanel({ tone: "success", text: "Wszystkie zdjecia zostaly wgrane poprawnie." });
     } catch (error) {
       renderHotelRoomGalleriesPanel({ tone: "error", text: error.message || "Blad podczas wgrywania zdjec." });
     }

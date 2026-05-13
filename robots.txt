@@ -6,4 +6,4 @@ Disallow: /Hotel/potwierdzenie.html
 Disallow: /Restauracja/potwierdzenie.html
 Disallow: /Przyjec/potwierdzenie.html
 
-Sitemap: https://www.sredzkakorona.pl/sitemap.xml
+Sitemap: https://sredzka-korona.pl/sitemap.xml
