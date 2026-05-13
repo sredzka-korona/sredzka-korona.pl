@@ -682,7 +682,7 @@
     restauracja: "restaurant",
     przyjecia: "events",
   };
-  const INLINE_IMAGE_MAX_BYTES = 320 * 1024;
+  const INLINE_IMAGE_MAX_BYTES = 200 * 1024;
   const API_IMAGE_MAX_BYTES = 1_700_000;
   const DOCUMENT_MAX_BYTES = 1_700_000;
   const IMAGE_MAX_DIMENSION = 1600;
