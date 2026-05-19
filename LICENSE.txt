@@ -1,0 +1,60 @@
+========================================================================
+THIRD-PARTY NOTICES AND LICENSES
+========================================================================
+This project/website incorporates open-source software, UI components, 
+and animations. Below are the copyright notices and license permissions 
+for these components.
+
+------------------------------------------------------------------------
+1. MIT License Components (Uiverse.io)
+------------------------------------------------------------------------
+The following UI components and animations are used under the MIT License:
+
+Copyright - 2026 Nawsome (https://uiverse.io/Nawsome/chilly-moose-65)
+Copyright - 2026 xXJollyHAKERXx (https://uiverse.io/xXJollyHAKERXx/lucky-falcon-75)
+Copyright - 2026 alexruix (Alex Ruiz) (https://uiverse.io/alexruix/heavy-elephant-39)
+Copyright - 2026 cssbuttons-io (cssbuttons.io) (https://uiverse.io/cssbuttons-io/wonderful-baboon-62)
+Copyright - 2026 Spacious74 (VishalS) (https://uiverse.io/Spacious74/horrible-horse-4)
+Copyright - 2026 Dennyhml (https://uiverse.io/Dennyhml/grumpy-squid-93)
+Copyright - 2026 anand_4957 (Anand Kotadiya) (https://uiverse.io/anand_4957/moody-ladybug-99)
+Copyright - 2026 catraco (Catraco) (https://uiverse.io/catraco/plastic-moth-91)
+Copyright - 2026 Lakshay-art (Lakshay Gupta) (https://uiverse.io/Lakshay-art/curvy-earwig-22)
+Copyright - 2026 kennyotsu (kotsu) (https://uiverse.io/kennyotsu/witty-deer-12)
+Copyright - 2026 ilkhoeri (ilkhoeri) (https://uiverse.io/ilkhoeri/swift-panda-38)
+Copyright - 2026 StealthWorm (thierry) (https://uiverse.io/StealthWorm/spotty-horse-48)
+Copyright - 2026 gharsh11032000 (Harsh Gupta) (https://uiverse.io/gharsh11032000/tasty-frog-49)
+Copyright - 2026 anishwij (Anish) (https://uiverse.io/anishwij/curly-ladybug-43)
+Copyright - 2026 vikas7754 (Vikas) (https://uiverse.io/vikas7754/evil-mule-52)
+Copyright - 2026 mRcOol7 (Nehal Chauhan) (https://uiverse.io/mRcOol7/wet-bullfrog-66)
+Copyright - 2026 vinodjangid07 (Vinod Jangid) (https://uiverse.io/vinodjangid07/gentle-penguin-44)
+
+For all components listed above, the following conditions apply:
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+------------------------------------------------------------------------
+2. General Open-Source Web Components
+------------------------------------------------------------------------
+This project may also utilize other minor open-source web animations, 
+CSS effects, and micro-scripts distributed under the MIT License. 
+
+While every effort has been made to track down and credit the original 
+authors, some contributions might not be individually identified above. 
+If you are the owner of any code used here and would like to be credited 
+or have it removed, please contact the developer of this website.
