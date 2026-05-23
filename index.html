@@ -41,9 +41,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Manrope:wght@400;600;700&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Manrope:wght@400;600;700&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
     <link rel="dns-prefetch" href="https://images.unsplash.com" />
     <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
     <link
@@ -426,7 +434,7 @@
         font-family: "Cormorant Garamond", serif;
         font-size: clamp(1rem, 2vw, 1.5rem);
         font-weight: 600;
-        color: #a8895a;
+        color: #7f6035;
         letter-spacing: 0.2em;
         text-transform: uppercase;
         white-space: nowrap;
@@ -2196,15 +2204,14 @@
             return;
           }
 
-          if (maxScroll <= 0) {
+          const trackHeight = scrollIndicator.clientHeight;
+          if (maxScroll <= 0 || trackHeight <= 0) {
             scrollIndicator.style.opacity = "0";
             scrollIndicatorThumb.style.transform = "translateY(0)";
             return;
           }
 
           scrollIndicator.style.opacity = "1";
-
-          const trackHeight = scrollIndicator.clientHeight;
           const thumbHeight = Math.max((viewportHeight / scrollHeight) * trackHeight, 44);
           const maxThumbOffset = Math.max(trackHeight - thumbHeight, 0);
           const scrollRatio = Math.min(Math.max(window.scrollY / maxScroll, 0), 1);
@@ -2416,8 +2423,28 @@
         function syncFloatingNavHeightCssVar() {
           const nav = document.getElementById("floating-nav");
           if (!nav) return;
-          const h = Math.ceil(nav.getBoundingClientRect().height);
+          const h = Math.ceil(nav.offsetHeight || nav.clientHeight || 0);
           document.documentElement.style.setProperty("--nav-height", Math.max(64, h) + "px");
+        }
+
+        function renderMainSplitContainer() {
+          const target = document.querySelector(".main-split-container");
+          if (!target) return;
+          target.innerHTML = `
+            ${(() => {
+              const media = resolveSectionMedia("hotel");
+              return renderMainSplitSection("hotel", "./Hotel/index.html", "Hotel", media, true);
+            })()}
+            ${(() => {
+              const media = resolveSectionMedia("restaurant");
+              return renderMainSplitSection("restaurant", "./Restauracja/index.html", "Catering", media, false);
+            })()}
+            ${(() => {
+              const media = resolveSectionMedia("events");
+              return renderMainSplitSection("events", "./Przyjec/index.html", "Przyjęcia", media, false);
+            })()}
+          `;
+          initMainSplit();
         }
 
         function renderShell() {
@@ -2431,29 +2458,17 @@
                 <nav class="floating-nav" id="floating-nav" aria-label="Główna nawigacja — Średzka Korona">
                   <a href="./index.html" class="floating-nav-brand">
                     <span class="floating-nav-brand-text">ŚREDZKA</span>
-                    <img class="brand-logo" src="./ikony/logo-korona.png" alt="Logo Średzka Korona" decoding="async" fetchpriority="high" />
+                    <img class="brand-logo" src="./ikony/logo-korona-120.webp" width="50" height="33" alt="Logo Średzka Korona" decoding="async" fetchpriority="high" />
                     <span class="floating-nav-brand-text">KORONA</span>
                   </a>
 
                 </nav>
-                <div class="main-split-container">
-                  ${(() => {
-                    const media = resolveSectionMedia("hotel");
-                    return renderMainSplitSection("hotel", "./Hotel/index.html", "Hotel", media, true);
-                  })()}
-                  ${(() => {
-                    const media = resolveSectionMedia("restaurant");
-                    return renderMainSplitSection("restaurant", "./Restauracja/index.html", "Catering", media, false);
-                  })()}
-                  ${(() => {
-                    const media = resolveSectionMedia("events");
-                    return renderMainSplitSection("events", "./Przyjec/index.html", "Przyjęcia", media, false);
-                  })()}
-                </div>
+                <div class="main-split-container"></div>
               </div>
             </main>
           `;
 
+          renderMainSplitContainer();
           scheduleScrollIndicatorUpdate();
           requestAnimationFrame(() => syncFloatingNavHeightCssVar());
         }
@@ -2478,7 +2493,7 @@
               
               if (section) {
                 e.preventDefault();
-                const navHeight = nav.offsetHeight;
+                const navHeight = Number(getComputedStyle(document.documentElement).getPropertyValue("--nav-height").replace("px", "")) || nav.offsetHeight || 80;
                 const sectionTop = section.getBoundingClientRect().top + window.scrollY;
                 const offsetPosition = sectionTop - navHeight - 20;
                 
@@ -2743,7 +2758,7 @@
           const cookie = document.querySelector(".cookie-banner");
           let fabExtra = 0;
           if (cookie) {
-            const h = cookie.getBoundingClientRect().height;
+            const h = cookie.offsetHeight || cookie.clientHeight || 0;
             fabExtra = 16 + (Number.isFinite(h) ? h : 0);
           }
           rootEl.style.setProperty("--bottom-floating-extra", `${Math.ceil(fabExtra)}px`);
@@ -2898,18 +2913,19 @@
 
         async function bootstrap() {
           initCustomScrollbar();
-          const activeNotifications = await loadRemoteData();
+          const remoteDataPromise = loadRemoteData();
           renderShell();
           window.addEventListener("resize", syncFloatingNavHeightCssVar);
           window.addEventListener("resize", updateBottomFixedStackVars, { passive: true });
           syncFloatingNavHeightCssVar();
           requestAnimationFrame(() => {
             syncFloatingNavHeightCssVar();
-            mountSiteNotifications(activeNotifications);
           });
-          initMainSplit();
           initScrollSpy();
           initCookieBanner();
+          const activeNotifications = await remoteDataPromise;
+          renderMainSplitContainer();
+          mountSiteNotifications(activeNotifications);
         }
 
         bootstrap();
