@@ -1270,15 +1270,13 @@
         }
 
         function showCookieBanner(force = false) {
-          if (!force && (localStorage.getItem(COOKIE_CHOICE_KEY) || localStorage.getItem(COOKIE_SEEN_KEY))) {
+          if (!force && localStorage.getItem(COOKIE_CHOICE_KEY)) {
             return;
           }
 
           if (cookieBanner) {
             return;
           }
-
-          markCookiesSeen();
 
           cookieBanner = document.createElement("div");
           cookieBanner.className = "cookie-banner";

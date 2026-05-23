@@ -2544,10 +2544,7 @@
         }
 
         function initCookieBanner() {
-          if (
-            localStorage.getItem("sredzka-cookies-choice") ||
-            localStorage.getItem("sredzka-cookies-seen")
-          ) {
+          if (localStorage.getItem("sredzka-cookies-choice")) {
             return;
           }
           const banner = document.createElement("div");
@@ -2562,11 +2559,7 @@
               <button class="button" type="button" data-cookie-action="accept-all">Akceptuj wszystko</button>
             </div>
           `;
-          localStorage.setItem("sredzka-cookies-seen", "1");
           document.body.appendChild(banner);
-          banner.querySelector('a[href="./dokumenty/index.html#cookies-info"]')?.addEventListener("click", () => {
-            localStorage.setItem("sredzka-cookies-seen", "1");
-          });
           banner.querySelectorAll("[data-cookie-action]").forEach((button) => {
             button.addEventListener("click", () => {
               const value =
@@ -2574,7 +2567,6 @@
                   ? { necessary: true, analytics: true, marketing: true }
                   : { necessary: true, analytics: false, marketing: false };
               localStorage.setItem("sredzka-cookies-choice", JSON.stringify(value));
-              localStorage.setItem("sredzka-cookies-seen", "1");
               banner.remove();
               observeBottomStackLayout();
             });
