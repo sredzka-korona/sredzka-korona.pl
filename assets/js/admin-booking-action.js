@@ -3,7 +3,7 @@
     '<div class="confirm-brand">' +
     '<a href="../index.html" class="confirm-logo-link" aria-label="Średzka Korona — strona główna">' +
     '<span class="confirm-logo-text">ŚREDZKA</span>' +
-    '<img class="confirm-logo-img" src="../ikony/logo-korona.png" alt="" width="48" height="48" decoding="async" />' +
+    '<img class="confirm-logo-img" src="../ikony/logo-korona.png" alt="" width="48" height="48" loading="lazy" decoding="async" />' +
     '<span class="confirm-logo-text">KORONA</span>' +
     "</a></div>";
   const CTA =

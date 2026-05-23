@@ -1505,6 +1505,21 @@
       }
 
         @media (max-width: 780px) {
+        html,
+        body {
+          min-height: 100%;
+          height: auto;
+          overflow-x: hidden;
+          overflow-y: auto;
+        }
+
+        .shell {
+          min-height: 100svh;
+          min-height: 100dvh;
+          height: auto;
+          overflow: visible;
+        }
+
         .floating-nav-brand {
           gap: 0.75rem !important;
           flex-direction: row !important;
@@ -1584,7 +1599,7 @@
 
         .floating-contact-button {
           right: 0.9rem !important;
-          bottom: calc(1.25rem + var(--bottom-floating-extra, 0px) + env(safe-area-inset-bottom, 0px)) !important;
+          bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px)) !important;
           width: 52px;
           height: 52px;
         }
@@ -1596,7 +1611,7 @@
         left: auto;
         margin: 0;
         right: 2rem;
-        bottom: calc(2rem + var(--bottom-floating-extra, 0px) + env(safe-area-inset-bottom, 0px));
+        bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
         width: 64px;
         height: 64px;
         border-radius: 50%;
