@@ -779,7 +779,7 @@ const ULTRA_LEGACY_RESTAURANT_DEFAULT_TEMPLATES = {
   restaurant_confirmed_client: {
     subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
     bodyHtml:
-      "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje stolika o numerze <strong>{{reservationNumber}}</strong>.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}</p><p>{{tablesList}}</p><p>W przypadku spoznienia lub potrzeby zmiany godziny prosimy o wczesniejszy kontakt z restauracja.</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
+      "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje stolika o numerze <strong>{{reservationNumber}}</strong>.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}</p><p>{{tablesList}}</p><p>W przypadku spoznienia lub potrzeby zmiany godziny prosimy o wczesniejszy kontakt z obsluga.</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
   },
   restaurant_cancelled_client: {
     subject: "{{restaurantName}} — rezerwacja anulowana ({{reservationNumber}})",

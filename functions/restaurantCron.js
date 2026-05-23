@@ -16,7 +16,7 @@ if (!getApps().length) {
 const db = getFirestore();
 
 function restaurantName() {
-  return process.env.RESTAURANT_NAME || process.env.HOTEL_NAME || "Średzka Korona — Restauracja";
+  return process.env.RESTAURANT_NAME || process.env.HOTEL_NAME || "Średzka Korona — Catering";
 }
 
 function adminNotifyEmail() {
@@ -86,7 +86,7 @@ async function sendTemplated(dbConn, key, to, vars) {
     mailHeaderService: "restaurant",
     mailHeaderKey: key,
     reservationNumber: vars.reservationNumber,
-    serviceLabel: "Restauracja",
+    serviceLabel: "Catering",
     siteUrl: publicSiteUrl(),
     serviceUrl: `${publicSiteUrl()}/Restauracja/`,
     preheader: `Rezerwacja stolika ${vars.reservationNumber || ""}`.trim(),

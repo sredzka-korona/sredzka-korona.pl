@@ -198,7 +198,7 @@ async function sendRestaurantTemplated(db, key, to, vars) {
     mailHeaderService: "restaurant",
     mailHeaderKey: key,
     reservationNumber: vars.reservationNumber,
-    serviceLabel: "Restauracja",
+    serviceLabel: "Catering",
     siteUrl: publicSiteUrl(),
     serviceUrl: `${publicSiteUrl()}/Restauracja/`,
     preheader: `Rezerwacja stolika ${vars.reservationNumber || ""}`.trim(),

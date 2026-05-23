@@ -1206,7 +1206,7 @@
         setError("");
       }
     } catch (error) {
-      setError(error?.message || "Nie udało się załadować kalendarza restauracji.");
+      setError(error?.message || "Nie udało się załadować kalendarza.");
     } finally {
       state.restaurant.calendarLoading = false;
       if (options.render !== false) {
@@ -1671,7 +1671,7 @@
     const durationOptions = restaurantDurationOptionsForDay(selectedDay, state.restaurant.startTime);
     const hoursLabel =
       selectedDay?.closed
-        ? "Restauracja jest nieczynna w wybranym dniu."
+        ? "Catering jest nieczynny w wybranym dniu."
         : selectedDay?.reservationOpenTime && selectedDay?.reservationCloseTime
           ? `W tym dniu rezerwacje są możliwe w godzinach ${selectedDay.reservationOpenTime}-${selectedDay.reservationCloseTime}.`
           : "Godziny rezerwacji zależą od godzin otwarcia wybranego dnia.";

@@ -1272,6 +1272,18 @@
           display: none;
         }
       }
+
+      .visually-hidden:not(:focus):not(:active) {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        border: 0;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
     </style>
   </head>
   <body>
@@ -1945,7 +1957,7 @@
             </nav>
             <div class="restaurant-content">
               <div class="restaurant-info">
-                <h1 class="restaurant-title">Catering</h1>
+                <h1 class="restaurant-title">Catering <span class="visually-hidden">i dowóz jedzenia w Środzie Śląskiej</span></h1>
                 <p class="restaurant-description">
                   Smaczne jedzenie, profesjonalna obsługa i terminowy dowóz.
                 </p>

@@ -1,0 +1,30 @@
+name: Generate Sitemap
+
+on:
+  push:
+    branches:
+      - main  # Zmień na master, jeśli takiego używasz
+
+jobs:
+  sitemap:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Pobranie kodu z repozytorium (wymagane fetch-depth: 0 dla daty modyfikacji plików)
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. Generowanie sitemapy na podstawie plików HTML
+      - name: Generate Sitemap
+        uses: cicirello/generate-sitemap@v1
+        with:
+          base-url-path: https://www.sredzkakorona.pl/
+
+      # 3. Automatyczny commit i push zaktualizowanego pliku sitemap.xml
+      - name: Commit and Push Sitemap
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add sitemap.xml
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update sitemap.xml [skip ci]" && git push)

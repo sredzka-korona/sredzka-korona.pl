@@ -403,7 +403,7 @@ function assertReservationWindowInSettings(settings, startMs, endMs) {
     dayClose = dayClose.plus({ days: 1 });
   }
   if (start < dayOpen || end > dayClose) {
-    throw new Error("Rezerwacja poza godzinami działania restauracji.");
+    throw new Error("Rezerwacja poza godzinami działania cateringu.");
   }
 }
 

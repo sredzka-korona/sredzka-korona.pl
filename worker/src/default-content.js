@@ -1,7 +1,7 @@
 export const DEFAULT_CONTENT = {
   company: {
     name: "Sredzka Korona",
-    tagline: "Restauracja, hotel i przyjecia w oprawie premium",
+    tagline: "Catering, hotel i przyjecia w oprawie premium",
     phone: "+48 600 700 800",
     email: "kontakt@sredzkakorona.pl",
     address: "ul. Wrocławska 11, 55-300 Środa Śląska",
@@ -34,7 +34,7 @@ export const DEFAULT_CONTENT = {
     ],
     highlights: [
       {
-        title: "Restauracja",
+        title: "Catering",
         text: "Karta laczaca klasyke kuchni polskiej z nowoczesnym podaniem i starannie dobranym winem.",
       },
       {
@@ -72,7 +72,7 @@ export const DEFAULT_CONTENT = {
       },
       restaurant: {
         imageUrl: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=80",
-        imageAlt: "Restauracja — Średzka Korona, Środa Śląska",
+        imageAlt: "Catering — Średzka Korona, Środa Śląska",
         focusX: 50,
         focusY: 50,
         zoom: 1,
@@ -89,7 +89,7 @@ export const DEFAULT_CONTENT = {
   restaurant: {
     heroTitle: "Autorska kuchnia i atmosfera wieczoru premium",
     heroText:
-      "Restauracja Sredzka Korona laczy elegancje sali, staranna obsluge i kuchnie, ktora dobrze sprawdza sie zarowno podczas codziennych kolacji, jak i okazji specjalnych.",
+      "Catering Sredzka Korona zapewnia smaczne jedzenie, profesjonalna obsluge i terminowy dowoz.",
     orderButtonText: "Zamów catering",
     ordersInfoText:
       "<p>Ceny oraz zasady współpracy ustalane indywidualnie.</p><p>Prosimy o kontakt telefoniczny i mailowy lub poprzez formularz kontaktowy.</p>",
@@ -322,16 +322,16 @@ export const DEFAULT_CONTENT = {
         ],
       },
       {
-        title: "Regulamin rezerwacji restauracji",
-        subtitle: "Rezerwacja stolikow przez formularz na stronie Restauracji",
+        title: "Regulamin rezerwacji cateringu",
+        subtitle: "Zamowienie cateringu przez formularz na stronie",
         sections: [
           {
             title: "1. Zgloszenie i potwierdzenie e-mail",
             text: "Wypelnienie formularza nie blokuje stolikow do czasu potwierdzenia e-mail. Link potwierdzajacy nalezy kliknac w ciagu 2 godzin. Po potwierdzeniu zgloszenie przechodzi do statusu oczekujacego i stoliki sa wstepnie rezerwowane.",
           },
           {
-            title: "2. Termin na potwierdzenie przez restauracje",
-            text: "Restauracja ma do 3 dni na decyzje od chwili uzyskania statusu oczekujacego. Brak decyzji skutkuje automatycznym anulowaniem.",
+            title: "2. Termin na potwierdzenie",
+            text: "Obsluga ma do 3 dni na decyzje od chwili uzyskania statusu oczekujacego. Brak decyzji skutkuje automatycznym anulowaniem.",
           },
           {
             title: "3. Skutki akceptacji",

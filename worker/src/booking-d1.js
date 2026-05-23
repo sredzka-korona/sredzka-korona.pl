@@ -434,7 +434,7 @@ function serviceLandingPath(service) {
 
 function serviceLabel(service) {
   if (service === "hotel") return "Hotel";
-  if (service === "restaurant") return "Restauracja";
+  if (service === "restaurant") return "Catering";
   return "Przyjęcia i sale";
 }
 
@@ -2720,7 +2720,7 @@ async function restaurantAvailabilityForSlot(env, settings, allTables, payload, 
   const dayWindow = await resolveRestaurantWindowForDate(env, settings, reservationDate);
   if (!skipPublicBookingRules) {
     if (dayWindow.closed) {
-      throw new Error("Restauracja jest nieczynna w wybranym dniu.");
+      throw new Error("Catering jest nieczynny w wybranym dniu.");
     }
     assertRestaurantStartLeadTime(reservationDate, startTime);
     restaurantWindowWithinDay(dayWindow, startTime, durationHours);
@@ -2884,7 +2884,7 @@ async function restaurantCalendarAvailability(env, payload = {}) {
     maxGuestsPerTable: Number(settings.maxGuestsPerTable || 4),
     tableCount: tables.length,
     timeSlotMinutes: Number(settings.timeSlotMinutes || 30),
-    restaurantName: "Średzka Korona — Restauracja",
+    restaurantName: "Średzka Korona — Catering",
     selectedDate: selectedDay?.reservationDate || requestedDate || startDate,
     selectedSlots: Array.isArray(selectedDay?.slots) ? selectedDay.slots : [],
     firstAvailableDate,
@@ -3458,7 +3458,7 @@ function legacyDefaultTemplateMap(service) {
       restaurant_confirmed_client: {
         subject: "{{restaurantName}} — rezerwacja potwierdzona ({{reservationNumber}})",
         bodyHtml:
-          "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje stolika o numerze <strong>{{reservationNumber}}</strong>.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}</p><p>{{tablesList}}</p><p>W przypadku spoznienia lub potrzeby zmiany godziny prosimy o wczesniejszy kontakt z restauracja.</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
+          "<p>Dzien dobry {{fullName}},</p><p>Potwierdzamy rezerwacje stolika o numerze <strong>{{reservationNumber}}</strong>.</p><p>{{date}} · {{timeFrom}}–{{timeTo}}</p><p>{{tablesList}}</p><p>W przypadku spoznienia lub potrzeby zmiany godziny prosimy o wczesniejszy kontakt z obsluga.</p><p>Pozdrawiamy,<br>{{restaurantName}}</p>",
       },
       restaurant_cancelled_client: {
         subject: "{{restaurantName}} — rezerwacja anulowana ({{reservationNumber}})",
@@ -4327,7 +4327,7 @@ function hotelDisplayName(env) {
 }
 
 function restaurantDisplayName(env) {
-  return cleanString(env.RESTAURANT_NAME, 140) || cleanString(env.HOTEL_NAME, 140) || "Średzka Korona — Restauracja";
+  return cleanString(env.RESTAURANT_NAME, 140) || cleanString(env.HOTEL_NAME, 140) || "Średzka Korona — Catering";
 }
 
 /** Nazwa marki w mailach i szablonach dla dostaw cateringu (nie „Restauracja”). */

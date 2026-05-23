@@ -2620,6 +2620,18 @@
           display: none;
         }
       }
+
+      .visually-hidden:not(:focus):not(:active) {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        border: 0;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
     </style>
   </head>
   <body>
@@ -3185,7 +3197,7 @@
             </nav>
             <div class="events-content">
               <div class="events-info">
-                <h1 class="events-title">Przyjęcia</h1>
+                <h1 class="events-title">Przyjęcia <span class="visually-hidden">okolicznościowe, imprezy i sale weselne w Środzie Śląskiej</span></h1>
                 <p class="events-description">
                   Nie organizujemy imprez. Organizujemy niezapomniane wspomnienia.
                 </p>

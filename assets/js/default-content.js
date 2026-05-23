@@ -340,16 +340,16 @@ window.SREDZKA_DEFAULT_CONTENT = {
         ],
       },
       {
-        title: "Regulamin rezerwacji restauracji",
-        subtitle: "Rezerwacja stolikow przez formularz na stronie Restauracji",
+        title: "Regulamin rezerwacji cateringu",
+        subtitle: "Zamowienie cateringu przez formularz na stronie",
         sections: [
           {
             title: "1. Zgloszenie i potwierdzenie e-mail",
             text: "Wypelnienie formularza nie blokuje stolikow do czasu potwierdzenia e-mail. Link potwierdzajacy nalezy kliknac w ciagu 2 godzin. Po potwierdzeniu zgloszenie przechodzi do statusu oczekujacego i stoliki sa wstepnie rezerwowane.",
           },
           {
-            title: "2. Termin na potwierdzenie przez restauracje",
-            text: "Restauracja ma do 3 dni na decyzje od chwili uzyskania statusu oczekujacego. Brak decyzji skutkuje automatycznym anulowaniem.",
+            title: "2. Termin na potwierdzenie",
+            text: "Obsluga ma do 3 dni na decyzje od chwili uzyskania statusu oczekujacego. Brak decyzji skutkuje automatycznym anulowaniem.",
           },
           {
             title: "3. Skutki akceptacji",
