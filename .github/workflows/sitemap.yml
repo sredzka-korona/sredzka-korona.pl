@@ -19,7 +19,7 @@ jobs:
       - name: Generate Sitemap
         uses: cicirello/generate-sitemap@v1
         with:
-          base-url-path: https://www.sredzkakorona.pl/
+          base-url-path: https://www.sredzka-korona.pl/
 
       # 3. Automatyczny commit i push zaktualizowanego pliku sitemap.xml
       - name: Commit and Push Sitemap
