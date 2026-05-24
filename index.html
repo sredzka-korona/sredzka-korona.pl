@@ -2194,6 +2194,7 @@
         const scrollIndicatorThumb = document.querySelector(".scroll-indicator-thumb");
         let scrollIndicatorFrame = 0;
         let navHeightObserver = null;
+        let navHeightPx = 80;
         let scrollMetrics = {
           viewportHeight: 0,
           scrollHeight: 0,
@@ -2455,12 +2456,10 @@
         }
 
         function syncFloatingNavHeightCssVar(measuredHeight) {
-          const nav = document.getElementById("floating-nav");
-          if (!nav) return;
-          const h = Math.ceil(
-            Number.isFinite(measuredHeight) ? measuredHeight : nav.offsetHeight || nav.clientHeight || 0
-          );
-          document.documentElement.style.setProperty("--nav-height", Math.max(64, h) + "px");
+          const h = Math.max(64, Math.ceil(Number.isFinite(measuredHeight) ? measuredHeight : navHeightPx));
+          if (h === navHeightPx) return;
+          navHeightPx = h;
+          document.documentElement.style.setProperty("--nav-height", `${navHeightPx}px`);
         }
 
         function renderMainSplitContainer() {
@@ -2505,6 +2504,7 @@
           `;
 
           renderMainSplitContainer();
+          refreshScrollIndicatorMetrics();
           scheduleScrollIndicatorUpdate();
           const nav = document.getElementById("floating-nav");
           navHeightObserver?.disconnect();
@@ -2815,7 +2815,7 @@
           });
           const cookie = document.querySelector(".cookie-banner");
           if (cookie) {
-            cookieBannerHeight = Math.max(0, Math.ceil(cookie.clientHeight || 0));
+            cookieBannerHeight = 0;
             bottomStackLayoutObserver.observe(cookie);
           } else {
             cookieBannerHeight = 0;
@@ -2937,13 +2937,6 @@
         }
 
         function initCustomScrollbar() {
-          const resizeObserver = new ResizeObserver(() => {
-            refreshScrollIndicatorMetrics();
-            scheduleScrollIndicatorUpdate();
-          });
-          resizeObserver.observe(document.body);
-          resizeObserver.observe(document.documentElement);
-
           window.addEventListener("scroll", scheduleScrollIndicatorUpdate, { passive: true });
           window.addEventListener("resize", () => {
             refreshScrollIndicatorMetrics();
