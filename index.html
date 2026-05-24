@@ -1273,29 +1273,6 @@
         transform: scale(1.15);
       }
 
-      .scroll-indicator {
-        position: fixed;
-        top: 0.2rem;
-        right: 0.05rem;
-        bottom: 0.4rem;
-        width: 14px;
-        border-radius: 999px;
-        background: transparent;
-        box-shadow: none;
-        pointer-events: none;
-        z-index: 20;
-      }
-
-      .scroll-indicator-thumb {
-        position: absolute;
-        top: 0;
-        left: 2px;
-        width: 10px;
-        min-height: 44px;
-        border-radius: 999px;
-        background: rgba(168, 150, 108, 0.72);
-      }
-
       .service-link {
         color: var(--gold-strong);
       }
@@ -1606,10 +1583,6 @@
           font-size: 0.85rem;
         }
 
-        .scroll-indicator {
-          display: none;
-        }
-
         .floating-contact-button {
           right: 0.9rem !important;
           bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px)) !important;
@@ -1820,9 +1793,6 @@
   </head>
   <body>
     <a class="skip-link" href="#main-content">Przejdź do treści</a>
-    <div class="scroll-indicator" aria-hidden="true">
-      <div class="scroll-indicator-thumb"></div>
-    </div>
     <div id="app"></div>
     <script>
       (() => {
@@ -2190,64 +2160,10 @@
         ];
 
         const app = document.querySelector("#app");
-        const scrollIndicator = document.querySelector(".scroll-indicator");
-        const scrollIndicatorThumb = document.querySelector(".scroll-indicator-thumb");
-        let scrollIndicatorFrame = 0;
         let navHeightObserver = null;
         let navHeightPx = 80;
-        let scrollMetrics = {
-          viewportHeight: 0,
-          scrollHeight: 0,
-          trackHeight: 0,
-          maxScroll: 0,
-          maxThumbOffset: 0,
-          thumbHeight: 44,
-        };
         let cookieBannerHeight = 0;
         let modal;
-
-        function refreshScrollIndicatorMetrics() {
-          if (!scrollIndicator || !scrollIndicatorThumb) {
-            return;
-          }
-          const viewportHeight = window.innerHeight;
-          const scrollHeight = document.documentElement.scrollHeight;
-          const trackHeight = scrollIndicator.clientHeight;
-          const maxScroll = Math.max(scrollHeight - viewportHeight, 0);
-          if (maxScroll <= 0 || trackHeight <= 0) {
-            scrollMetrics = { viewportHeight, scrollHeight, trackHeight, maxScroll, maxThumbOffset: 0, thumbHeight: 44 };
-            scrollIndicator.style.opacity = "0";
-            scrollIndicatorThumb.style.transform = "translateY(0)";
-            return;
-          }
-          const thumbHeight = Math.max((viewportHeight / scrollHeight) * trackHeight, 44);
-          const maxThumbOffset = Math.max(trackHeight - thumbHeight, 0);
-          scrollMetrics = { viewportHeight, scrollHeight, trackHeight, maxScroll, maxThumbOffset, thumbHeight };
-          scrollIndicator.style.opacity = "1";
-          scrollIndicatorThumb.style.height = `${thumbHeight}px`;
-        }
-
-        function updateScrollIndicator() {
-          if (!scrollIndicator || !scrollIndicatorThumb) return;
-          if (scrollMetrics.maxScroll <= 0 || scrollMetrics.trackHeight <= 0) {
-            scrollIndicator.style.opacity = "0";
-            scrollIndicatorThumb.style.transform = "translateY(0)";
-            return;
-          }
-          const scrollRatio = Math.min(Math.max(window.scrollY / scrollMetrics.maxScroll, 0), 1);
-          const thumbOffset = scrollMetrics.maxThumbOffset * scrollRatio;
-          scrollIndicatorThumb.style.transform = `translateY(${thumbOffset}px)`;
-        }
-
-        function scheduleScrollIndicatorUpdate() {
-          if (scrollIndicatorFrame) {
-            return;
-          }
-          scrollIndicatorFrame = window.requestAnimationFrame(() => {
-            scrollIndicatorFrame = 0;
-            updateScrollIndicator();
-          });
-        }
 
         const escapeHtml = (value) =>
           String(value ?? "")
@@ -2504,8 +2420,6 @@
           `;
 
           renderMainSplitContainer();
-          refreshScrollIndicatorMetrics();
-          scheduleScrollIndicatorUpdate();
           const nav = document.getElementById("floating-nav");
           navHeightObserver?.disconnect();
           navHeightObserver = null;
@@ -2936,26 +2850,7 @@
           }
         }
 
-        function initCustomScrollbar() {
-          if (scrollIndicator) {
-            scrollIndicator.style.display = "none";
-          }
-          return;
-          window.addEventListener("scroll", scheduleScrollIndicatorUpdate, { passive: true });
-          window.addEventListener("resize", () => {
-            refreshScrollIndicatorMetrics();
-            scheduleScrollIndicatorUpdate();
-          });
-          window.addEventListener("load", () => {
-            refreshScrollIndicatorMetrics();
-            scheduleScrollIndicatorUpdate();
-          });
-          refreshScrollIndicatorMetrics();
-          scheduleScrollIndicatorUpdate();
-        }
-
         async function bootstrap() {
-          initCustomScrollbar();
           renderShell();
           window.addEventListener("resize", updateBottomFixedStackVars, { passive: true });
           syncFloatingNavHeightCssVar();
