@@ -17,7 +17,7 @@
     <meta name="apple-mobile-web-app-title" content="Catering | Średzka Korona" />
     <meta
       name="description"
-      content="Catering Środa Śląska, Lutynia, Brzeg Dolny, Miękinia i okolice Wrocławia. Profesjonalny catering na imprezy okolicznościowe, śluby, chrzciny i komunie. Działamy również pod namiotami, obsługujemy nawet ponad 100 osób."
+      content="Catering Środa Śląska, Lutynia, Brzeg Dolny, Miękinia i okolice Wrocławia. Profesjonalny catering wyjazdowy na imprezy okolicznościowe, śluby, chrzciny i komunie. Gotujemy u klienta, również pod namiotami, obsługujemy nawet ponad 100 osób."
     />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pl_PL" />
@@ -25,7 +25,7 @@
     <meta property="og:title" content="Catering Środa Śląska | Średzka Korona" />
     <meta
       property="og:description"
-      content="Catering Środa Śląska — profesjonalna obsługa imprez okolicznościowych, ślubów, chrztów i komunii. Działamy w Lutyni, Brzegu Dolnym, Miękini i okolicach Wrocławia. Jesteśmy blisko Wrocławia!"
+      content="Catering Środa Śląska — profesjonalny catering wyjazdowy na imprezy okolicznościowe, śluby, chrzciny i komunie. Gotujemy u klienta w Lutyni, Brzegu Dolnym, Miękini i okolicach Wrocławia. Jesteśmy blisko Wrocławia!"
     />
     <meta property="og:image" content="https://www.sredzkakorona.pl/ikony/logo-korona.png" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -1296,7 +1296,6 @@
         
         let restaurantMenu = [];
         let restaurantGallery = [];
-        let openingHours = [];
 
         const isLocalPreview =
           window.location.protocol === "file:" ||
@@ -1575,15 +1574,7 @@
                 { url: "https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=800&q=80", alt: "Nakrycie stołów" },
                 { url: "https://images.unsplash.com/photo-1515669097368-22e68427d265?auto=format&fit=crop&w=800&q=80", alt: "Dania restauracyjne" },
               ];
-              openingHours = [
-                { day: "Poniedziałek", hours: "12:00 - 22:00" },
-                { day: "Wtorek", hours: "12:00 - 22:00" },
-                { day: "Środa", hours: "12:00 - 22:00" },
-                { day: "Czwartek", hours: "12:00 - 22:00" },
-                { day: "Piątek", hours: "12:00 - 24:00" },
-                { day: "Sobota", hours: "12:00 - 24:00" },
-                { day: "Niedziela", hours: "12:00 - 21:00" },
-              ];
+
               return;
             }
             const payload = await loadBootstrapPayload();
@@ -1607,22 +1598,7 @@
             if (payload.content?.company?.email) {
               companyEmail = payload.content.company.email;
             }
-            if (payload.content?.company?.openingHours) {
-              // Konwertuj różne formaty na jednolity format {day, hours}
-              openingHours = payload.content.company.openingHours.map(item => {
-                if (typeof item === 'string') {
-                  const colonIndex = item.indexOf(':');
-                  if (colonIndex > 0) {
-                    return {
-                      day: item.substring(0, colonIndex).trim(),
-                      hours: item.substring(colonIndex + 1).trim()
-                    };
-                  }
-                  return { day: item, hours: '' };
-                }
-                return item;
-              });
-            }
+
           } catch (error) {
             console.warn("Nie udało się załadować danych restauracji:", error);
           }
@@ -1897,29 +1873,6 @@
           `;
         }
 
-        function renderOpeningHours() {
-          return `
-            <div class="modal-body modal-body-hours">
-              <div class="modal-header">
-                <h2>Godziny dowozów</h2>
-                <button class="modal-close" id="close-hours" aria-label="Zamknij">×</button>
-              </div>
-              <div class="opening-hours-list">
-                ${(openingHours || []).map(item => {
-                  const day = typeof item === 'string' ? item.split(':')[0].trim() : (item.day || '');
-                  const hours = typeof item === 'string' ? item.split(':').slice(1).join(':').trim() : (item.hours || '');
-                  return `
-                    <div class="opening-hours-row">
-                      <span class="opening-hours-day">${escapeHtml(day)}</span>
-                      <span class="opening-hours-time">${escapeHtml(hours)}</span>
-                    </div>
-                  `;
-                }).join('')}
-              </div>
-            </div>
-          `;
-        }
-
         function renderOrdersInfo() {
           return `
             <div class="modal-body">
@@ -1973,10 +1926,7 @@
                   <button class="action-button" id="orders-button">
                     <div class="action-button-title">ZAMÓWIENIA</div>
                   </button>
-                  <button class="action-button" id="hours-button">
-                    <div class="action-button-title">GODZINY</div>
-                    <div class="action-button-label">Dowozów</div>
-                  </button>
+
                 </div>
               </div>
               <a
@@ -1992,7 +1942,6 @@
 
         const modal = document.querySelector("#restaurant-modal");
         const menuButton = document.querySelector("#menu-button");
-        const hoursButton = document.querySelector("#hours-button");
         const galleryButton = document.querySelector("#gallery-button");
         const ordersButton = document.querySelector("#orders-button");
 
@@ -2036,15 +1985,6 @@
           });
         }
 
-        function openOpeningHours() {
-          modal.innerHTML = renderOpeningHours();
-          modal.classList.add("open");
-          document.querySelector("#close-hours")?.addEventListener("click", closeModal);
-          modal.addEventListener("click", (e) => {
-            if (e.target === modal) closeModal();
-          });
-        }
-
         function openGallery() {
           modal.innerHTML = renderGallery();
           modal.classList.add("open");
@@ -2072,7 +2012,6 @@
           menuButton.addEventListener("click", openMenu);
           galleryButton.addEventListener("click", openGallery);
           ordersButton.addEventListener("click", openOrdersInfo);
-          hoursButton.addEventListener("click", openOpeningHours);
         });
 
         const nav = document.querySelector("#floating-nav");
