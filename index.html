@@ -2193,31 +2193,46 @@
         const scrollIndicator = document.querySelector(".scroll-indicator");
         const scrollIndicatorThumb = document.querySelector(".scroll-indicator-thumb");
         let scrollIndicatorFrame = 0;
+        let scrollMetrics = {
+          viewportHeight: 0,
+          scrollHeight: 0,
+          trackHeight: 0,
+          maxScroll: 0,
+          maxThumbOffset: 0,
+          thumbHeight: 44,
+        };
         let modal;
 
-        function updateScrollIndicator() {
-          const viewportHeight = window.innerHeight;
-          const scrollHeight = document.documentElement.scrollHeight;
-          const maxScroll = Math.max(scrollHeight - viewportHeight, 0);
-
+        function refreshScrollIndicatorMetrics() {
           if (!scrollIndicator || !scrollIndicatorThumb) {
             return;
           }
-
+          const viewportHeight = window.innerHeight;
+          const scrollHeight = document.documentElement.scrollHeight;
           const trackHeight = scrollIndicator.clientHeight;
+          const maxScroll = Math.max(scrollHeight - viewportHeight, 0);
           if (maxScroll <= 0 || trackHeight <= 0) {
+            scrollMetrics = { viewportHeight, scrollHeight, trackHeight, maxScroll, maxThumbOffset: 0, thumbHeight: 44 };
             scrollIndicator.style.opacity = "0";
             scrollIndicatorThumb.style.transform = "translateY(0)";
             return;
           }
-
-          scrollIndicator.style.opacity = "1";
           const thumbHeight = Math.max((viewportHeight / scrollHeight) * trackHeight, 44);
           const maxThumbOffset = Math.max(trackHeight - thumbHeight, 0);
-          const scrollRatio = Math.min(Math.max(window.scrollY / maxScroll, 0), 1);
-          const thumbOffset = maxThumbOffset * scrollRatio;
-
+          scrollMetrics = { viewportHeight, scrollHeight, trackHeight, maxScroll, maxThumbOffset, thumbHeight };
+          scrollIndicator.style.opacity = "1";
           scrollIndicatorThumb.style.height = `${thumbHeight}px`;
+        }
+
+        function updateScrollIndicator() {
+          if (!scrollIndicator || !scrollIndicatorThumb) return;
+          if (scrollMetrics.maxScroll <= 0 || scrollMetrics.trackHeight <= 0) {
+            scrollIndicator.style.opacity = "0";
+            scrollIndicatorThumb.style.transform = "translateY(0)";
+            return;
+          }
+          const scrollRatio = Math.min(Math.max(window.scrollY / scrollMetrics.maxScroll, 0), 1);
+          const thumbOffset = scrollMetrics.maxThumbOffset * scrollRatio;
           scrollIndicatorThumb.style.transform = `translateY(${thumbOffset}px)`;
         }
 
@@ -2908,14 +2923,22 @@
 
         function initCustomScrollbar() {
           const resizeObserver = new ResizeObserver(() => {
+            refreshScrollIndicatorMetrics();
             scheduleScrollIndicatorUpdate();
           });
           resizeObserver.observe(document.body);
           resizeObserver.observe(document.documentElement);
 
           window.addEventListener("scroll", scheduleScrollIndicatorUpdate, { passive: true });
-          window.addEventListener("resize", scheduleScrollIndicatorUpdate);
-          window.addEventListener("load", scheduleScrollIndicatorUpdate);
+          window.addEventListener("resize", () => {
+            refreshScrollIndicatorMetrics();
+            scheduleScrollIndicatorUpdate();
+          });
+          window.addEventListener("load", () => {
+            refreshScrollIndicatorMetrics();
+            scheduleScrollIndicatorUpdate();
+          });
+          refreshScrollIndicatorMetrics();
           scheduleScrollIndicatorUpdate();
         }
 
@@ -2935,15 +2958,15 @@
             renderMainSplitContainer();
             mountSiteNotifications(activeNotifications);
           };
-          if ("requestIdleCallback" in window) {
-            window.requestIdleCallback(() => {
-              hydrateFromRemote().catch(() => {});
-            }, { timeout: 1600 });
-          } else {
-            window.setTimeout(() => {
-              hydrateFromRemote().catch(() => {});
-            }, 900);
-          }
+          window.addEventListener(
+            "load",
+            () => {
+              window.setTimeout(() => {
+                hydrateFromRemote().catch(() => {});
+              }, 2500);
+            },
+            { once: true }
+          );
         }
 
         bootstrap();
