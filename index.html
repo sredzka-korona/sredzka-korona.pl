@@ -57,7 +57,7 @@
     <link
       rel="preload"
       as="image"
-      href="https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&amp;fit=crop&amp;fm=webp&amp;q=62&amp;w=900"
+      href="https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&amp;fit=crop&amp;fm=webp&amp;q=52&amp;w=720"
       fetchpriority="high"
     />
     <script type="application/ld+json">
@@ -2393,11 +2393,11 @@
             return `src="${escapeHtml(safeUrl)}"${loadingAttrs} sizes="(max-width: 1024px) 100vw, 33vw"`;
           }
           const base = safeUrl.split("?")[0];
-          const make = (w) => `${base}?auto=format&fit=crop&fm=webp&q=62&w=${w}`;
+          const make = (w) => `${base}?auto=format&fit=crop&fm=webp&q=52&w=${w}`;
           return [
-            `src="${escapeHtml(make(900))}"`,
-            `srcset="${escapeHtml(make(540))} 540w, ${escapeHtml(make(900))} 900w, ${escapeHtml(make(1200))} 1200w"`,
-            `sizes="(max-width: 760px) 100vw, (max-width: 1200px) 50vw, 33vw"`,
+            `src="${escapeHtml(make(720))}"`,
+            `srcset="${escapeHtml(make(360))} 360w, ${escapeHtml(make(540))} 540w, ${escapeHtml(make(720))} 720w, ${escapeHtml(make(840))} 840w"`,
+            `sizes="(max-width: 760px) 92vw, (max-width: 1200px) 50vw, 33vw"`,
             loadingAttrs.trim(),
           ].join(" ");
         }
@@ -2913,15 +2913,6 @@
           resizeObserver.observe(document.body);
           resizeObserver.observe(document.documentElement);
 
-          const mutationObserver = new MutationObserver(() => {
-            scheduleScrollIndicatorUpdate();
-          });
-          mutationObserver.observe(document.body, {
-            attributes: true,
-            childList: true,
-            subtree: true,
-          });
-
           window.addEventListener("scroll", scheduleScrollIndicatorUpdate, { passive: true });
           window.addEventListener("resize", scheduleScrollIndicatorUpdate);
           window.addEventListener("load", scheduleScrollIndicatorUpdate);
@@ -2939,10 +2930,20 @@
           });
           initScrollSpy();
           initCookieBanner();
-          const remoteDataPromise = loadRemoteData();
-          const activeNotifications = await remoteDataPromise;
-          renderMainSplitContainer();
-          mountSiteNotifications(activeNotifications);
+          const hydrateFromRemote = async () => {
+            const activeNotifications = await loadRemoteData();
+            renderMainSplitContainer();
+            mountSiteNotifications(activeNotifications);
+          };
+          if ("requestIdleCallback" in window) {
+            window.requestIdleCallback(() => {
+              hydrateFromRemote().catch(() => {});
+            }, { timeout: 1600 });
+          } else {
+            window.setTimeout(() => {
+              hydrateFromRemote().catch(() => {});
+            }, 900);
+          }
         }
 
         bootstrap();
