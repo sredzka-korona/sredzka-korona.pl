@@ -2937,6 +2937,10 @@
         }
 
         function initCustomScrollbar() {
+          if (scrollIndicator) {
+            scrollIndicator.style.display = "none";
+          }
+          return;
           window.addEventListener("scroll", scheduleScrollIndicatorUpdate, { passive: true });
           window.addEventListener("resize", () => {
             refreshScrollIndicatorMetrics();
