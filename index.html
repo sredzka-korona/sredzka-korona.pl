@@ -2193,6 +2193,7 @@
         const scrollIndicator = document.querySelector(".scroll-indicator");
         const scrollIndicatorThumb = document.querySelector(".scroll-indicator-thumb");
         let scrollIndicatorFrame = 0;
+        let navHeightObserver = null;
         let scrollMetrics = {
           viewportHeight: 0,
           scrollHeight: 0,
@@ -2201,6 +2202,7 @@
           maxThumbOffset: 0,
           thumbHeight: 44,
         };
+        let cookieBannerHeight = 0;
         let modal;
 
         function refreshScrollIndicatorMetrics() {
@@ -2452,10 +2454,12 @@
                 </div>`;
         }
 
-        function syncFloatingNavHeightCssVar() {
+        function syncFloatingNavHeightCssVar(measuredHeight) {
           const nav = document.getElementById("floating-nav");
           if (!nav) return;
-          const h = Math.ceil(nav.offsetHeight || nav.clientHeight || 0);
+          const h = Math.ceil(
+            Number.isFinite(measuredHeight) ? measuredHeight : nav.offsetHeight || nav.clientHeight || 0
+          );
           document.documentElement.style.setProperty("--nav-height", Math.max(64, h) + "px");
         }
 
@@ -2502,6 +2506,17 @@
 
           renderMainSplitContainer();
           scheduleScrollIndicatorUpdate();
+          const nav = document.getElementById("floating-nav");
+          navHeightObserver?.disconnect();
+          navHeightObserver = null;
+          if (nav) {
+            navHeightObserver = new ResizeObserver((entries) => {
+              const entry = entries[0];
+              if (!entry) return;
+              syncFloatingNavHeightCssVar(entry.contentRect.height);
+            });
+            navHeightObserver.observe(nav);
+          }
           requestAnimationFrame(() => syncFloatingNavHeightCssVar());
         }
 
@@ -2787,23 +2802,23 @@
 
         function updateBottomFixedStackVars() {
           const rootEl = document.documentElement;
-          const cookie = document.querySelector(".cookie-banner");
-          let fabExtra = 0;
-          if (cookie) {
-            const h = cookie.offsetHeight || cookie.clientHeight || 0;
-            fabExtra = 16 + (Number.isFinite(h) ? h : 0);
-          }
+          const fabExtra = 16 + (Number.isFinite(cookieBannerHeight) ? cookieBannerHeight : 0);
           rootEl.style.setProperty("--bottom-floating-extra", `${Math.ceil(fabExtra)}px`);
         }
 
         function observeBottomStackLayout() {
           bottomStackLayoutObserver?.disconnect();
-          bottomStackLayoutObserver = new ResizeObserver(() => {
+          bottomStackLayoutObserver = new ResizeObserver((entries) => {
+            const entry = entries[0];
+            cookieBannerHeight = entry ? Math.max(0, Math.ceil(entry.contentRect.height || 0)) : 0;
             window.requestAnimationFrame(() => updateBottomFixedStackVars());
           });
           const cookie = document.querySelector(".cookie-banner");
           if (cookie) {
+            cookieBannerHeight = Math.max(0, Math.ceil(cookie.clientHeight || 0));
             bottomStackLayoutObserver.observe(cookie);
+          } else {
+            cookieBannerHeight = 0;
           }
           window.requestAnimationFrame(() => updateBottomFixedStackVars());
         }
@@ -2945,7 +2960,6 @@
         async function bootstrap() {
           initCustomScrollbar();
           renderShell();
-          window.addEventListener("resize", syncFloatingNavHeightCssVar);
           window.addEventListener("resize", updateBottomFixedStackVars, { passive: true });
           syncFloatingNavHeightCssVar();
           requestAnimationFrame(() => {
