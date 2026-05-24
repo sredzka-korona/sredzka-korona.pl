@@ -57,7 +57,7 @@
     <link
       rel="preload"
       as="image"
-      href="https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&amp;fit=crop&amp;w=1600&amp;q=80"
+      href="https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&amp;fit=crop&amp;fm=webp&amp;q=62&amp;w=900"
       fetchpriority="high"
     />
     <script type="application/ld+json">
@@ -2383,6 +2383,25 @@
           };
         }
 
+        function buildResponsiveImageAttrs(imageUrl, imagePriority) {
+          const safeUrl = String(imageUrl || "");
+          const isUnsplash = safeUrl.includes("images.unsplash.com/");
+          const loadingAttrs = imagePriority
+            ? ` fetchpriority="high" decoding="async" loading="eager"`
+            : ` fetchpriority="high" decoding="async" loading="eager"`;
+          if (!isUnsplash) {
+            return `src="${escapeHtml(safeUrl)}"${loadingAttrs} sizes="(max-width: 1024px) 100vw, 33vw"`;
+          }
+          const base = safeUrl.split("?")[0];
+          const make = (w) => `${base}?auto=format&fit=crop&fm=webp&q=62&w=${w}`;
+          return [
+            `src="${escapeHtml(make(900))}"`,
+            `srcset="${escapeHtml(make(540))} 540w, ${escapeHtml(make(900))} 900w, ${escapeHtml(make(1200))} 1200w"`,
+            `sizes="(max-width: 760px) 100vw, (max-width: 1200px) 50vw, 33vw"`,
+            loadingAttrs.trim(),
+          ].join(" ");
+        }
+
         function renderMainSplitSection(sectionKey, link, label, media, imagePriority) {
           const sb = state.content.home?.sectionBlocks || {};
           const blocked = Boolean(sb[sectionKey]);
@@ -2392,9 +2411,7 @@
           const focusY = clampNumber(media?.focusY, 0, 100, 50);
           const zoom = clampNumber(media?.zoom, 1, 2.5, 1);
           const soonText = "Chwilowo niedostępne";
-          const imgAttrs = imagePriority
-            ? ` fetchpriority="high" decoding="async" loading="eager"`
-            : ` loading="lazy" decoding="async"`;
+          const imgAttrs = buildResponsiveImageAttrs(imageUrl, imagePriority);
           const goLabel = blocked
             ? `${label} — Chwilowo niedostępne`
             : `Przejdź do: ${label} — Średzka Korona, Środa Śląska`;
@@ -2410,7 +2427,7 @@
                   aria-disabled="${blocked ? "true" : "false"}"
                   aria-label="${escapeHtml(goLabel)}"
                 >
-                  <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(alt)}"${imgAttrs} />
+                  <img ${imgAttrs} alt="${escapeHtml(alt)}" />
                   <div class="main-split-overlay">
                     <div class="main-split-overlay-stack">
                       <span class="main-split-label">${escapeHtml(label)}</span>
@@ -2913,7 +2930,6 @@
 
         async function bootstrap() {
           initCustomScrollbar();
-          const remoteDataPromise = loadRemoteData();
           renderShell();
           window.addEventListener("resize", syncFloatingNavHeightCssVar);
           window.addEventListener("resize", updateBottomFixedStackVars, { passive: true });
@@ -2923,6 +2939,7 @@
           });
           initScrollSpy();
           initCookieBanner();
+          const remoteDataPromise = loadRemoteData();
           const activeNotifications = await remoteDataPromise;
           renderMainSplitContainer();
           mountSiteNotifications(activeNotifications);
