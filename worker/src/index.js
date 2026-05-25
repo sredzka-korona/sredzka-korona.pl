@@ -135,6 +135,7 @@ export default {
         const payload = await request.json();
         const content = sanitizeContent(payload.content || DEFAULT_CONTENT);
         await saveContent(env, content);
+        invalidateBootstrapPayloadCache();
         return jsonResponse({ content: await getContent(env, url) }, 200, request, env);
       }
 
