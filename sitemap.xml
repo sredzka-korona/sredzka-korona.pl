@@ -1,59 +1,45 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-<url>
-<loc>https://www.sredzka-korona.pl/</loc>
-<lastmod>2026-05-25T18:34:13+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/Hotel/</loc>
-<lastmod>2026-05-25T18:34:13+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/Hotel/hotel-sroda-slaska.html</loc>
-<lastmod>2026-05-23T20:55:07+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/catering/</loc>
-<lastmod>2026-05-25T18:34:13+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/catering/catering-sroda-slaska.html</loc>
-<lastmod>2026-05-25T15:21:49+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/catering/catering-test.html</loc>
-<lastmod>2026-05-25T15:21:49+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/dokumenty/</loc>
-<lastmod>2026-05-23T18:30:41+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/f-and-q/</loc>
-<lastmod>2026-05-23T18:30:41+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/kontakt/</loc>
-<lastmod>2026-05-25T18:34:13+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/przyjecia/</loc>
-<lastmod>2026-05-25T18:34:13+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/przyjecia/przyjec-sroda-slaska.html</loc>
-<lastmod>2026-05-25T15:21:49+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/functions/node_modules/tslib/tslib.es6.html</loc>
-<lastmod>2026-03-30T17:52:17+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/functions/node_modules/tslib/tslib.html</loc>
-<lastmod>2026-03-30T17:52:17+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/functions/node_modules/bignumber.js/doc/API.html</loc>
-<lastmod>2026-03-30T17:52:17+02:00</lastmod>
-</url>
+  <url>
+    <loc>https://sredzka-korona.pl/</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://sredzka-korona.pl/Hotel/</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://sredzka-korona.pl/catering/</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://sredzka-korona.pl/przyjecia/</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://sredzka-korona.pl/kontakt/</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://sredzka-korona.pl/dokumenty/</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://sredzka-korona.pl/f-and-q/</loc>
+    <lastmod>2026-05-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
 </urlset>

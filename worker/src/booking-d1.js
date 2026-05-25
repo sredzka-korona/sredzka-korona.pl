@@ -250,7 +250,7 @@ function buildBrandedEmail({
                     <td style="font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1;letter-spacing:0.28em;color:#7b5a24;font-weight:700;padding-right:10px;">ŚREDZKA</td>
                     <td style="padding:0 2px;">${
                       logoUrl
-                        ? `<img src="${escapeHtml(logoUrl)}" alt="Korona" width="42" height="42" style="display:block;width:42px;height:42px;border:0;outline:none;text-decoration:none;" />`
+                        ? `<img src="${escapeHtml(logoUrl)}" alt="Logo Średzka Korona" width="42" height="42" style="display:block;width:42px;height:42px;border:0;outline:none;text-decoration:none;" />`
                         : `<span style="display:inline-block;font-size:26px;line-height:1;color:#c8aa78;">&#9819;</span>`
                     }</td>
                     <td style="font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1;letter-spacing:0.28em;color:#7b5a24;font-weight:700;padding-left:10px;">KORONA</td>

@@ -11,7 +11,7 @@
       gtag('js', new Date());
       gtag('config', 'AW-18082369489');
     </script>
-    <link rel="canonical" href="https://www.sredzkakorona.pl/kontakt/" />
+    <link rel="canonical" href="https://sredzka-korona.pl/kontakt/" />
     <link rel="icon" type="image/png" sizes="32x32" href="../ikony/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="../ikony/favicon-16x16.png" />
     <link rel="shortcut icon" href="../favicon.ico" />
@@ -29,13 +29,13 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pl_PL" />
-    <meta property="og:url" content="https://www.sredzkakorona.pl/kontakt/" />
+    <meta property="og:url" content="https://sredzka-korona.pl/kontakt/" />
     <meta property="og:title" content="Kontakt — Średzka Korona, Środa Śląska" />
     <meta
       property="og:description"
       content="Adres, telefon i formularz kontaktowy — Średzka Korona, ul. Wrocławska 11, Środa Śląska."
     />
-    <meta property="og:image" content="https://www.sredzkakorona.pl/ikony/logo-korona.png" />
+    <meta property="og:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <script type="application/ld+json">
       {
@@ -43,11 +43,11 @@
         "@graph": [
           {
             "@type": "ContactPage",
-            "@id": "https://www.sredzkakorona.pl/kontakt/#contactpage",
-            "url": "https://www.sredzkakorona.pl/kontakt/",
+            "@id": "https://sredzka-korona.pl/kontakt/#contactpage",
+            "url": "https://sredzka-korona.pl/kontakt/",
             "name": "Kontakt — Średzka Korona",
-            "isPartOf": { "@id": "https://www.sredzkakorona.pl/#website" },
-            "mainEntity": { "@id": "https://www.sredzkakorona.pl/#organization" },
+            "isPartOf": { "@id": "https://sredzka-korona.pl/#website" },
+            "mainEntity": { "@id": "https://sredzka-korona.pl/#organization" },
             "inLanguage": "pl-PL"
           },
           {
@@ -57,9 +57,9 @@
                 "@type": "ListItem",
                 "position": 1,
                 "name": "Strona główna",
-                "item": "https://www.sredzkakorona.pl/"
+                "item": "https://sredzka-korona.pl/"
               },
-              { "@type": "ListItem", "position": 2, "name": "Kontakt", "item": "https://www.sredzkakorona.pl/kontakt/" }
+              { "@type": "ListItem", "position": 2, "name": "Kontakt", "item": "https://sredzka-korona.pl/kontakt/" }
             ]
           }
         ]
@@ -163,6 +163,7 @@
         position: fixed;
         inset: 0;
         z-index: 0;
+        background-image: url("/assets/img/kontakt.webp");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
@@ -347,6 +348,20 @@
         gap: 0.75rem;
         margin: 0;
         justify-content: center;
+      }
+
+      .contact-seo-heading-wrap {
+        margin-top: auto;
+      }
+
+      .contact-seo-heading {
+        margin: 0 0 1rem;
+        text-align: center;
+        font-family: "Cormorant Garamond", serif;
+        font-size: clamp(1.3rem, 2.8vw, 2rem);
+        line-height: 1.2;
+        color: var(--gold-strong);
+        text-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
       }
 
       .social-link {
@@ -1048,6 +1063,11 @@
           gap: 0.5rem;
         }
 
+        .contact-seo-heading {
+          margin: 0 0 0.75rem;
+          font-size: clamp(1.15rem, 5vw, 1.5rem);
+        }
+
         .modal-body {
           padding: 1.5rem;
           margin-top: 1rem;
@@ -1086,7 +1106,7 @@
       <nav class="floating-nav" id="floating-nav">
         <a href="../index.html" class="floating-nav-brand">
           <span class="floating-nav-brand-text">ŚREDZKA</span>
-          <img class="brand-logo" src="../ikony/logo-korona.png" alt="Korona Sredzka Korona" loading="lazy" decoding="async" />
+          <img class="brand-logo" src="../ikony/logo-korona.png" alt="Logo Średzka Korona" loading="lazy" decoding="async" />
           <span class="floating-nav-brand-text">KORONA</span>
         </a>
       </nav>
@@ -1181,6 +1201,10 @@
               </div>
 
               <div class="contact-separator"></div>
+
+              <div class="contact-seo-heading-wrap">
+                <h1 class="contact-seo-heading">Kontakt — Średzka Korona, Środa Śląska</h1>
+              </div>
 
               <div class="action-buttons">
                 <button type="button" class="action-button" id="info-button">

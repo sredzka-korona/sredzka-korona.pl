@@ -202,7 +202,7 @@
     totalPrice: "1240",
     customerNote: "Prosimy o spokojny pokój i możliwość późniejszego zameldowania około 20:30.",
     adminNote: "Gość preferuje apartament od strony dziedzińca.",
-    confirmationLink: "https://www.sredzkakorona.pl/hotel/potwierdzenie?token=podglad",
+    confirmationLink: "https://sredzka-korona.pl/hotel/potwierdzenie?token=podglad",
     hotelName: "Średzka Korona",
   });
 
@@ -263,7 +263,7 @@
                         <tr>
                           <td style="font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1;letter-spacing:0.28em;color:#7b5a24;font-weight:700;padding-right:10px;">ŚREDZKA</td>
                           <td style="padding:0 2px;">
-                            <img src="${logoUrl}" alt="Korona" width="42" height="42" style="display:block;width:42px;height:42px;border:0;" />
+                            <img src="${logoUrl}" alt="Logo Średzka Korona" width="42" height="42" style="display:block;width:42px;height:42px;border:0;" />
                           </td>
                           <td style="font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1;letter-spacing:0.28em;color:#7b5a24;font-weight:700;padding-left:10px;">KORONA</td>
                         </tr>

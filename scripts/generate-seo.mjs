@@ -23,32 +23,36 @@ try {
 
 if (!origin || !/^https:\/\//i.test(origin)) {
   console.error(
-    'Uzupełnij poprawny "origin" (np. https://www.sredzkakorona.pl) w assets/seo/site-origin.json'
+    'Uzupełnij poprawny "origin" (np. https://sredzka-korona.pl) w assets/seo/site-origin.json'
   );
   process.exit(1);
 }
 
-/** Ścieżki kanoniczne (końcowy slash zgodny z linkami wewnętrznymi) */
-const paths = [
-  "/",
-  "/Hotel/",
-  "/catering/",
-  "/przyjecia/",
-  "/kontakt/",
-  "/dokumenty/",
+/**
+ * Ścieżki kanoniczne (końcowy slash zgodny z linkami wewnętrznymi).
+ * Tylko strony indeksowalne i z realną treścią.
+ */
+const urls = [
+  { path: "/", changefreq: "weekly", priority: "1.0" },
+  { path: "/Hotel/", changefreq: "weekly", priority: "0.9" },
+  { path: "/catering/", changefreq: "weekly", priority: "0.9" },
+  { path: "/przyjecia/", changefreq: "weekly", priority: "0.9" },
+  { path: "/kontakt/", changefreq: "monthly", priority: "0.85" },
+  { path: "/dokumenty/", changefreq: "monthly", priority: "0.7" },
+  { path: "/f-and-q/", changefreq: "monthly", priority: "0.75" },
 ];
 
 const lastmod = new Date().toISOString().slice(0, 10);
 
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${paths
+${urls
   .map(
-    (p) => `  <url>
-    <loc>${origin}${p}</loc>
+    (item) => `  <url>
+    <loc>${origin}${item.path}</loc>
     <lastmod>${lastmod}</lastmod>
-    <changefreq>${p === "/" ? "weekly" : "monthly"}</changefreq>
-    <priority>${p === "/" ? "1.0" : "0.85"}</priority>
+    <changefreq>${item.changefreq}</changefreq>
+    <priority>${item.priority}</priority>
   </url>`
   )
   .join("\n")}
@@ -59,9 +63,15 @@ const robots = `User-agent: *
 Allow: /
 
 Disallow: /admin/
+Disallow: /functions/
+Disallow: /worker/
+Disallow: /scripts/
 Disallow: /Hotel/potwierdzenie.html
+Disallow: /Hotel/akceptacja.html
 Disallow: /catering/potwierdzenie.html
+Disallow: /catering/akceptacja.html
 Disallow: /przyjecia/potwierdzenie.html
+Disallow: /przyjecia/akceptacja.html
 
 Sitemap: ${origin}/sitemap.xml
 `;

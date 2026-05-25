@@ -4190,7 +4190,7 @@
     app.innerHTML = `
       <div class="login-wrap">
         <div class="login-card">
-          <img src="../ikony/logo.png" alt="Logo" width="84" height="84" />
+          <img src="../ikony/logo.png" alt="Logo panelu Średzka Korona" width="84" height="84" />
           <p class="pill">Panel administratora</p>
           <h1>Logowanie do zarzadzania obiektem</h1>
           <p>Po zalogowaniu mozesz edytowac tresci, galerie, dokumenty, terminy sal i obslugiwac zgloszenia.</p>
@@ -4701,7 +4701,7 @@
           <div class="admin-topbar-center">
             <a href="../index.html" class="admin-brand-link" aria-label="Przejdz do strony glownej Sredzka Korona">
               <span class="admin-brand-text">SREDZKA</span>
-              <img class="admin-brand-logo" src="../ikony/logo-korona.png" alt="" aria-hidden="true" />
+              <img class="admin-brand-logo" src="../ikony/logo-korona.png" alt="Logo Średzka Korona" aria-hidden="true" />
               <span class="admin-brand-text">KORONA</span>
             </a>
           </div>
@@ -7796,7 +7796,7 @@
                   .map(
                     (image, index) => `
                       <article class="thumb-card">
-                        <img src="${escapeAttribute(image.url || image)}" alt="${escapeAttribute(image.alt || "Catering")}" />
+                        <img src="${escapeAttribute(image.url || image)}" alt="${escapeAttribute(image.alt || "Zdjęcie cateringu Średzka Korona")}" />
                         <div class="inline-actions">
                           <button class="button secondary" type="button" data-move-restaurant-image-up="${index}" aria-label="Przesun w lewo" ${index === 0 ? 'disabled' : ''}>←</button>
                           <button class="button secondary" type="button" data-move-restaurant-image-down="${index}" aria-label="Przesun w prawo" ${index === gallery.length - 1 ? 'disabled' : ''}>→</button>
