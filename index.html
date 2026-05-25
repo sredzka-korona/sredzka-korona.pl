@@ -2287,6 +2287,7 @@
 
         function buildResponsiveImageAttrs(imageUrl, imagePriority) {
           const safeUrl = String(imageUrl || "");
+          const isUnsplash = /(^https?:)?\/\/images\.unsplash\.com\//i.test(safeUrl);
           const loadingAttrs = imagePriority
             ? ` fetchpriority="high" decoding="async" loading="eager"`
             : ` fetchpriority="high" decoding="async" loading="eager"`;
