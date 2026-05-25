@@ -554,7 +554,7 @@
         grafik: "overview",
         hotel: "gallery",
         restauracja: "menu",
-        przyjecia: "oferta",
+        przyjecia: "gallery",
         dokumenty: "documents",
         kontakt: "contact",
         powiadomienia: "notifications",
@@ -622,7 +622,6 @@
       tiles: [
         { key: "menu", label: "Menu", description: "Kategorie, pozycje, składniki i kolejność." },
         { key: "gallery", label: "Galeria", description: "Zdjęcia cateringu i ich kolejność." },
-        { key: "orders", label: "Zamówienia", description: "Edycja treści modala zamówień widocznej na stronie cateringu." },
         { key: "hours", label: "Godziny dowozów", description: "Dni i przedziały dowozu widoczne w kafelku na stronie cateringu." },
         { key: "recipients", label: "Odbiorcy", description: "Lista odbiorców dostaw: dane kontaktowe i adresowe." },
         { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Catering na stronie głównej (pozycja i zoom)." },
@@ -634,7 +633,6 @@
       label: "Przyjęcia",
       description: "Oferta, galeria, menu oraz konfiguracja rezerwacji i komunikacji.",
       tiles: [
-        { key: "oferta", label: "Oferta", description: "Edycja treści kafelka Oferta i modala." },
         { key: "gallery", label: "Galeria", description: "Galerie sal i albumy wydarzeń." },
         { key: "menu", label: "Menu okolicznościowe", description: "Sekcje, pozycje i kolejność menu." },
         { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Przyjęcia na stronie głównej (pozycja i zoom)." },
@@ -4347,9 +4345,6 @@
     if (tabKey === "restauracja" && tileKey === "gallery") {
       return `<section class="panel col-12" id="restaurant-gallery-panel"></section>`;
     }
-    if (tabKey === "restauracja" && tileKey === "orders") {
-      return `<section class="panel col-12" id="restaurant-order-panel"></section>`;
-    }
     if (tabKey === "restauracja" && tileKey === "hours") {
       return `<section class="panel col-12" id="restaurant-opening-hours-panel"></section>`;
     }
@@ -4361,9 +4356,6 @@
     }
     if (tabKey === "restauracja" && tileKey === "settings") {
       return `<section class="panel col-12" id="restaurant-booking-settings-panel"></section>`;
-    }
-    if (tabKey === "przyjecia" && tileKey === "oferta") {
-      return `<section class="panel col-12" id="events-offer-panel"></section>`;
     }
     if (tabKey === "przyjecia" && tileKey === "home") {
       return `<section class="panel col-12" id="events-home-media-panel"></section>`;
@@ -4611,8 +4603,6 @@
         renderRestaurantMenuPanel(statusMessage);
       } else if (tileKey === "gallery") {
         renderRestaurantGalleryPanel(statusMessage);
-      } else if (tileKey === "orders") {
-        renderRestaurantOrderPanel(statusMessage);
       } else if (tileKey === "hours") {
         renderRestaurantOpeningHoursPanel(statusMessage);
       } else if (tileKey === "recipients") {
@@ -4637,8 +4627,6 @@
     if (topTab === "przyjecia") {
       if (tileKey === "home") {
         renderHomeSectionMediaPanel("events", "#events-home-media-panel", "Przyjecia", statusMessage);
-      } else if (tileKey === "oferta") {
-        renderEventsOfferPanel(statusMessage);
       } else if (tileKey === "sale") {
         renderEventsHallsPanel(statusMessage);
       } else if (tileKey === "gallery") {
@@ -4941,7 +4929,6 @@
             <label class="field-full"><span>Naglowek</span><input id="events-hero-title" value="${escapeAttribute(content.events.heroTitle)}" /></label>
             <label class="field-full"><span>Opis</span><textarea id="events-hero-text">${escapeHtml(content.events.heroText)}</textarea></label>
             <label class="field-full"><span>Pakiety i uslugi przyjec, jedna pozycja w linii</span><textarea id="events-packages">${escapeHtml((content.events.packages || []).join("\n"))}</textarea></label>
-            <label class="field-full"><span>Modal Oferta na stronie Przyjecia (HTML wewnatrz okna)</span><textarea id="events-oferta-modal-html" rows="18">${escapeHtml(content.events.ofertaModalBodyHtml || "")}</textarea></label>
             <p class="helper">Dozwolone znaczniki jak na stronie: p, ul, li, strong, a. Pusty tekst przywraca domyslna tresc z szablonu.</p>
           </div>
           <div class="repeater-head">
@@ -5343,11 +5330,6 @@
         .map((item) => item.trim())
         .filter(Boolean);
     }
-    const restaurantOrdersInfoText = getTrimmedValue("#restaurant-orders-info-html") ?? getTrimmedValue("#restaurant-orders-info-text");
-    if (restaurantOrdersInfoText !== null) {
-      content.restaurant.ordersInfoText = restaurantOrdersInfoText;
-    }
-
     if (document.querySelector("#restaurant-menu-panel") || document.querySelector("#events-menu-panel")) {
       if (!content.restaurant) {
         content.restaurant = {};
@@ -5402,10 +5384,6 @@
         .split("\n")
         .map((item) => item.trim())
         .filter(Boolean);
-    }
-    const ofertaEl = document.querySelector("#events-oferta-modal-html");
-    if (ofertaEl) {
-      content.events.ofertaModalBodyHtml = ofertaEl.value;
     }
     if (document.querySelector("[data-hall-name-fixed]")) {
       content.events.halls = [

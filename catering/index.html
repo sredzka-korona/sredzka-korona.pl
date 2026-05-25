@@ -59,7 +59,7 @@
             },
             "telephone": "+48-600-700-800",
             "email": "kontakt@sredzkakorona.pl",
-            "description": "Profesjonalny catering na imprezy okolicznościowe — gotujemy na miejscu u klienta, również pod namiotami. Obsługujemy śluby, chrzciny, komunie i imprezy nawet na ponad 100 osób w Środzie Śląskiej, Lutyni, Brzegu Dolnym, Miękini i okolicach Wrocławia.",
+            "description": "Profesjonalny catering na imprezy okolicznościowe — Gotujemy, Pakujemy, Przywozimy, Serwujemy - również w wersji plenerowej. Obsługujemy śluby, chrzciny, komunie i inne imprezy nawet na ponad 100 osób. Działamy na terenie gminy Środa Śląska, Miękinia i okolicach.",
             "servesCuisine": "Polska",
             "areaServed": ["Środa Śląska", "Lutynia", "Brzeg Dolny", "Miękinia", "Wrocław", "Dolny Śląsk"],
             "acceptsReservations": false
@@ -1297,6 +1297,24 @@
     </style>
   </head>
   <body>
+    <!-- Statyczna treść oferty dla Google (widoczna dla robotów) -->
+    <div class="visually-hidden" aria-hidden="true">
+      <h2>Oferta cateringu eventowego – Środa Śląska, Miękinia i okolice Wrocławia</h2>
+      <h3>Profesjonalny catering eventowy – Środa Śląska, Miękinia i okolice Wrocławia</h3>
+      <p>Oferujemy wyjątkowy catering eventowy z pełną obsługą, który całkowicie różni się od standardowych dostaw. Nie tylko dowozimy gotowe potrawy, ale przede wszystkim dbamy o kompleksową oprawę gastronomiczną Twojego wydarzenia.</p>
+      <p>Działamy elastycznie: serwujemy dania bezpośrednio u klienta, a także gotujemy na miejscu wydarzenia – również podczas imprez plenerowych i wesel pod namiotami.</p>
+      <h3>Mobilna gastronomia i catering – Środa Śląska i okolice</h3>
+      <p>Nasz catering z obsługą kelnerską i kucharską dowozimy oraz realizujemy w godzinach 06:00–19:00 na terenie całego powiatu średzkiego oraz w okolicach Wrocławia. Zapewniamy pyszne menu na:</p>
+      <ul>
+        <li>Wesela w plenerze i pod namiotami (pełna kuchnia polowa i elegancki serwis),</li>
+        <li>Poprawiny, chrzciny, komunie i urodziny w Twoim domu lub ogrodzie,</li>
+        <li>Spotkania firmowe, bankiety i imprezy integracyjne,</li>
+        <li>Stypy i pożegnania wymagające spokojnej, profesjonalnej obsługi.</li>
+      </ul>
+      <p>Obsługujemy m.in. miejscowości: Środa Śląska, Miękinia, Lutynia, Brzeg Dolny, Szczepanów, Malczyce, Krępice oraz bliskie okolice Wrocławia.</p>
+      <p>Niezależnie od tego, czy planujesz eleganckie przyjęcie w ogrodzie pod Wrocławiem, czy firmowy event na Dolnym Śląsku – przyjedziemy, ugotujemy na miejscu i zaserwujemy jedzenie, które zachwyci Twoich gości. Skontaktuj się z nami, aby ustalić menu na swoje wydarzenie!</p>
+      <p>Prosimy o kontakt telefoniczny, mailowy lub przez formularz kontaktowy w celu ustalenia szczegółów.</p>
+    </div>
     <div id="app"></div>
     <script>
       (async () => {
@@ -1722,7 +1740,20 @@
         let companyEmail = "kontakt@sredzkakorona.pl";
         let restaurantOrderButtonText = "Zamów catering na imprezę";
         let restaurantOrdersInfoText =
-          "<p>Oferujemy catering na imprezy od <strong>60zł za osobę</strong>.</p><p>Gotujemy, Pakujemy, Dowozimy, Serwujemy.</p><p>Oferujemy bogate menu, ustalane indywidualnie z każdym klientem.</p>";
+          "<h3>Profesjonalny catering eventowy &ndash; Środa Śląska, Miękinia i okolice Wrocławia</h3>" +
+          "<p>Oferujemy wyjątkowy catering eventowy z pełną obsługą, który całkowicie różni się od standardowych dostaw. Nie tylko dowozimy gotowe potrawy, ale przede wszystkim dbamy o kompleksową oprawę gastronomiczną Twojego wydarzenia.</p>" +
+          "<p>Działamy elastycznie: serwujemy dania bezpośrednio u klienta, a także gotujemy na miejscu wydarzenia &ndash; również podczas imprez plenerowych i wesel pod namiotami.</p>" +
+          "<h3>Mobilna gastronomia i catering &ndash; Środa Śląska i okolice</h3>" +
+          "<p>Nasz catering z obsługą kelnerską i kucharską dowozimy na terenie całego powiatu średzkiego oraz w okolicach Wrocławia. Zapewniamy pyszne menu na:</p>" +
+          "<ul>" +
+          "<li>Wesela w plenerze i pod namiotami (pełna kuchnia polowa i elegancki serwis),</li>" +
+          "<li>Poprawiny, chrzciny, komunie i urodziny w Twoim domu lub ogrodzie,</li>" +
+          "<li>Spotkania firmowe, bankiety i imprezy integracyjne,</li>" +
+          "<li>Stypy i pożegnania wymagające spokojnej, profesjonalnej obsługi.</li>" +
+          "</ul>" +
+          "<p>Obsługujemy m.in. miejscowości: Środa Śląska, Miękinia, Lutynia, Brzeg Dolny, Szczepanów, Malczyce, Krępice oraz bliskie okolice Wrocławia.</p>" +
+          "<p>Niezależnie od tego, czy planujesz eleganckie przyjęcie w ogrodzie pod Wrocławiem, czy firmowy event na Dolnym Śląsku &ndash; przyjedziemy, ugotujemy na miejscu i zaserwujemy jedzenie, które zachwyci Twoich gości. Skontaktuj się z nami, aby ustalić menu na swoje wydarzenie!</p>" +
+          "<p>Prosimy o kontakt telefoniczny, mailowy lub przez formularz kontaktowy w celu ustalenia szczegółów.<br>Kontakt telefoniczny: +48 691 964 714.<br>Kontakt mailowy: kontakt@sredzka-korona.pl.</p>";
 
         function menuPriceHtml(price) {
           const t = String(price ?? "").trim();
@@ -1885,7 +1916,7 @@
           return `
             <div class="modal-body">
               <div class="modal-header">
-                <h2>Zamówienia</h2>
+                <h2>Oferta</h2>
                 <button class="modal-close" id="close-orders" aria-label="Zamknij">×</button>
               </div>
               <div class="opening-hours-list">
@@ -1922,17 +1953,17 @@
               <div class="restaurant-info">
                 <h1 class="restaurant-title">Catering <span class="visually-hidden">Środa Śląska, Lutynia, Brzeg Dolny, Miękinia — okolice Wrocławia</span></h1>
                 <p class="restaurant-description">
-                  Profesjonalny catering na imprezy okolicznościowe — gotujemy na miejscu u klienta, również pod namiotami. Obsługujemy śluby, chrzciny, komunie i imprezy nawet na ponad 100 osób. Działamy w Środzie Śląskiej, Lutyni, Brzegu Dolnym, Miękini oraz blisko Wrocławia.
+                  Profesjonalny catering na imprezy okolicznościowe — Gotujemy, Pakujemy, Przywozimy, Serwujemy - również w wersji plenerowej. Obsługujemy śluby, chrzciny, komunie i inne imprezy nawet na ponad 100 osób. Działamy na terenie gminy Środa Śląska, Miękinia i okolicach.
                 </p>
                 <div class="action-buttons">
+                  <button class="action-button" id="orders-button">
+                    <div class="action-button-title">OFERTA</div>
+                  </button>
                   <button class="action-button" id="menu-button">
                     <div class="action-button-title">MENU</div>
                   </button>
                   <button class="action-button" id="gallery-button">
                     <div class="action-button-title">GALERIA</div>
-                  </button>
-                  <button class="action-button" id="orders-button">
-                    <div class="action-button-title">ZAMÓWIENIA</div>
                   </button>
 
                 </div>

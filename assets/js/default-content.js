@@ -220,39 +220,37 @@ window.SREDZKA_DEFAULT_CONTENT = {
       },
     ],
     /** Tresc modala „Oferta” na stronie /przyjecia/ (wewnatrz .modal-content, dozwolony HTML) */
-    ofertaModalBodyHtml: `<p>Organizujemy różnorodne przyjęcia okolicznościowe, dostosowane do Twoich potrzeb i oczekiwań. Oferujemy kompleksową obsługę następujących wydarzeń:</p>
+    ofertaModalBodyHtml: `<h3>Nowoczesna sala bankietowa – Środa Śląska, Miękinia, Lutynia i okolice Wrocławia</h3>
+<p>Organizujemy różnorodne przyjęcia okolicznościowe na Dolnym Śląsku, dostosowane do Twoich indywidualnych potrzeb i oczekiwań. Nasza elegancka sala na przyjęcia (sala do 120 osób) to idealne miejsce na każde wydarzenie. Oferujemy kompleksową obsługę i wynajem sali na następujące okazje:</p>
 <ul>
-  <li><strong>Chrzty</strong> - uroczyste przyjęcia chrzcielne w eleganckiej oprawie</li>
-  <li><strong>Komunie</strong> - wyjątkowe przyjęcia komunijne dla dzieci i rodzin</li>
-  <li><strong>Śluby</strong> - niezapomniane wesela z pełną obsługą</li>
-  <li><strong>Urodziny</strong> - urodzinowe przyjęcia dla każdego wieku</li>
-  <li><strong>Imieniny</strong> - kameralne spotkania z okazji imienin</li>
-  <li><strong>Andrzejki</strong> - wieczory andrzejkowe z tradycyjnymi wróżbami</li>
-  <li><strong>Nowy Rok</strong> - sylwestrowe bale i przyjęcia noworoczne</li>
-  <li><strong>Jubileusze</strong> - uroczyste obchody rocznic</li>
-  <li><strong>Wydarzenia firmowe</strong> - spotkania biznesowe, konferencje i integracje</li>
-  <li><strong>Inne okazje</strong> - jesteśmy otwarci na każde wyjątkowe wydarzenie</li>
+  <li><strong>Wesele i poprawiny</strong> – niezapomniane, tradycyjne wesela z pełną obsługą oraz poprawiny w świetnej atmosferze.</li>
+  <li><strong>Ślub humanistyczny</strong> – wyjątkowe i osobiste ceremonie w pięknej oprawie blisko Wrocławia.</li>
+  <li><strong>Chrzciny i komunie</strong> – uroczyste przyjęcia komunijne oraz chrzty dla dzieci i rodzin (Szczepanów, Malczyce, Krępice).</li>
+  <li><strong>Stypy i pożegnania</strong> – godne pożegnania bliskich w spokojnej, pełnej szacunku atmosferze.</li>
+  <li><strong>Urodziny, imieniny i jubileusze</strong> – kameralne oraz huczne spotkania dla każdego wieku.</li>
+  <li><strong>Sylwester i Nowy Rok</strong> – niezapomniane, szampańskie bale sylwestrowe i uroczyste przyjęcia noworoczne.</li>
+  <li><strong>Sala na Andrzejki</strong> – klimatyczne wieczory andrzejkowe z tradycyjnymi wróżbami i zabawą do rana.</li>
+  <li><strong>Spotkania firmowe</strong> – profesjonalne wydarzenia firmowe, konferencje, szkolenia i imprezy integracyjne.</li>
 </ul>
-<p>Każde przyjęcie przygotowujemy indywidualnie, dbając o każdy szczegół, aby Twój dzień był wyjątkowy i niezapomniany.</p>
-<p style="margin-top: 1.5rem;"><strong>Koszt organizacji przyjęcia</strong></p>
-<p>Koszt organizacji przyjęcia zależy od składu menu (dania wybierane z karty), liczby gości i dodatkowych usług.</p>
-<p><strong>Wycenę ustalamy indywidualnie</strong>.</p>
-<p>W typowej ofercie podstawowej zapewniamy m.in.:</p>
+<p>Nasza sala bankietowa (Środa Śląska, Brzeg Dolny, pod Wrocławiem) jest otwarta na każde wyjątkowe wydarzenie. Dbamy o każdy szczegół, aby Twój dzień był niezapomniany.</p>
+<h3>Koszt wynajmu sali i organizacji przyjęcia</h3>
+<p>Cena organizacji wydarzenia zależy od wybranego menu (dania z karty), liczby gości oraz dodatkowych usług i zaczyna się od 250 zł/os. Każdą wycenę przygotowujemy indywidualnie.</p>
+<p>W typowej ofercie podstawowej zapewniamy:</p>
 <ul>
-  <li>Wynajem sali</li>
-  <li>Podstawowe menu (do wyboru z naszej karty)</li>
-  <li>Obsługę kelnerską</li>
-  <li>Podstawowe nakrycie stołów</li>
+  <li>Komfortowy wynajem sali na Dolnym Śląsku (blisko Wrocławia)</li>
+  <li>Smaczne menu podstawowe (do wyboru z naszej karty)</li>
+  <li>Profesjonalną obsługę kelnerską</li>
+  <li>Podstawową, elegancką dekorację i nakrycie stołów</li>
 </ul>
 <p>Dodatkowo oferujemy:</p>
 <ul>
   <li>Rozszerzone menu premium</li>
-  <li>Dekoracje sali</li>
-  <li>Obsługę barmańską</li>
+  <li>Kompleksowe dekoracje sali dopasowane do motywu przewodniego</li>
+  <li>Profesjonalną obsługę barmańską</li>
   <li>Dodatkowe atrakcje (DJ, zespół muzyczny, fotograf)</li>
-  <li>Noclegi dla gości</li>
+  <li>Komfortowe noclegi dla gości</li>
 </ul>
-<p>Zapraszamy do kontaktu w celu omówienia szczegółów i przygotowania indywidualnej wyceny dla Twojego wydarzenia.</p>`,
+<p>Zapraszamy do kontaktu! Z przyjemnością pomożemy zorganizować Twoje wymarzone przyjęcie w okolicach Wrocławia.</p>`,
   },
   booking: {
     restaurant: false,
