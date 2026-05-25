@@ -112,14 +112,14 @@
                 },
                 {
                   "@type": "Offer",
-                  "itemOffered": { "@type": "Service", "name": "Catering", "url": "https://www.sredzkakorona.pl/Restauracja/" }
+                  "itemOffered": { "@type": "Service", "name": "Catering", "url": "https://www.sredzkakorona.pl/catering/" }
                 },
                 {
                   "@type": "Offer",
                   "itemOffered": {
                     "@type": "Service",
                     "name": "Sale na imprezy okolicznościowe",
-                    "url": "https://www.sredzkakorona.pl/Przyjec/"
+                    "url": "https://www.sredzkakorona.pl/przyjecia/"
                   }
                 }
               ]
@@ -2388,11 +2388,11 @@
             })()}
             ${(() => {
               const media = resolveSectionMedia("restaurant");
-              return renderMainSplitSection("restaurant", "./Restauracja/index.html", "Catering", media, false);
+              return renderMainSplitSection("restaurant", "./catering/index.html", "Catering", media, false);
             })()}
             ${(() => {
               const media = resolveSectionMedia("events");
-              return renderMainSplitSection("events", "./Przyjec/index.html", "Przyjęcia", media, false);
+              return renderMainSplitSection("events", "./przyjecia/index.html", "Przyjęcia", media, false);
             })()}
           `;
           initMainSplit();

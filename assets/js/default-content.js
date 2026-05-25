@@ -219,7 +219,7 @@ window.SREDZKA_DEFAULT_CONTENT = {
         ],
       },
     ],
-    /** Tresc modala „Oferta” na stronie /Przyjec/ (wewnatrz .modal-content, dozwolony HTML) */
+    /** Tresc modala „Oferta” na stronie /przyjecia/ (wewnatrz .modal-content, dozwolony HTML) */
     ofertaModalBodyHtml: `<p>Organizujemy różnorodne przyjęcia okolicznościowe, dostosowane do Twoich potrzeb i oczekiwań. Oferujemy kompleksową obsługę następujących wydarzeń:</p>
 <ul>
   <li><strong>Chrzty</strong> - uroczyste przyjęcia chrzcielne w eleganckiej oprawie</li>

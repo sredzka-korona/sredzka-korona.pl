@@ -406,14 +406,14 @@ function publicSiteUrl(env, request) {
 
 function serviceConfirmPath(service) {
   if (service === "hotel") return "/Hotel/potwierdzenie.html";
-  if (service === "restaurant") return "/Restauracja/potwierdzenie.html";
-  return "/Przyjec/potwierdzenie.html";
+  if (service === "restaurant") return "/catering/potwierdzenie.html";
+  return "/przyjecia/potwierdzenie.html";
 }
 
 function serviceAdminActionPath(service) {
   if (service === "hotel") return "/Hotel/akceptacja.html";
-  if (service === "restaurant") return "/Restauracja/akceptacja.html";
-  return "/Przyjec/akceptacja.html";
+  if (service === "restaurant") return "/catering/akceptacja.html";
+  return "/przyjecia/akceptacja.html";
 }
 
 function buildConfirmationLink(env, request, service, token) {
@@ -428,8 +428,8 @@ function buildAdminActionLink(env, request, service, token) {
 
 function serviceLandingPath(service) {
   if (service === "hotel") return "/Hotel/";
-  if (service === "restaurant") return "/Restauracja/";
-  return "/Przyjec/";
+  if (service === "restaurant") return "/catering/";
+  return "/przyjecia/";
 }
 
 function serviceLabel(service) {

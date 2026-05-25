@@ -88,7 +88,7 @@ async function sendTemplated(dbConn, key, to, vars) {
     reservationNumber: vars.reservationNumber,
     serviceLabel: "Catering",
     siteUrl: publicSiteUrl(),
-    serviceUrl: `${publicSiteUrl()}/Restauracja/`,
+    serviceUrl: `${publicSiteUrl()}/catering/`,
     preheader: `Rezerwacja stolika ${vars.reservationNumber || ""}`.trim(),
   });
   await sendMail(key, { to, subject, html: email.html });

@@ -32,8 +32,8 @@ if (!origin || !/^https:\/\//i.test(origin)) {
 const paths = [
   "/",
   "/Hotel/",
-  "/Restauracja/",
-  "/Przyjec/",
+  "/catering/",
+  "/przyjecia/",
   "/kontakt/",
   "/dokumenty/",
 ];
@@ -60,8 +60,8 @@ Allow: /
 
 Disallow: /admin/
 Disallow: /Hotel/potwierdzenie.html
-Disallow: /Restauracja/potwierdzenie.html
-Disallow: /Przyjec/potwierdzenie.html
+Disallow: /catering/potwierdzenie.html
+Disallow: /przyjecia/potwierdzenie.html
 
 Sitemap: ${origin}/sitemap.xml
 `;

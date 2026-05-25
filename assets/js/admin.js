@@ -4842,14 +4842,14 @@
               <input type="checkbox" id="section-block-restaurant" ${content.home.sectionBlocks?.restaurant ? "checked" : ""} />
               <span class="checkbox-copy">
                 <strong>Zablokuj Catering</strong>
-                <span>Wyszarza kafelek i blokuje wejscie na adres /Restauracja/.</span>
+                <span>Wyszarza kafelek i blokuje wejscie na adres /catering/.</span>
               </span>
             </label>
             <label class="checkbox-field">
               <input type="checkbox" id="section-block-events" ${content.home.sectionBlocks?.events ? "checked" : ""} />
               <span class="checkbox-copy">
                 <strong>Zablokuj Przyjecia</strong>
-                <span>Wyszarza kafelek i blokuje wejscie na adres /Przyjec/.</span>
+                <span>Wyszarza kafelek i blokuje wejscie na adres /przyjecia/.</span>
               </span>
             </label>
           </div>

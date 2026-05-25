@@ -200,7 +200,7 @@ async function sendRestaurantTemplated(db, key, to, vars) {
     reservationNumber: vars.reservationNumber,
     serviceLabel: "Catering",
     siteUrl: publicSiteUrl(),
-    serviceUrl: `${publicSiteUrl()}/Restauracja/`,
+    serviceUrl: `${publicSiteUrl()}/catering/`,
     preheader: `Rezerwacja stolika ${vars.reservationNumber || ""}`.trim(),
     actionUrl:
       key === "restaurant_confirm_email" || key === "rest_confirm_email" ? vars.confirmationLink || "" : "",
@@ -772,7 +772,7 @@ const restaurantApi = onRequest(
         const tokenHash = hashToken(token);
         const now = Date.now();
         const resRef = db.collection("restaurantReservations").doc();
-        const confirmationLink = `${publicSiteUrl()}/Restauracja/potwierdzenie.html?token=${encodeURIComponent(token)}`;
+        const confirmationLink = `${publicSiteUrl()}/catering/potwierdzenie.html?token=${encodeURIComponent(token)}`;
 
         const dur = Number(durationHours);
         await db.runTransaction(async (tx) => {

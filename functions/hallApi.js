@@ -191,7 +191,7 @@ async function sendHallTemplated(db, key, to, vars) {
     reservationNumber: vars.reservationNumber,
     serviceLabel: "Przyjęcia i sale",
     siteUrl: publicSiteUrl(),
-    serviceUrl: `${publicSiteUrl()}/Przyjec/`,
+    serviceUrl: `${publicSiteUrl()}/przyjecia/`,
     preheader: `Zgłoszenie ${vars.reservationNumber || ""}`.trim(),
     actionUrl: key === "hall_confirm_email" ? vars.confirmationLink || "" : "",
     actionLabel: "Potwierdź zgłoszenie",
@@ -472,7 +472,7 @@ const hallApi = onRequest(
         const tokenHash = hashToken(token);
         const now = Date.now();
         const resRef = db.collection("venueReservations").doc();
-        const confirmationLink = `${publicSiteUrl()}/Przyjec/potwierdzenie.html?token=${encodeURIComponent(token)}`;
+        const confirmationLink = `${publicSiteUrl()}/przyjecia/potwierdzenie.html?token=${encodeURIComponent(token)}`;
 
         const dur = Number(durationHours);
         const durationUnspecifiedFlag = Boolean(durationUnspecified);

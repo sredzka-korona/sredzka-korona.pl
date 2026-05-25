@@ -6,8 +6,8 @@
 |--------|--------|-------|
 | Strona główna (`/`) | ✅ Działa | Treści generowane dynamicznie przez JS + Firestore |
 | Hotel (`/Hotel/`) | ✅ Działa | Pełna podstrona z rezerwacjami |
-| Restauracja / Catering (`/Restauracja/`) | ✅ Działa | Pełna podstrona z zapytaniami |
-| Przyjęcia (`/Przyjec/`) | ✅ Działa | Pełna podstrona z zapytaniami |
+| Restauracja / Catering (`/catering/`) | ✅ Działa | Pełna podstrona z zapytaniami |
+| Przyjęcia (`/przyjecia/`) | ✅ Działa | Pełna podstrona z zapytaniami |
 | Kontakt (`/kontakt/`) | ✅ Działa | Formularz kontaktowy |
 | Dokumenty (`/dokumenty/`) | ✅ Działa | Polityka prywatności itp. |
 | Panel admin (`/admin/`) | ✅ Działa | Zarządzanie treścią przez Firestore |

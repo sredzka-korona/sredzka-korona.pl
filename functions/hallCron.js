@@ -63,7 +63,7 @@ async function sendHallTemplated(db, key, to, vars) {
     reservationNumber: vars.reservationNumber,
     serviceLabel: "Przyjęcia i sale",
     siteUrl: publicSiteUrl(),
-    serviceUrl: `${publicSiteUrl()}/Przyjec/`,
+    serviceUrl: `${publicSiteUrl()}/przyjecia/`,
     preheader: `Zgłoszenie ${vars.reservationNumber || ""}`.trim(),
   });
   await sendMail(key, { to, subject, html: email.html });

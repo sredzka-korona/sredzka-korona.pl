@@ -174,7 +174,7 @@
     tablesList: "—",
     guestsCount: "6",
     customerNote: "Zestaw lunchowy dla 12 osób, bez orzechów.",
-    confirmationLink: "https://www.sredzkakorona.pl/restauracja/potwierdzenie?token=podglad",
+    confirmationLink: "https://www.sredzkakorona.pl/catering/potwierdzenie?token=podglad",
     restaurantName: "Średzka Korona — Catering",
   });
 
