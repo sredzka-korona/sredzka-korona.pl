@@ -1,0 +1,1534 @@
+{
+  "t": "2026-05-25T15:48:35.049Z",
+  "f": [
+    {
+      "p": ".DS_Store",
+      "m": "2026-05-25T14:30:25.494Z",
+      "z": 14340,
+      "k": 0,
+      "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u00000\u0000\u0000\u0000\b\u0000\u0000\u00000\u0000\u0000\u0000\u0010\f\u0000\u0000\u0000�\u0000\u0000 \f\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003\u0000\u0000\u0000\u0001\u0000\u0000\u0000T\u0000\u0000\u0000\u0003\u0000\u0000\u0010\u0000\u0000k\u0000u\u0000m\u0000e\u0000n\u0000t\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0004\u0000\u0000\u0000\t\u0000d\u0000o\u0000k\u0000u\u0000m\u0000e\u0000n\u0000t\u0000yvSrnlong\u0000\u0000\u0000\u0001\u0000.\u0000c\u0000l\u0000a\u0000u\u0000d\u0000emoDD\u0000\u0000\u0000\u0000"
+    },
+    {
+      "p": ".claude/settings.local.json",
+      "m": "2026-04-24T17:34:10.233Z",
+      "z": 77,
+      "k": 0,
+      "s": "{   \"permissions\": {     \"allow\": ["
+    },
+    {
+      "p": ".dev.vars",
+      "m": "2026-04-03T14:02:34.700Z",
+      "z": 180,
+      "k": 0,
+      "s": "SMTP_USER=kontakt@sredzka-korona.pl SMTP_PASS=SredzkaKorona!123 SMTP_FROM=kontakt@sredzka-korona.pl"
+    },
+    {
+      "p": ".firebase/hosting..cache",
+      "m": "2026-04-03T21:18:27.440Z",
+      "z": 965257,
+      "k": 0
+    },
+    {
+      "p": ".firebaserc",
+      "m": "2026-03-30T17:38:17.914Z",
+      "z": 94,
+      "k": 0,
+      "s": "{   \"projects\": {     \"sredzka-korona\": \"sredzka-korona\""
+    },
+    {
+      "p": ".github/workflows/sitemap.yml",
+      "m": "2026-05-23T17:09:08.841Z",
+      "z": 994,
+      "k": 0,
+      "s": "name: Generate Sitemap on:   push:"
+    },
+    {
+      "p": ".gitignore",
+      "m": "2026-04-11T07:52:05.522Z",
+      "z": 235,
+      "k": 0,
+      "s": ".dev.vars .dev.vars.* worker/.dev.vars"
+    },
+    {
+      "p": ".wrangler/.DS_Store",
+      "m": "2026-05-22T08:29:07.555Z",
+      "z": 6148,
+      "k": 0,
+      "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u0000\u0010\u0000\u0000\u0000\b\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0001\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\u0001\u0000\u0000\u0010\u0000\u0000elg1Scomp\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+    },
+    {
+      "p": ".wrangler/cache/wrangler-account.json",
+      "m": "2026-04-02T18:21:22.604Z",
+      "z": 83,
+      "k": 0,
+      "s": "{   \"account\": {     \"id\": \"4a3c79a448a041a1dc51c57ae3b7e573\","
+    },
+    {
+      "p": "CNAME",
+      "m": "2026-03-30T19:30:54.901Z",
+      "z": 18,
+      "k": 0,
+      "s": "sredzka-korona.pl"
+    },
+    {
+      "p": "Hotel/.DS_Store",
+      "m": "2026-05-23T16:40:40.885Z",
+      "z": 6148,
+      "k": 0,
+      "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u0000\u0010\u0000\u0000\u0000\b\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0000%\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+    },
+    {
+      "p": "Hotel/akceptacja.html",
+      "m": "2026-04-11T19:40:45.894Z",
+      "z": 1354,
+      "k": 0,
+      "s": "<!doctype html> <html lang=\"pl\">   <head>"
+    },
+    {
+      "p": "Hotel/hotel-sroda-slaska.html",
+      "m": "2026-05-23T17:45:02.921Z",
+      "z": 0,
+      "k": 0
+    },
+    {
+      "p": "Hotel/hotel.webp",
+      "m": "2026-05-23T16:41:43.076Z",
+      "z": 553264,
+      "k": 0
+    },
+    {
+      "p": "Hotel/index.html",
+      "m": "2026-05-25T14:46:43.165Z",
+      "z": 33834,
+      "k": 0,
+      "s": "<!doctype html> <html lang=\"pl\" data-sredzka-title=\"Hotel | Średzka Korona\">   <head>"
+    },
+    {
+      "p": "Hotel/potwierdzenie.html",
+      "m": "2026-05-23T13:20:27.970Z",
+      "z": 6432,
+      "k": 0,
+      "s": "<!doctype html> <html lang=\"pl\">   <head>"
+    },
+    {
+      "p": "Icon\r",
+      "m": "2026-05-22T08:42:37.775Z",
+      "z": 0,
+      "k": 0
+    },
+    {
+      "p": "LICENSE.txt",
+      "m": "2026-05-19T18:41:24.662Z",
+      "z": 3766,
+      "k": 0,
+      "s": "======================================================================== THIRD-PARTY NOTICES AND LICENSES ========================================================================"
+    },
+    {
+      "p": "ROADMAP.md",
+      "m": "2026-05-25T13:12:27.234Z",
+      "z": 1378,
+      "k": 0,
+      "s": "# Roadmap — Średzka Korona (sredzka-korona.pl) ## Status projektu | Sekcja | Status | Uwagi |"
+    },
+    {
+      "p": "admin/index.html",
+      "m": "2026-04-11T22:58:09.075Z",
+      "z": 1683,
+      "k": 0,
+      "s": "<!doctype html> <html lang=\"pl\">   <head>"
+    },
+    {
+      "p": "assets/.DS_Store",
+      "m": "2026-05-23T16:34:12.055Z",
+      "z": 10244,
+      "k": 0,
+      "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u0000 \u0000\u0000\u0000\b\u0000\u0000\u0000 \u0000\u0000\u0000\u0010\f\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u001c\u0000\u0000\u0000\u0001\u0000\u0000\u0010\u0000spblob\u0000\u0000\u0000�bp\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+    },
+    {
+      "p": "assets/css/admin.css",
+      "m": "2026-04-11T22:58:02.103Z",
+      "z": 70788,
+      "k": 0
+    },
+    {
+      "p": "assets/css/booking-confirm.css",
+      "m": "2026-04-06T22:54:25.510Z",
+      "z": 5867,
+      "k": 0,
+      "s": "/* Wspólny wygląd stron potwierdzenia rezerwacji (hotel / restauracja / przyjęcia) */ :root {   --confirm-bg-top: #fbf6ee;"
+    },
+    {
+      "p": "assets/css/global-booking-modal.css",
+      "m": "2026-04-07T15:07:36.400Z",
+      "z": 33182,
+      "k": 0,
+      "s": ":root {   --gb-text: #f8f2e6;   --gb-text-muted: rgba(248, 242, 230, 0.78);"
+    },
+    {
+      "p": "assets/img/catering.webp",
+      "m": "2026-05-23T16:33:04.286Z",
+      "z": 147042,
+      "k": 0
+    },
+    {
+      "p": "assets/img/sala.webp",
+      "m": "2026-05-23T13:23:55.302Z",
+      "z": 1605684,
+      "k": 0
+    },
+    {
+      "p": "assets/js/admin-booking-action.js",
+      "m": "2026-05-23T13:20:27.971Z",
+      "z": 7287,
+      "k": 0,
+      "s": "(function () {   const BRAND =     '<div class=\"confirm-brand\">' +"
+    },
+    {
+      "p": "assets/js/admin.js",
+      "m": "2026-05-25T14:57:46.396Z",
+      "z": 405304,
+      "k": 0
+    },
+    {
+      "p": "assets/js/booking-flags.js",
+      "m": "2026-04-11T19:45:59.874Z",
+      "z": 9153,
+      "k": 0,
+      "s": "Ustawienia rezerwacji online z Worker API (/api/public/bootstrap).\n  Bez włączonego backendu rezerwacji wszystkie moduły są wyłączone."
+    },
+    {
+      "p": "assets/js/default-content.js",
+      "m": "2026-05-25T14:52:41.518Z",
+      "z": 17235,
+      "k": 0,
+      "s": "window.SREDZKA_DEFAULT_CONTENT = {   company: {     name: \"Sredzka Korona\","
+    },
+    {
+      "p": "assets/js/global-booking-modal.js",
+      "m": "2026-05-23T15:20:13.423Z",
+      "z": 129240,
+      "k": 0
+    },
+    {
+      "p": "assets/js/hall-admin.js",
+      "m": "2026-04-11T21:01:23.752Z",
+      "z": 49146,
+      "k": 0,
+      "s": "Panel admina — moduł Sale (hallApi)."
+    },
+    {
+      "p": "assets/js/hall-booking.js",
+      "m": "2026-04-07T10:00:49.228Z",
+      "z": 34403,
+      "k": 0,
+      "s": "Modal rezerwacji sal — hallApi, sesja 30 min, honeypot, Turnstile (opcjonalnie)."
+    },
+    {
+      "p": "assets/js/hotel-admin.js",
+      "m": "2026-04-11T21:01:22.593Z",
+      "z": 64497,
+      "k": 0
+    },
+    {
+      "p": "assets/js/hotel-booking.js",
+      "m": "2026-04-11T18:23:14.786Z",
+      "z": 23512,
+      "k": 0,
+      "s": "Modal rezerwacji hotelu — kroki 1–5, sesja 30 min, honeypot, opcjonalnie Turnstile.\n  Backend: Cloud Functions hotelApi (?op=...)."
+    },
+    {
+      "p": "assets/js/restaurant-admin.js",
+      "m": "2026-05-25T13:12:27.203Z",
+      "z": 48122,
+      "k": 0,
+      "s": "Panel admina — moduł Catering / restauracja (restaurantApi)."
+    },
+    {
+      "p": "assets/js/sredzka-document-title.js",
+      "m": "2026-05-19T13:30:38.356Z",
+      "z": 10068,
+      "k": 0,
+      "s": "Utrzymuje document.title zgodny z atrybutem data-sredzka-title na <html>.\n  Chroni przed nadpisaniem przez skrypty zewnętrzne / heurystyki przeglądarki."
+    },
+    {
+      "p": "assets/seo/site-origin.json",
+      "m": "2026-05-05T16:42:25.885Z",
+      "z": 322,
+      "k": 0,
+      "s": "{   \"origin\": \"https://sredzka-korona.pl\",   \"canonicalHostNote\": \"Ustaw ten adres zgodnie z faktycznym hostingiem (Firebase/Cloudflare) oraz jedną wersją www lub bez www. Dla tej strony przyjmuję wer"
+    },
+    {
+      "p": "catering/akceptacja.html",
+      "m": "2026-04-11T19:45:59.872Z",
+      "z": 1357,
+      "k": 0,
+      "s": "<!doctype html> <html lang=\"pl\">   <head>"
+    },
+    {
+      "p": "catering/catering-sroda-slaska.html",
+      "m": "2026-05-23T17:47:19.569Z",
+      "z": 0,
+      "k": 0
+    },
+    {
+      "p": "catering/catering-test.html",
+      "m": "2026-05-23T18:38:20.788Z",
+      "z": 5,
+      "k": 0
+    },
+    {
+      "p": "catering/catering.webp",
+      "m": "2026-05-23T16:33:04.286Z",
+      "z": 147042,
+      "k": 0
+    },
+    {
+      "p": "catering/index.html",
+      "m": "2026-05-25T14:57:19.596Z",
+      "z": 71510,
+      "k": 0
+    },
+    {
+      "p": "catering/potwierdzenie.html",
+      "m": "2026-05-23T15:20:25.349Z",
+      "z": 6557,
+      "k": 0,
+      "s": "<!doctype html> <html lang=\"pl\">   <head>"
+    },
+    {
+      "p": "dokumenty/index.html",
+      "m": "2026-05-23T15:51:45.700Z",
+      "z": 76057,
+      "k": 0
+    },
+    {
+      "p": "f-and-q/index.html",
+      "m": "2026-05-23T15:50:44.698Z",
+      "z": 29016,
+      "k": 0,
+      "s": "<!doctype html> <html lang=\"pl\" data-sredzka-title=\"Pytania i odpowiedzi | Średzka Korona\">   <head>"
+    },
+    {
+      "p": "firebase.json",
+      "m": "2026-05-23T20:17:54.654Z",
+      "z": 1887,
+      "k": 0,
+      "s": "{   \"hosting\": {     \"public\": \".\","
+    },
+    {
+      "p": "firestore.indexes.json",
+      "m": "2026-03-28T17:32:23.699Z",
+      "z": 3179,
+      "k": 0,
+      "s": "{   \"indexes\": [     {"
+    },
+    {
+      "p": "firestore.rules",
+      "m": "2026-03-28T16:16:20.552Z",
+      "z": 348,
+      "k": 0,
+      "s": "rules_version = '2'; // Cała logika biznesowa i dostęp do danych odbywa się wyłącznie przez Cloud Functions (Admin SDK). // Klient publiczny i panel admina nie łączą się bezpośrednio z Firestore."
+    },
+    {
+      "p": "functions/.DS_Store",
+      "m": "2026-05-22T08:29:07.553Z",
+      "z": 6148,
+      "k": 0,
+      "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u0000\u0010\u0000\u0000\u0000\b\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0002\t\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\f\u0000\u0000\u0000\u0001\u0000\u0000\u0010\u00001Scomp\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+    },
+    {
+      "p": "functions/hallApi.js",
+      "m": "2026-05-25T13:11:39.788Z",
+      "z": 42757,
+      "k": 0,
+      "s": "Cloud Functions — moduł sal (HTTPS hallApi ?op=...)."
+    },
+    {
+      "p": "functions/hallCron.js",
+      "m": "2026-05-25T13:11:39.759Z",
+      "z": 5053,
+      "k": 0,
+      "s": "const { onSchedule } = require(\"firebase-functions/v2/scheduler\"); const { initializeApp, getApps } = require(\"firebase-admin/app\"); const { getFirestore, FieldValue, Timestamp } = require(\"firebase-a"
+    },
+    {
+      "p": "functions/index.js",
+      "m": "2026-04-07T15:56:25.308Z",
+      "z": 41781,
+      "k": 0,
+      "s": "Cloud Functions — moduł hotelowy (Firestore + SMTP + cron).\n  Routing: HTTPS endpoint `hotelApi` z parametrem ?op=... (Functions nie obsługują ścieżek podfunkcji bez Hosting rewrite)."
+    },
+    {
+      "p": "functions/lib/apiHelpers.js",
+      "m": "2026-04-11T07:38:19.868Z",
+      "z": 1788,
+      "k": 0,
+      "s": "const crypto = require(\"crypto\"); function json(res, data, status = 200) {   res.status(status).json(data);"
+    },
+    {
+      "p": "functions/lib/bookingConstants.js",
+      "m": "2026-04-02T18:45:21.578Z",
+      "z": 993,
+      "k": 0,
+      "s": "Wspólne limity czasu dla modułów rezerwacji (hotel, restauracja, sale)."
+    },
+    {
+      "p": "functions/lib/bookingSpamBlock.js",
+      "m": "2026-03-28T17:27:59.695Z",
+      "z": 1716,
+      "k": 0,
+      "s": "const crypto = require(\"crypto\"); const { FieldValue, Timestamp } = require(\"firebase-admin/firestore\"); const { SPAM_BLOCK_MS } = require(\"./bookingConstants\");"
+    },
+    {
+      "p": "functions/lib/dates.js",
+      "m": "2026-03-28T16:16:32.029Z",
+      "z": 1398,
+      "k": 0,
+      "s": "Daty hotelowe jako stringi YYYY-MM-DD (UTC), bez strefy — spójne porównania."
+    },
+    {
+      "p": "functions/lib/hallLogic.js",
+      "m": "2026-04-11T17:59:05.267Z",
+      "z": 9053,
+      "k": 0,
+      "s": "const { DateTime } = require(\"luxon\"); const { FieldValue } = require(\"firebase-admin/firestore\"); const { allocateSharedReservationNumber } = require(\"./humanNumber\");"
+    },
+    {
+      "p": "functions/lib/humanNumber.js",
+      "m": "2026-04-03T21:16:48.388Z",
+      "z": 5253,
+      "k": 0,
+      "s": "const { DateTime } = require(\"luxon\"); const { FieldValue, Timestamp } = require(\"firebase-admin/firestore\"); const WARSAW = \"Europe/Warsaw\";"
+    },
+    {
+      "p": "functions/lib/mail.js",
+      "m": "2026-05-23T15:24:18.048Z",
+      "z": 57997,
+      "k": 0
+    },
+    {
+      "p": "functions/lib/rateLimit.js",
+      "m": "2026-03-28T16:16:35.057Z",
+      "z": 964,
+      "k": 0,
+      "s": "const crypto = require(\"crypto\"); const WINDOW_MS = 60 * 60 * 1000; const MAX_PER_WINDOW = 12;"
+    },
+    {
+      "p": "functions/lib/reservationLogic.js",
+      "m": "2026-04-07T10:01:08.026Z",
+      "z": 8183,
+      "k": 0,
+      "s": "const { FieldValue, Timestamp } = require(\"firebase-admin/firestore\"); const { enumerateNights, nightsCount, parseYmd, todayYmd } = require(\"./dates\"); const { allocateSharedReservationNumber } = requ"
+    },
+    {
+      "p": "functions/lib/restaurantLogic.js",
+      "m": "2026-05-23T15:27:45.120Z",
+      "z": 13687,
+      "k": 0,
+      "s": "const { FieldValue, Timestamp } = require(\"firebase-admin/firestore\"); const { DateTime } = require(\"luxon\"); const { allocateSharedReservationNumber } = require(\"./humanNumber\");"
+    },
+    {
+      "p": "functions/package-lock.json",
+      "m": "2026-03-30T17:38:30.831Z",
+      "z": 101927,
+      "k": 0
+    },
+    {
+      "p": "functions/package.json",
+      "m": "2026-03-28T17:04:04.730Z",
+      "z": 485,
+      "k": 0,
+      "s": "{   \"name\": \"sredzka-korona-functions\",   \"description\": \"Cloud Functions: hotel rezerwacje, maile, cron\","
+    },
+    {
+      "p": "functions/restaurantApi.js",
+      "m": "2026-05-25T13:12:27.272Z",
+      "z": 65894,
+      "k": 0
+    },
+    {
+      "p": "functions/restaurantCron.js",
+      "m": "2026-05-25T13:12:27.294Z",
+      "z": 5829,
+      "k": 0,
+      "s": "Wygaszanie rezerwacji restauracji: link e-mail 2h + pending 3 dni."
+    },
+    {
+      "p": "functions/tools/seed-rooms.js",
+      "m": "2026-03-28T16:26:49.562Z",
+      "z": 3050,
+      "k": 0,
+      "s": "Seed 14 pokoi do kolekcji hotelRooms.\n  Uruchomienie (w katalogu functions/, z ustawionym projektem Firebase / ADC):\n    npm run seed:rooms\n \n  Wymaga: zmiennej GOOGLE_APPLICATION_CREDENTIALS lub `firebase login` + application default credentials."
+    },
+    {
+      "p": "ikony/.DS_Store",
+      "m": "2026-05-04T18:47:57.658Z",
+      "z": 6148,
+      "k": 0,
+      "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u0000\u0010\u0000\u0000\u0000\b\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0000%\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+    },
+    {
+      "p": "ikony/logo-korona-120.webp",
+      "m": "2026-05-23T20:16:39.623Z",
+      "z": 1756,
+      "k": 0,
+      "s": "RIFF�\u0006\u0000\u0000WEBPVP8X \u0000\u0000\u0000\u0010\u0000\u0000\u0000w\u0000\u0000O\u0000\u0000ALPH�\u0002\u0000\u0000\u0001�D[�!Idu��\u001e��ʶm۶m۶��m�v��-\"2��2k���\u0000��.sT\u0019k:�&�cb�o�9 �4j>��r�\u0005�0��s4��\t�6��y\u0015��Ii"
+    },
+    {
+      "p": "index.html",
+      "m": "2026-05-25T15:47:26.167Z",
+      "z": 94352,
+      "k": 0
+    },
+    {
+      "p": "kontakt/index.html",
+      "m": "2026-05-25T13:38:53.836Z",
+      "z": 54521,
+      "k": 0
+    },
+    {
+      "p": "package.json",
+      "m": "2026-04-11T17:39:09.023Z",
+      "z": 572,
+      "k": 0,
+      "s": "{   \"name\": \"sredzka-korona\",   \"private\": true,"
+    },
+    {
+      "p": "przyjecia/.DS_Store",
+      "m": "2026-05-23T16:39:42.966Z",
+      "z": 6148,
+      "k": 0,
+      "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u0000\u0010\u0000\u0000\u0000\b\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0000%\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+    },
+    {
+      "p": "przyjecia/akceptacja.html",
+      "m": "2026-04-11T19:40:44.749Z",
+      "z": 1348,
+      "k": 0,
+      "s": "<!doctype html> <html lang=\"pl\">   <head>"
+    },
+    {
+      "p": "przyjecia/index.html",
+      "m": "2026-05-25T14:52:41.509Z",
+      "z": 102368,
+      "k": 0
+    },
+    {
+      "p": "przyjecia/potwierdzenie.html",
+      "m": "2026-05-23T13:20:27.970Z",
+      "z": 6203,
+      "k": 0,
+      "s": "<!doctype html> <html lang=\"pl\">   <head>"
+    },
+    {
+      "p": "przyjecia/przyjec-sroda-slaska.html",
+      "m": "2026-05-23T17:49:30.130Z",
+      "z": 0,
+      "k": 0
+    },
+    {
+      "p": "przyjecia/tlo_przyjecia.webp",
+      "m": "2026-05-23T13:23:55.302Z",
+      "z": 1605684,
+      "k": 0
+    },
+    {
+      "p": "robots.txt",
+      "m": "2026-05-25T13:12:27.225Z",
+      "z": 209,
+      "k": 0,
+      "s": "User-agent: * Allow: / Disallow: /admin/"
+    },
+    {
+      "p": "scripts/d1/2026-04-02-mail-templates-backup-and-migrate.sql",
+      "m": "2026-04-02T18:34:30.793Z",
+      "z": 19188,
+      "k": 0,
+      "s": "CREATE TABLE IF NOT EXISTS booking_mail_templates_backup_20260402 AS SELECT * FROM booking_mail_templates; -- HOTEL"
+    },
+    {
+      "p": "scripts/d1/clear-reservations.sql",
+      "m": "2026-04-11T17:38:41.164Z",
+      "z": 172,
+      "k": 0,
+      "s": "DELETE FROM hotel_reservations; DELETE FROM restaurant_reservations; DELETE FROM venue_reservations;"
+    },
+    {
+      "p": "scripts/generate-seo.mjs",
+      "m": "2026-05-25T13:12:27.281Z",
+      "z": 1910,
+      "k": 0,
+      "s": "Generuje robots.txt i sitemap.xml w katalogu głównym projektu\n  na podstawie assets/seo/site-origin.json\n \n  Uruchomienie: npm run seo:generate"
+    },
+    {
+      "p": "scripts/preview.mjs",
+      "m": "2026-03-06T18:08:49.811Z",
+      "z": 2407,
+      "k": 0,
+      "s": "import { createReadStream, existsSync, statSync } from \"node:fs\"; import { extname, join, normalize } from \"node:path\"; import { createServer, request as httpRequest } from \"node:http\";"
+    },
+    {
+      "p": "site.webmanifest",
+      "m": "2026-04-11T20:40:42.675Z",
+      "z": 613,
+      "k": 0,
+      "s": "{   \"name\": \"Średzka Korona — hotel, restauracja, imprezy\",   \"short_name\": \"Średzka Korona\","
+    },
+    {
+      "p": "sitemap.md",
+      "m": "2026-05-25T13:12:27.181Z",
+      "z": 1378,
+      "k": 0,
+      "s": "# Roadmap — Średzka Korona (sredzka-korona.pl) ## Status projektu | Sekcja | Status | Uwagi |"
+    },
+    {
+      "p": "sitemap.xml",
+      "m": "2026-05-25T15:48:20.738Z",
+      "z": 1817,
+      "k": 0,
+      "s": "<?xml version=\"1.0\" encoding=\"UTF-8\"?> <urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"> <url>"
+    },
+    {
+      "p": "worker/.DS_Store",
+      "m": "2026-05-22T08:29:07.557Z",
+      "z": 6148,
+      "k": 0,
+      "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u0000\u0010\u0000\u0000\u0000\b\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0002\t\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\f\u0000\u0000\u0000\u0001\u0000\u0000\u0010\u0000\u0000n\u0000g\u0000l\u0000e\u0000rlg\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+    },
+    {
+      "p": "worker/.dev.vars",
+      "m": "2026-04-03T14:02:34.700Z",
+      "z": 180,
+      "k": 0,
+      "s": "SMTP_USER=kontakt@sredzka-korona.pl SMTP_PASS=SredzkaKorona!123 SMTP_FROM=kontakt@sredzka-korona.pl"
+    },
+    {
+      "p": "worker/.dev.vars.example",
+      "m": "2026-04-11T12:43:08.942Z",
+      "z": 509,
+      "k": 0,
+      "s": "# Skopiuj do pliku .dev.vars w tym katalogu (jest w .gitignore). # # TURNSTILE_SECRET — \"Secret key\" z Cloudflare Dashboard → Turnstile → Twoja witryna"
+    },
+    {
+      "p": "worker/.wrangler/cache/wrangler-account.json",
+      "m": "2026-04-01T09:58:37.480Z",
+      "z": 83,
+      "k": 0,
+      "s": "{   \"account\": {     \"id\": \"4a3c79a448a041a1dc51c57ae3b7e573\","
+    },
+    {
+      "p": "worker/package-lock.json",
+      "m": "2026-04-11T22:04:51.903Z",
+      "z": 48502,
+      "k": 0,
+      "s": "{   \"name\": \"sredzka-korona-worker\",   \"lockfileVersion\": 3,"
+    },
+    {
+      "p": "worker/package.json",
+      "m": "2026-04-11T07:45:19.268Z",
+      "z": 254,
+      "k": 0,
+      "s": "{   \"name\": \"sredzka-korona-worker\",   \"private\": true,"
+    },
+    {
+      "p": "worker/schema.sql",
+      "m": "2026-05-13T18:16:43.671Z",
+      "z": 9179,
+      "k": 0,
+      "s": "CREATE TABLE IF NOT EXISTS site_content (   id INTEGER PRIMARY KEY CHECK (id = 1),   content_json TEXT NOT NULL,"
+    },
+    {
+      "p": "worker/src/booking-d1.js",
+      "m": "2026-05-25T13:12:27.215Z",
+      "z": 257639,
+      "k": 0
+    },
+    {
+      "p": "worker/src/default-content.js",
+      "m": "2026-05-25T14:52:41.515Z",
+      "z": 16585,
+      "k": 0,
+      "s": "export const DEFAULT_CONTENT = {   company: {     name: \"Sredzka Korona\",",
+      "e": [
+        "DEFAULT_CONTENT"
+      ]
+    },
+    {
+      "p": "worker/src/firebase-verify.js",
+      "m": "2026-03-30T19:49:47.029Z",
+      "z": 3454,
+      "k": 0,
+      "s": "Weryfikacja Firebase ID token (RS256) dla Cloudflare Workers — bez firebase-admin.\n  @see https://firebase.google.com/docs/auth/admin/verify-id-tokens",
+      "e": [
+        "parseAdminEmailAllowlist"
+      ]
+    },
+    {
+      "p": "worker/src/index.js",
+      "m": "2026-05-13T18:19:18.657Z",
+      "z": 71974,
+      "k": 0
+    },
+    {
+      "p": "worker/wrangler.jsonc",
+      "m": "2026-04-11T12:43:07.085Z",
+      "z": 1449,
+      "k": 0,
+      "s": "Turnstile: ustaw sekret po stronie Cloudflare (nie commituj wartości w tym pliku)."
+    },
+    {
+      "p": "wrangler.jsonc",
+      "m": "2026-05-13T18:39:07.330Z",
+      "z": 1054,
+      "k": 0,
+      "s": "{   \"name\": \"sredzka-korona\",   \"main\": \"worker/src/index.js\","
+    },
+    {
+      "p": "assets/js/config.js",
+      "m": "2026-04-11T19:26:06.269Z",
+      "z": 1263,
+      "k": 6,
+      "s": "window.SREDZKA_CONFIG = {   /**    * Publiczne API strony i panelu admina — wyłącznie adres Workera Cloudflare (bez końcowego slasha)."
+    }
+  ],
+  "r": {
+    "name": "sredzka-korona.pl",
+    "type": "directory",
+    "children": [
+      {
+        "name": ".DS_Store",
+        "type": "file",
+        "path": ".DS_Store",
+        "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u00000\u0000\u0000\u0000\b\u0000\u0000\u00000\u0000\u0000\u0000\u0010\f\u0000\u0000\u0000�\u0000\u0000 \f\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003\u0000\u0000\u0000\u0001\u0000\u0000\u0000T\u0000\u0000\u0000\u0003\u0000\u0000\u0010\u0000\u0000k\u0000u\u0000m\u0000e\u0000n\u0000t\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0004\u0000\u0000\u0000\t\u0000d\u0000o\u0000k\u0000u\u0000m\u0000e\u0000n\u0000t\u0000yvSrnlong\u0000\u0000\u0000\u0001\u0000.\u0000c\u0000l\u0000a\u0000u\u0000d\u0000emoDD\u0000\u0000\u0000\u0000"
+      },
+      {
+        "name": ".claude",
+        "type": "directory",
+        "children": [
+          {
+            "name": "settings.local.json",
+            "type": "file",
+            "path": ".claude/settings.local.json",
+            "s": "{   \"permissions\": {     \"allow\": ["
+          }
+        ]
+      },
+      {
+        "name": ".dev.vars",
+        "type": "file",
+        "path": ".dev.vars",
+        "s": "SMTP_USER=kontakt@sredzka-korona.pl SMTP_PASS=SredzkaKorona!123 SMTP_FROM=kontakt@sredzka-korona.pl"
+      },
+      {
+        "name": ".firebase",
+        "type": "directory",
+        "children": [
+          {
+            "name": "hosting..cache",
+            "type": "file",
+            "path": ".firebase/hosting..cache"
+          }
+        ]
+      },
+      {
+        "name": ".firebaserc",
+        "type": "file",
+        "path": ".firebaserc",
+        "s": "{   \"projects\": {     \"sredzka-korona\": \"sredzka-korona\""
+      },
+      {
+        "name": ".github",
+        "type": "directory",
+        "children": [
+          {
+            "name": "workflows",
+            "type": "directory",
+            "children": [
+              {
+                "name": "sitemap.yml",
+                "type": "file",
+                "path": ".github/workflows/sitemap.yml",
+                "s": "name: Generate Sitemap on:   push:"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": ".gitignore",
+        "type": "file",
+        "path": ".gitignore",
+        "s": ".dev.vars .dev.vars.* worker/.dev.vars"
+      },
+      {
+        "name": ".wrangler",
+        "type": "directory",
+        "children": [
+          {
+            "name": ".DS_Store",
+            "type": "file",
+            "path": ".wrangler/.DS_Store",
+            "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u0000\u0010\u0000\u0000\u0000\b\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0001\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\u0001\u0000\u0000\u0010\u0000\u0000elg1Scomp\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+          },
+          {
+            "name": "cache",
+            "type": "directory",
+            "children": [
+              {
+                "name": "wrangler-account.json",
+                "type": "file",
+                "path": ".wrangler/cache/wrangler-account.json",
+                "s": "{   \"account\": {     \"id\": \"4a3c79a448a041a1dc51c57ae3b7e573\","
+              }
+            ]
+          },
+          {
+            "name": "tmp",
+            "type": "directory",
+            "children": []
+          }
+        ]
+      },
+      {
+        "name": "CNAME",
+        "type": "file",
+        "path": "CNAME",
+        "s": "sredzka-korona.pl"
+      },
+      {
+        "name": "Hotel",
+        "type": "directory",
+        "children": [
+          {
+            "name": ".DS_Store",
+            "type": "file",
+            "path": "Hotel/.DS_Store",
+            "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u0000\u0010\u0000\u0000\u0000\b\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0000%\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+          },
+          {
+            "name": "akceptacja.html",
+            "type": "file",
+            "path": "Hotel/akceptacja.html",
+            "s": "<!doctype html> <html lang=\"pl\">   <head>"
+          },
+          {
+            "name": "favicon.ico",
+            "type": "file",
+            "path": "Hotel/favicon.ico"
+          },
+          {
+            "name": "hotel-sroda-slaska.html",
+            "type": "file",
+            "path": "Hotel/hotel-sroda-slaska.html"
+          },
+          {
+            "name": "hotel.webp",
+            "type": "file",
+            "path": "Hotel/hotel.webp"
+          },
+          {
+            "name": "index.html",
+            "type": "file",
+            "path": "Hotel/index.html",
+            "s": "<!doctype html> <html lang=\"pl\" data-sredzka-title=\"Hotel | Średzka Korona\">   <head>"
+          },
+          {
+            "name": "potwierdzenie.html",
+            "type": "file",
+            "path": "Hotel/potwierdzenie.html",
+            "s": "<!doctype html> <html lang=\"pl\">   <head>"
+          }
+        ]
+      },
+      {
+        "name": "Icon\r",
+        "type": "file",
+        "path": "Icon\r"
+      },
+      {
+        "name": "LICENSE.txt",
+        "type": "file",
+        "path": "LICENSE.txt",
+        "s": "======================================================================== THIRD-PARTY NOTICES AND LICENSES ========================================================================"
+      },
+      {
+        "name": "ROADMAP.md",
+        "type": "file",
+        "path": "ROADMAP.md",
+        "s": "# Roadmap — Średzka Korona (sredzka-korona.pl) ## Status projektu | Sekcja | Status | Uwagi |"
+      },
+      {
+        "name": "admin",
+        "type": "directory",
+        "children": [
+          {
+            "name": "favicon.ico",
+            "type": "file",
+            "path": "admin/favicon.ico"
+          },
+          {
+            "name": "index.html",
+            "type": "file",
+            "path": "admin/index.html",
+            "s": "<!doctype html> <html lang=\"pl\">   <head>"
+          }
+        ]
+      },
+      {
+        "name": "assets",
+        "type": "directory",
+        "children": [
+          {
+            "name": ".DS_Store",
+            "type": "file",
+            "path": "assets/.DS_Store",
+            "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u0000 \u0000\u0000\u0000\b\u0000\u0000\u0000 \u0000\u0000\u0000\u0010\f\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u001c\u0000\u0000\u0000\u0001\u0000\u0000\u0010\u0000spblob\u0000\u0000\u0000�bp\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+          },
+          {
+            "name": "css",
+            "type": "directory",
+            "children": [
+              {
+                "name": "admin.css",
+                "type": "file",
+                "path": "assets/css/admin.css"
+              },
+              {
+                "name": "booking-confirm.css",
+                "type": "file",
+                "path": "assets/css/booking-confirm.css",
+                "s": "/* Wspólny wygląd stron potwierdzenia rezerwacji (hotel / restauracja / przyjęcia) */ :root {   --confirm-bg-top: #fbf6ee;"
+              },
+              {
+                "name": "global-booking-modal.css",
+                "type": "file",
+                "path": "assets/css/global-booking-modal.css",
+                "s": ":root {   --gb-text: #f8f2e6;   --gb-text-muted: rgba(248, 242, 230, 0.78);"
+              }
+            ]
+          },
+          {
+            "name": "img",
+            "type": "directory",
+            "children": [
+              {
+                "name": "booking-lux-bg.svg",
+                "type": "file",
+                "path": "assets/img/booking-lux-bg.svg"
+              },
+              {
+                "name": "catering.webp",
+                "type": "file",
+                "path": "assets/img/catering.webp"
+              },
+              {
+                "name": "sala.webp",
+                "type": "file",
+                "path": "assets/img/sala.webp"
+              }
+            ]
+          },
+          {
+            "name": "js",
+            "type": "directory",
+            "children": [
+              {
+                "name": "admin-booking-action.js",
+                "type": "file",
+                "path": "assets/js/admin-booking-action.js",
+                "s": "(function () {   const BRAND =     '<div class=\"confirm-brand\">' +"
+              },
+              {
+                "name": "admin.js",
+                "type": "file",
+                "path": "assets/js/admin.js"
+              },
+              {
+                "name": "booking-flags.js",
+                "type": "file",
+                "path": "assets/js/booking-flags.js",
+                "s": "Ustawienia rezerwacji online z Worker API (/api/public/bootstrap).\n  Bez włączonego backendu rezerwacji wszystkie moduły są wyłączone."
+              },
+              {
+                "name": "config.js",
+                "type": "file",
+                "path": "assets/js/config.js",
+                "s": "window.SREDZKA_CONFIG = {   /**    * Publiczne API strony i panelu admina — wyłącznie adres Workera Cloudflare (bez końcowego slasha)."
+              },
+              {
+                "name": "default-content.js",
+                "type": "file",
+                "path": "assets/js/default-content.js",
+                "s": "window.SREDZKA_DEFAULT_CONTENT = {   company: {     name: \"Sredzka Korona\","
+              },
+              {
+                "name": "global-booking-modal.js",
+                "type": "file",
+                "path": "assets/js/global-booking-modal.js"
+              },
+              {
+                "name": "hall-admin.js",
+                "type": "file",
+                "path": "assets/js/hall-admin.js",
+                "s": "Panel admina — moduł Sale (hallApi)."
+              },
+              {
+                "name": "hall-booking.js",
+                "type": "file",
+                "path": "assets/js/hall-booking.js",
+                "s": "Modal rezerwacji sal — hallApi, sesja 30 min, honeypot, Turnstile (opcjonalnie)."
+              },
+              {
+                "name": "hotel-admin.js",
+                "type": "file",
+                "path": "assets/js/hotel-admin.js"
+              },
+              {
+                "name": "hotel-booking.js",
+                "type": "file",
+                "path": "assets/js/hotel-booking.js",
+                "s": "Modal rezerwacji hotelu — kroki 1–5, sesja 30 min, honeypot, opcjonalnie Turnstile.\n  Backend: Cloud Functions hotelApi (?op=...)."
+              },
+              {
+                "name": "restaurant-admin.js",
+                "type": "file",
+                "path": "assets/js/restaurant-admin.js",
+                "s": "Panel admina — moduł Catering / restauracja (restaurantApi)."
+              },
+              {
+                "name": "sredzka-document-title.js",
+                "type": "file",
+                "path": "assets/js/sredzka-document-title.js",
+                "s": "Utrzymuje document.title zgodny z atrybutem data-sredzka-title na <html>.\n  Chroni przed nadpisaniem przez skrypty zewnętrzne / heurystyki przeglądarki."
+              }
+            ]
+          },
+          {
+            "name": "seo",
+            "type": "directory",
+            "children": [
+              {
+                "name": "site-origin.json",
+                "type": "file",
+                "path": "assets/seo/site-origin.json",
+                "s": "{   \"origin\": \"https://sredzka-korona.pl\",   \"canonicalHostNote\": \"Ustaw ten adres zgodnie z faktycznym hostingiem (Firebase/Cloudflare) oraz jedną wersją www lub bez www. Dla tej strony przyjmuję wer"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "catering",
+        "type": "directory",
+        "children": [
+          {
+            "name": "akceptacja.html",
+            "type": "file",
+            "path": "catering/akceptacja.html",
+            "s": "<!doctype html> <html lang=\"pl\">   <head>"
+          },
+          {
+            "name": "catering-sroda-slaska.html",
+            "type": "file",
+            "path": "catering/catering-sroda-slaska.html"
+          },
+          {
+            "name": "catering-test.html",
+            "type": "file",
+            "path": "catering/catering-test.html"
+          },
+          {
+            "name": "catering.webp",
+            "type": "file",
+            "path": "catering/catering.webp"
+          },
+          {
+            "name": "favicon.ico",
+            "type": "file",
+            "path": "catering/favicon.ico"
+          },
+          {
+            "name": "index.html",
+            "type": "file",
+            "path": "catering/index.html"
+          },
+          {
+            "name": "potwierdzenie.html",
+            "type": "file",
+            "path": "catering/potwierdzenie.html",
+            "s": "<!doctype html> <html lang=\"pl\">   <head>"
+          }
+        ]
+      },
+      {
+        "name": "dokumenty",
+        "type": "directory",
+        "children": [
+          {
+            "name": "favicon.ico",
+            "type": "file",
+            "path": "dokumenty/favicon.ico"
+          },
+          {
+            "name": "index.html",
+            "type": "file",
+            "path": "dokumenty/index.html"
+          }
+        ]
+      },
+      {
+        "name": "f-and-q",
+        "type": "directory",
+        "children": [
+          {
+            "name": "index.html",
+            "type": "file",
+            "path": "f-and-q/index.html",
+            "s": "<!doctype html> <html lang=\"pl\" data-sredzka-title=\"Pytania i odpowiedzi | Średzka Korona\">   <head>"
+          }
+        ]
+      },
+      {
+        "name": "favicon.ico",
+        "type": "file",
+        "path": "favicon.ico"
+      },
+      {
+        "name": "favicon.png",
+        "type": "file",
+        "path": "favicon.png"
+      },
+      {
+        "name": "firebase.json",
+        "type": "file",
+        "path": "firebase.json",
+        "s": "{   \"hosting\": {     \"public\": \".\","
+      },
+      {
+        "name": "firestore.indexes.json",
+        "type": "file",
+        "path": "firestore.indexes.json",
+        "s": "{   \"indexes\": [     {"
+      },
+      {
+        "name": "firestore.rules",
+        "type": "file",
+        "path": "firestore.rules",
+        "s": "rules_version = '2'; // Cała logika biznesowa i dostęp do danych odbywa się wyłącznie przez Cloud Functions (Admin SDK). // Klient publiczny i panel admina nie łączą się bezpośrednio z Firestore."
+      },
+      {
+        "name": "functions",
+        "type": "directory",
+        "children": [
+          {
+            "name": ".DS_Store",
+            "type": "file",
+            "path": "functions/.DS_Store",
+            "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u0000\u0010\u0000\u0000\u0000\b\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0002\t\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\f\u0000\u0000\u0000\u0001\u0000\u0000\u0010\u00001Scomp\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+          },
+          {
+            "name": "hallApi.js",
+            "type": "file",
+            "path": "functions/hallApi.js",
+            "s": "Cloud Functions — moduł sal (HTTPS hallApi ?op=...)."
+          },
+          {
+            "name": "hallCron.js",
+            "type": "file",
+            "path": "functions/hallCron.js",
+            "s": "const { onSchedule } = require(\"firebase-functions/v2/scheduler\"); const { initializeApp, getApps } = require(\"firebase-admin/app\"); const { getFirestore, FieldValue, Timestamp } = require(\"firebase-a"
+          },
+          {
+            "name": "index.js",
+            "type": "file",
+            "path": "functions/index.js",
+            "s": "Cloud Functions — moduł hotelowy (Firestore + SMTP + cron).\n  Routing: HTTPS endpoint `hotelApi` z parametrem ?op=... (Functions nie obsługują ścieżek podfunkcji bez Hosting rewrite)."
+          },
+          {
+            "name": "lib",
+            "type": "directory",
+            "children": [
+              {
+                "name": "apiHelpers.js",
+                "type": "file",
+                "path": "functions/lib/apiHelpers.js",
+                "s": "const crypto = require(\"crypto\"); function json(res, data, status = 200) {   res.status(status).json(data);"
+              },
+              {
+                "name": "bookingConstants.js",
+                "type": "file",
+                "path": "functions/lib/bookingConstants.js",
+                "s": "Wspólne limity czasu dla modułów rezerwacji (hotel, restauracja, sale)."
+              },
+              {
+                "name": "bookingSpamBlock.js",
+                "type": "file",
+                "path": "functions/lib/bookingSpamBlock.js",
+                "s": "const crypto = require(\"crypto\"); const { FieldValue, Timestamp } = require(\"firebase-admin/firestore\"); const { SPAM_BLOCK_MS } = require(\"./bookingConstants\");"
+              },
+              {
+                "name": "dates.js",
+                "type": "file",
+                "path": "functions/lib/dates.js",
+                "s": "Daty hotelowe jako stringi YYYY-MM-DD (UTC), bez strefy — spójne porównania."
+              },
+              {
+                "name": "hallLogic.js",
+                "type": "file",
+                "path": "functions/lib/hallLogic.js",
+                "s": "const { DateTime } = require(\"luxon\"); const { FieldValue } = require(\"firebase-admin/firestore\"); const { allocateSharedReservationNumber } = require(\"./humanNumber\");"
+              },
+              {
+                "name": "humanNumber.js",
+                "type": "file",
+                "path": "functions/lib/humanNumber.js",
+                "s": "const { DateTime } = require(\"luxon\"); const { FieldValue, Timestamp } = require(\"firebase-admin/firestore\"); const WARSAW = \"Europe/Warsaw\";"
+              },
+              {
+                "name": "mail.js",
+                "type": "file",
+                "path": "functions/lib/mail.js"
+              },
+              {
+                "name": "rateLimit.js",
+                "type": "file",
+                "path": "functions/lib/rateLimit.js",
+                "s": "const crypto = require(\"crypto\"); const WINDOW_MS = 60 * 60 * 1000; const MAX_PER_WINDOW = 12;"
+              },
+              {
+                "name": "reservationLogic.js",
+                "type": "file",
+                "path": "functions/lib/reservationLogic.js",
+                "s": "const { FieldValue, Timestamp } = require(\"firebase-admin/firestore\"); const { enumerateNights, nightsCount, parseYmd, todayYmd } = require(\"./dates\"); const { allocateSharedReservationNumber } = requ"
+              },
+              {
+                "name": "restaurantLogic.js",
+                "type": "file",
+                "path": "functions/lib/restaurantLogic.js",
+                "s": "const { FieldValue, Timestamp } = require(\"firebase-admin/firestore\"); const { DateTime } = require(\"luxon\"); const { allocateSharedReservationNumber } = require(\"./humanNumber\");"
+              }
+            ]
+          },
+          {
+            "name": "package-lock.json",
+            "type": "file",
+            "path": "functions/package-lock.json"
+          },
+          {
+            "name": "package.json",
+            "type": "file",
+            "path": "functions/package.json",
+            "s": "{   \"name\": \"sredzka-korona-functions\",   \"description\": \"Cloud Functions: hotel rezerwacje, maile, cron\","
+          },
+          {
+            "name": "restaurantApi.js",
+            "type": "file",
+            "path": "functions/restaurantApi.js"
+          },
+          {
+            "name": "restaurantCron.js",
+            "type": "file",
+            "path": "functions/restaurantCron.js",
+            "s": "Wygaszanie rezerwacji restauracji: link e-mail 2h + pending 3 dni."
+          },
+          {
+            "name": "tools",
+            "type": "directory",
+            "children": [
+              {
+                "name": "seed-rooms.js",
+                "type": "file",
+                "path": "functions/tools/seed-rooms.js",
+                "s": "Seed 14 pokoi do kolekcji hotelRooms.\n  Uruchomienie (w katalogu functions/, z ustawionym projektem Firebase / ADC):\n    npm run seed:rooms\n \n  Wymaga: zmiennej GOOGLE_APPLICATION_CREDENTIALS lub `firebase login` + application default credentials."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "ikony",
+        "type": "directory",
+        "children": [
+          {
+            "name": ".DS_Store",
+            "type": "file",
+            "path": "ikony/.DS_Store",
+            "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u0000\u0010\u0000\u0000\u0000\b\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0000%\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+          },
+          {
+            "name": "favicon-16x16.png",
+            "type": "file",
+            "path": "ikony/favicon-16x16.png"
+          },
+          {
+            "name": "favicon-180x180.png",
+            "type": "file",
+            "path": "ikony/favicon-180x180.png"
+          },
+          {
+            "name": "favicon-32x32.png",
+            "type": "file",
+            "path": "ikony/favicon-32x32.png"
+          },
+          {
+            "name": "logo-korona-120.webp",
+            "type": "file",
+            "path": "ikony/logo-korona-120.webp",
+            "s": "RIFF�\u0006\u0000\u0000WEBPVP8X \u0000\u0000\u0000\u0010\u0000\u0000\u0000w\u0000\u0000O\u0000\u0000ALPH�\u0002\u0000\u0000\u0001�D[�!Idu��\u001e��ʶm۶m۶��m�v��-\"2��2k���\u0000��.sT\u0019k:�&�cb�o�9 �4j>��r�\u0005�0��s4��\t�6��y\u0015��Ii"
+          },
+          {
+            "name": "logo-korona.png",
+            "type": "file",
+            "path": "ikony/logo-korona.png"
+          },
+          {
+            "name": "logo.png",
+            "type": "file",
+            "path": "ikony/logo.png"
+          }
+        ]
+      },
+      {
+        "name": "index.html",
+        "type": "file",
+        "path": "index.html"
+      },
+      {
+        "name": "kontakt",
+        "type": "directory",
+        "children": [
+          {
+            "name": "favicon.ico",
+            "type": "file",
+            "path": "kontakt/favicon.ico"
+          },
+          {
+            "name": "index.html",
+            "type": "file",
+            "path": "kontakt/index.html"
+          }
+        ]
+      },
+      {
+        "name": "package.json",
+        "type": "file",
+        "path": "package.json",
+        "s": "{   \"name\": \"sredzka-korona\",   \"private\": true,"
+      },
+      {
+        "name": "przyjecia",
+        "type": "directory",
+        "children": [
+          {
+            "name": ".DS_Store",
+            "type": "file",
+            "path": "przyjecia/.DS_Store",
+            "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u0000\u0010\u0000\u0000\u0000\b\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0000%\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+          },
+          {
+            "name": "akceptacja.html",
+            "type": "file",
+            "path": "przyjecia/akceptacja.html",
+            "s": "<!doctype html> <html lang=\"pl\">   <head>"
+          },
+          {
+            "name": "favicon.ico",
+            "type": "file",
+            "path": "przyjecia/favicon.ico"
+          },
+          {
+            "name": "index.html",
+            "type": "file",
+            "path": "przyjecia/index.html"
+          },
+          {
+            "name": "potwierdzenie.html",
+            "type": "file",
+            "path": "przyjecia/potwierdzenie.html",
+            "s": "<!doctype html> <html lang=\"pl\">   <head>"
+          },
+          {
+            "name": "przyjec-sroda-slaska.html",
+            "type": "file",
+            "path": "przyjecia/przyjec-sroda-slaska.html"
+          },
+          {
+            "name": "tlo_przyjecia.jpeg",
+            "type": "file",
+            "path": "przyjecia/tlo_przyjecia.jpeg"
+          },
+          {
+            "name": "tlo_przyjecia.webp",
+            "type": "file",
+            "path": "przyjecia/tlo_przyjecia.webp"
+          }
+        ]
+      },
+      {
+        "name": "robots.txt",
+        "type": "file",
+        "path": "robots.txt",
+        "s": "User-agent: * Allow: / Disallow: /admin/"
+      },
+      {
+        "name": "scripts",
+        "type": "directory",
+        "children": [
+          {
+            "name": "d1",
+            "type": "directory",
+            "children": [
+              {
+                "name": "2026-04-02-mail-templates-backup-and-migrate.sql",
+                "type": "file",
+                "path": "scripts/d1/2026-04-02-mail-templates-backup-and-migrate.sql",
+                "s": "CREATE TABLE IF NOT EXISTS booking_mail_templates_backup_20260402 AS SELECT * FROM booking_mail_templates; -- HOTEL"
+              },
+              {
+                "name": "clear-reservations.sql",
+                "type": "file",
+                "path": "scripts/d1/clear-reservations.sql",
+                "s": "DELETE FROM hotel_reservations; DELETE FROM restaurant_reservations; DELETE FROM venue_reservations;"
+              }
+            ]
+          },
+          {
+            "name": "generate-seo.mjs",
+            "type": "file",
+            "path": "scripts/generate-seo.mjs",
+            "s": "Generuje robots.txt i sitemap.xml w katalogu głównym projektu\n  na podstawie assets/seo/site-origin.json\n \n  Uruchomienie: npm run seo:generate"
+          },
+          {
+            "name": "preview.mjs",
+            "type": "file",
+            "path": "scripts/preview.mjs",
+            "s": "import { createReadStream, existsSync, statSync } from \"node:fs\"; import { extname, join, normalize } from \"node:path\"; import { createServer, request as httpRequest } from \"node:http\";"
+          }
+        ]
+      },
+      {
+        "name": "site.webmanifest",
+        "type": "file",
+        "path": "site.webmanifest",
+        "s": "{   \"name\": \"Średzka Korona — hotel, restauracja, imprezy\",   \"short_name\": \"Średzka Korona\","
+      },
+      {
+        "name": "sitemap.md",
+        "type": "file",
+        "path": "sitemap.md",
+        "s": "# Roadmap — Średzka Korona (sredzka-korona.pl) ## Status projektu | Sekcja | Status | Uwagi |"
+      },
+      {
+        "name": "sitemap.xml",
+        "type": "file",
+        "path": "sitemap.xml",
+        "s": "<?xml version=\"1.0\" encoding=\"UTF-8\"?> <urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"> <url>"
+      },
+      {
+        "name": "worker",
+        "type": "directory",
+        "children": [
+          {
+            "name": ".DS_Store",
+            "type": "file",
+            "path": "worker/.DS_Store",
+            "s": "\u0000\u0000\u0000\u0001Bud1\u0000\u0000\u0010\u0000\u0000\u0000\b\u0000\u0000\u0000\u0010\u0000\u0000\u0000\u0002\t\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000\f\u0000\u0000\u0000\u0001\u0000\u0000\u0010\u0000\u0000n\u0000g\u0000l\u0000e\u0000rlg\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000"
+          },
+          {
+            "name": ".dev.vars",
+            "type": "file",
+            "path": "worker/.dev.vars",
+            "s": "SMTP_USER=kontakt@sredzka-korona.pl SMTP_PASS=SredzkaKorona!123 SMTP_FROM=kontakt@sredzka-korona.pl"
+          },
+          {
+            "name": ".dev.vars.example",
+            "type": "file",
+            "path": "worker/.dev.vars.example",
+            "s": "# Skopiuj do pliku .dev.vars w tym katalogu (jest w .gitignore). # # TURNSTILE_SECRET — \"Secret key\" z Cloudflare Dashboard → Turnstile → Twoja witryna"
+          },
+          {
+            "name": ".wrangler",
+            "type": "directory",
+            "children": [
+              {
+                "name": "cache",
+                "type": "directory",
+                "children": [
+                  {
+                    "name": "wrangler-account.json",
+                    "type": "file",
+                    "path": "worker/.wrangler/cache/wrangler-account.json",
+                    "s": "{   \"account\": {     \"id\": \"4a3c79a448a041a1dc51c57ae3b7e573\","
+                  }
+                ]
+              },
+              {
+                "name": "tmp",
+                "type": "directory",
+                "children": []
+              }
+            ]
+          },
+          {
+            "name": "package-lock.json",
+            "type": "file",
+            "path": "worker/package-lock.json",
+            "s": "{   \"name\": \"sredzka-korona-worker\",   \"lockfileVersion\": 3,"
+          },
+          {
+            "name": "package.json",
+            "type": "file",
+            "path": "worker/package.json",
+            "s": "{   \"name\": \"sredzka-korona-worker\",   \"private\": true,"
+          },
+          {
+            "name": "schema.sql",
+            "type": "file",
+            "path": "worker/schema.sql",
+            "s": "CREATE TABLE IF NOT EXISTS site_content (   id INTEGER PRIMARY KEY CHECK (id = 1),   content_json TEXT NOT NULL,"
+          },
+          {
+            "name": "src",
+            "type": "directory",
+            "children": [
+              {
+                "name": "booking-d1.js",
+                "type": "file",
+                "path": "worker/src/booking-d1.js"
+              },
+              {
+                "name": "default-content.js",
+                "type": "file",
+                "path": "worker/src/default-content.js",
+                "s": "export const DEFAULT_CONTENT = {   company: {     name: \"Sredzka Korona\","
+              },
+              {
+                "name": "firebase-verify.js",
+                "type": "file",
+                "path": "worker/src/firebase-verify.js",
+                "s": "Weryfikacja Firebase ID token (RS256) dla Cloudflare Workers — bez firebase-admin.\n  @see https://firebase.google.com/docs/auth/admin/verify-id-tokens"
+              },
+              {
+                "name": "index.js",
+                "type": "file",
+                "path": "worker/src/index.js"
+              }
+            ]
+          },
+          {
+            "name": "wrangler.jsonc",
+            "type": "file",
+            "path": "worker/wrangler.jsonc",
+            "s": "Turnstile: ustaw sekret po stronie Cloudflare (nie commituj wartości w tym pliku)."
+          }
+        ]
+      },
+      {
+        "name": "wrangler.jsonc",
+        "type": "file",
+        "path": "wrangler.jsonc",
+        "s": "{   \"name\": \"sredzka-korona\",   \"main\": \"worker/src/index.js\","
+      }
+    ]
+  },
+  "v": 1
+}
