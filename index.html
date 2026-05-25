@@ -2293,9 +2293,9 @@
         function resolveSectionMedia(sectionKey) {
           const fallback = DEFAULT_SECTION_MEDIA[sectionKey] || DEFAULT_SECTION_MEDIA.hotel;
           const raw = state.content.home?.sectionMedia?.[sectionKey] || {};
-          const fallbackImageUrl = state.homeMediaPending ? "" : fallback.imageUrl;
+          const resolvedImageUrl = String(raw.imageUrl || "").trim();
           return {
-            imageUrl: raw.imageUrl || fallbackImageUrl,
+            imageUrl: resolvedImageUrl,
             imageAlt: raw.imageAlt || fallback.imageAlt,
             focusX: clampNumber(raw.focusX, 0, 100, fallback.focusX),
             focusY: clampNumber(raw.focusY, 0, 100, fallback.focusY),
