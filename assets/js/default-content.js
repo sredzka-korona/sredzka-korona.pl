@@ -63,21 +63,21 @@ window.SREDZKA_DEFAULT_CONTENT = {
     },
     sectionMedia: {
       hotel: {
-        imageUrl: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1600&q=80",
+        imageUrl: "",
         imageAlt: "Hotel — Średzka Korona, noclegi Środa Śląska",
         focusX: 50,
         focusY: 50,
         zoom: 1,
       },
       restaurant: {
-        imageUrl: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=80",
+        imageUrl: "",
         imageAlt: "Catering — Średzka Korona, Środa Śląska",
         focusX: 50,
         focusY: 50,
         zoom: 1,
       },
       events: {
-        imageUrl: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1600&q=80",
+        imageUrl: "",
         imageAlt: "Sale na przyjęcia i imprezy okolicznościowe — Średzka Korona",
         focusX: 50,
         focusY: 50,
@@ -294,15 +294,14 @@ window.SREDZKA_DEFAULT_CONTENT = {
         id: "sample-bal",
         title: "Bal Karnawalowy",
         description: "Wieczor z muzyka na zywo i wystrojem w tonacji zlota i czerni.",
-        coverUrl:
-          "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=900&q=80",
+        coverUrl: "",
         images: [
           {
-            url: "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=1200&q=80",
+            url: "",
             alt: "Sala podczas przyjecia",
           },
           {
-            url: "https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=1200&q=80",
+            url: "",
             alt: "Goscie przy stolach",
           },
         ],
