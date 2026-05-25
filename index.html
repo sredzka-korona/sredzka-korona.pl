@@ -868,6 +868,12 @@
         will-change: transform;
       }
 
+      .main-split-section.no-image {
+        background:
+          radial-gradient(120% 120% at 85% 15%, rgba(210, 175, 120, 0.28), transparent 58%),
+          linear-gradient(140deg, #2f241b 0%, #4a3422 48%, #7a5a39 100%);
+      }
+
       .main-split-section:hover img {
         transform: scale(calc(var(--split-zoom, 1) * 1.15));
         filter: brightness(1.1);
@@ -2155,6 +2161,7 @@
           content: structuredClone(defaultContent),
           galleryAlbums: structuredClone(defaultContent.gallery.albums || []),
           calendarBlocks: [],
+          homeMediaPending: false,
         };
 
         const sections = [
@@ -2316,8 +2323,9 @@
         function resolveSectionMedia(sectionKey) {
           const fallback = DEFAULT_SECTION_MEDIA[sectionKey] || DEFAULT_SECTION_MEDIA.hotel;
           const raw = state.content.home?.sectionMedia?.[sectionKey] || {};
+          const fallbackImageUrl = state.homeMediaPending ? "" : fallback.imageUrl;
           return {
-            imageUrl: raw.imageUrl || fallback.imageUrl,
+            imageUrl: raw.imageUrl || fallbackImageUrl,
             imageAlt: raw.imageAlt || fallback.imageAlt,
             focusX: clampNumber(raw.focusX, 0, 100, fallback.focusX),
             focusY: clampNumber(raw.focusY, 0, 100, fallback.focusY),
@@ -2353,13 +2361,14 @@
           const focusY = clampNumber(media?.focusY, 0, 100, 50);
           const zoom = clampNumber(media?.zoom, 1, 2.5, 1);
           const soonText = "Chwilowo niedostępne";
-          const imgAttrs = buildResponsiveImageAttrs(imageUrl, imagePriority);
+          const hasImage = Boolean(imageUrl);
+          const imgAttrs = hasImage ? buildResponsiveImageAttrs(imageUrl, imagePriority) : "";
           const goLabel = blocked
             ? `${label} — Chwilowo niedostępne`
             : `Przejdź do: ${label} — Średzka Korona, Środa Śląska`;
           return `
                 <div
-                  class="main-split-section${blocked ? " is-blocked" : ""}"
+                  class="main-split-section${blocked ? " is-blocked" : ""}${hasImage ? "" : " no-image"}"
                   style="--split-focus-x:${focusX}%;--split-focus-y:${focusY}%;--split-zoom:${zoom};"
                   data-section-key="${escapeHtml(sectionKey)}"
                   data-link="${escapeHtml(link)}"
@@ -2369,7 +2378,7 @@
                   aria-disabled="${blocked ? "true" : "false"}"
                   aria-label="${escapeHtml(goLabel)}"
                 >
-                  <img ${imgAttrs} alt="${escapeHtml(alt)}" />
+                  ${hasImage ? `<img ${imgAttrs} alt="${escapeHtml(alt)}" />` : ""}
                   <div class="main-split-overlay">
                     <div class="main-split-overlay-stack">
                       <span class="main-split-label">${escapeHtml(label)}</span>
@@ -2868,6 +2877,7 @@
         async function bootstrap() {
           const cachedPayload = readBootstrapCache();
           const cachedNotifications = applyBootstrapPayload(cachedPayload);
+          state.homeMediaPending = !cachedPayload && !isLocalPreview && Boolean(state.apiBase);
           renderShell();
           window.addEventListener("resize", updateBottomFixedStackVars, { passive: true });
           syncFloatingNavHeightCssVar();
@@ -2879,6 +2889,7 @@
           mountSiteNotifications(cachedNotifications);
 
           const activeNotifications = await loadRemoteData();
+          state.homeMediaPending = false;
           renderMainSplitContainer();
           mountSiteNotifications(activeNotifications);
         }
