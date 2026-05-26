@@ -3,21 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18082369489"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
+      gtag('consent', 'default', {
+        'ad_storage': 'denied',
+        'ad_user_data': 'denied',
+        'ad_personalization': 'denied',
+        'analytics_storage': 'denied'
+      });
       gtag('js', new Date());
       gtag('config', 'AW-18082369489');
+      gtag('config', 'G-6ENY27XX0B');
     </script>
     <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18082369489"></script>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-6ENY27XX0B"></script>
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-6ENY27XX0B');
+      (function() {
+        try {
+          var c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
+          if (c && c.analytics && c.marketing) {
+            gtag('consent', 'update', {
+              'ad_storage': 'granted',
+              'ad_user_data': 'granted',
+              'ad_personalization': 'granted',
+              'analytics_storage': 'granted'
+            });
+          }
+        } catch(e) {}
+      })();
     </script>
     <link rel="canonical" href="https://sredzka-korona.pl/" />
     <link rel="icon" type="image/png" sizes="32x32" href="./ikony/favicon-32x32.png" />
@@ -2523,11 +2538,20 @@
           document.body.appendChild(banner);
           banner.querySelectorAll("[data-cookie-action]").forEach((button) => {
             button.addEventListener("click", () => {
-              const value =
-                button.dataset.cookieAction === "accept-all"
+              const isAccepted =
+                button.dataset.cookieAction === "accept-all";
+              const value = isAccepted
                   ? { necessary: true, analytics: true, marketing: true }
                   : { necessary: true, analytics: false, marketing: false };
               localStorage.setItem("sredzka-cookies-choice", JSON.stringify(value));
+              if (isAccepted) {
+                gtag('consent', 'update', {
+                  'ad_storage': 'granted',
+                  'ad_user_data': 'granted',
+                  'ad_personalization': 'granted',
+                  'analytics_storage': 'granted'
+                });
+              }
               banner.remove();
               observeBottomStackLayout();
             });
