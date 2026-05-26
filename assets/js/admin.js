@@ -484,21 +484,21 @@
 
   const HOME_SECTION_MEDIA_DEFAULTS = {
     hotel: {
-      imageUrl: "",
+      imageUrl: "/assets/img/home-hotel.jpg",
       imageAlt: "Hotel — Średzka Korona, noclegi Środa Śląska",
       focusX: 50,
       focusY: 50,
       zoom: 1,
     },
     restaurant: {
-      imageUrl: "",
+      imageUrl: "/assets/img/home-restaurant.jpg",
       imageAlt: "Catering — Średzka Korona, Środa Śląska",
       focusX: 50,
       focusY: 50,
       zoom: 1,
     },
     events: {
-      imageUrl: "",
+      imageUrl: "/assets/img/home-events.jpg",
       imageAlt: "Sale na przyjęcia i imprezy okolicznościowe — Średzka Korona",
       focusX: 50,
       focusY: 50,
@@ -611,7 +611,6 @@
       tiles: [
         { key: "rooms", label: "Pokoje", description: "Konfiguracja pokoi, cen i parametrów rezerwacyjnych." },
         { key: "gallery", label: "Galeria", description: "Wspólna galeria pokoi z podziałem na albumy 1/2/3/4-osobowe." },
-        { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Hotel na stronie głównej (pozycja i zoom)." },
         { key: "settings", label: "Ustawienia rezerwacji", description: "Włączenie i przerwy w przyjmowaniu rezerwacji." },
       ],
     },
@@ -624,7 +623,6 @@
         { key: "gallery", label: "Galeria", description: "Zdjęcia cateringu i ich kolejność." },
         { key: "hours", label: "Godziny dowozów", description: "Dni i przedziały dowozu widoczne w kafelku na stronie cateringu." },
         { key: "recipients", label: "Odbiorcy", description: "Lista odbiorców dostaw: dane kontaktowe i adresowe." },
-        { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Catering na stronie głównej (pozycja i zoom)." },
         { key: "settings", label: "Ustawienia rezerwacji", description: "Włączenie i przerwy w przyjmowaniu rezerwacji." },
       ],
     },
@@ -635,7 +633,6 @@
       tiles: [
         { key: "gallery", label: "Galeria", description: "Galerie sal i albumy wydarzeń." },
         { key: "menu", label: "Menu okolicznościowe", description: "Sekcje, pozycje i kolejność menu." },
-        { key: "home", label: "Strona główna", description: "Zdjęcie kafelka Przyjęcia na stronie głównej (pozycja i zoom)." },
         { key: "settings", label: "Ustawienia rezerwacji", description: "Włączenie rezerwacji i blokady terminów sal." },
       ],
     },
@@ -4324,9 +4321,6 @@
     if (tabKey === "hotel" && tileKey === "gallery") {
       return `<section class="panel col-12" id="hotel-room-galleries-panel"></section>`;
     }
-    if (tabKey === "hotel" && tileKey === "home") {
-      return `<section class="panel col-12" id="hotel-home-media-panel"></section>`;
-    }
     if (tabKey === "hotel" && tileKey === "rooms") {
       return `<div id="admin-panel-hotel-rooms" class="admin-hotel-wrap admin-stage-panel col-12"></div>`;
     }
@@ -4338,9 +4332,6 @@
     }
     if (tabKey === "restauracja" && tileKey === "menu") {
       return `<section class="panel col-12" id="restaurant-menu-panel"></section>`;
-    }
-    if (tabKey === "restauracja" && tileKey === "home") {
-      return `<section class="panel col-12" id="restaurant-home-media-panel"></section>`;
     }
     if (tabKey === "restauracja" && tileKey === "gallery") {
       return `<section class="panel col-12" id="restaurant-gallery-panel"></section>`;
@@ -4356,9 +4347,6 @@
     }
     if (tabKey === "restauracja" && tileKey === "settings") {
       return `<section class="panel col-12" id="restaurant-booking-settings-panel"></section>`;
-    }
-    if (tabKey === "przyjecia" && tileKey === "home") {
-      return `<section class="panel col-12" id="events-home-media-panel"></section>`;
     }
     if (tabKey === "przyjecia" && tileKey === "sale") {
       return `<section class="panel col-12" id="events-halls-panel"></section>`;
@@ -4572,9 +4560,7 @@
     }
 
     if (topTab === "hotel") {
-      if (tileKey === "home") {
-        renderHomeSectionMediaPanel("hotel", "#hotel-home-media-panel", "Hotel", statusMessage);
-      } else if (tileKey === "gallery") {
+      if (tileKey === "gallery") {
         renderHotelRoomGalleriesPanel(statusMessage);
       } else if (tileKey === "rooms") {
         mountLegacyBookingModule(
@@ -4597,9 +4583,7 @@
     }
 
     if (topTab === "restauracja") {
-      if (tileKey === "home") {
-        renderHomeSectionMediaPanel("restaurant", "#restaurant-home-media-panel", "Catering", statusMessage);
-      } else if (tileKey === "menu") {
+      if (tileKey === "menu") {
         renderRestaurantMenuPanel(statusMessage);
       } else if (tileKey === "gallery") {
         renderRestaurantGalleryPanel(statusMessage);
@@ -4625,9 +4609,7 @@
     }
 
     if (topTab === "przyjecia") {
-      if (tileKey === "home") {
-        renderHomeSectionMediaPanel("events", "#events-home-media-panel", "Przyjecia", statusMessage);
-      } else if (tileKey === "sale") {
+      if (tileKey === "sale") {
         renderEventsHallsPanel(statusMessage);
       } else if (tileKey === "gallery") {
         renderEventsHallGalleriesPanel(statusMessage);

@@ -956,14 +956,15 @@
             ? { necessary: true, analytics: true, marketing: true }
             : { necessary: true, analytics: false, marketing: false };
           localStorage.setItem('sredzka-cookies-choice', JSON.stringify(value));
-          if (acceptAll && typeof gtag === 'function') {
-            gtag('consent', 'update', {
-              'ad_storage': 'granted',
-              'ad_user_data': 'granted',
-              'ad_personalization': 'granted',
-              'analytics_storage': 'granted'
-            });
+
+          if (window.sredzkaGoogleConsent) {
+            if (acceptAll) {
+              window.sredzkaGoogleConsent.grant();
+            } else {
+              window.sredzkaGoogleConsent.deny();
+            }
           }
+
           updateCookiePanelState();
           closeCookiePanel();
         }

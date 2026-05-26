@@ -4,27 +4,57 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('consent', 'default', {
-        'ad_storage': 'denied',
-        'ad_user_data': 'denied',
-        'ad_personalization': 'denied',
-        'analytics_storage': 'denied'
-      });
-      gtag('js', new Date());
-      gtag('config', 'G-6ENY27XX0B');
-    </script>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-6ENY27XX0B"></script>
-    <script>
       (function() {
+        var GOOGLE_TAG_IDS = ['G-6ENY27XX0B'];
+        var googleTagsLoaded = false;
+
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = window.gtag || function(){window.dataLayer.push(arguments);};
+
+        function applyConsent(granted) {
+          window.gtag('consent', 'update', {
+            'ad_storage': granted ? 'granted' : 'denied',
+            'ad_user_data': granted ? 'granted' : 'denied',
+            'ad_personalization': granted ? 'granted' : 'denied',
+            'analytics_storage': granted ? 'granted' : 'denied'
+          });
+        }
+
+        function loadGoogleTags() {
+          if (googleTagsLoaded) {
+            return;
+          }
+          googleTagsLoaded = true;
+
+          window.gtag('js', new Date());
+          GOOGLE_TAG_IDS.forEach(function(id) {
+            window.gtag('config', id);
+          });
+
+          GOOGLE_TAG_IDS.forEach(function(id) {
+            var script = document.createElement('script');
+            script.async = true;
+            script.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(id);
+            document.head.appendChild(script);
+          });
+        }
+
+        window.sredzkaGoogleConsent = {
+          grant: function() {
+            applyConsent(true);
+            loadGoogleTags();
+          },
+          deny: function() {
+            applyConsent(false);
+          }
+        };
+
+        applyConsent(false);
+
         try {
           var c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
-          if (c && c.analytics) {
-            gtag('consent', 'update', {
-              'analytics_storage': 'granted'
-            });
+          if (c && c.analytics && c.marketing) {
+            window.sredzkaGoogleConsent.grant();
           }
         } catch(e) {}
       })();
@@ -82,6 +112,16 @@
       }
     </script>
     <style>
+      :root {
+        --bg-elevated: rgba(255, 255, 255, 0.98);
+        --text: #1f1712;
+        --muted: #6b5d4f;
+        --gold: #c8aa78;
+        --line: rgba(200, 170, 120, 0.2);
+        --shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        --radius-xl: 28px;
+      }
+
       html {
         color-scheme: light;
         background:
@@ -1575,16 +1615,52 @@
           });
         }
 
+        function resolveDocumentHash(hash = window.location.hash) {
+          const value = String(hash || "").replace(/^#/, "").trim();
+          if (!value) {
+            return "";
+          }
+          const decoded = decodeURIComponent(value);
+          if (decoded === "regulamin") {
+            return "regulamin-serwisu";
+          }
+          return decoded;
+        }
+
+        function openDocumentFromHash(hash = window.location.hash, scroll = false) {
+          const targetId = resolveDocumentHash(hash);
+          if (!targetId) {
+            return;
+          }
+          const target = document.getElementById(targetId);
+          if (!target) {
+            return;
+          }
+          const detailsElement =
+            target.tagName?.toLowerCase() === "details" ? target : target.closest("details");
+          if (detailsElement) {
+            detailsElement.open = true;
+          }
+          scheduleScrollIndicatorUpdate();
+          if (!scroll) {
+            return;
+          }
+          window.requestAnimationFrame(() => {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        }
+
         function setCookieChoice(value) {
           localStorage.setItem(COOKIE_CHOICE_KEY, JSON.stringify(value));
-          if (value.analytics || value.marketing) {
-            gtag('consent', 'update', {
-              'ad_storage': value.marketing ? 'granted' : 'denied',
-              'ad_user_data': value.marketing ? 'granted' : 'denied',
-              'ad_personalization': value.marketing ? 'granted' : 'denied',
-              'analytics_storage': value.analytics ? 'granted' : 'denied'
-            });
+
+          if (window.sredzkaGoogleConsent) {
+            if (value && value.analytics && value.marketing) {
+              window.sredzkaGoogleConsent.grant();
+            } else {
+              window.sredzkaGoogleConsent.deny();
+            }
           }
+
           markCookiesSeen();
           closeCookieBanner();
         }
@@ -1755,6 +1831,10 @@
           });
         }
 
+        window.addEventListener("hashchange", () => {
+          openDocumentFromHash(window.location.hash, true);
+        });
+
         const resizeObserver = new ResizeObserver(() => {
           scheduleScrollIndicatorUpdate();
         });
@@ -1775,6 +1855,7 @@
         window.addEventListener("load", scheduleScrollIndicatorUpdate);
 
         // bootstrap(); // API call disabled - use static docs
+        openDocumentFromHash(window.location.hash, Boolean(window.location.hash));
         showCookieBanner();
 
         /* ═══════════ PANEL COOKIES — otwieranie/zamykanie ═══════════ */
@@ -1817,14 +1898,15 @@
             ? { necessary: true, analytics: true, marketing: true }
             : { necessary: true, analytics: false, marketing: false };
           localStorage.setItem('sredzka-cookies-choice', JSON.stringify(value));
-          if (acceptAll && typeof gtag === 'function') {
-            gtag('consent', 'update', {
-              'ad_storage': 'granted',
-              'ad_user_data': 'granted',
-              'ad_personalization': 'granted',
-              'analytics_storage': 'granted'
-            });
+
+          if (window.sredzkaGoogleConsent) {
+            if (acceptAll) {
+              window.sredzkaGoogleConsent.grant();
+            } else {
+              window.sredzkaGoogleConsent.deny();
+            }
           }
+
           updateCookiePanelState();
           closeCookiePanel();
         }
@@ -1900,7 +1982,7 @@
         </div>
 
         <div class="cookie-docs-row">
-          <a class="cookie-doc-link" href="./index.html#regulamin">Regulamin witryny</a>
+          <a class="cookie-doc-link" href="./index.html#regulamin-serwisu">Regulamin witryny</a>
           <a class="cookie-doc-link" href="./index.html#polityka-prywatnosci">Polityka prywatności</a>
           <a class="cookie-doc-link" href="./index.html#cookies-info">Szczegóły cookies</a>
           <a class="cookie-doc-link" href="./index.html">Wszystkie dokumenty</a>

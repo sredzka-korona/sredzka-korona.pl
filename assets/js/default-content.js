@@ -63,21 +63,21 @@ window.SREDZKA_DEFAULT_CONTENT = {
     },
     sectionMedia: {
       hotel: {
-        imageUrl: "",
+        imageUrl: "/assets/img/home-hotel.jpg",
         imageAlt: "Hotel — Średzka Korona, noclegi Środa Śląska",
         focusX: 50,
         focusY: 50,
         zoom: 1,
       },
       restaurant: {
-        imageUrl: "",
+        imageUrl: "/assets/img/home-restaurant.jpg",
         imageAlt: "Catering — Średzka Korona, Środa Śląska",
         focusX: 50,
         focusY: 50,
         zoom: 1,
       },
       events: {
-        imageUrl: "",
+        imageUrl: "/assets/img/home-events.jpg",
         imageAlt: "Sale na przyjęcia i imprezy okolicznościowe — Średzka Korona",
         focusX: 50,
         focusY: 50,
