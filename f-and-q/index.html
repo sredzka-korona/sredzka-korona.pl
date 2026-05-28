@@ -414,21 +414,22 @@
       .cookie-float-btn {
         position: fixed;
         top: auto;
-        left: auto;
-        right: 2rem;
-        bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
-        width: 48px;
-        height: 48px;
+        left: 0.5rem;
+        right: auto;
+        bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
-        background: var(--bg-elevated);
-        border: 1px solid var(--line);
+        background: transparent;
+        border: none;
         color: var(--text);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 22px;
-        box-shadow: var(--shadow);
-        transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease, border-color 0.3s ease;
+        font-size: 19px;
+        box-shadow: none;
+        opacity: 0.65;
+        transition: opacity 0.3s ease;
         z-index: 98;
         cursor: pointer;
         padding: 0;
@@ -438,10 +439,9 @@
       }
 
       .cookie-float-btn:hover {
-        transform: translateZ(0) scale(1.1);
-        box-shadow: 0 6px 24px rgba(168, 137, 90, 0.25);
-        border-color: var(--gold);
-        background: rgba(200, 170, 120, 0.08);
+        transform: none;
+        background: transparent;
+        opacity: 0.65;
       }
 
       .cookie-float-btn:active {
@@ -994,7 +994,7 @@
           });
         }
 
-        initCookiePanel();
+        setTimeout(initCookiePanel, 0);
       })();
     </script>
 
