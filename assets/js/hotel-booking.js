@@ -278,10 +278,12 @@
         <ul class="booking-summary-list">${lines.join("")}</ul>
         <p><strong>Łącznie:</strong> ${totalPrice().toFixed(2)} PLN</p>
         <p><strong>Dane:</strong> ${escapeHtml(state.customer.fullName || "")}, ${escapeHtml(state.customer.email || "")}</p>
-        <label class="booking-terms">
-          <input type="checkbox" id="bf-terms" required />
-          <span>Oświadczam, że zapoznałem/am się z <a href="../dokumenty/index.html#regulamin-rezerwacji-hotel" target="_blank" rel="noopener">regulaminem rezerwacji pokoi hotelowych</a>, rozumiem, że po akceptacji przez hotel rezerwacja jest zobowiązująca oraz zobowiązuję się do zapłaty zgodnie z warunkami obiektu.<br>Wyrażam zgodę na przetwarzanie moich danych osobowych w celu obsługi i realizacji rezerwacji, zgodnie z <a href="../dokumenty/index.html#polityka-prywatnosci" target="_blank" rel="noopener">Polityką prywatności</a>. Wiem, że zgodę mogę wycofać w dowolnym momencie (e-mail: kontakt@sredzka-korona.pl). Pełny obowiązek informacyjny znajduje się w dziale <a href="../dokumenty/index.html" target="_blank" rel="noopener">Dokumenty</a>.</span>
-        </label>
+        <div style="border-radius:12px;border:1px solid rgba(200,170,120,0.25);background:rgba(255,245,225,0.08);padding:0.75rem;margin-top:0.85rem;min-width:0">
+          <label class="booking-terms" style="margin:0">
+            <input type="checkbox" id="bf-terms" required />
+            <span>Oświadczam, że zapoznałem/am się z <a href="../dokumenty/index.html#regulamin-rezerwacji-hotel" target="_blank" rel="noopener">regulaminem rezerwacji pokoi hotelowych</a>, rozumiem, że po akceptacji przez hotel rezerwacja jest zobowiązująca oraz zobowiązuję się do zapłaty zgodnie z warunkami obiektu.<br>Wyrażam zgodę na przetwarzanie moich danych osobowych w celu obsługi i realizacji rezerwacji, zgodnie z <a href="../dokumenty/index.html#polityka-prywatnosci" target="_blank" rel="noopener">Polityką prywatności</a>. Wiem, że zgodę mogę wycofać w dowolnym momencie (e-mail: kontakt@sredzka-korona.pl). Pełny obowiązek informacyjny znajduje się w dziale <a href="../dokumenty/index.html" target="_blank" rel="noopener">Dokumenty</a>.</span>
+          </label>
+        </div>
         <p class="booking-error" id="booking-step-error" hidden></p>
         <div class="booking-actions">
           <button type="button" class="booking-btn secondary" id="booking-back-4">Wstecz</button>

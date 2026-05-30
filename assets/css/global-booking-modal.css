@@ -649,6 +649,13 @@ body.gb-modal-open {
   padding: 0.2rem;
 }
 
+#gb-modal .gb-service-tiles--count-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 70%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 #gb-modal .gb-hall-tiles {
   display: grid;
   grid-template-columns: repeat(2, minmax(220px, 320px));
@@ -1416,6 +1423,10 @@ body.gb-modal-open {
     grid-template-columns: 1fr;
   }
 
+  #gb-modal .gb-service-tiles--count-2 {
+    grid-template-columns: 1fr;
+  }
+
   #gb-modal .gb-grid-3,
   #gb-modal .gb-grid-4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1497,6 +1508,7 @@ body.gb-modal-open {
   }
 
   #gb-modal .gb-service-tiles,
+  #gb-modal .gb-service-tiles--count-2,
   #gb-modal .gb-hall-tiles,
   #gb-modal .gb-grid-2,
   #gb-modal .gb-grid-3,

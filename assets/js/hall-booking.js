@@ -222,6 +222,7 @@
       .hb-summary li{padding:.2rem 0;border-bottom:1px solid rgba(200,170,120,.15);}
       .hb-terms{font-size:.82rem;line-height:1.45;color:#4a3f36;}
       .hb-terms a{color:#8b6914;text-decoration:underline;}
+      .hb-terms-card{border-radius:12px;border:1px solid rgba(200,170,120,0.25);background:rgba(255,245,225,0.08);padding:0.75rem;margin-top:0.85rem;min-width:0;}
       .hb-success h3{margin-top:0;}
       input[type="range"].hb-range{width:100%;}
     `;
@@ -397,13 +398,15 @@
           ${state.hallKind === "large" && state.exclusive ? `<li><strong>Wyłączność:</strong> tak</li>` : ""}
         </ul>
         <p class="hb-hint"><strong>Obsługa skontaktuje się z zamawiającym telefonicznie w celu podania wyceny i potwierdzenia rezerwacji.</strong> Nie ma stałego cennika online.</p>
-        <label class="hb-terms">
-          <input type="checkbox" id="hb-terms" required />
-          Zapoznałem/am się z <a href="../dokumenty/index.html#regulamin-rezerwacji-sali" target="_blank" rel="noopener">regulaminem rezerwacji sali</a>.
-          Przyjmuję do wiadomości, że wycena zostanie podana indywidualnie po kontakcie telefonicznym.
-          Rezerwacja jest zgłoszeniem zobowiązującym i wymaga potwierdzenia przez obiekt.
-          <br>Wyrażam zgodę na przetwarzanie moich danych osobowych w celu obsługi i realizacji rezerwacji, zgodnie z <a href="../dokumenty/index.html#polityka-prywatnosci" target="_blank" rel="noopener">Polityką prywatności</a>. Wiem, że zgodę mogę wycofać w dowolnym momencie (e-mail: kontakt@sredzka-korona.pl). Pełny obowiązek informacyjny znajduje się w dziale <a href="../dokumenty/index.html" target="_blank" rel="noopener">Dokumenty</a>.
-        </label>
+        <div class="hb-terms-card">
+          <label class="hb-terms" style="margin:0">
+            <input type="checkbox" id="hb-terms" required />
+            Zapoznałem/am się z <a href="../dokumenty/index.html#regulamin-rezerwacji-sali" target="_blank" rel="noopener">regulaminem rezerwacji sali</a>.
+            Przyjmuję do wiadomości, że wycena zostanie podana indywidualnie po kontakcie telefonicznym.
+            Rezerwacja jest zgłoszeniem zobowiązującym i wymaga potwierdzenia przez obiekt.
+            <br>Wyrażam zgodę na przetwarzanie moich danych osobowych w celu obsługi i realizacji rezerwacji, zgodnie z <a href="../dokumenty/index.html#polityka-prywatnosci" target="_blank" rel="noopener">Polityką prywatności</a>. Wiem, że zgodę mogę wycofać w dowolnym momencie (e-mail: kontakt@sredzka-korona.pl). Pełny obowiązek informacyjny znajduje się w dziale <a href="../dokumenty/index.html" target="_blank" rel="noopener">Dokumenty</a>.
+          </label>
+        </div>
         <div id="turnstile-slot-hall"></div>
         <p class="hb-err" id="hb-e5" hidden></p>
         <div class="hb-actions">
