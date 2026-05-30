@@ -61,6 +61,26 @@
         "source": "/index.html",
         "destination": "/",
         "type": 301
+      },
+      {
+        "source": "/functions/node_modules/**",
+        "destination": "/",
+        "type": 301
+      },
+      {
+        "source": "/catering/catering-sroda-slaska.html",
+        "destination": "/catering/",
+        "type": 301
+      },
+      {
+        "source": "/catering/catering-test.html",
+        "destination": "/catering/",
+        "type": 301
+      },
+      {
+        "source": "/Hotel/hotel-sroda-slaska.html",
+        "destination": "/Hotel/",
+        "type": 301
       }
     ]
   },

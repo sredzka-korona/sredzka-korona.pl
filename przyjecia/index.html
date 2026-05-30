@@ -2161,6 +2161,33 @@
         transition: none !important;
       }
 
+      .faq-float-btn {
+        position: fixed;
+        top: calc(var(--nav-height) + 4px);
+        right: 20px;
+        z-index: 99;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--gold);
+        text-decoration: none;
+        opacity: 1;
+        transition: opacity 0.2s ease;
+        line-height: 1;
+        background: none;
+        border: none;
+        padding: 4px 8px;
+      }
+      .faq-float-btn:hover {
+        opacity: 0.8;
+        color: var(--gold-strong);
+      }
+      .faq-float-btn:visited {
+        color: var(--gold);
+      }
+
       .section-card,
       .card {
         border: 1px solid var(--line);
@@ -3529,6 +3556,7 @@
                 <img class="brand-logo" src="../ikony/logo-korona.png" alt="Logo Średzka Korona" loading="lazy" decoding="async" />
                 <span class="floating-nav-brand-text">KORONA</span>
               </a>
+
             </nav>
             <div class="events-content">
               <div class="events-info">
@@ -3838,6 +3866,7 @@
       </div>
     </div>
 
+    <a class="faq-float-btn" href="../f-and-q/index.html" aria-label="FAQ — częste pytania" title="FAQ — częste pytania">F&amp;Q</a>
     <a class="watermark" href="https://i-janicki.pl">Design &amp; Development by Igor Janicki</a>
   </body>
 </html>

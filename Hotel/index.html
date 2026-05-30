@@ -615,6 +615,33 @@
         background: rgba(200, 170, 120, 0.08);
       }
 
+      .faq-float-btn {
+        position: fixed;
+        top: calc(var(--nav-height) + 4px);
+        right: 20px;
+        z-index: 99;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--gold);
+        text-decoration: none;
+        opacity: 1;
+        transition: opacity 0.2s ease;
+        line-height: 1;
+        background: none;
+        border: none;
+        padding: 4px 8px;
+      }
+      .faq-float-btn:hover {
+        opacity: 0.8;
+        color: var(--gold-strong);
+      }
+      .faq-float-btn:visited {
+        color: var(--gold);
+      }
+
       .floating-nav > a.floating-nav-brand:hover,
       .floating-nav > a.floating-nav-brand:focus,
       .floating-nav > a.floating-nav-brand:active,
@@ -1204,6 +1231,35 @@
     </style>
   </head>
   <body>
+    <!-- Statyczny opis hotelu dla wyszukiwarek -->
+    <div class="visually-hidden" aria-hidden="true">
+      <h2>Hotel Środa Śląska – komfortowe noclegi blisko Wrocławia</h2>
+      <h3>Noclegi w hotelu przy Średzkiej Koronie – Środa Śląska, okolice Wrocławia</h3>
+      <p>Hotel Średzka Korona oferuje wygodne i przestronne pokoje gościnne w samym centrum Środy Śląskiej, zaledwie 30 km od Wrocławia. Naszym atutem jest kameralna atmosfera, czyste i komfortowe wnętrza oraz śniadanie wliczone w cenę każdego pobytu.</p>
+      <h3>Nasze pokoje hotelowe – różnorodne konfiguracje</h3>
+      <p>Oferujemy pokoje w czterech konfiguracjach, które zaspokoją potrzeby zarówno osób podróżujących samotnie w celach biznesowych, jak i rodzin oraz grup przyjaciół odwiedzających Dolny Śląsk:</p>
+      <ul>
+        <li><strong>Pokoje 1-osobowe</strong> – idealne dla podróżujących służbowo i turystów indywidualnych. Każdy pokój wyposażony w wygodne łóżko, biurko, telewizor, bezpłatne WiFi oraz łazienkę.</li>
+        <li><strong>Pokoje 2-osobowe</strong> – doskonałe dla par oraz przyjaciół podróżujących razem. Do wyboru łóżko małżeńskie lub dwa pojedyncze. Przestronna łazienka, miejsce do pracy, telewizor.</li>
+        <li><strong>Pokoje 3-osobowe</strong> – komfortowy wybór dla małych rodzin lub grup znajomych. Trzy wygodne miejsca do spania, łazienka, TV, bezpłatne WiFi.</li>
+        <li><strong>Pokoje 4-osobowe</strong> – przestronne apartamenty dla rodzin z dziećmi lub grup przyjaciół. Duża łazienka, dodatkowe udogodnienia, przestrzeń do wypoczynku.</li>
+      </ul>
+      <h3>Udogodnienia w hotelu</h3>
+      <ul>
+        <li><strong>Śniadanie w cenie</strong> – każdego ranka serwujemy obfite śniadanie w formie bufetu, przygotowane ze świeżych, lokalnych produktów.</li>
+        <li><strong>Bezpłatne WiFi</strong> – szybki internet we wszystkich pokojach i częściach wspólnych.</li>
+        <li><strong>Telewizja</strong> – telewizory z dostępem do programów naziemnych i kablowych.</li>
+        <li><strong>Parking</strong> – możliwość parkowania przy obiekcie (szczegóły przy rezerwacji).</li>
+        <li><strong>Restauracja i catering</strong> – możliwość zamówienia cateringu lub skorzystania z oferty restauracji Średzka Korona.</li>
+      </ul>
+      <h3>Lokalizacja i okolice</h3>
+      <p>Hotel znajduje się w Środzie Śląskiej, przy ul. Wrocławskiej 11 – w samym sercu miasta, w pobliżu rynku i najważniejszych atrakcji. Doskonała lokalizacja dla podróżujących do Wrocławia (ok. 30 km) oraz zwiedzających Dolny Śląsk. W pobliżu znajdują się malownicze szlaki turystyczne i rowerowe, zabytki Środy Śląskiej oraz atrakcje przyrodnicze.</p>
+      <p>Hotel jest idealną bazą wypadową dla turystów chcących zwiedzić Wrocław, okolice Trzebnicy, Oleśnicy, Legnicy oraz malownicze tereny Dolnego Śląska. Dla gości biznesowych – szybki dojazd do Wrocławia i autostrady A4.</p>
+      <h3>Jak dokonać rezerwacji?</h3>
+      <p>Rezerwacji pokoju można dokonać przez nasz system rezerwacji online dostępny na tej stronie, telefonicznie lub mailowo. Zachęcamy do kontaktu – odpowiemy na wszystkie pytania i pomożemy dobrać najlepszy pokój.</p>
+      <p>Hotel czynny przez cały rok. Zapraszamy zarówno na krótkie pobyty, jak i dłuższe weekendy oraz urlopy. Gościmy osoby indywidualne, pary, rodziny oraz grupy zorganizowane.</p>
+      <p>Skontaktuj się z nami, aby sprawdzić dostępność i zarezerwować pobyt w hotelu Średzka Korona w Środzie Śląskiej.</p>
+    </div>
     <div id="app"></div>
     <script>
       (async () => {
@@ -1338,6 +1394,7 @@
                 <img class="brand-logo" src="../ikony/logo-korona.png" alt="Logo Średzka Korona" loading="lazy" decoding="async" />
                 <span class="floating-nav-brand-text">KORONA</span>
               </a>
+
             </nav>
             <div class="hotel-content">
               <div class="hotel-info">
@@ -1551,6 +1608,7 @@
       </div>
     </div>
 
+    <a class="faq-float-btn" href="../f-and-q/index.html" aria-label="FAQ — częste pytania" title="FAQ — częste pytania">F&amp;Q</a>
     <a class="watermark" href="https://i-janicki.pl">Design &amp; Development by Igor Janicki</a>
   </body>
 </html>

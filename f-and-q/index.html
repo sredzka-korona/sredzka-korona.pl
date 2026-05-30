@@ -138,6 +138,18 @@
       }
     </script>
     <style>
+      :root {
+        --nav-height: 80px;
+        --gold: #c8aa78;
+        --gold-strong: #e8d8b8;
+        --text: #1f1712;
+        --bg-elevated: rgba(255, 249, 241, 0.9);
+        --line: rgba(198, 148, 34, 0.22);
+        --radius-xl: 28px;
+        --shadow: 0 24px 60px rgba(79, 55, 22, 0.12);
+        --muted: #6b5c4a;
+      }
+
       html {
         color-scheme: light;
         background:
@@ -174,7 +186,147 @@
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
-        padding: 2rem 0 1rem;
+        padding: calc(var(--nav-height) + 2rem) 0 1rem;
+      }
+
+      .floating-nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: var(--nav-height);
+        background: rgba(254, 252, 249, 1);
+        backdrop-filter: blur(20px) saturate(180%);
+        border-bottom: 1px solid rgba(200, 170, 120, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 2rem;
+        z-index: 100;
+        transition: box-shadow 0.3s ease, background 0.3s ease, transform 0.3s ease;
+      }
+
+      .floating-nav.scrolled {
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+        background: rgba(254, 252, 249, 1);
+      }
+
+      .floating-nav.nav-hidden {
+        transform: translateY(-100%);
+      }
+
+      .floating-nav-brand {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 1.5rem;
+        text-decoration: none;
+        position: relative;
+        flex-shrink: 0;
+        width: auto;
+        height: auto;
+        background: transparent !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        outline: none !important;
+        border: none !important;
+        transition: none !important;
+      }
+
+      .floating-nav-brand::before {
+        content: "";
+        width: clamp(40px, 8vw, 100px);
+        height: 1px;
+        background: var(--gold);
+        flex-shrink: 0;
+        display: block;
+        order: 1;
+      }
+
+      .floating-nav-brand .floating-nav-brand-text:first-of-type {
+        order: 2;
+      }
+
+      .floating-nav-brand .brand-logo {
+        order: 3;
+      }
+
+      .floating-nav-brand .floating-nav-brand-text:last-of-type {
+        order: 4;
+      }
+
+      .floating-nav-brand::after {
+        content: "";
+        width: clamp(40px, 8vw, 100px);
+        height: 1px;
+        background: var(--gold);
+        flex-shrink: 0;
+        display: block;
+        order: 5;
+      }
+
+      .floating-nav .brand-logo {
+        width: 50px !important;
+        height: 50px !important;
+        object-fit: contain !important;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+        padding: 0 !important;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        display: block !important;
+        flex-shrink: 0;
+        margin: 0 !important;
+      }
+
+      .floating-nav-brand-text {
+        font-family: "Cormorant Garamond", serif;
+        font-size: clamp(1rem, 2vw, 1.5rem);
+        font-weight: 600;
+        color: #a8895a;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        flex-shrink: 0;
+        display: inline-block !important;
+        line-height: 1;
+        margin: 0;
+      }
+
+      .floating-nav > a:not(.floating-nav-brand) {
+        display: block;
+        padding: 0.6rem 1.2rem;
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        position: relative;
+        text-decoration: none;
+      }
+
+      .floating-nav > a:not(.floating-nav-brand):hover {
+        color: var(--gold);
+        background: rgba(200, 170, 120, 0.08);
+      }
+
+      .floating-nav > a.floating-nav-brand:hover,
+      .floating-nav > a.floating-nav-brand:focus,
+      .floating-nav > a.floating-nav-brand:active,
+      .floating-nav > a.floating-nav-brand:visited,
+      a.floating-nav-brand:hover,
+      a.floating-nav-brand:focus,
+      a.floating-nav-brand:active,
+      a.floating-nav-brand:visited {
+        background: transparent !important;
+        box-shadow: none !important;
+        outline: none !important;
+        border: none !important;
+        transform: none !important;
+        transition: none !important;
       }
 
       .card {
@@ -186,46 +338,14 @@
         margin-bottom: 1rem;
       }
 
-      .page-header {
-        position: relative;
-        margin-bottom: 1.75rem;
-        padding: 0.5rem 0 0;
-        text-align: center;
-      }
-
-      .back-link {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 2rem;
-        height: 2rem;
-        color: #241b14;
-        text-decoration: none;
-        transition: color 0.2s ease;
-      }
-
-      .back-link:hover {
-        color: #efcf78;
-      }
-
-      .back-link-wrap {
-        position: absolute;
-        top: 0.25rem;
-        left: clamp(-7rem, calc((960px - 100vw) / 2 - 3rem), -2.25rem);
-      }
-
       .page-title {
-        margin: 0;
+        margin: 0 0 1.75rem;
         color: #1f1712;
         letter-spacing: 0.24em;
         text-transform: uppercase;
         font-size: clamp(1.15rem, 2vw, 1.45rem);
         font-weight: 700;
-      }
-
-      .back-link svg {
-        width: 1.2rem;
-        height: 1.2rem;
+        text-align: center;
       }
 
       .collapsible-card {
@@ -364,38 +484,31 @@
         white-space: nowrap;
       }
 
-      .footer-links {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 1rem;
-        padding: 1.25rem 0 2rem;
-        font-size: 0.85rem;
-        flex-wrap: wrap;
+      .watermark {
+        display: block;
+        margin: 2rem auto 0;
+        max-width: min(92vw, 420px);
+        text-align: center;
+        white-space: nowrap;
+        font-size: 0.75rem;
+        color: rgba(0, 0, 0, 0.35);
+        font-family: "Manrope", sans-serif;
+        font-weight: 400;
+        opacity: 0.45;
+        transition: opacity 0.3s ease;
       }
 
-      .footer-links a,
-      .footer-links span {
-        color: #241b14;
-        font-weight: 300;
-        letter-spacing: 0.1em;
+      .watermark:hover {
+        opacity: 0.7;
+      }
+
+      a.watermark {
         text-decoration: none;
       }
 
-      .footer-links a:hover {
-        color: #efcf78;
-      }
-
-      .faq-intro {
-        text-align: center;
-        margin-bottom: 2rem;
-      }
-
-      .faq-intro p {
-        margin: 0.5rem 0 0;
-        color: #4a3f35;
-        font-size: 1rem;
-        line-height: 1.6;
+      a.watermark:link,
+      a.watermark:visited {
+        color: rgba(0, 0, 0, 0.35);
       }
 
       @media (max-width: 600px) {
@@ -410,6 +523,13 @@
           padding: 0 1rem 1rem;
         }
       }
+
+      @media (max-width: 780px) {
+        .watermark {
+          display: none;
+        }
+      }
+
       /* ═══════════ PRZYCISK COOKIES (floating) ═══════════ */
       .cookie-float-btn {
         position: fixed;
@@ -690,6 +810,232 @@
         }
       }
 
+
+      /* ═══════════ DEV FOOTER LOADER ANIMATION ═══════════ */
+      #dev-loader-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(6, 8, 15, 0.92);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+      }
+
+      #dev-loader-overlay.active {
+        display: flex;
+      }
+
+      #dev-loader-overlay .loader {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        margin-left: -50px;
+        animation: speeder 0.4s linear infinite;
+      }
+
+      #dev-loader-overlay .loader > span {
+        height: 5px;
+        width: 35px;
+        background: #ff6b9d;
+        position: absolute;
+        top: -19px;
+        left: 60px;
+        border-radius: 2px 10px 1px 0;
+      }
+
+      #dev-loader-overlay .base span {
+        position: absolute;
+        width: 0;
+        height: 0;
+        border-top: 6px solid transparent;
+        border-right: 100px solid #ff6b9d;
+        border-bottom: 6px solid transparent;
+      }
+
+      #dev-loader-overlay .base span:before {
+        content: "";
+        height: 22px;
+        width: 22px;
+        border-radius: 50%;
+        background: #c44dff;
+        position: absolute;
+        right: -110px;
+        top: -16px;
+        box-shadow: 0 0 15px rgba(196, 77, 255, 0.6);
+      }
+
+      #dev-loader-overlay .base span:after {
+        content: "";
+        position: absolute;
+        width: 0;
+        height: 0;
+        border-top: 0 solid transparent;
+        border-right: 55px solid #4d9eff;
+        border-bottom: 16px solid transparent;
+        top: -16px;
+        right: -98px;
+      }
+
+      #dev-loader-overlay .face {
+        position: absolute;
+        height: 12px;
+        width: 20px;
+        background: #c44dff;
+        border-radius: 20px 20px 0 0;
+        transform: rotate(-40deg);
+        right: -125px;
+        top: -15px;
+        box-shadow: 0 0 10px rgba(196, 77, 255, 0.4);
+      }
+
+      #dev-loader-overlay .face:after {
+        content: "";
+        height: 12px;
+        width: 12px;
+        background: #4d9eff;
+        right: 4px;
+        top: 7px;
+        position: absolute;
+        transform: rotate(40deg);
+        transform-origin: 50% 50%;
+        border-radius: 0 0 0 2px;
+        box-shadow: 0 0 8px rgba(77, 158, 255, 0.4);
+      }
+
+      #dev-loader-overlay .loader > span > span:nth-child(1) {
+        width: 30px;
+        height: 1px;
+        background: #ff6b9d;
+        position: absolute;
+        animation: fazer1 0.2s linear infinite;
+      }
+
+      #dev-loader-overlay .loader > span > span:nth-child(2) {
+        width: 30px;
+        height: 1px;
+        background: #c44dff;
+        position: absolute;
+        top: 3px;
+        animation: fazer2 0.4s linear infinite;
+      }
+
+      #dev-loader-overlay .loader > span > span:nth-child(3) {
+        width: 30px;
+        height: 1px;
+        background: #4d9eff;
+        position: absolute;
+        top: 1px;
+        animation: fazer3 0.4s linear infinite;
+        animation-delay: -1s;
+      }
+
+      #dev-loader-overlay .loader > span > span:nth-child(4) {
+        width: 30px;
+        height: 1px;
+        background: #ff6b9d;
+        position: absolute;
+        top: 4px;
+        animation: fazer4 1s linear infinite;
+        animation-delay: -1s;
+      }
+
+      #dev-loader-overlay .longfazers {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+      }
+
+      #dev-loader-overlay .longfazers span {
+        position: absolute;
+        height: 2px;
+        width: 20%;
+        opacity: 0.5;
+      }
+
+      #dev-loader-overlay .longfazers span:nth-child(1) {
+        top: 20%;
+        background: #ff6b9d;
+        animation: lf 0.6s linear infinite;
+        animation-delay: -5s;
+      }
+
+      #dev-loader-overlay .longfazers span:nth-child(2) {
+        top: 40%;
+        background: #c44dff;
+        animation: lf2 0.8s linear infinite;
+        animation-delay: -1s;
+      }
+
+      #dev-loader-overlay .longfazers span:nth-child(3) {
+        top: 60%;
+        background: #4d9eff;
+        animation: lf3 0.6s linear infinite;
+      }
+
+      #dev-loader-overlay .longfazers span:nth-child(4) {
+        top: 80%;
+        background: #ff6b9d;
+        animation: lf4 0.5s linear infinite;
+        animation-delay: -3s;
+      }
+
+      @keyframes fazer1 {
+        0% { left: 0; }
+        100% { left: -80px; opacity: 0; }
+      }
+
+      @keyframes fazer2 {
+        0% { left: 0; }
+        100% { left: -100px; opacity: 0; }
+      }
+
+      @keyframes fazer3 {
+        0% { left: 0; }
+        100% { left: -50px; opacity: 0; }
+      }
+
+      @keyframes fazer4 {
+        0% { left: 0; }
+        100% { left: -150px; opacity: 0; }
+      }
+
+      @keyframes speeder {
+        0%   { transform: translate(2px, 1px) rotate(0deg); }
+        10%  { transform: translate(-1px, -3px) rotate(-1deg); }
+        20%  { transform: translate(-2px, 0) rotate(1deg); }
+        30%  { transform: translate(1px, 2px) rotate(0deg); }
+        40%  { transform: translate(1px, -1px) rotate(1deg); }
+        50%  { transform: translate(-1px, 3px) rotate(-1deg); }
+        60%  { transform: translate(-1px, 1px) rotate(0deg); }
+        70%  { transform: translate(3px, 1px) rotate(-1deg); }
+        80%  { transform: translate(-2px, -1px) rotate(1deg); }
+        90%  { transform: translate(2px, 1px) rotate(0deg); }
+        100% { transform: translate(1px, -2px) rotate(-1deg); }
+      }
+
+      @keyframes lf {
+        0% { left: 200%; }
+        100% { left: -200%; opacity: 0; }
+      }
+
+      @keyframes lf2 {
+        0% { left: 200%; }
+        100% { left: -200%; opacity: 0; }
+      }
+
+      @keyframes lf3 {
+        0% { left: 200%; }
+        100% { left: -100%; opacity: 0; }
+      }
+
+      @keyframes lf4 {
+        0% { left: 200%; }
+        100% { left: -100%; opacity: 0; }
+      }
+
     </style>
   </head>
   <body>
@@ -697,62 +1043,45 @@
       <div class="scroll-indicator-thumb"></div>
     </div>
     <div class="wrap">
-      <header class="page-header">
-        <div class="back-link-wrap">
-          <a class="back-link" href="../dokumenty/index.html" aria-label="Wróć do dokumentów">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M15 5 8 12l7 7"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </a>
-        </div>
-        <h1 class="page-title">Pytania i odpowiedzi</h1>
-      </header>
+      <nav class="floating-nav" id="floating-nav" aria-label="Główna nawigacja — Średzka Korona">
+        <a href="../index.html" class="floating-nav-brand">
+          <span class="floating-nav-brand-text">ŚREDZKA</span>
+          <img class="brand-logo" src="../ikony/logo-korona-120.webp" width="50" height="33" alt="Logo Średzka Korona" decoding="async" fetchpriority="high" />
+          <span class="floating-nav-brand-text">KORONA</span>
+        </a>
+      </nav>
+      <h1 class="page-title">Pytania i odpowiedzi</h1>
 
-      <div class="faq-intro">
-        <p>Najczęściej zadawane pytania dotyczące organizacji przyjęć, sal weselnych, cateringu i noclegów w Średzkiej Koronie w Środzie Śląskiej.</p>
+      <div class="card" style="margin-bottom: 1.5rem; background: rgba(255, 249, 241, 0.7);">
+        <p style="margin: 0; line-height: 1.6; font-size: 0.95rem; color: var(--muted, #6b5d4f);">
+          Najczęściej zadawane pytania dotyczące organizacji przyjęć, sal weselnych, cateringu i noclegów w <strong>Średzkiej Koronie</strong> w <strong>Środzie Śląskiej</strong>.
+        </p>
       </div>
 
-      <details class="card collapsible-card" id="faq-sale-weselne">
+      <details class="card collapsible-card" id="faq-stypa">
         <summary class="collapsible-summary">
-          <h2>Jakie sale weselne są dostępne w Środzie Śląskiej i okolicach?</h2>
+          <h2>Gdzie zorganizować stypę w Środzie Śląskiej?</h2>
         </summary>
         <div class="collapsible-content">
-          <p>W <strong>Średzkiej Koronie</strong> dostępne są dwie sale:</p>
-          <ul class="crown-list" style="display: grid; gap: 0.65rem; margin: 0.75rem 0; padding: 0; list-style: none;">
-            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> <strong>Sala mała</strong> &ndash; do 50 gości, idealna na kameralne wesela i przyjęcia rodzinne</li>
-            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> <strong>Sala duża</strong> &ndash; do 120 gości, przestronna i elegancka, z parkietem i sceną</li>
-          </ul>
-          <p>Obie sale są klimatyzowane, posiadają osobne zaplecze cateringowe oraz nowoczesny system nagłośnienia. Istnieje również możliwość skorzystania z ogrodu w cieplejsze miesiące.</p>
+          <p><strong>Średzka Korona</strong> zapewnia dyskretną i godną oprawę dla przyjęć stypowych. Oferujemy kameralną salę, tradycyjny catering oraz pomoc w organizacji. Służymy wsparciem w tym trudnym czasie &ndash; prosimy o kontakt telefoniczny w celu ustalenia szczegółów i dopasowania oferty do Państwa potrzeb.</p>
         </div>
       </details>
 
-      <details class="card collapsible-card" id="faq-koszt-wynajmu">
+      <details class="card collapsible-card" id="faq-przyjecie">
         <summary class="collapsible-summary">
-          <h2>Ile kosztuje wynajem sali na przyjęcie w okolicach Wrocławia?</h2>
+          <h2>Gdzie zorganizować przyjęcie w Środzie Śląskiej?</h2>
         </summary>
         <div class="collapsible-content">
-          <p><strong>Średzka Korona</strong> nie publikuje stałego cennika online &ndash; wycena ustalana jest indywidualnie po rozmowie telefonicznej. Na koszt wynajmu wpływają:</p>
-          <ul class="crown-list" style="display: grid; gap: 0.65rem; margin: 0.75rem 0; padding: 0; list-style: none;">
-            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> liczba gości i wybór sali (mała / duża)</li>
-            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> wybrane menu cateringowe</li>
-            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> dodatkowe usługi (dekoracje, noclegi, sprzęt multimedialny)</li>
-          </ul>
-          <p>Zachęcamy do <a href="../#kontakt" style="color: #c69422;">kontaktu</a>, aby poznać szczegółową ofertę dopasowaną do Twoich potrzeb.</p>
+          <p><strong>Średzka Korona</strong> to sprawdzone miejsce na przyjęcia w Środzie Śląskiej. Dwie eleganckie sale, własny catering oraz doświadczony zespół sprawiają, że każda uroczystość przebiega bez stresu i w przyjemnej atmosferze. Jesteśmy otwarci na Twoje pomysły &ndash; pomożemy dopracować każdy szczegół, od menu po dekoracje.</p>
         </div>
       </details>
 
-      <details class="card collapsible-card" id="faq-hotele-noclegi">
+      <details class="card collapsible-card" id="faq-najtansze-noclegi">
         <summary class="collapsible-summary">
-          <h2>Czy w Środzie Śląskiej są hotele oferujące noclegi dla grup?</h2>
+          <h2>Jakie są najtańsze opcje noclegowe w Środzie Śląskiej?</h2>
         </summary>
         <div class="collapsible-content">
-          <p>Tak, <strong>Średzka Korona</strong> oferuje noclegi dla gości w komfortowych pokojach gościnnych. Dostępne są pokoje 2-, 3- i 4-osobowe, które można zarezerwować łącznie z przyjęciem. To wygodne rozwiązanie dla grup weselnych i rodzinnych &ndash; goście mogą bezpiecznie zostać na miejscu po zakończeniu uroczystości.</p>
+          <p><strong>Średzka Korona</strong> oferuje przystępne cenowo noclegi w pokojach gościnnych. Goście przyjęć weselnych i rodzinnych mogą liczyć na atrakcyjne pakiety łączące salę, catering i nocleg w konkurencyjnej cenie. Dzięki temu nie trzeba szukać osobnego zakwaterowania &ndash; wszystko jest na miejscu, w przyjaznej i bezpiecznej atmosferze.</p>
         </div>
       </details>
 
@@ -768,6 +1097,45 @@
             <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> napojów (catering otwarty, zestaw butelkowy)</li>
           </ul>
           <p>Skontaktuj się z nami, a przygotujemy wycenę dopasowaną do Twojego budżetu i oczekiwań.</p>
+        </div>
+      </details>
+
+      <details class="card collapsible-card" id="faq-hotele-noclegi">
+        <summary class="collapsible-summary">
+          <h2>Czy w Środzie Śląskiej są hotele oferujące noclegi dla grup?</h2>
+        </summary>
+        <div class="collapsible-content">
+          <p>Tak, <strong>Średzka Korona</strong> oferuje noclegi dla gości w komfortowych pokojach gościnnych. Dostępne są pokoje 2-, 3- i 4-osobowe, które można zarezerwować łącznie z przyjęciem. To wygodne rozwiązanie dla grup weselnych i rodzinnych &ndash; goście mogą bezpiecznie zostać na miejscu po zakończeniu uroczystości.</p>
+        </div>
+      </details>
+
+      <details class="card collapsible-card" id="faq-hotele-eventy">
+        <summary class="collapsible-summary">
+          <h2>Jakie hotele w Środzie Śląskiej oferują organizację eventów?</h2>
+        </summary>
+        <div class="collapsible-content">
+          <p><strong>Średzka Korona</strong> kompleksowo organizuje eventy &ndash; od spotkań firmowych i szkoleń po bankiety i imprezy integracyjne. Dysponujemy:</p>
+          <ul class="crown-list" style="display: grid; gap: 0.65rem; margin: 0.75rem 0; padding: 0; list-style: none;">
+            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> salą konferencyjno-bankietową z nowoczesnym wyposażeniem</li>
+            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> sprzętem multimedialnym (projektor, ekran, nagłośnienie)</li>
+            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> własnym cateringiem z możliwością przerw kawowych i lunchy</li>
+            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> noclegami dla uczestników szkoleń i konferencji</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="card collapsible-card" id="faq-koszt-wynajmu">
+        <summary class="collapsible-summary">
+          <h2>Ile kosztuje wynajem sali na przyjęcie w okolicach Wrocławia?</h2>
+        </summary>
+        <div class="collapsible-content">
+          <p><strong>Średzka Korona</strong> nie publikuje stałego cennika online &ndash; wycena ustalana jest indywidualnie po rozmowie telefonicznej. Na koszt wynajmu wpływają:</p>
+          <ul class="crown-list" style="display: grid; gap: 0.65rem; margin: 0.75rem 0; padding: 0; list-style: none;">
+            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> liczba gości i wybór sali (mała / duża)</li>
+            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> wybrane menu cateringowe</li>
+            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> dodatkowe usługi (dekoracje, noclegi, sprzęt multimedialny)</li>
+          </ul>
+          <p>Zachęcamy do <a href="../#kontakt" style="color: #c69422;">kontaktu</a>, aby poznać szczegółową ofertę dopasowaną do Twoich potrzeb.</p>
         </div>
       </details>
 
@@ -787,36 +1155,17 @@
         </div>
       </details>
 
-      <details class="card collapsible-card" id="faq-hotele-eventy">
+      <details class="card collapsible-card" id="faq-sale-weselne">
         <summary class="collapsible-summary">
-          <h2>Jakie hotele w Środzie Śląskiej oferują organizację eventów?</h2>
+          <h2>Jakie sale weselne są dostępne w Środzie Śląskiej i okolicach?</h2>
         </summary>
         <div class="collapsible-content">
-          <p><strong>Średzka Korona</strong> kompleksowo organizuje eventy &ndash; od spotkań firmowych i szkoleń po bankiety i imprezy integracyjne. Dysponujemy:</p>
+          <p>W <strong>Średzkiej Koronie</strong> dostępne są dwie sale:</p>
           <ul class="crown-list" style="display: grid; gap: 0.65rem; margin: 0.75rem 0; padding: 0; list-style: none;">
-            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> salą konferencyjno-bankietową z nowoczesnym wyposażeniem</li>
-            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> sprzętem multimedialnym (projektor, ekran, nagłośnienie)</li>
-            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> własnym cateringiem z możliwością przerw kawowych i lunchy</li>
-            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> noclegami dla uczestników szkoleń i konferencji</li>
+            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> <strong>Sala mała</strong> &ndash; do 50 gości, idealna na kameralne wesela i przyjęcia rodzinne</li>
+            <li style="display: flex; align-items: flex-start; gap: 0.75rem; color: #241b14;"><span style="color: #c69422;">♛</span> <strong>Sala duża</strong> &ndash; do 120 gości, przestronna i elegancka, z parkietem i sceną</li>
           </ul>
-        </div>
-      </details>
-
-      <details class="card collapsible-card" id="faq-najtansze-noclegi">
-        <summary class="collapsible-summary">
-          <h2>Jakie są najtańsze opcje noclegowe w Środzie Śląskiej?</h2>
-        </summary>
-        <div class="collapsible-content">
-          <p><strong>Średzka Korona</strong> oferuje przystępne cenowo noclegi w pokojach gościnnych. Goście przyjęć weselnych i rodzinnych mogą liczyć na atrakcyjne pakiety łączące salę, catering i nocleg w konkurencyjnej cenie. Dzięki temu nie trzeba szukać osobnego zakwaterowania &ndash; wszystko jest na miejscu, w przyjaznej i bezpiecznej atmosferze.</p>
-        </div>
-      </details>
-
-      <details class="card collapsible-card" id="faq-przyjecie">
-        <summary class="collapsible-summary">
-          <h2>Gdzie zorganizować przyjęcie w Środzie Śląskiej?</h2>
-        </summary>
-        <div class="collapsible-content">
-          <p><strong>Średzka Korona</strong> to sprawdzone miejsce na przyjęcia w Środzie Śląskiej. Dwie eleganckie sale, własny catering oraz doświadczony zespół sprawiają, że każda uroczystość przebiega bez stresu i w przyjemnej atmosferze. Jesteśmy otwarci na Twoje pomysły &ndash; pomożemy dopracować każdy szczegół, od menu po dekoracje.</p>
+          <p>Obie sale są klimatyzowane, posiadają osobne zaplecze cateringowe oraz nowoczesny system nagłośnienia. Istnieje również możliwość skorzystania z ogrodu w cieplejsze miesiące.</p>
         </div>
       </details>
 
@@ -835,68 +1184,36 @@
         </div>
       </details>
 
-      <details class="card collapsible-card" id="faq-stypa">
-        <summary class="collapsible-summary">
-          <h2>Gdzie zorganizować stypę w Środzie Śląskiej?</h2>
-        </summary>
-        <div class="collapsible-content">
-          <p><strong>Średzka Korona</strong> zapewnia dyskretną i godną oprawę dla przyjęć stypowych. Oferujemy kameralną salę, tradycyjny catering oraz pomoc w organizacji. Służymy wsparciem w tym trudnym czasie &ndash; prosimy o kontakt telefoniczny w celu ustalenia szczegółów i dopasowania oferty do Państwa potrzeb.</p>
-        </div>
-      </details>
-
-      <footer class="footer-links">
-        <a href="https://i-janicki.pl">Design &amp; Development by Igor Janicki</a>
-        <span>|</span>
-        <a href="../dokumenty/index.html#cookies-info" data-open-cookies>POLITYKA PRYWATNOSCI</a>
-      </footer>
+      <a class="watermark" id="dev-link" href="https://i-janicki.pl">Design &amp; Development by Igor Janicki</a>
     </div>
+
     <script>
       (() => {
         const COOKIE_CHOICE_KEY = "sredzka-cookies-choice";
-        const COOKIE_SEEN_KEY = "sredzka-cookies-seen";
-
-        function getCookie(name) {
-          const match = document.cookie.match(new RegExp("(?:^|;\\s*)" + name + "=([^;]*)"));
-          return match ? decodeURIComponent(match[1]) : null;
-        }
-
-        function setCookie(name, value) {
-          document.cookie = name + "=" + encodeURIComponent(value) + ";path=/;max-age=" + (365 * 24 * 60 * 60) + ";SameSite=Lax";
-        }
-
-        function getChoice() {
-          return getCookie(COOKIE_CHOICE_KEY);
-        }
-
-        function hasMadeChoice() {
-          return getCookie(COOKIE_SEEN_KEY) !== null;
-        }
 
         function buildBanner() {
-          if (hasMadeChoice()) return;
+          if (localStorage.getItem(COOKIE_CHOICE_KEY)) return;
           const banner = document.createElement("div");
           banner.className = "cookie-banner";
           banner.innerHTML =
-            '<strong>🍪 Polityka prywatności</strong>' +
+            '<p class="eyebrow">Cookies</p>' +
             '<p>Ta strona używa plików cookies w celach analitycznych i do prawidłowego działania formularzy. Korzystając ze strony, zgadzasz się na ich użycie.</p>' +
             '<div class="cookie-actions">' +
-            '<a class="button" href="#" data-cookie-accept-all style="margin:0;">AKCEPTUJĘ WSZYSTKIE</a>' +
-            '<a class="button" href="#" data-cookie-accept-essential style="margin:0;">TYLKO NIEZBĘDNE</a>' +
-            '<a class="button" href="../dokumenty/index.html" style="margin:0;">WIĘCEJ INFORMACJI</a>' +
+            '<button class="button" type="button" data-cookie-action="accept-all">Akceptuj wszystko</button>' +
+            '<button class="button secondary" type="button" data-cookie-action="necessary-only">Tylko niezbędne</button>' +
+            '<a class="button secondary" href="../dokumenty/index.html#cookies-info">Zobacz szczegóły</a>' +
             "</div>";
           document.body.appendChild(banner);
 
-          document.querySelector("[data-cookie-accept-all]").addEventListener("click", function (e) {
-            e.preventDefault();
-            setCookie(COOKIE_CHOICE_KEY, "all");
-            setCookie(COOKIE_SEEN_KEY, "1");
-            banner.remove();
-          });
-          document.querySelector("[data-cookie-accept-essential]").addEventListener("click", function (e) {
-            e.preventDefault();
-            setCookie(COOKIE_CHOICE_KEY, "essential");
-            setCookie(COOKIE_SEEN_KEY, "1");
-            banner.remove();
+          banner.querySelectorAll("[data-cookie-action]").forEach((button) => {
+            button.addEventListener("click", () => {
+              const acceptAll = button.dataset.cookieAction === "accept-all";
+              const value = acceptAll
+                ? { necessary: true, analytics: true, marketing: true }
+                : { necessary: true, analytics: false, marketing: false };
+              localStorage.setItem(COOKIE_CHOICE_KEY, JSON.stringify(value));
+              banner.remove();
+            });
           });
         }
 
@@ -995,6 +1312,40 @@
         }
 
         setTimeout(initCookiePanel, 0);
+
+        /* ═══════════ SCROLL SPY — floating nav shadow + hide/show ═══════════ */
+        const floatNav = document.querySelector('#floating-nav');
+        if (floatNav) {
+          let lastScrollY = window.scrollY;
+
+          const handleNavScroll = () => {
+            const currentScrollY = window.scrollY;
+
+            /* cień */
+            if (currentScrollY > 50) {
+              floatNav.classList.add('scrolled');
+            } else {
+              floatNav.classList.remove('scrolled');
+            }
+
+            /* chowanie/pokazywanie w zależności od kierunku */
+            if (currentScrollY > 100) {
+              if (currentScrollY > lastScrollY) {
+                floatNav.classList.add('nav-hidden');
+              } else {
+                floatNav.classList.remove('nav-hidden');
+              }
+            } else {
+              floatNav.classList.remove('nav-hidden');
+            }
+
+            lastScrollY = currentScrollY;
+          };
+
+          window.addEventListener('scroll', handleNavScroll, { passive: true });
+          handleNavScroll();
+        }
+
       })();
     </script>
 
@@ -1046,6 +1397,105 @@
         </div>
       </div>
     </div>
+
+
+    <!-- ═══════════ DEV FOOTER LOADER ═══════════ -->
+    <script>
+(function () {
+  "use strict";
+
+  var cfg = window.DevFooterLoaderConfig || {};
+  var targetUrl = cfg.targetUrl || "https://i-janicki.pl";
+  var delayMs = typeof cfg.delayMs === "number" ? cfg.delayMs : 1000;
+  var linkSelector = cfg.linkSelector || "";
+
+  function normalize(url) {
+    return String(url || "").replace(/\/+$/, "").trim();
+  }
+
+  function createOverlayIfMissing() {
+    var existing = document.getElementById("dev-loader-overlay");
+    if (existing) return existing;
+
+    var wrapper = document.createElement("div");
+    wrapper.innerHTML =
+      '<div id="dev-loader-overlay">' +
+      '  <div class="loader">' +
+      "    <span><span></span><span></span><span></span><span></span></span>" +
+      '    <div class="base">' +
+      "      <span></span>" +
+      '      <div class="face"></div>' +
+      "    </div>" +
+      "  </div>" +
+      '  <div class="longfazers">' +
+      "    <span></span><span></span><span></span><span></span>" +
+      "  </div>" +
+      "</div>";
+
+    var overlay = wrapper.firstElementChild;
+    if (!overlay) return null;
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+
+  function isDevCreditAnchor(anchor) {
+    if (!anchor) return false;
+    var href = normalize(anchor.getAttribute("href"));
+    if (href !== normalize(targetUrl)) return false;
+
+    var text = (anchor.textContent || "").toLowerCase();
+    return text.indexOf("design") !== -1 && text.indexOf("igor janicki") !== -1;
+  }
+
+  function findTargetLinks() {
+    if (linkSelector) {
+      return Array.prototype.slice.call(document.querySelectorAll(linkSelector));
+    }
+
+    var explicit = Array.prototype.slice.call(document.querySelectorAll("[data-dev-loader-link], #dev-link"));
+    if (explicit.length) return explicit;
+
+    var footerLinks = Array.prototype.slice.call(document.querySelectorAll("footer a[href]"));
+    return footerLinks.filter(isDevCreditAnchor);
+  }
+
+  function bindLoader() {
+    var links = findTargetLinks();
+    if (!links.length) return;
+
+    var overlay = createOverlayIfMissing();
+    if (!overlay) return;
+
+    function resetLoader() {
+      overlay.classList.remove("active");
+    }
+
+    resetLoader();
+    window.addEventListener("pageshow", resetLoader);
+
+    links.forEach(function (link) {
+      if (!link || link.dataset.devLoaderBound === "1") return;
+      link.dataset.devLoaderBound = "1";
+
+      link.addEventListener("click", function (event) {
+        event.preventDefault();
+        overlay.classList.add("active");
+        window.setTimeout(function () {
+          window.location.href = targetUrl;
+        }, delayMs);
+      });
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bindLoader);
+  } else {
+    bindLoader();
+  }
+
+  window.initDevFooterLoader = bindLoader;
+})();
+    </script>
 
   </body>
 </html>

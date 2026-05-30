@@ -522,6 +522,33 @@
         background: rgba(200, 170, 120, 0.08);
       }
 
+      .faq-float-btn {
+        position: fixed;
+        top: calc(var(--nav-height) + 4px);
+        right: 20px;
+        z-index: 99;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--gold);
+        text-decoration: none;
+        opacity: 1;
+        transition: opacity 0.2s ease;
+        line-height: 1;
+        background: none;
+        border: none;
+        padding: 4px 8px;
+      }
+      .faq-float-btn:hover {
+        opacity: 0.8;
+        color: var(--gold-strong);
+      }
+      .faq-float-btn:visited {
+        color: var(--gold);
+      }
+
       .floating-nav > a.floating-nav-brand:hover,
       .floating-nav > a.floating-nav-brand:focus,
       .floating-nav > a.floating-nav-brand:active,
@@ -1642,10 +1669,28 @@
         <li>Wesela w plenerze i pod namiotami (pełna kuchnia polowa i elegancki serwis),</li>
         <li>Poprawiny, chrzciny, komunie i urodziny w Twoim domu lub ogrodzie,</li>
         <li>Spotkania firmowe, bankiety i imprezy integracyjne,</li>
-        <li>Stypy i pożegnania wymagające spokojnej, profesjonalnej obsługi.</li>
+        <li>Stypy i pożegnania wymagające spokojnej, profesjonalnej obsługi,</li>
+        <li>Przyjęcia okolicznościowe – urodziny, jubileusze, rocznice.</li>
       </ul>
-      <p>Obsługujemy m.in. miejscowości: Środa Śląska, Miękinia, Lutynia, Brzeg Dolny, Szczepanów, Malczyce, Krępice oraz bliskie okolice Wrocławia.</p>
-      <p>Niezależnie od tego, czy planujesz eleganckie przyjęcie w ogrodzie pod Wrocławiem, czy firmowy event na Dolnym Śląsku – przyjedziemy, ugotujemy na miejscu i zaserwujemy jedzenie, które zachwyci Twoich gości. Skontaktuj się z nami, aby ustalić menu na swoje wydarzenie!</p>
+      <h3>Menu cateringowe – różnorodność smaków na każdą okazję</h3>
+      <p>Nasze menu cateringowe obejmuje szeroki wybór dań, które przygotowujemy ze świeżych, lokalnych składników. Oferujemy:</p>
+      <ul>
+        <li><strong>Zupy:</strong> Rosół domowy, krem z pieczonych warzyw, zupa grzybowa, barszcz czerwony, zupa pomidorowa na wywarze mięsnym – idealne jako przystawka lub samodzielne danie.</li>
+        <li><strong>Dania główne:</strong> Schab pieczony z ziołami, rolada wołowa z kaszą i sosem, filet z kurczaka w sosie grzybowym, pieczeń wieprzowa na słodko, łosoś pieczony w koperku, kaczka pieczona z jabłkami – każde danie serwowane z sezonowymi dodatkami.</li>
+        <li><strong>Przystawki i przekąski:</strong> Deski serów i wędlin, tatar wołowy, śledź w oleju lub śmietanie, pasztet domowy z żurawiną, koreczki i mini tartaletki – idealne na przyjęcia w formie bufetu.</li>
+        <li><strong>Sałatki i dodatki:</strong> Sałatka grecka, sałatka z buraków z chrzanem, surówka z młodej kapusty, ziemniaki pieczone z rozmarynem, kopytka domowe, kasza gryczana z grzybami.</li>
+        <li><strong>Desery:</strong> Sernik domowy, szarlotka na kruchym cieście, panna cotta z sosem owocowym, ciasto marchewkowe, lody rzemieślnicze – słodkie zakończenie każdej uczty.</li>
+        <li><strong>Napoje:</strong> Kompot domowy, lemoniada, kawa i herbata – w cenach cateringu, a także możliwość zapewnienia napojów zimnych i gorących według życzenia.</li>
+      </ul>
+      <h3>Jak działa nasz catering? – proces zamówienia krok po kroku</h3>
+      <p>1. <strong>Kontakt i wycena:</strong> Zadzwoń lub napisz – omówimy termin, liczbę gości i charakter wydarzenia. Na tej podstawie przygotowujemy indywidualną wycenę.</p>
+      <p>2. <strong>Ustalenie menu:</strong> Wspólnie wybieramy dania z naszego menu cateringowego lub tworzymy autorskie menu dopasowane do Twoich preferencji. Uwzględniamy diety specjalne (wegetariańskie, bezglutenowe, bezlaktozowe).</p>
+      <p>3. <strong>Przygotowanie i dostawa:</strong> W dniu wydarzenia przygotowujemy wszystkie potrawy, pakujemy i dostarczamy we wskazane miejsce. W przypadku cateringu z obsługą – nasi kelnerzy i kucharze serwują dania na miejscu.</p>
+      <p>4. <strong>Obsługa na miejscu:</strong> Zajmujemy się nakryciem stołów, podaniem potraw, dokładaniem i sprzątaniem po uczcie. Ty i Twoi goście możecie w pełni cieszyć się wydarzeniem.</p>
+      <p>5. <strong>Sprzątanie:</strong> Po zakończeniu przyjęcia zbieramy naczynia, sprzątamy i pozostawiamy miejsce w nienagannym stanie.</p>
+      <h3>Dlaczego warto wybrać catering Średzka Korona?</h3>
+      <p>Jesteśmy lokalną firmą z wieloletnim doświadczeniem w organizacji przyjęć na Dolnym Śląsku. Naszym atutem jest elastyczność – dopasowujemy się do każdej lokalizacji i budżetu. Korzystamy wyłącznie ze świeżych produktów od regionalnych dostawców. Nasza kadra to doświadczeni kucharze i kelnerzy, którzy dbają o najwyższy standard obsługi.</p>
+      <p>Obsługujemy zarówno kameralne spotkania (od 10 osób), jak i duże wesela oraz eventy firmowe (nawet ponad 100 osób). Działamy na terenie gmin: Środa Śląska, Miękinia, Malczyce, Udanin, Kostomłoty oraz w okolicach Wrocławia (do 40 km od Środy Śląskiej).</p>
       <p>Prosimy o kontakt telefoniczny, mailowy lub przez formularz kontaktowy w celu ustalenia szczegółów.</p>
     </div>
     <div id="app"></div>
@@ -2279,6 +2324,7 @@
                 <img class="brand-logo" src="../ikony/logo-korona.png" alt="Logo Średzka Korona" loading="lazy" decoding="async" />
                 <span class="floating-nav-brand-text">KORONA</span>
               </a>
+
             </nav>
             <div class="restaurant-content">
               <div class="restaurant-info">
@@ -2530,6 +2576,7 @@
       </div>
     </div>
 
+    <a class="faq-float-btn" href="../f-and-q/index.html" aria-label="FAQ — częste pytania" title="FAQ — częste pytania">F&amp;Q</a>
     <a class="watermark" href="https://i-janicki.pl">Design &amp; Development by Igor Janicki</a>
   </body>
 </html>
