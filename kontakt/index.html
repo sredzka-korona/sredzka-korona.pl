@@ -946,6 +946,86 @@
         color: var(--muted);
       }
 
+      /* ═══════════ GDPR CONSENT MODAL ═══════════ */
+      .gdpr-consent-body {
+        max-width: 700px;
+      }
+
+      .gdpr-consent-content {
+        margin-bottom: 1.5rem;
+      }
+
+      .gdpr-consent-content p {
+        margin: 0.75rem 0;
+        line-height: 1.7;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .gdpr-consent-content a {
+        color: #c8aa78;
+        text-decoration: underline;
+        transition: color 0.2s;
+      }
+
+      .gdpr-consent-content a:hover {
+        color: #b8944a;
+      }
+
+      .gdpr-consent-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+      }
+
+      .gdpr-btn {
+        padding: 0.75rem 2rem;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: 1px solid;
+        font-family: "Manrope", sans-serif;
+      }
+
+      .gdpr-btn-accept {
+        background: #c8aa78;
+        color: white;
+        border-color: #c8aa78;
+      }
+
+      .gdpr-btn-accept:hover {
+        background: #b8944a;
+        border-color: #b8944a;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(200, 170, 120, 0.3);
+      }
+
+      .gdpr-btn-cancel {
+        background: transparent;
+        color: var(--muted);
+        border-color: rgba(0, 0, 0, 0.15);
+      }
+
+      .gdpr-btn-cancel:hover {
+        background: rgba(0, 0, 0, 0.05);
+        border-color: rgba(0, 0, 0, 0.25);
+        transform: translateY(-2px);
+      }
+
+      @media (max-width: 600px) {
+        .gdpr-consent-actions {
+          flex-direction: column-reverse;
+        }
+        .gdpr-btn {
+          width: 100%;
+          text-align: center;
+        }
+      }
+
       .info-watermark {
         margin-top: 1.5rem;
         padding-top: 0.85rem;
@@ -1625,6 +1705,37 @@
         <div id="turnstile-modal-host"></div>
       </div>
     </div>
+
+    <!-- ══════════════ MODAL ZGODY RODO ══════════════ -->
+    <div class="modal" id="gdpr-consent-modal" role="dialog" aria-modal="true" aria-hidden="true">
+      <div class="modal-body gdpr-consent-body">
+        <div class="modal-header">
+          <h2>Zgoda na przetwarzanie danych</h2>
+          <button type="button" class="modal-close" id="gdpr-consent-close" aria-label="Zamknij">&times;</button>
+        </div>
+        <div class="gdpr-consent-content">
+          <h3>Klauzula Informacyjna RODO</h3>
+          <p><strong>Administratorem danych osobowych</strong> jest firma „BAHAMA Bartosz Hamkało”, z siedzibą pod adresem: ul. Wrocławska 11, 55-300 Środa Śląska, NIP: 9131513928, REGON: 522050940.</p>
+          <p>Dane podane w formularzu będą przetwarzane w celu obsługi zapytania, kontaktu zwrotnego, przygotowania odpowiedzi, obsługi rezerwacji lub podjęcia działań przed zawarciem umowy.</p>
+          <p><strong>Podstawą prawną przetwarzania danych jest:</strong></p>
+          <ol>
+            <li>art. 6 ust. 1 lit. b RODO – jeżeli zapytanie dotyczy rezerwacji, zamówienia lub zawarcia umowy,</li>
+            <li>art. 6 ust. 1 lit. f RODO – prawnie uzasadniony interes Administratora polegający na obsłudze korespondencji i dochodzeniu lub obronie przed roszczeniami,</li>
+            <li>art. 6 ust. 1 lit. a RODO – jeżeli przetwarzanie odbywa się na podstawie dobrowolnej zgody.</li>
+          </ol>
+          <p>Podanie danych jest dobrowolne, ale niezbędne do obsługi formularza.</p>
+          <p>Dane mogą być przekazywane podmiotom technicznie obsługującym Serwis, pocztę elektroniczną, hosting, formularze kontaktowe lub systemy rezerwacyjne.</p>
+          <p>Dane będą przechowywane przez czas niezbędny do obsługi zapytania, a następnie przez okres przedawnienia ewentualnych roszczeń lub przez okres wymagany przepisami prawa.</p>
+          <p>Osobie, której dane dotyczą, przysługuje prawo dostępu do danych, sprostowania, usunięcia, ograniczenia przetwarzania, przenoszenia danych, sprzeciwu, wycofania zgody oraz wniesienia skargi do Prezesa UODO.</p>
+          <p><strong>Kontakt z Administratorem:</strong> <a href="mailto:kontakt@sredzka-korona.pl">kontakt@sredzka-korona.pl</a>, +48 691 964 714, ul. Wrocławska 11, 55-300 Środa Śląska.</p>
+          <p>Pełna Polityka Prywatności dostępna jest pod adresem: <a href="../dokumenty/index.html" target="_blank" rel="noopener">dokumenty/index.html</a>.</p>
+        </div>
+        <div class="gdpr-consent-actions">
+          <button type="button" class="gdpr-btn gdpr-btn-cancel" id="gdpr-btn-cancel">Anuluj</button>
+          <button type="button" class="gdpr-btn gdpr-btn-accept" id="gdpr-btn-accept">Akceptuj</button>
+        </div>
+      </div>
+    </div>
     <script src="../assets/js/config.js"></script>
     <script>
       (() => {
@@ -1889,30 +2000,61 @@
           }
         }
 
-        // Obsługa formularza
-        form.addEventListener("submit", async (event) => {
-          event.preventDefault();
-          
-          // Walidacja tematu
-          if (!topicInput.value) {
-            topicSelection.classList.add("error");
-            status.textContent = "Proszę wybrać temat.";
-            status.className = "form-status error";
-            status.style.display = "block";
-            return;
-          }
+        // ══════════════ MODAL ZGODY RODO ══════════════
+        const gdprModal = document.querySelector("#gdpr-consent-modal");
+        const gdprAccept = document.querySelector("#gdpr-btn-accept");
+        const gdprCancel = document.querySelector("#gdpr-btn-cancel");
+        const gdprClose = document.querySelector("#gdpr-consent-close");
+        let pendingGdprPayload = null;
 
-          // Usuń błędy z pól
-          document.querySelectorAll(".form-group").forEach(group => {
-            group.classList.remove("error");
+        function openGdprModal(payload) {
+          pendingGdprPayload = payload;
+          gdprModal.classList.add("open");
+          gdprModal.setAttribute("aria-hidden", "false");
+        }
+
+        function closeGdprModal() {
+          gdprModal.classList.remove("open");
+          gdprModal.setAttribute("aria-hidden", "true");
+          pendingGdprPayload = null;
+        }
+
+        if (gdprAccept) {
+          gdprAccept.addEventListener("click", () => {
+            const payload = pendingGdprPayload;
+            pendingGdprPayload = null;
+            gdprModal.classList.remove("open");
+            gdprModal.setAttribute("aria-hidden", "true");
+            if (payload) {
+              startSubmission(payload);
+            }
           });
-          topicSelection.classList.remove("error");
-          
-          status.style.display = "none";
+        }
 
-          const formData = new FormData(form);
-          const payload = Object.fromEntries(formData.entries());
+        if (gdprCancel) {
+          gdprCancel.addEventListener("click", closeGdprModal);
+        }
 
+        if (gdprClose) {
+          gdprClose.addEventListener("click", closeGdprModal);
+        }
+
+        if (gdprModal) {
+          gdprModal.addEventListener("click", (e) => {
+            if (e.target === gdprModal) {
+              closeGdprModal();
+            }
+          });
+        }
+
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && gdprModal?.classList.contains("open")) {
+            closeGdprModal();
+          }
+        });
+
+        // ══════════════ WYSYŁANIE FORMULARZA (po akceptacji RODO) ══════════════
+        async function startSubmission(payload) {
           const finishSuccess = () => {
             form.reset();
             topicButtons.forEach(btn => btn.classList.remove("selected"));
@@ -2014,6 +2156,34 @@
             submitBtn.disabled = false;
             submitBtn.textContent = "Wyślij wiadomość";
           }
+        }
+
+        // Obsługa formularza — najpierw zgoda RODO
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          
+          // Walidacja tematu
+          if (!topicInput.value) {
+            topicSelection.classList.add("error");
+            status.textContent = "Proszę wybrać temat.";
+            status.className = "form-status error";
+            status.style.display = "block";
+            return;
+          }
+
+          // Usuń błędy z pól
+          document.querySelectorAll(".form-group").forEach(group => {
+            group.classList.remove("error");
+          });
+          topicSelection.classList.remove("error");
+          
+          status.style.display = "none";
+
+          const formData = new FormData(form);
+          const payload = Object.fromEntries(formData.entries());
+
+          // Pokaż modal zgody RODO
+          openGdprModal(payload);
         });
 
         // Walidacja pól formularza przy blur
@@ -2170,5 +2340,6 @@
       </div>
     </div>
 
-  </body>
+      <p class="footer-date">Data: 01.05.2026r.</p>
+</body>
 </html>
