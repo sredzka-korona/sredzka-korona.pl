@@ -12,17 +12,17 @@
 | Dokumenty (`/dokumenty/`) | ✅ Działa | Polityka prywatności itp. |
 | Panel admin (`/admin/`) | ✅ Działa | Zarządzanie treścią przez Firestore |
 | Worker (rezerwacje Cloudflare D1) | ✅ Działa | Backend rezerwacji |
-| **robots.txt** | ⚠️ **Błąd URL** | Używa `sredzka-korona.pl` zamiast `www.sredzka-korona.pl` |
-| **sitemap.xml** | ⚠️ **Błąd URL** | Używa `sredzka-korona.pl` zamiast `www.sredzka-korona.pl` |
+| **robots.txt** | ✅ OK | Używa kanonicznego `https://sredzka-korona.pl` |
+| **sitemap.xml** | ✅ OK | Używa kanonicznego `https://sredzka-korona.pl` |
 
 ---
 
 ## Plan działania
 
 ### 1. 🔧 SEO — naprawa URL-i w robots.txt i sitemap.xml (PILNE)
-- [x] robots.txt — zmiana `sredzka-korona.pl` → `www.sredzka-korona.pl`
-- [x] sitemap.xml — zmiana `sredzka-korona.pl` → `www.sredzka-korona.pl`
-- [x] `scripts/generate-seo.mjs` — dodać obsługę poprawnego originu z `www.`
+- [x] robots.txt — ustawiony na kanoniczny `https://sredzka-korona.pl`
+- [x] sitemap.xml — ustawiony na kanoniczny `https://sredzka-korona.pl`
+- [x] `scripts/generate-seo.mjs` — generuje SEO z `assets/seo/site-origin.json`
 
 ### 2. 🔧 SEO — statyczne nagłówki H1/H2 na stronie głównej
 - [ ] Dodać statyczne `

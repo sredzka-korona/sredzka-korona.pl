@@ -23,19 +23,19 @@
       label: "Hotel",
       subtitle: "Pokoje i noclegi",
       apiService: "hotel",
-      confirmPath: "../dokumenty/index.html#regulamin-rezerwacji-hotel",
+      confirmPath: "/dokumenty/#regulamin-rezerwacji-hotel",
     },
     restaurant: {
       label: "Catering",
       subtitle: "Rezerwacja stolika",
       apiService: "restaurant",
-      confirmPath: "../dokumenty/index.html#regulamin-rezerwacji-restauracja",
+      confirmPath: "/dokumenty/#regulamin-rezerwacji-restauracja",
     },
     events: {
       label: "Przyjęcia",
       subtitle: "Sale i wydarzenia",
       apiService: "hall",
-      confirmPath: "../dokumenty/index.html#regulamin-rezerwacji-sali",
+      confirmPath: "/dokumenty/#regulamin-rezerwacji-sali",
     },
   };
 
@@ -2107,7 +2107,7 @@
         <div class="gb-summary-box">
           <label class="gb-check" style="margin-top:0">
             <input type="checkbox" id="gb-terms" ${state.termsAccepted ? "checked" : ""} />
-            <span>Akceptuję <a class="gb-link" href="${escapeHtml(SERVICE_META[state.selectedService]?.confirmPath || "#")}" target="_blank" rel="noopener">regulamin rezerwacji</a>, oraz fakt, że moja rezerwacja zostanie rozpatrzona w ciągu ${decisionDaysLabel}.<br>Wyrażam zgodę na przetwarzanie moich danych osobowych w celu obsługi i realizacji rezerwacji, zgodnie z <a class="gb-link" href="../dokumenty/index.html#polityka-prywatnosci" target="_blank" rel="noopener">Polityką prywatności</a>. Wiem, że zgodę mogę wycofać w dowolnym momencie (e-mail: kontakt@sredzka-korona.pl). Pełny obowiązek informacyjny znajduje się w dziale <a class="gb-link" href="../dokumenty/index.html" target="_blank" rel="noopener">Dokumenty</a>.</span>
+            <span>Akceptuję <a class="gb-link" href="${escapeHtml(SERVICE_META[state.selectedService]?.confirmPath || "#")}" target="_blank" rel="noopener">regulamin rezerwacji</a>, oraz fakt, że moja rezerwacja zostanie rozpatrzona w ciągu ${decisionDaysLabel}.<br>Wyrażam zgodę na przetwarzanie moich danych osobowych w celu obsługi i realizacji rezerwacji, zgodnie z <a class="gb-link" href="/dokumenty/#polityka-prywatnosci" target="_blank" rel="noopener">Polityką prywatności</a>. Wiem, że zgodę mogę wycofać w dowolnym momencie (e-mail: kontakt@sredzka-korona.pl). Pełny obowiązek informacyjny znajduje się w dziale <a class="gb-link" href="/dokumenty/" target="_blank" rel="noopener">Dokumenty</a>.</span>
           </label>
         </div>
 

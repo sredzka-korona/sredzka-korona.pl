@@ -1,39 +1,41 @@
 <!doctype html>
-<html lang="pl" data-sredzka-title="Kontakt | Średzka Korona">
+<html lang="pl" data-sredzka-title="Kontakt i rezerwacje | Średzka Korona">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (function() {
-        var GOOGLE_TAG_IDS = ['AW-18082369489', 'G-6ENY27XX0B'];
-        var PRIMARY_GOOGLE_TAG_ID = GOOGLE_TAG_IDS[0];
-        var googleTagsLoaded = false;
+        var ADS_GOOGLE_TAG_IDS = ['AW-18082369489'];
+        var ANALYTICS_GOOGLE_TAG_IDS = ['G-6ENY27XX0B'];
+        var PRIMARY_GOOGLE_TAG_ID = ANALYTICS_GOOGLE_TAG_IDS[0] || ADS_GOOGLE_TAG_IDS[0];
+        var googleScriptLoaded = false;
+        var configuredGoogleTagIds = {};
 
         window.dataLayer = window.dataLayer || [];
         window.gtag = window.gtag || function(){window.dataLayer.push(arguments);};
 
-        function getConsentState(granted) {
+        function getConsentState(analytics, marketing) {
           return {
-            'ad_storage': granted ? 'granted' : 'denied',
-            'ad_user_data': granted ? 'granted' : 'denied',
-            'ad_personalization': granted ? 'granted' : 'denied',
-            'analytics_storage': granted ? 'granted' : 'denied'
+            'ad_storage': marketing ? 'granted' : 'denied',
+            'ad_user_data': marketing ? 'granted' : 'denied',
+            'ad_personalization': marketing ? 'granted' : 'denied',
+            'analytics_storage': analytics ? 'granted' : 'denied'
           };
         }
 
         function applyConsentDefault() {
-          window.gtag('consent', 'default', getConsentState(false));
+          window.gtag('consent', 'default', getConsentState(false, false));
         }
 
-        function applyConsentUpdate(granted) {
-          window.gtag('consent', 'update', getConsentState(granted));
+        function applyConsentUpdate(analytics, marketing) {
+          window.gtag('consent', 'update', getConsentState(analytics, marketing));
         }
 
-        function loadGoogleTags() {
-          if (googleTagsLoaded) {
+        function ensureGoogleTagsLoaded() {
+          if (googleScriptLoaded || !PRIMARY_GOOGLE_TAG_ID) {
             return;
           }
-          googleTagsLoaded = true;
+          googleScriptLoaded = true;
 
           var script = document.createElement('script');
           script.async = true;
@@ -41,18 +43,42 @@
           document.head.appendChild(script);
 
           window.gtag('js', new Date());
-          GOOGLE_TAG_IDS.forEach(function(id) {
+        }
+
+        function configureGoogleTags(tagIds) {
+          tagIds.forEach(function(id) {
+            if (configuredGoogleTagIds[id]) {
+              return;
+            }
+            configuredGoogleTagIds[id] = true;
             window.gtag('config', id);
           });
         }
 
+        function loadConsentedGoogleTags(analytics, marketing) {
+          if (!analytics && !marketing) {
+            return;
+          }
+          ensureGoogleTagsLoaded();
+          if (analytics) {
+            configureGoogleTags(ANALYTICS_GOOGLE_TAG_IDS);
+          }
+          if (marketing) {
+            configureGoogleTags(ADS_GOOGLE_TAG_IDS);
+          }
+        }
+
         window.sredzkaGoogleConsent = {
-          grant: function() {
-            applyConsentUpdate(true);
-            loadGoogleTags();
+          grant: function(analytics, marketing) {
+            if (typeof analytics === 'undefined' && typeof marketing === 'undefined') {
+              analytics = true;
+              marketing = true;
+            }
+            applyConsentUpdate(!!analytics, !!marketing);
+            loadConsentedGoogleTags(!!analytics, !!marketing);
           },
           deny: function() {
-            applyConsentUpdate(false);
+            applyConsentUpdate(false, false);
           }
         };
 
@@ -60,8 +86,8 @@
 
         try {
           var c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
-          if (c && c.analytics && c.marketing) {
-            window.sredzkaGoogleConsent.grant();
+          if (c) {
+            window.sredzkaGoogleConsent.grant(!!c.analytics, !!c.marketing);
           }
         } catch(e) {}
       })();
@@ -76,22 +102,30 @@
     <meta name="robots" content="index,follow" />
     <meta name="geo.region" content="PL-DS" />
     <meta name="geo.placename" content="Środa Śląska" />
-    <title>Kontakt | Średzka Korona</title>
-    <meta name="apple-mobile-web-app-title" content="Kontakt | Średzka Korona" />
+    <title>Kontakt i rezerwacje | Średzka Korona</title>
+    <meta name="apple-mobile-web-app-title" content="Kontakt Średzka Korona" />
     <meta
       name="description"
       content="Kontakt do Średzkiej Korony w Środzie Śląskiej: telefon, e-mail, adres. Rezerwacje hotelu, cateringu i sal na imprezy okolicznościowe."
     />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pl_PL" />
+    <meta property="og:site_name" content="Średzka Korona" />
     <meta property="og:url" content="https://sredzka-korona.pl/kontakt/" />
-    <meta property="og:title" content="Kontakt — Średzka Korona, Środa Śląska" />
+    <meta property="og:title" content="Kontakt i rezerwacje | Średzka Korona" />
     <meta
       property="og:description"
       content="Adres, telefon i formularz kontaktowy — Średzka Korona, ul. Wrocławska 11, Środa Śląska."
     />
     <meta property="og:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
+    <meta property="og:image:alt" content="Logo Średzka Korona" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Kontakt i rezerwacje | Średzka Korona" />
+    <meta name="twitter:description" content="Adres, telefon i formularz kontaktowy Średzkiej Korony w Środzie Śląskiej." />
+    <meta name="twitter:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
+    <meta name="twitter:image:alt" content="Logo Średzka Korona" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -1519,7 +1553,7 @@
     <div class="contact-background"></div>
     <div class="shell">
       <nav class="floating-nav" id="floating-nav">
-        <a href="../index.html" class="floating-nav-brand">
+        <a href="../" class="floating-nav-brand">
           <span class="floating-nav-brand-text">ŚREDZKA</span>
           <img class="brand-logo" src="../ikony/logo-korona.png" alt="Logo Średzka Korona" loading="lazy" decoding="async" />
           <span class="floating-nav-brand-text">KORONA</span>
@@ -1630,7 +1664,7 @@
                   </svg>
                   Informacje
                 </button>
-                <a href="../dokumenty/index.html" class="action-button">
+                <a href="../dokumenty/" class="action-button">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                     <polyline points="14,2 14,8 20,8"></polyline>
@@ -1689,7 +1723,7 @@
         </div>
       </div>
     </div>
-    <a href="../admin/index.html" class="admin-corner-link">Panel</a>
+    <a href="../admin/" class="admin-corner-link">Panel</a>
     <div
       class="modal turnstile-modal"
       id="turnstile-modal"
@@ -1728,7 +1762,7 @@
           <p>Dane będą przechowywane przez czas niezbędny do obsługi zapytania, a następnie przez okres przedawnienia ewentualnych roszczeń lub przez okres wymagany przepisami prawa.</p>
           <p>Osobie, której dane dotyczą, przysługuje prawo dostępu do danych, sprostowania, usunięcia, ograniczenia przetwarzania, przenoszenia danych, sprzeciwu, wycofania zgody oraz wniesienia skargi do Prezesa UODO.</p>
           <p><strong>Kontakt z Administratorem:</strong> <a href="mailto:kontakt@sredzka-korona.pl">kontakt@sredzka-korona.pl</a>, +48 691 964 714, ul. Wrocławska 11, 55-300 Środa Śląska.</p>
-          <p>Pełna Polityka Prywatności dostępna jest pod adresem: <a href="../dokumenty/index.html" target="_blank" rel="noopener">dokumenty/index.html</a>.</p>
+          <p>Pełna Polityka Prywatności dostępna jest pod adresem: <a href="../dokumenty/" target="_blank" rel="noopener">dokumenty/</a>.</p>
         </div>
         <div class="gdpr-consent-actions">
           <button type="button" class="gdpr-btn gdpr-btn-cancel" id="gdpr-btn-cancel">Anuluj</button>
@@ -2226,7 +2260,7 @@
           let analyticsGranted = false;
           try {
             const c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
-            if (c && c.analytics && c.marketing) {
+            if (c && (c.analytics || c.marketing)) {
               analyticsGranted = true;
             }
           } catch(e) {}
@@ -2246,11 +2280,7 @@
           localStorage.setItem('sredzka-cookies-choice', JSON.stringify(value));
 
           if (window.sredzkaGoogleConsent) {
-            if (acceptAll) {
-              window.sredzkaGoogleConsent.grant();
-            } else {
-              window.sredzkaGoogleConsent.deny();
-            }
+            window.sredzkaGoogleConsent.grant(!!value.analytics, !!value.marketing);
           }
 
           updateCookiePanelState();
@@ -2327,7 +2357,7 @@
         </div>
 
         <div class="cookie-docs-row">
-          <a class="cookie-doc-link" href="../dokumenty/index.html">Dokumenty: Polityka prywatności i cookies oraz informacja RODO</a>
+          <a class="cookie-doc-link" href="../dokumenty/">Dokumenty: Polityka prywatności i cookies oraz informacja RODO</a>
         </div>
 
         <div class="cookie-actions">
@@ -2338,5 +2368,6 @@
     </div>
 
       <p class="footer-date">Data: 01.05.2026r.</p>
+    <script src="../assets/js/cookies-banner.js"></script>
 </body>
 </html>

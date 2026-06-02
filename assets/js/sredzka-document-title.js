@@ -4,6 +4,32 @@
  */
 (function () {
   "use strict";
+  var protocol = window.location.protocol || "";
+  var canonicalHost = "sredzka-korona.pl";
+  var currentHost = window.location.hostname || "";
+
+  if ((protocol === "http:" || protocol === "https:") && currentHost === "www." + canonicalHost) {
+    window.location.replace(
+      "https://" +
+        canonicalHost +
+        window.location.pathname +
+        window.location.search +
+        window.location.hash
+    );
+    return;
+  }
+
+  var currentPath = window.location.pathname || "";
+  if ((protocol === "http:" || protocol === "https:") && /\/index\.html$/i.test(currentPath)) {
+    window.location.replace(
+      window.location.origin +
+        currentPath.replace(/index\.html$/i, "") +
+        window.location.search +
+        window.location.hash
+    );
+    return;
+  }
+
   var locked = document.documentElement.getAttribute("data-sredzka-title");
   if (!locked) return;
 

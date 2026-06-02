@@ -1,39 +1,41 @@
 <!doctype html>
-<html lang="pl" data-sredzka-title="Hotel | Średzka Korona">
+<html lang="pl" data-sredzka-title="Hotel Środa Śląska | noclegi | Średzka Korona">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (function() {
-        var GOOGLE_TAG_IDS = ['AW-18082369489', 'G-6ENY27XX0B'];
-        var PRIMARY_GOOGLE_TAG_ID = GOOGLE_TAG_IDS[0];
-        var googleTagsLoaded = false;
+        var ADS_GOOGLE_TAG_IDS = ['AW-18082369489'];
+        var ANALYTICS_GOOGLE_TAG_IDS = ['G-6ENY27XX0B'];
+        var PRIMARY_GOOGLE_TAG_ID = ANALYTICS_GOOGLE_TAG_IDS[0] || ADS_GOOGLE_TAG_IDS[0];
+        var googleScriptLoaded = false;
+        var configuredGoogleTagIds = {};
 
         window.dataLayer = window.dataLayer || [];
         window.gtag = window.gtag || function(){window.dataLayer.push(arguments);};
 
-        function getConsentState(granted) {
+        function getConsentState(analytics, marketing) {
           return {
-            'ad_storage': granted ? 'granted' : 'denied',
-            'ad_user_data': granted ? 'granted' : 'denied',
-            'ad_personalization': granted ? 'granted' : 'denied',
-            'analytics_storage': granted ? 'granted' : 'denied'
+            'ad_storage': marketing ? 'granted' : 'denied',
+            'ad_user_data': marketing ? 'granted' : 'denied',
+            'ad_personalization': marketing ? 'granted' : 'denied',
+            'analytics_storage': analytics ? 'granted' : 'denied'
           };
         }
 
         function applyConsentDefault() {
-          window.gtag('consent', 'default', getConsentState(false));
+          window.gtag('consent', 'default', getConsentState(false, false));
         }
 
-        function applyConsentUpdate(granted) {
-          window.gtag('consent', 'update', getConsentState(granted));
+        function applyConsentUpdate(analytics, marketing) {
+          window.gtag('consent', 'update', getConsentState(analytics, marketing));
         }
 
-        function loadGoogleTags() {
-          if (googleTagsLoaded) {
+        function ensureGoogleTagsLoaded() {
+          if (googleScriptLoaded || !PRIMARY_GOOGLE_TAG_ID) {
             return;
           }
-          googleTagsLoaded = true;
+          googleScriptLoaded = true;
 
           var script = document.createElement('script');
           script.async = true;
@@ -41,18 +43,42 @@
           document.head.appendChild(script);
 
           window.gtag('js', new Date());
-          GOOGLE_TAG_IDS.forEach(function(id) {
+        }
+
+        function configureGoogleTags(tagIds) {
+          tagIds.forEach(function(id) {
+            if (configuredGoogleTagIds[id]) {
+              return;
+            }
+            configuredGoogleTagIds[id] = true;
             window.gtag('config', id);
           });
         }
 
+        function loadConsentedGoogleTags(analytics, marketing) {
+          if (!analytics && !marketing) {
+            return;
+          }
+          ensureGoogleTagsLoaded();
+          if (analytics) {
+            configureGoogleTags(ANALYTICS_GOOGLE_TAG_IDS);
+          }
+          if (marketing) {
+            configureGoogleTags(ADS_GOOGLE_TAG_IDS);
+          }
+        }
+
         window.sredzkaGoogleConsent = {
-          grant: function() {
-            applyConsentUpdate(true);
-            loadGoogleTags();
+          grant: function(analytics, marketing) {
+            if (typeof analytics === 'undefined' && typeof marketing === 'undefined') {
+              analytics = true;
+              marketing = true;
+            }
+            applyConsentUpdate(!!analytics, !!marketing);
+            loadConsentedGoogleTags(!!analytics, !!marketing);
           },
           deny: function() {
-            applyConsentUpdate(false);
+            applyConsentUpdate(false, false);
           }
         };
 
@@ -60,8 +86,8 @@
 
         try {
           var c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
-          if (c && c.analytics && c.marketing) {
-            window.sredzkaGoogleConsent.grant();
+          if (c) {
+            window.sredzkaGoogleConsent.grant(!!c.analytics, !!c.marketing);
           }
         } catch(e) {}
       })();
@@ -76,24 +102,30 @@
     <meta name="robots" content="index,follow,max-image-preview:large" />
     <meta name="geo.region" content="PL-DS" />
     <meta name="geo.placename" content="Środa Śląska" />
-    <title>Hotel | Średzka Korona</title>
-    <meta name="apple-mobile-web-app-title" content="Hotel | Średzka Korona" />
+    <title>Hotel Środa Śląska | noclegi | Średzka Korona</title>
+    <meta name="apple-mobile-web-app-title" content="Hotel Średzka Korona" />
     <meta
       name="description"
-      content="Noclegi w hotelu przy Średzkiej Koronie w Środzie Śląskiej. Komfortowe pokoje dla gości z miasta, okolic Wrocławia oraz miejscowości: Lutynia, Miękinia, Źródła, Szczepanów."
+      content="Hotel i noclegi w Środzie Śląskiej. Komfortowe pokoje dla gości z miasta, okolic Wrocławia oraz miejscowości: Lutynia, Miękinia, Źródła i Szczepanów."
     />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pl_PL" />
+    <meta property="og:site_name" content="Średzka Korona" />
     <meta property="og:url" content="https://sredzka-korona.pl/Hotel/" />
-    <meta property="og:title" content="Hotel Środa Śląska — noclegi | Średzka Korona" />
+    <meta property="og:title" content="Hotel Środa Śląska | noclegi | Średzka Korona" />
     <meta
       property="og:description"
       content="Hotel i noclegi w Środzie Śląskiej — Średzka Korona. Wygodna baza na Dolny Śląsk i Wrocław."
     />
     <meta property="og:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
+    <meta property="og:image:alt" content="Logo Średzka Korona" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Hotel Środa Śląska — Średzka Korona" />
+    <meta name="twitter:title" content="Hotel Środa Śląska | noclegi | Średzka Korona" />
+    <meta name="twitter:description" content="Hotel i noclegi w Środzie Śląskiej — wygodna baza dla gości z Wrocławia i okolic." />
     <meta name="twitter:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
+    <meta name="twitter:image:alt" content="Logo Średzka Korona" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -287,6 +319,7 @@
         line-height: 1.6;
         margin: 0 0 2rem;
         color: rgba(255, 255, 255, 0.95);
+        font-weight: 400;
       }
 
       .rooms-info {
@@ -782,6 +815,7 @@
 
         .hotel-description {
           font-size: clamp(1rem, 2vw, 1.2rem);
+          font-weight: 400;
         }
 
         .rooms-info {
@@ -1260,6 +1294,15 @@
       <p>Hotel czynny przez cały rok. Zapraszamy zarówno na krótkie pobyty, jak i dłuższe weekendy oraz urlopy. Gościmy osoby indywidualne, pary, rodziny oraz grupy zorganizowane.</p>
       <p>Skontaktuj się z nami, aby sprawdzić dostępność i zarezerwować pobyt w hotelu Średzka Korona w Środzie Śląskiej.</p>
     </div>
+    <noscript>
+      <div style="padding: 2rem; max-width: 800px; margin: 0 auto; text-align: center;">
+        <h1>Hotel Średzka Korona</h1>
+        <p style="font-size: 1.2rem; margin-bottom: 2rem;">Noclegi w Środzie Śląskiej niedaleko Wrocławia</p>
+        <p><a href="../">← Powrót do strony głównej</a></p>
+        <p style="margin-top: 2rem;">Aby w pełni korzystać z naszej strony, włącz obsługę JavaScript w przeglądarce.</p>
+        <p>Telefon: +48 600 700 800 | Email: kontakt@sredzkakorona.pl</p>
+      </div>
+    </noscript>
     <div id="app"></div>
     <script>
       (async () => {
@@ -1323,8 +1366,8 @@
         try {
           if (!(isLocalPreview && !fallbackApiBase)) {
             const payload = await loadBootstrapPayload();
-            if (payload.content?.home?.sectionBlocks?.hotel) {
-              window.location.replace("../index.html");
+              if (payload.content?.home?.sectionBlocks?.hotel) {
+              window.location.replace("../");
               return;
             }
           }
@@ -1389,7 +1432,7 @@
           <div class="hotel-background"></div>
           <div class="shell">
             <nav class="floating-nav" id="floating-nav">
-              <a href="../index.html" class="floating-nav-brand">
+              <a href="../" class="floating-nav-brand">
                 <span class="floating-nav-brand-text">ŚREDZKA</span>
                 <img class="brand-logo" src="../ikony/logo-korona.png" alt="Logo Średzka Korona" loading="lazy" decoding="async" />
                 <span class="floating-nav-brand-text">KORONA</span>
@@ -1399,9 +1442,9 @@
             <div class="hotel-content">
               <div class="hotel-info">
                 <h1 class="hotel-title">Hotel <span class="visually-hidden">– komfortowe noclegi i pokoje w Środzie Śląskiej</span></h1>
-                <p class="hotel-description">
+                <h2 class="hotel-description">
                   Noclegi w Środzie Śląskiej niedaleko Wrocławia na 50 osób ze śniadaniem w cenie. Oferujemy pokoje w różnych kofniguracjach:
-                </p>
+                </h2>
                 <div class="rooms-info">
                   <div class="room-type" data-room-type="1-osobowe">
                     <div class="room-type-number">1</div>
@@ -1490,7 +1533,7 @@
           let analyticsGranted = false;
           try {
             const c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
-            if (c && c.analytics && c.marketing) {
+            if (c && (c.analytics || c.marketing)) {
               analyticsGranted = true;
             }
           } catch(e) {}
@@ -1510,11 +1553,7 @@
           localStorage.setItem('sredzka-cookies-choice', JSON.stringify(value));
 
           if (window.sredzkaGoogleConsent) {
-            if (acceptAll) {
-              window.sredzkaGoogleConsent.grant();
-            } else {
-              window.sredzkaGoogleConsent.deny();
-            }
+            window.sredzkaGoogleConsent.grant(!!value.analytics, !!value.marketing);
           }
 
           updateCookiePanelState();
@@ -1554,7 +1593,7 @@
     <script src="../assets/js/booking-flags.js?v=20260411-3"></script>
     <script src="../assets/js/global-booking-modal.js?v=20260411-3"></script>
     <script src="../assets/js/sredzka-document-title.js"></script>
-    <a href="../kontakt/index.html" class="floating-contact-button" aria-label="Kontakt">
+    <a href="../kontakt/" class="floating-contact-button" aria-label="Kontakt">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
       </svg>
@@ -1595,7 +1634,7 @@
         </div>
 
         <div class="cookie-docs-row">
-          <a class="cookie-doc-link" href="../dokumenty/index.html">Dokumenty: Polityka prywatności i cookies oraz informacja RODO</a>
+          <a class="cookie-doc-link" href="../dokumenty/">Dokumenty: Polityka prywatności i cookies oraz informacja RODO</a>
         </div>
 
         <div class="cookie-actions">
@@ -1605,8 +1644,9 @@
       </div>
     </div>
 
-    <a class="faq-float-btn" href="../f-and-q/index.html" aria-label="FAQ — częste pytania" title="FAQ — częste pytania">F&amp;Q</a>
+    <a class="faq-float-btn" href="../f-and-q/" aria-label="FAQ — częste pytania" title="FAQ — częste pytania">F&amp;Q</a>
     <a class="watermark" href="https://i-janicki.pl">Design &amp; Development by Igor Janicki</a>
       <p class="footer-date">Data: 01.05.2026r.</p>
+    <script src="../assets/js/cookies-banner.js"></script>
 </body>
 </html>

@@ -1,39 +1,41 @@
 <!doctype html>
-<html lang="pl" data-sredzka-title="Przyjęcia | Średzka Korona">
+<html lang="pl" data-sredzka-title="Przyjęcia okolicznościowe Środa Śląska | sala weselna | Średzka Korona">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (function() {
-        var GOOGLE_TAG_IDS = ['AW-18082369489', 'G-6ENY27XX0B'];
-        var PRIMARY_GOOGLE_TAG_ID = GOOGLE_TAG_IDS[0];
-        var googleTagsLoaded = false;
+        var ADS_GOOGLE_TAG_IDS = ['AW-18082369489'];
+        var ANALYTICS_GOOGLE_TAG_IDS = ['G-6ENY27XX0B'];
+        var PRIMARY_GOOGLE_TAG_ID = ANALYTICS_GOOGLE_TAG_IDS[0] || ADS_GOOGLE_TAG_IDS[0];
+        var googleScriptLoaded = false;
+        var configuredGoogleTagIds = {};
 
         window.dataLayer = window.dataLayer || [];
         window.gtag = window.gtag || function(){window.dataLayer.push(arguments);};
 
-        function getConsentState(granted) {
+        function getConsentState(analytics, marketing) {
           return {
-            'ad_storage': granted ? 'granted' : 'denied',
-            'ad_user_data': granted ? 'granted' : 'denied',
-            'ad_personalization': granted ? 'granted' : 'denied',
-            'analytics_storage': granted ? 'granted' : 'denied'
+            'ad_storage': marketing ? 'granted' : 'denied',
+            'ad_user_data': marketing ? 'granted' : 'denied',
+            'ad_personalization': marketing ? 'granted' : 'denied',
+            'analytics_storage': analytics ? 'granted' : 'denied'
           };
         }
 
         function applyConsentDefault() {
-          window.gtag('consent', 'default', getConsentState(false));
+          window.gtag('consent', 'default', getConsentState(false, false));
         }
 
-        function applyConsentUpdate(granted) {
-          window.gtag('consent', 'update', getConsentState(granted));
+        function applyConsentUpdate(analytics, marketing) {
+          window.gtag('consent', 'update', getConsentState(analytics, marketing));
         }
 
-        function loadGoogleTags() {
-          if (googleTagsLoaded) {
+        function ensureGoogleTagsLoaded() {
+          if (googleScriptLoaded || !PRIMARY_GOOGLE_TAG_ID) {
             return;
           }
-          googleTagsLoaded = true;
+          googleScriptLoaded = true;
 
           var script = document.createElement('script');
           script.async = true;
@@ -41,18 +43,42 @@
           document.head.appendChild(script);
 
           window.gtag('js', new Date());
-          GOOGLE_TAG_IDS.forEach(function(id) {
+        }
+
+        function configureGoogleTags(tagIds) {
+          tagIds.forEach(function(id) {
+            if (configuredGoogleTagIds[id]) {
+              return;
+            }
+            configuredGoogleTagIds[id] = true;
             window.gtag('config', id);
           });
         }
 
+        function loadConsentedGoogleTags(analytics, marketing) {
+          if (!analytics && !marketing) {
+            return;
+          }
+          ensureGoogleTagsLoaded();
+          if (analytics) {
+            configureGoogleTags(ANALYTICS_GOOGLE_TAG_IDS);
+          }
+          if (marketing) {
+            configureGoogleTags(ADS_GOOGLE_TAG_IDS);
+          }
+        }
+
         window.sredzkaGoogleConsent = {
-          grant: function() {
-            applyConsentUpdate(true);
-            loadGoogleTags();
+          grant: function(analytics, marketing) {
+            if (typeof analytics === 'undefined' && typeof marketing === 'undefined') {
+              analytics = true;
+              marketing = true;
+            }
+            applyConsentUpdate(!!analytics, !!marketing);
+            loadConsentedGoogleTags(!!analytics, !!marketing);
           },
           deny: function() {
-            applyConsentUpdate(false);
+            applyConsentUpdate(false, false);
           }
         };
 
@@ -60,8 +86,8 @@
 
         try {
           var c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
-          if (c && c.analytics && c.marketing) {
-            window.sredzkaGoogleConsent.grant();
+          if (c) {
+            window.sredzkaGoogleConsent.grant(!!c.analytics, !!c.marketing);
           }
         } catch(e) {}
       })();
@@ -76,33 +102,71 @@
     <meta name="robots" content="index,follow,max-image-preview:large" />
     <meta name="geo.region" content="PL-DS" />
     <meta name="geo.placename" content="Środa Śląska" />
-    <title>Przyjęcia | Średzka Korona</title>
-    <meta name="apple-mobile-web-app-title" content="Przyjęcia | Średzka Korona" />
+    <title>Przyjęcia okolicznościowe Środa Śląska | sala weselna | Średzka Korona</title>
+    <meta name="apple-mobile-web-app-title" content="Przyjęcia Średzka Korona" />
     <meta
       name="description"
-      content="Sale na wesela, komunie i imprezy okolicznościowe w Środzie Śląskiej. Organizacja przyjęć i catering dla gości z Wrocławia, Dolnego Śląska oraz okolic: Lutynia, Miękinia, Źródła, Szczepanów."
+      content="Sale na wesela, komunie i imprezy okolicznościowe w Środzie Śląskiej. Organizacja przyjęć i catering dla gości z Wrocławia, Dolnego Śląska oraz okolic: Lutynia, Miękinia, Źródła i Szczepanów."
     />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pl_PL" />
+    <meta property="og:site_name" content="Średzka Korona" />
     <meta property="og:url" content="https://sredzka-korona.pl/przyjecia/" />
-    <meta property="og:title" content="Sala na imprezy okolicznościowe — Środa Śląska | Średzka Korona" />
+    <meta property="og:title" content="Przyjęcia okolicznościowe Środa Śląska | sala weselna | Średzka Korona" />
     <meta
       property="og:description"
-      content="Sale bankietowe i organizacja imprez okolicznościowych przy Średzkiej Koronie — Środa Śląska i okolice."
+      content="Sale bankietowe i organizacja imprez okolicznościowych przy Średzkiej Koronie — Środa Śląska i okolice Wrocławia."
     />
-    <meta property="og:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
+    <meta property="og:image" content="https://sredzka-korona.pl/assets/img/sala.webp" />
+    <meta property="og:image:alt" content="Sala bankietowa Średzka Korona" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Imprezy okolicznościowe Środa Śląska | Średzka Korona" />
-    <meta name="twitter:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
+    <meta name="twitter:title" content="Przyjęcia okolicznościowe Środa Śląska | sala weselna | Średzka Korona" />
+    <meta name="twitter:description" content="Sale bankietowe i organizacja imprez okolicznościowych w Środzie Śląskiej i okolicach Wrocławia." />
+    <meta name="twitter:image" content="https://sredzka-korona.pl/assets/img/sala.webp" />
+    <meta name="twitter:image:alt" content="Sala bankietowa Średzka Korona" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@graph": [
           {
+            "@type": "Organization",
+            "@id": "https://sredzka-korona.pl/#organization",
+            "name": "Średzka Korona",
+            "url": "https://sredzka-korona.pl/",
+            "logo": "https://sredzka-korona.pl/ikony/logo-korona.png",
+            "image": "https://sredzka-korona.pl/assets/img/sala.webp",
+            "email": "kontakt@sredzkakorona.pl",
+            "telephone": "+48-600-700-800",
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "ul. Wrocławska 11",
+              "addressLocality": "Środa Śląska",
+              "postalCode": "55-300",
+              "addressRegion": "Dolnośląskie",
+              "addressCountry": "PL"
+            },
+            "sameAs": [
+              "https://www.facebook.com/SredzkaKorona/?locale=pl_PL",
+              "https://www.instagram.com/sredzka_korona/"
+            ]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://sredzka-korona.pl/#website",
+            "url": "https://sredzka-korona.pl/",
+            "name": "Średzka Korona",
+            "inLanguage": "pl-PL",
+            "publisher": { "@id": "https://sredzka-korona.pl/#organization" }
+          },
+          {
             "@type": "EventVenue",
             "@id": "https://sredzka-korona.pl/przyjecia/#venue",
             "name": "Sale bankietowe Średzka Korona",
             "url": "https://sredzka-korona.pl/przyjecia/",
+            "image": "https://sredzka-korona.pl/assets/img/sala.webp",
+            "description": "Sale bankietowe na wesela, komunie, chrzciny, jubileusze i spotkania firmowe w Środzie Śląskiej.",
             "parentOrganization": { "@id": "https://sredzka-korona.pl/#organization" },
             "address": {
               "@type": "PostalAddress",
@@ -113,6 +177,36 @@
               "addressCountry": "PL"
             },
             "telephone": "+48-600-700-800"
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://sredzka-korona.pl/przyjecia/#faq",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Ile osób pomieszczą sale na przyjęcia?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Sala Duża mieści do 120 osób, a Sala Mała do 40 osób."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Jakie przyjęcia organizujecie w Środzie Śląskiej?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Organizujemy wesela, poprawiny, komunie, chrzciny, jubileusze, stypy oraz spotkania firmowe."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Czy można zamówić catering i noclegi dla gości?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Tak, łączymy przyjęcie z cateringiem oraz noclegiem dla gości w jednym miejscu."
+                }
+              }
+            ]
           },
           {
             "@type": "BreadcrumbList",
@@ -289,6 +383,67 @@
         font-size: clamp(1.1rem, 2vw, 1.4rem);
         line-height: 1.6;
         margin: 0 0 2rem;
+        color: rgba(255, 255, 255, 0.95);
+      }
+
+      .events-details {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+        width: 100%;
+        max-width: 900px;
+        margin: 0 auto 1.75rem;
+        text-align: left;
+      }
+
+      .events-detail-card {
+        padding: 1.2rem 1.25rem 1.15rem;
+        background: rgba(255, 255, 255, 0.14);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+      }
+
+      .events-detail-card--full {
+        grid-column: 1 / -1;
+      }
+
+      .events-detail-card h2 {
+        font-family: "Cormorant Garamond", serif;
+        font-size: clamp(1.5rem, 2vw, 2rem);
+        line-height: 1.1;
+        margin: 0 0 0.75rem;
+        color: white;
+      }
+
+      .events-detail-card p,
+      .events-detail-card li {
+        margin: 0 0 0.65rem;
+        color: rgba(255, 255, 255, 0.94);
+        line-height: 1.6;
+        font-size: 1rem;
+      }
+
+      .events-detail-card ul {
+        margin: 0.75rem 0 0;
+        padding-left: 1.2rem;
+      }
+
+      .events-detail-card strong {
+        color: #ffffff;
+      }
+
+      .events-detail-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem 1rem;
+      }
+
+      .events-detail-meta span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
         color: rgba(255, 255, 255, 0.95);
       }
 
@@ -510,6 +665,17 @@
       .modal-content p {
         margin: 0 0 1rem;
         font-size: 1.1rem;
+      }
+
+      .modal-support-text {
+        color: var(--muted);
+        font-size: 1rem;
+        line-height: 1.7;
+        padding: 1.25rem 1.5rem;
+        background: rgba(250, 248, 245, 0.5);
+        border-radius: 16px;
+        border: 1px solid rgba(200, 170, 120, 0.2);
+        margin: 1rem 0;
       }
 
       .modal-content ul {
@@ -887,7 +1053,7 @@
       .hall-list {
         display: grid;
         gap: 1.5rem;
-        margin-top: 1.5rem;
+        margin: 1.5rem 0;
       }
 
       .hall-item {
@@ -2307,6 +2473,14 @@
           font-size: clamp(1rem, 2vw, 1.2rem);
         }
 
+        .events-details {
+          grid-template-columns: 1fr;
+        }
+
+        .events-detail-card--full {
+          grid-column: auto;
+        }
+
         .tiles-grid {
           grid-template-columns: repeat(2, 1fr);
           gap: 1rem;
@@ -3003,7 +3177,68 @@
     </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="events-background"></div>
+      <div class="shell">
+        <nav class="floating-nav" id="floating-nav">
+          <a href="../" class="floating-nav-brand">
+            <span class="floating-nav-brand-text">ŚREDZKA</span>
+            <img class="brand-logo" src="../ikony/logo-korona.png" alt="Logo Średzka Korona" loading="lazy" decoding="async" />
+            <span class="floating-nav-brand-text">KORONA</span>
+          </a>
+        </nav>
+          <div class="events-content">
+            <div class="events-info">
+            <h1 class="events-title">Przyjęcia okolicznościowe</h1>
+            <p class="events-description">
+              Wesela, komunie, chrzciny, jubileusze i spotkania firmowe w salach bankietowych w Środzie Śląskiej.
+            </p>
+            <div id="sale-modal-static" class="visually-hidden">
+              <div class="modal-body">
+                <div class="modal-header">
+                  <h2>Sale</h2>
+                  <button class="modal-close" id="close-modal" aria-label="Zamknij">×</button>
+                </div>
+                <div class="modal-content">
+                  <p class="modal-support-text">Dwie sale bankietowe pozwalają dobrać przestrzeń do liczby gości i skali wydarzenia — bez przepłacania za zbyt dużą salę.</p>
+                  <div class="hall-list">
+                    <div class="hall-item">
+                      <h3>Sala Duża</h3>
+                      <p><strong>Pojemność:</strong> do 120 osób</p>
+                      <p>Przestronna sala bankietowa na większe uroczystości, z miejscem na stoły, taniec i wygodną obsługę.</p>
+                    </div>
+                    <div class="hall-item">
+                      <h3>Sala Mała</h3>
+                      <p><strong>Pojemność:</strong> do 40 osób</p>
+                      <p>Kameralna sala na rodzinne spotkania, chrzciny, komunie i mniejsze przyjęcia w spokojnej atmosferze.</p>
+                    </div>
+                  </div>
+                  <p class="modal-support-text">To rozwiązanie dobrze sprawdza się przy wydarzeniach lokalnych w Środzie Śląskiej, Miękini, Lutyni i okolicach Wrocławia.</p>
+                </div>
+              </div>
+            </div>
+            <div class="tiles-grid">
+              <div class="tile" data-modal="oferta">
+                <div class="tile-label">Oferta</div>
+              </div>
+              <div class="tile" data-modal="sale">
+                <div class="tile-label">Sale</div>
+              </div>
+              <div class="tile" data-modal="menu-okolicznosciowe">
+                <div class="tile-label">Menu</div>
+              </div>
+              <div class="tile" data-modal="galeria">
+                <div class="tile-label">Zdjęcia</div>
+              </div>
+            </div>
+          </div>
+          <div class="reservation-info" data-open-global-booking data-global-booking-service="events" role="button" tabindex="0" aria-label="Otwórz system rezerwacji">
+            <span class="reservation-info-text">Rezerwacja sali / przyjęcia okolicznościowego</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal" id="modal"></div>
+    </div>
     <script src="../assets/js/default-content.js"></script>
     <script src="../assets/js/config.js"></script>
     <script src="../assets/js/booking-flags.js?v=20260411-3"></script>
@@ -3106,8 +3341,8 @@
         try {
           if (!(isLocalPreview && !fallbackApiBase)) {
             const payload = await loadBootstrapPayload();
-            if (payload.content?.home?.sectionBlocks?.events) {
-              window.location.replace("../index.html");
+              if (payload.content?.home?.sectionBlocks?.events) {
+              window.location.replace("../");
               return;
             }
           }
@@ -3117,12 +3352,10 @@
           try {
             if (isLocalPreview && !fallbackApiBase) {
               // Fallback dla lokalnego podglądu
-              hallGalleries = {
-                "1": [
-                ],
-                "2": [
-                ],
-              };
+              hallGalleries = structuredClone(window.SREDZKA_DEFAULT_CONTENT?.events?.hallGalleries || {
+                "1": [],
+                "2": [],
+              });
               {
                 const dc = window.SREDZKA_DEFAULT_CONTENT;
                 const r = Array.isArray(dc?.restaurant?.menu) ? dc.restaurant.menu : [];
@@ -3357,32 +3590,6 @@
           modal.innerHTML = "";
         }
 
-        function renderSaleModal() {
-          return `
-            <div class="modal-body">
-              <div class="modal-header">
-                <h2>Sale</h2>
-                <button class="modal-close" id="close-modal" aria-label="Zamknij">×</button>
-              </div>
-              <div class="modal-content">
-                <p>Dysponujemy dwiema eleganckimi salami o różnej pojemności, które można dostosować do potrzeb Twojego wydarzenia:</p>
-                <div class="hall-list">
-                  <div class="hall-item">
-                    <h3>Sala Duża</h3>
-                    <p><strong>Pojemność:</strong> do 120 osób</p>
-                    <p>Przestronna sala na większe wesela, gale i wydarzenia firmowe.</p>
-                  </div>
-                  <div class="hall-item">
-                    <h3>Sala Mała</h3>
-                    <p><strong>Pojemność:</strong> do 40 osób</p>
-                    <p>Kameralna przestrzeń na mniejsze przyjęcia i spotkania rodzinne.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          `;
-        }
-
         function renderOfertaModal() {
           const inner = getOfertaModalInnerHtml();
           return (
@@ -3547,57 +3754,24 @@
           `;
         }
 
-        app.innerHTML = `
+        if (!app.querySelector(".shell")) {
+          app.innerHTML = `
           <div class="events-background"></div>
           <div class="shell">
             <nav class="floating-nav" id="floating-nav">
-              <a href="../index.html" class="floating-nav-brand">
+              <a href="../" class="floating-nav-brand">
                 <span class="floating-nav-brand-text">ŚREDZKA</span>
                 <img class="brand-logo" src="../ikony/logo-korona.png" alt="Logo Średzka Korona" loading="lazy" decoding="async" />
                 <span class="floating-nav-brand-text">KORONA</span>
               </a>
 
             </nav>
-            <div class="events-content">
+          <div class="events-content">
               <div class="events-info">
-                <h1 class="events-title">Przyjęcia <span class="visually-hidden">okolicznościowe, imprezy i sale weselne w Środzie Śląskiej</span></h1>
+                <h1 class="events-title">Przyjęcia okolicznościowe</h1>
                 <p class="events-description">
-                  Nie organizujemy imprez. Organizujemy niezapomniane wspomnienia.
+                  Wesela, komunie, chrzciny, jubileusze i spotkania firmowe w salach bankietowych w Środzie Śląskiej.
                 </p>
-                <!-- Tekst oferty dla Google (visually-hidden, widoczny po kliknięciu kafelka) -->
-                <div class="visually-hidden" aria-hidden="true">
-                  <h3>Nowoczesna sala bankietowa – Środa Śląska, Miękinia, Lutynia i okolice Wrocławia</h3>
-                  <p>Organizujemy różnorodne przyjęcia okolicznościowe na Dolnym Śląsku, dostosowane do Twoich indywidualnych potrzeb i oczekiwań. Nasza elegancka sala na przyjęcia (sala do 120 osób) to idealne miejsce na każde wydarzenie. Oferujemy kompleksową obsługę i wynajem sali na następujące okazje:</p>
-                  <ul>
-                    <li><strong>Wesele i poprawiny</strong> – niezapomniane, tradycyjne wesela z pełną obsługą oraz poprawiny w świetnej atmosferze.</li>
-                    <li><strong>Ślub humanistyczny</strong> – wyjątkowe i osobiste ceremonie w pięknej oprawie blisko Wrocławia.</li>
-                    <li><strong>Chrzciny i komunie</strong> – uroczyste przyjęcia komunijne oraz chrzty dla dzieci i rodzin (Szczepanów, Malczyce, Krępice).</li>
-                    <li><strong>Stypy i pożegnania</strong> – godne pożegnania bliskich w spokojnej, pełnej szacunku atmosferze.</li>
-                    <li><strong>Urodziny, imieniny i jubileusze</strong> – kameralne oraz huczne spotkania dla każdego wieku.</li>
-                    <li><strong>Sylwester i Nowy Rok</strong> – niezapomniane, szampańskie bale sylwestrowe i uroczyste przyjęcia noworoczne.</li>
-                    <li><strong>Sala na Andrzejki</strong> – klimatyczne wieczory andrzejkowe z tradycyjnymi wróżbami i zabawą do rana.</li>
-                    <li><strong>Spotkania firmowe</strong> – profesjonalne wydarzenia firmowe, konferencje, szkolenia i imprezy integracyjne.</li>
-                  </ul>
-                  <p>Nasza sala bankietowa (Środa Śląska, Brzeg Dolny, pod Wrocławiem) jest otwarta na każde wyjątkowe wydarzenie. Dbamy o każdy szczegół, aby Twój dzień był niezapomniany.</p>
-                  <p><strong>Koszt wynajmu sali i organizacji przyjęcia</strong></p>
-                  <p>Cena organizacji wydarzenia zależy od wybranego menu (dania z karty), liczby gości oraz dodatkowych usług i zaczyna się od 250 zł/os. Każdą wycenę przygotowujemy indywidualnie.</p>
-                  <p>W typowej ofercie podstawowej zapewniamy:</p>
-                  <ul>
-                    <li>Komfortowy wynajem sali na Dolnym Śląsku (blisko Wrocławia)</li>
-                    <li>Smaczne menu podstawowe (do wyboru z naszej karty)</li>
-                    <li>Profesjonalną obsługę kelnerską</li>
-                    <li>Podstawową, elegancką dekorację i nakrycie stołów</li>
-                  </ul>
-                  <p>Dodatkowo oferujemy:</p>
-                  <ul>
-                    <li>Rozszerzone menu premium</li>
-                    <li>Kompleksowe dekoracje sali dopasowane do motywu przewodniego</li>
-                    <li>Profesjonalną obsługę barmańską</li>
-                    <li>Dodatkowe atrakcje (DJ, zespół muzyczny, fotograf)</li>
-                    <li>Komfortowe noclegi dla gości</li>
-                  </ul>
-                  <p>Zapraszamy do kontaktu! Z przyjemnością pomożemy zorganizować Twoje wymarzone przyjęcie w okolicach Wrocławia.</p>
-                </div>
                 <div class="tiles-grid">
                   <div class="tile" data-modal="oferta">
                     <div class="tile-label">Oferta</div>
@@ -3620,8 +3794,10 @@
           </div>
           <div class="modal" id="modal"></div>
         `;
+        }
 
         const modal = document.querySelector("#modal");
+        const saleModalStatic = document.querySelector("#sale-modal-static");
 
         function openOccasionMenu() {
           selectedOccasionCategoryIndex = 0;
@@ -3670,7 +3846,7 @@
           let content = "";
           switch (type) {
             case "sale":
-              content = renderSaleModal();
+              content = saleModalStatic?.innerHTML || "";
               break;
             case "oferta":
               content = renderOfertaModal();
@@ -3751,7 +3927,7 @@
           let analyticsGranted = false;
           try {
             const c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
-            if (c && c.analytics && c.marketing) {
+            if (c && (c.analytics || c.marketing)) {
               analyticsGranted = true;
             }
           } catch(e) {}
@@ -3771,11 +3947,7 @@
           localStorage.setItem('sredzka-cookies-choice', JSON.stringify(value));
 
           if (window.sredzkaGoogleConsent) {
-            if (acceptAll) {
-              window.sredzkaGoogleConsent.grant();
-            } else {
-              window.sredzkaGoogleConsent.deny();
-            }
+            window.sredzkaGoogleConsent.grant(!!value.analytics, !!value.marketing);
           }
 
           updateCookiePanelState();
@@ -3812,7 +3984,7 @@
       })();
     </script>
     <script src="../assets/js/sredzka-document-title.js"></script>
-    <a href="../kontakt/index.html" class="floating-contact-button" aria-label="Kontakt">
+    <a href="../kontakt/" class="floating-contact-button" aria-label="Kontakt">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
       </svg>
@@ -3853,7 +4025,7 @@
         </div>
 
         <div class="cookie-docs-row">
-          <a class="cookie-doc-link" href="../dokumenty/index.html">Dokumenty: Polityka prywatności i cookies oraz informacja RODO</a>
+          <a class="cookie-doc-link" href="../dokumenty/">Dokumenty: Polityka prywatności i cookies oraz informacja RODO</a>
         </div>
 
         <div class="cookie-actions">
@@ -3863,8 +4035,9 @@
       </div>
     </div>
 
-    <a class="faq-float-btn" href="../f-and-q/index.html" aria-label="FAQ — częste pytania" title="FAQ — częste pytania">F&amp;Q</a>
+    <a class="faq-float-btn" href="../f-and-q/" aria-label="FAQ — częste pytania" title="FAQ — częste pytania">F&amp;Q</a>
     <a class="watermark" href="https://i-janicki.pl">Design &amp; Development by Igor Janicki</a>
       <p class="footer-date">Data: 01.05.2026r.</p>
+    <script src="../assets/js/cookies-banner.js"></script>
 </body>
 </html>

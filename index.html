@@ -1,39 +1,41 @@
 <!doctype html>
-<html lang="pl" data-sredzka-title="Średzka Korona">
+<html lang="pl" data-sredzka-title="Hotel, catering i przyjęcia w Środzie Śląskiej | Średzka Korona">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (function() {
-        var GOOGLE_TAG_IDS = ['AW-18082369489', 'G-6ENY27XX0B'];
-        var PRIMARY_GOOGLE_TAG_ID = GOOGLE_TAG_IDS[0];
-        var googleTagsLoaded = false;
+        var ADS_GOOGLE_TAG_IDS = ['AW-18082369489'];
+        var ANALYTICS_GOOGLE_TAG_IDS = ['G-6ENY27XX0B'];
+        var PRIMARY_GOOGLE_TAG_ID = ANALYTICS_GOOGLE_TAG_IDS[0] || ADS_GOOGLE_TAG_IDS[0];
+        var googleScriptLoaded = false;
+        var configuredGoogleTagIds = {};
 
         window.dataLayer = window.dataLayer || [];
         window.gtag = window.gtag || function(){window.dataLayer.push(arguments);};
 
-        function getConsentState(granted) {
+        function getConsentState(analytics, marketing) {
           return {
-            'ad_storage': granted ? 'granted' : 'denied',
-            'ad_user_data': granted ? 'granted' : 'denied',
-            'ad_personalization': granted ? 'granted' : 'denied',
-            'analytics_storage': granted ? 'granted' : 'denied'
+            'ad_storage': marketing ? 'granted' : 'denied',
+            'ad_user_data': marketing ? 'granted' : 'denied',
+            'ad_personalization': marketing ? 'granted' : 'denied',
+            'analytics_storage': analytics ? 'granted' : 'denied'
           };
         }
 
         function applyConsentDefault() {
-          window.gtag('consent', 'default', getConsentState(false));
+          window.gtag('consent', 'default', getConsentState(false, false));
         }
 
-        function applyConsentUpdate(granted) {
-          window.gtag('consent', 'update', getConsentState(granted));
+        function applyConsentUpdate(analytics, marketing) {
+          window.gtag('consent', 'update', getConsentState(analytics, marketing));
         }
 
-        function loadGoogleTags() {
-          if (googleTagsLoaded) {
+        function ensureGoogleTagsLoaded() {
+          if (googleScriptLoaded || !PRIMARY_GOOGLE_TAG_ID) {
             return;
           }
-          googleTagsLoaded = true;
+          googleScriptLoaded = true;
 
           var script = document.createElement('script');
           script.async = true;
@@ -41,18 +43,38 @@
           document.head.appendChild(script);
 
           window.gtag('js', new Date());
-          GOOGLE_TAG_IDS.forEach(function(id) {
+        }
+
+        function configureGoogleTags(tagIds) {
+          tagIds.forEach(function(id) {
+            if (configuredGoogleTagIds[id]) {
+              return;
+            }
+            configuredGoogleTagIds[id] = true;
             window.gtag('config', id);
           });
         }
 
+        function loadConsentedGoogleTags(analytics, marketing) {
+          if (!analytics && !marketing) {
+            return;
+          }
+          ensureGoogleTagsLoaded();
+          if (analytics) {
+            configureGoogleTags(ANALYTICS_GOOGLE_TAG_IDS);
+          }
+          if (marketing) {
+            configureGoogleTags(ADS_GOOGLE_TAG_IDS);
+          }
+        }
+
         window.sredzkaGoogleConsent = {
-          grant: function() {
-            applyConsentUpdate(true);
-            loadGoogleTags();
+          grant: function(analytics, marketing) {
+            applyConsentUpdate(analytics, marketing);
+            loadConsentedGoogleTags(analytics, marketing);
           },
           deny: function() {
-            applyConsentUpdate(false);
+            applyConsentUpdate(false, false);
           }
         };
 
@@ -60,8 +82,8 @@
 
         try {
           var c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
-          if (c && c.analytics && c.marketing) {
-            window.sredzkaGoogleConsent.grant();
+          if (c) {
+            window.sredzkaGoogleConsent.grant(!!c.analytics, !!c.marketing);
           }
         } catch(e) {}
       })();
@@ -77,30 +99,33 @@
     <meta name="author" content="Sredzka Korona" />
     <meta name="geo.region" content="PL-DS" />
     <meta name="geo.placename" content="Środa Śląska" />
-    <title>Średzka Korona</title>
+    <title>Hotel, catering i przyjęcia w Środzie Śląskiej | Średzka Korona</title>
     <meta name="apple-mobile-web-app-title" content="Średzka Korona" />
     <meta
       name="description"
-      content="Hotel, catering oraz sala na imprezy okolicznościowe w Środzie Śląskiej. Noclegi, przyjęcia i wyżywienie w jednym miejscu — także dla gości z okolic Wrocławia, Lutyni, Miękini, Źródeł i Szczepanowa."
+      content="Hotel, catering oraz sale na przyjęcia w Środzie Śląskiej. Średzka Korona łączy noclegi, restaurację i organizację wydarzeń blisko Wrocławia, Lutyni, Miękini, Źródeł i Szczepanowa."
     />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pl_PL" />
     <meta property="og:site_name" content="Średzka Korona" />
     <meta property="og:url" content="https://sredzka-korona.pl/" />
-    <meta property="og:title" content="Średzka Korona — hotel, catering, imprezy okolicznościowe | Środa Śląska" />
+    <meta property="og:title" content="Hotel, catering i przyjęcia w Środzie Śląskiej | Średzka Korona" />
     <meta
       property="og:description"
-      content="Hotel, catering oraz sale na przyjęcia w Środzie Śląskiej. Obsługa Dolnego Śląska i okolic Wrocławia."
+      content="Hotel, catering oraz sale na przyjęcia w Środzie Śląskiej. Średzka Korona obsługuje gości z Dolnego Śląska i okolic Wrocławia."
     />
     <meta property="og:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
     <meta property="og:image:alt" content="Logo Średzka Korona" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Średzka Korona — hotel, catering, imprezy | Środa Śląska" />
+    <meta name="twitter:title" content="Hotel, catering i przyjęcia w Środzie Śląskiej | Średzka Korona" />
     <meta
       name="twitter:description"
-      content="Hotel, catering i sale na imprezy okolicznościowe w Środzie Śląskiej (Dolny Śląsk)."
+      content="Hotel, catering i sale na przyjęcia w Środzie Śląskiej — blisko Wrocławia, Lutyni i Miękini."
     />
     <meta name="twitter:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
+    <meta name="twitter:image:alt" content="Logo Średzka Korona" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -385,6 +410,21 @@
       .button.secondary {
         background: rgba(255, 252, 247, 0.82);
         color: var(--text);
+      }
+
+      .button.primary {
+        background: linear-gradient(135deg, #c9a96e, #b8924a);
+        color: #fff;
+        border-color: #b8924a;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(184, 146, 74, 0.35);
+      }
+
+      .button.primary:hover,
+      .button.primary:focus-visible {
+        background: linear-gradient(135deg, #d4b87a, #c9a96e);
+        border-color: #c9a96e;
+        box-shadow: 0 4px 14px rgba(184, 146, 74, 0.5);
       }
 
       .page-layout {
@@ -878,6 +918,7 @@
         transition: z-index 0s;
         -webkit-tap-highlight-color: transparent;
         user-select: none;
+        --split-image-filter: saturate(0.9) contrast(1.04) brightness(1.02) sepia(0.03);
       }
 
       .main-split-section:nth-child(1) {
@@ -911,6 +952,7 @@
         object-position: var(--split-focus-x, 50%) var(--split-focus-y, 50%);
         display: block;
         transform: scale(var(--split-zoom, 1));
+        filter: var(--split-image-filter);
         transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), filter 0.6s ease;
         will-change: transform;
       }
@@ -921,7 +963,7 @@
 
       .main-split-section:hover img {
         transform: scale(calc(var(--split-zoom, 1) * 1.15));
-        filter: brightness(1.1);
+        filter: var(--split-image-filter) brightness(1.1);
       }
 
       .main-split-overlay {
@@ -1026,7 +1068,7 @@
 
         .main-split-section.is-blocked:hover img {
           transform: scale(calc(var(--split-zoom, 1) * 1.06));
-          filter: grayscale(0.88) brightness(0.72);
+          filter: var(--split-image-filter) grayscale(0.88) brightness(0.72);
         }
 
         .main-split-section.is-blocked:hover .main-split-overlay {
@@ -1046,7 +1088,7 @@
 
         .main-split-section.is-blocked:active img {
           transform: scale(calc(var(--split-zoom, 1) * 1.06));
-          filter: grayscale(0.88) brightness(0.72);
+          filter: var(--split-image-filter) grayscale(0.88) brightness(0.72);
         }
 
         .main-split-section.is-blocked:active .main-split-overlay {
@@ -1083,20 +1125,20 @@
         .main-split-section img,
         .main-split-section:hover img {
           transform: scale(var(--split-zoom, 1)) !important;
-          filter: brightness(0.95) !important;
+          filter: var(--split-image-filter) brightness(1) !important;
           object-position: var(--split-focus-x, 50%) var(--split-focus-y, 50%);
           transition: none;
         }
 
         @media (hover: hover) {
           .main-split-section.is-blocked:hover img {
-            filter: grayscale(0.88) brightness(0.72) !important;
+            filter: var(--split-image-filter) grayscale(0.88) brightness(0.72) !important;
           }
         }
 
         @media (hover: none) {
           .main-split-section.is-blocked:active img {
-            filter: grayscale(0.88) brightness(0.72) !important;
+            filter: var(--split-image-filter) grayscale(0.88) brightness(0.72) !important;
           }
         }
 
@@ -1469,29 +1511,25 @@
         left: 50%;
         transform: translateX(-50%);
         bottom: 2rem;
-        width: min(600px, calc(100vw - 2rem));
+        width: min(800px, calc(100vw - 2rem));
         max-width: none;
         z-index: 1002;
         padding: 1rem 1.5rem;
       }
 
-      .cookie-actions {
+      .cookie-banner .cookie-actions {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.35fr);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
         gap: 0.5rem;
         margin-top: 0.55rem;
       }
 
-      .cookie-actions .button {
+      .cookie-banner .cookie-actions .button {
         width: 100%;
         min-width: 0;
         text-align: center;
         padding: 0.58rem 0.85rem;
         font-size: 0.95rem;
-      }
-
-      .cookie-actions .button:last-child {
-        grid-column: auto;
       }
 
       .modal {
@@ -1632,12 +1670,12 @@
           transform: none;
         }
 
-        .cookie-actions {
-          grid-template-columns: minmax(0, 0.95fr) minmax(0, 0.95fr) minmax(0, 1.2fr);
+        .cookie-banner .cookie-actions {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
           gap: 0.4rem;
         }
 
-        .cookie-actions .button {
+        .cookie-banner .cookie-actions .button {
           padding: 0.55rem 0.65rem;
           font-size: 0.85rem;
         }
@@ -1914,7 +1952,7 @@
       }
 
       .cookie-panel {
-        width: min(560px, 96vw);
+        width: min(800px, 98vw);
         background: var(--bg-elevated);
         border: 1px solid var(--line);
         border-radius: var(--radius-xl);
@@ -1992,40 +2030,66 @@
         line-height: 1.5;
       }
 
-      .cookie-badge {
-        font-size: 10px;
-        letter-spacing: 0.5px;
-        white-space: nowrap;
-        padding: 4px 10px;
-        border-radius: 999px;
-        font-weight: 600;
+      /* ═══════ toggle switch ═══════ */
+      .cookie-toggle {
+        position: relative;
+        display: inline-block;
+        width: 46px;
+        height: 26px;
         flex-shrink: 0;
+        cursor: pointer;
       }
 
-      .cookie-badge-essential {
-        color: #5a7d3a;
-        background: rgba(90, 125, 58, 0.08);
-        border: 1px solid rgba(90, 125, 58, 0.25);
+      .cookie-toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
       }
 
-      .cookie-badge-extra {
-        color: var(--muted);
-        background: rgba(107, 93, 79, 0.06);
-        border: 1px solid var(--line);
+      .cookie-toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(107, 93, 79, 0.15);
+        border-radius: 26px;
+        transition: background 0.25s ease;
       }
 
-      .cookie-badge-extra.is-enabled {
-        color: #5a7d3a;
-        background: rgba(90, 125, 58, 0.08);
-        border: 1px solid rgba(90, 125, 58, 0.25);
+      .cookie-toggle-slider::before {
+        content: "";
+        position: absolute;
+        height: 20px;
+        width: 20px;
+        left: 3px;
+        bottom: 3px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform 0.25s ease;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.12);
       }
 
-      .cookie-status-indicator {
-        font-size: 11px;
-        color: var(--muted);
-        flex-shrink: 0;
-        min-width: 65px;
-        text-align: right;
+      .cookie-toggle input:checked + .cookie-toggle-slider {
+        background: var(--gold);
+      }
+
+      .cookie-toggle input:checked + .cookie-toggle-slider::before {
+        transform: translateX(20px);
+      }
+
+      .cookie-toggle.is-locked {
+        cursor: default;
+        opacity: 0.75;
+      }
+
+      .cookie-toggle.is-locked .cookie-toggle-slider {
+        background: rgba(90, 125, 58, 0.18);
+      }
+
+      .cookie-toggle.is-locked .cookie-toggle-slider::before {
+        background: #f0f4ec;
       }
 
       .cookie-docs-row {
@@ -2076,17 +2140,18 @@
         cursor: pointer;
         transition: all 0.2s;
         letter-spacing: 0.3px;
+        text-align: center;
       }
 
-      .cookie-btn-essential {
+      .cookie-btn-save {
+        border-color: var(--line);
+        background: transparent;
+        color: var(--text);
+      }
+
+      .cookie-btn-save:hover {
         border-color: var(--gold);
-        background: var(--gold);
-        color: #fff;
-      }
-
-      .cookie-btn-essential:hover {
-        background: #b8946a;
-        box-shadow: 0 2px 16px rgba(168, 137, 90, 0.35);
+        background: rgba(200, 170, 120, 0.06);
       }
 
       .cookie-btn-all {
@@ -2098,6 +2163,18 @@
       .cookie-btn-all:hover {
         background: #b8946a;
         box-shadow: 0 2px 16px rgba(168, 137, 90, 0.35);
+      }
+
+      .cookie-btn-reject {
+        border-color: var(--line);
+        background: transparent;
+        color: var(--muted);
+      }
+
+      .cookie-btn-reject:hover {
+        border-color: var(--gold);
+        background: rgba(200, 170, 120, 0.06);
+        color: var(--text);
       }
 
       @media (max-width: 820px) {
@@ -2120,7 +2197,8 @@
         }
 
         .cookie-actions {
-          flex-direction: column;
+          flex-direction: row;
+          flex-wrap: nowrap;
         }
 
         .cookie-btn {
@@ -2132,7 +2210,108 @@
   </head>
   <body>
     <a class="skip-link" href="#main-content">Przejdź do treści</a>
-    <div id="app"></div>
+    <div id="app">
+      <main id="main-content">
+        <h1 class="visually-hidden">Średzka Korona — hotel, catering i przyjęcia, Środa Śląska</h1>
+        <h2 class="visually-hidden">Hotel, noclegi i pokoje w Środzie Śląskiej</h2>
+        <h2 class="visually-hidden">Catering i dowóz jedzenia w Środzie Śląskiej</h2>
+        <h2 class="visually-hidden">Przyjęcia okolicznościowe, imprezy i sala weselna w Środzie Śląskiej</h2>
+        <div class="shell">
+          <nav class="floating-nav" id="floating-nav" aria-label="Główna nawigacja — Średzka Korona">
+            <a href="./" class="floating-nav-brand">
+              <span class="floating-nav-brand-text">ŚREDZKA</span>
+              <img
+                class="brand-logo"
+                src="./ikony/logo-korona-120.webp"
+                width="50"
+                height="33"
+                alt="Logo Średzka Korona"
+                decoding="async"
+                fetchpriority="high"
+              />
+              <span class="floating-nav-brand-text">KORONA</span>
+            </a>
+          </nav>
+          <div class="main-split-container">
+            <div
+              class="main-split-section"
+              style="--split-focus-x:50%;--split-focus-y:50%;--split-zoom:1;"
+              data-section-key="hotel"
+              data-link="./Hotel/"
+              data-blocked="0"
+              role="button"
+              tabindex="0"
+              aria-disabled="false"
+              aria-label="Przejdź do: Hotel — Średzka Korona, Środa Śląska"
+            >
+              <img
+                src="/assets/img/home-hotel.webp"
+                alt="Hotel — Średzka Korona, noclegi Środa Śląska"
+                loading="eager"
+                fetchpriority="high"
+                decoding="async"
+                sizes="(max-width: 1024px) 100vw, 33vw"
+              />
+              <div class="main-split-overlay">
+                <div class="main-split-overlay-stack">
+                  <span class="main-split-label">Hotel</span>
+                </div>
+              </div>
+            </div>
+            <div
+              class="main-split-section"
+              style="--split-focus-x:50%;--split-focus-y:50%;--split-zoom:1;"
+              data-section-key="restaurant"
+              data-link="./catering/"
+              data-blocked="0"
+              role="button"
+              tabindex="0"
+              aria-disabled="false"
+              aria-label="Przejdź do: Catering — Średzka Korona, Środa Śląska"
+            >
+              <img
+                src="/assets/img/home-restaurant.webp"
+                alt="Catering — Średzka Korona, Środa Śląska"
+                loading="eager"
+                fetchpriority="high"
+                decoding="async"
+                sizes="(max-width: 1024px) 100vw, 33vw"
+              />
+              <div class="main-split-overlay">
+                <div class="main-split-overlay-stack">
+                  <span class="main-split-label">Catering</span>
+                </div>
+              </div>
+            </div>
+            <div
+              class="main-split-section"
+              style="--split-focus-x:50%;--split-focus-y:50%;--split-zoom:1;"
+              data-section-key="events"
+              data-link="./przyjecia/"
+              data-blocked="0"
+              role="button"
+              tabindex="0"
+              aria-disabled="false"
+              aria-label="Przejdź do: Przyjęcia — Średzka Korona, Środa Śląska"
+            >
+              <img
+                src="/assets/img/home-events.webp"
+                alt="Sale na przyjęcia i imprezy okolicznościowe — Średzka Korona"
+                loading="eager"
+                fetchpriority="high"
+                decoding="async"
+                sizes="(max-width: 1024px) 100vw, 33vw"
+              />
+              <div class="main-split-overlay">
+                <div class="main-split-overlay-stack">
+                  <span class="main-split-label">Przyjęcia</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
     <script>
       (() => {
         const config = {
@@ -2210,21 +2389,21 @@
             },
             sectionMedia: {
               hotel: {
-                imageUrl: "/assets/img/home-hotel.jpg",
+                imageUrl: "/assets/img/home-hotel.webp",
                 imageAlt: "Hotel — Średzka Korona, noclegi Środa Śląska",
                 focusX: 50,
                 focusY: 50,
                 zoom: 1,
               },
               restaurant: {
-                imageUrl: "/assets/img/home-restaurant.jpg",
+                imageUrl: "/assets/img/home-restaurant.webp",
                 imageAlt: "Catering — Średzka Korona, Środa Śląska",
                 focusX: 50,
                 focusY: 50,
                 zoom: 1,
               },
               events: {
-                imageUrl: "/assets/img/home-events.jpg",
+                imageUrl: "/assets/img/home-events.webp",
                 imageAlt: "Sale na przyjęcia i imprezy okolicznościowe — Średzka Korona",
                 focusX: 50,
                 focusY: 50,
@@ -2421,7 +2600,7 @@
           cookies: {
             updatedAt: "2026-03-05",
             text:
-              "Strona korzysta z plikow cookies niezbednych do dzialania oraz opcjonalnych cookies analitycznych i marketingowych. Zgode mozna zmienic w dowolnym momencie.",
+              "Ta strona korzysta z plików cookies niezbędnych do prawidłowego działania oraz — za Twoją zgodą — z cookies analitycznych i marketingowych. Możesz zaakceptować wszystkie, odrzucić opcjonalne albo dostosować ustawienia.",
           },
         };
 
@@ -2613,21 +2792,21 @@
 
         const DEFAULT_SECTION_MEDIA = {
           hotel: {
-            imageUrl: "/assets/img/home-hotel.jpg",
+            imageUrl: "/assets/img/home-hotel.webp",
             imageAlt: "Hotel — Średzka Korona, noclegi Środa Śląska",
             focusX: 50,
             focusY: 50,
             zoom: 1,
           },
           restaurant: {
-            imageUrl: "/assets/img/home-restaurant.jpg",
+            imageUrl: "/assets/img/home-restaurant.webp",
             imageAlt: "Catering — Średzka Korona, Środa Śląska",
             focusX: 50,
             focusY: 50,
             zoom: 1,
           },
           events: {
-            imageUrl: "/assets/img/home-events.jpg",
+            imageUrl: "/assets/img/home-events.webp",
             imageAlt: "Sale na przyjęcia i imprezy okolicznościowe — Średzka Korona",
             focusX: 50,
             focusY: 50,
@@ -2725,24 +2904,31 @@
         function renderMainSplitContainer() {
           const target = document.querySelector(".main-split-container");
           if (!target) return;
+          if (target.children.length) {
+            initMainSplit();
+            return;
+          }
           target.innerHTML = `
             ${(() => {
               const media = resolveSectionMedia("hotel");
-              return renderMainSplitSection("hotel", "./Hotel/index.html", "Hotel", media, true);
+              return renderMainSplitSection("hotel", "./Hotel/", "Hotel", media, true);
             })()}
             ${(() => {
               const media = resolveSectionMedia("restaurant");
-              return renderMainSplitSection("restaurant", "./catering/index.html", "Catering", media, false);
+              return renderMainSplitSection("restaurant", "./catering/", "Catering", media, false);
             })()}
             ${(() => {
               const media = resolveSectionMedia("events");
-              return renderMainSplitSection("events", "./przyjecia/index.html", "Przyjęcia", media, false);
+              return renderMainSplitSection("events", "./przyjecia/", "Przyjęcia", media, false);
             })()}
           `;
           initMainSplit();
         }
 
         function renderShell() {
+          if (app.querySelector("main#main-content")) {
+            return;
+          }
           app.innerHTML = `
             <main id="main-content">
               <h1 class="visually-hidden">Średzka Korona — hotel, catering i przyjęcia, Środa Śląska</h1>
@@ -2751,7 +2937,7 @@
               <h2 class="visually-hidden">Przyjęcia okolicznościowe, imprezy i sala weselna w Środzie Śląskiej</h2>
               <div class="shell">
                 <nav class="floating-nav" id="floating-nav" aria-label="Główna nawigacja — Średzka Korona">
-                  <a href="./index.html" class="floating-nav-brand">
+                  <a href="./" class="floating-nav-brand">
                     <span class="floating-nav-brand-text">ŚREDZKA</span>
                     <img class="brand-logo" src="./ikony/logo-korona-120.webp" width="50" height="33" alt="Logo Średzka Korona" decoding="async" fetchpriority="high" />
                     <span class="floating-nav-brand-text">KORONA</span>
@@ -2879,30 +3065,32 @@
           banner.className = "cookie-banner";
           banner.innerHTML = `
             <p class="eyebrow">Cookies</p>
-            <strong>Twoja prywatnosc</strong>
-            <p style="margin:0.35rem 0 0; line-height:1.3;">${escapeHtml(state.content.cookies.text)}</p>
+            <strong>Pliki cookie i prywatność</strong>
+            <p style="margin:0.35rem 0 0; line-height:1.3;">
+              ${escapeHtml(state.content.cookies.text)}
+              <span> Więcej informacji: <a href="./dokumenty/index.html" style="color:var(--gold); text-decoration:underline;">Dokumenty</a></span>
+            </p>
             <div class="cookie-actions">
-              <a class="button secondary" href="./dokumenty/index.html#cookies-info">Zobacz szczegoly</a>
-              <button class="button secondary" type="button" data-cookie-action="necessary-only">Tylko niezbedne</button>
-              <button class="button" type="button" data-cookie-action="accept-all">Akceptuj wszystko</button>
+              <button class="button secondary" type="button" data-cookie-action="settings">Ustawienia</button>
+              <button class="button secondary" type="button" data-cookie-action="necessary-only">Odrzucam opcjonalne</button>
+              <button class="button primary" type="button" data-cookie-action="accept-all">Akceptuję wszystkie</button>
             </div>
           `;
           document.body.appendChild(banner);
           banner.querySelectorAll("[data-cookie-action]").forEach((button) => {
             button.addEventListener("click", () => {
-              const isAccepted =
-                button.dataset.cookieAction === "accept-all";
-              const value = isAccepted
-                  ? { necessary: true, analytics: true, marketing: true }
-                  : { necessary: true, analytics: false, marketing: false };
-              localStorage.setItem("sredzka-cookies-choice", JSON.stringify(value));
-              if (window.sredzkaGoogleConsent) {
-                if (isAccepted) {
-                  window.sredzkaGoogleConsent.grant();
-                } else {
-                  window.sredzkaGoogleConsent.deny();
-                }
+              const action = button.dataset.cookieAction;
+              if (action === "settings") {
+                banner.remove();
+                observeBottomStackLayout();
+                openCookiePanel();
+                return;
               }
+              const isAccepted = action === "accept-all";
+              const value = isAccepted
+                  ? { necessary: true, analytics: true, marketing: true, external: true }
+                  : { necessary: true, analytics: false, marketing: false, external: false };
+              applyCookieChoice(value);
               banner.remove();
               observeBottomStackLayout();
             });
@@ -2926,41 +3114,46 @@
           overlay.setAttribute('aria-hidden', 'true');
         }
 
-        function updateCookiePanelState() {
-          const statusEl = document.getElementById('cookieAnalyticsStatus');
-          const badgeEl = document.getElementById('cookieExtraBadge');
-          let analyticsGranted = false;
+        function getCookieChoice() {
           try {
-            const c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
-            if (c && c.analytics && c.marketing) {
-              analyticsGranted = true;
-            }
-          } catch(e) {}
-          if (statusEl) {
-            statusEl.textContent = analyticsGranted ? '✓ włączone' : '✗ wyłączone';
-            statusEl.style.color = analyticsGranted ? '#5a7d3a' : '';
-          }
-          if (badgeEl) {
-            badgeEl.classList.toggle('is-enabled', analyticsGranted);
-          }
+            return JSON.parse(localStorage.getItem('sredzka-cookies-choice')) || null;
+          } catch(e) { return null; }
         }
 
-        function cookieDecide(acceptAll) {
-          const value = acceptAll
-            ? { necessary: true, analytics: true, marketing: true }
-            : { necessary: true, analytics: false, marketing: false };
+        function applyCookieChoice(value) {
           localStorage.setItem('sredzka-cookies-choice', JSON.stringify(value));
-
           if (window.sredzkaGoogleConsent) {
-            if (acceptAll) {
-              window.sredzkaGoogleConsent.grant();
-            } else {
-              window.sredzkaGoogleConsent.deny();
-            }
+            window.sredzkaGoogleConsent.grant(!!value.analytics, !!value.marketing);
           }
 
           updateCookiePanelState();
           closeCookiePanel();
+        }
+
+        function updateCookiePanelState() {
+          const choice = getCookieChoice();
+          ['analytics','marketing','external'].forEach(function(cat) {
+            var toggle = document.getElementById('cookieToggle_' + cat);
+            if (toggle) {
+              toggle.checked = choice ? !!choice[cat] : false;
+            }
+          });
+        }
+
+        function cookieSaveFromPanel() {
+          var value = { necessary: true };
+          ['analytics','marketing','external'].forEach(function(cat) {
+            var toggle = document.getElementById('cookieToggle_' + cat);
+            value[cat] = toggle ? toggle.checked : false;
+          });
+          applyCookieChoice(value);
+        }
+
+        function cookieDecide(acceptAll) {
+          const value = acceptAll
+            ? { necessary: true, analytics: true, marketing: true, external: true }
+            : { necessary: true, analytics: false, marketing: false, external: false };
+          applyCookieChoice(value);
         }
 
         function initCookiePanel() {
@@ -2976,10 +3169,10 @@
             }
           });
 
-          const essentialBtn = document.getElementById('cookieEssentialBtn');
-          const acceptAllBtn = document.getElementById('cookieAcceptAllBtn');
-          if (essentialBtn) essentialBtn.addEventListener('click', function() { cookieDecide(false); });
-          if (acceptAllBtn) acceptAllBtn.addEventListener('click', function() { cookieDecide(true); });
+          var saveBtn = document.getElementById('cookieSaveSettings');
+          var acceptBtn = document.getElementById('cookieAcceptAllBtn');
+          if (saveBtn) saveBtn.addEventListener('click', function() { cookieSaveFromPanel(); });
+          if (acceptBtn) acceptBtn.addEventListener('click', function() { cookieDecide(true); });
 
           document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape' && overlay.hidden === false) {
@@ -3308,7 +3501,7 @@
         bootstrap();
       })();
     </script>
-    <a href="./kontakt/index.html" class="floating-contact-button" aria-label="Kontakt — Średzka Korona, Środa Śląska">
+    <a href="./kontakt/" class="floating-contact-button" aria-label="Kontakt — Średzka Korona, Środa Śląska">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
       </svg>
@@ -3322,43 +3515,63 @@
           <h2>Pliki cookie i prywatność</h2>
         </div>
         <p class="cookie-desc">
-          Ta strona używa plików cookie i pamięci lokalnej. Część jest <strong>niezbędna</strong>
-          do działania strony i nie wymaga zgody. Pozostałe (Google Analytics, Google Ads)
-          pomagają ulepszać stronę i personalizować reklamy — wymagają Twojej zgody zgodnie z RODO.
+          Ta strona korzysta z plików cookies niezbędnych do prawidłowego działania oraz — za Twoją zgodą — z cookies analitycznych i marketingowych. Możesz zaakceptować wszystkie, odrzucić opcjonalne albo dostosować ustawienia.
         </p>
 
         <div class="cookie-options">
           <div class="cookie-option">
             <div class="cookie-option-info">
               <strong>Niezbędne</strong>
-              <p>Sesja, preferencje i zapamiętanie wyborów. Zawsze aktywne — niezbędne do działania strony.</p>
+              <p>Zawsze aktywne. Techniczne cookies potrzebne do działania strony, bezpieczeństwa, formularzy i zapamiętania zgód.</p>
             </div>
-            <div class="cookie-badge cookie-badge-essential">Niezbędne</div>
+            <label class="cookie-toggle is-locked" aria-label="Niezbędne — zawsze aktywne">
+              <input type="checkbox" checked disabled>
+              <span class="cookie-toggle-slider"></span>
+            </label>
           </div>
           <div class="cookie-option">
             <div class="cookie-option-info">
-              <strong>Analityczne i marketingowe</strong>
-              <p>Google Analytics (anonimowe dane o ruchu) oraz Google Ads (personalizacja reklam). Pomagają ulepszać stronę i dostosowywać treści.</p>
+              <strong>Analityczne</strong>
+              <p>Opcjonalne. Np. Google Analytics, statystyki odwiedzin, źródła wejść, zachowanie na stronie.</p>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-              <div id="cookieAnalyticsStatus" class="cookie-status-indicator"></div>
-              <div class="cookie-badge cookie-badge-extra" id="cookieExtraBadge">Dodatkowe</div>
+            <label class="cookie-toggle" aria-label="Przełącznik: Analityczne">
+              <input type="checkbox" id="cookieToggle_analytics">
+              <span class="cookie-toggle-slider"></span>
+            </label>
+          </div>
+          <div class="cookie-option">
+            <div class="cookie-option-info">
+              <strong>Marketingowe</strong>
+              <p>Opcjonalne. Np. Google Ads, remarketing, piksele reklamowe.</p>
             </div>
+            <label class="cookie-toggle" aria-label="Przełącznik: Marketingowe">
+              <input type="checkbox" id="cookieToggle_marketing">
+              <span class="cookie-toggle-slider"></span>
+            </label>
+          </div>
+          <div class="cookie-option">
+            <div class="cookie-option-info">
+              <strong>Zewnętrzne / multimedialne</strong>
+              <p>Opcjonalne. Np. YouTube, Google Maps, osadzone treści społecznościowe.</p>
+            </div>
+            <label class="cookie-toggle" aria-label="Przełącznik: Zewnętrzne / multimedialne">
+              <input type="checkbox" id="cookieToggle_external">
+              <span class="cookie-toggle-slider"></span>
+            </label>
           </div>
         </div>
 
         <div class="cookie-docs-row">
-          <a class="cookie-doc-link" href="./dokumenty/index.html">Dokumenty: Polityka prywatności i cookies oraz informacja RODO</a>
+          <a class="cookie-doc-link" href="./dokumenty/">Dokumenty: Polityka prywatności i cookies oraz informacja RODO</a>
         </div>
 
         <div class="cookie-actions">
-          <button class="cookie-btn cookie-btn-essential" id="cookieEssentialBtn" type="button">Tylko niezbędne</button>
+          <button class="cookie-btn cookie-btn-save" id="cookieSaveSettings" type="button">Zapisz ustawienia</button>
           <button class="cookie-btn cookie-btn-all" id="cookieAcceptAllBtn" type="button">Akceptuję wszystkie</button>
         </div>
       </div>
     </div>
 
     <script src="./assets/js/sredzka-document-title.js" defer></script>
-      <p class="footer-date">Data: 01.05.2026r.</p>
 </body>
 </html>

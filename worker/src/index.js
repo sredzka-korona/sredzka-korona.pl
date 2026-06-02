@@ -1,6 +1,6 @@
 import { DEFAULT_CONTENT } from "./default-content.js";
 import { parseAdminEmailAllowlist, verifyFirebaseIdToken } from "./firebase-verify.js";
-import { handleD1BookingApi, runBookingMaintenance, sendContactFormAdminEmail } from "./booking-d1.js";
+import { handleD1BookingApi, runBookingMaintenance, sendContactFormAdminEmail, upsertConsentEmail } from "./booking-d1.js";
 
 const MAX_MEDIA_FILE_BYTES = 1_700_000;
 const BOOTSTRAP_EDGE_CACHE_TTL_MS = 30 * 1000;
@@ -728,7 +728,7 @@ function withVenueHallAndRestaurantGalleries(content, hallGalleries, restaurantG
     ...content,
     events: {
       ...(content.events || {}),
-      hallGalleries: {},
+      hallGalleries: structuredClone(content?.events?.hallGalleries || {}),
     },
     restaurant: {
       ...(content.restaurant || {}),
@@ -736,7 +736,9 @@ function withVenueHallAndRestaurantGalleries(content, hallGalleries, restaurantG
     },
   };
   for (const [hallKey, images] of hallGalleries) {
-    updated.events.hallGalleries[hallKey] = images;
+    if (Array.isArray(images) && images.length) {
+      updated.events.hallGalleries[hallKey] = images;
+    }
   }
   return updated;
 }
@@ -836,6 +838,12 @@ async function handleContactSubmission(payload, request, env) {
   )
     .bind(fullName, email, phone, eventType, preferredDate, message, nowIso())
     .run();
+  await upsertConsentEmail(env, {
+    fullName,
+    email,
+    acceptedAtIso: nowIso(),
+    source: "contact_form",
+  });
 
   try {
     await sendContactFormAdminEmail(env, { fullName, email, phone, formKind: eventType, message });
@@ -1448,7 +1456,10 @@ function sanitizeContent(content) {
       // Galerie pokoi sa utrzymywane poza content_json (tabela hotel_room_images).
       roomGalleries: emptyHotelRoomGalleries(),
     },
-    events: { ...eventsMerged, hallGalleries: {} },
+    events: {
+      ...eventsMerged,
+      hallGalleries: structuredClone(eventsMerged.hallGalleries || DEFAULT_CONTENT.events.hallGalleries || {}),
+    },
     services: Array.isArray(content.services) ? content.services : DEFAULT_CONTENT.services,
     gallery: { ...DEFAULT_CONTENT.gallery, ...(content.gallery || {}) },
     documentsPage: {

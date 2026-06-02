@@ -92,7 +92,7 @@ export const DEFAULT_CONTENT = {
       "Catering Sredzka Korona zapewnia smaczne jedzenie, profesjonalna obsluge i terminowy dowoz.",
     orderButtonText: "Zamów catering",
     ordersInfoText:
-      "<p>Ceny oraz zasady współpracy ustalane indywidualnie.</p><p>Prosimy o kontakt telefoniczny i mailowy lub poprzez formularz kontaktowy.</p>",
+      "<h3>Catering eventowy w Środzie Śląskiej i okolicach Wrocławia</h3><p>Organizujemy catering okolicznościowy i eventowy z dowozem lub obsługą na miejscu. Zajmujemy się całą stroną gastronomiczną wydarzenia, żebyś mógł skupić się na gościach, a nie na logistyce.</p><p>Dopasowujemy menu, sposób podania i zakres obsługi do charakteru wydarzenia — od kameralnych spotkań rodzinnych po większe realizacje firmowe i plenerowe.</p><h3>Dla kogo przygotowujemy catering</h3><ul><li>uroczystości rodzinne: chrzciny, komunie, jubileusze i rocznice,</li><li>wydarzenia firmowe: szkolenia, spotkania integracyjne, bankiety i konferencje,</li><li>przyjęcia w domu, ogrodzie, sali lub pod namiotem,</li><li>catering na zewnątrz: pikniki, wydarzenia sezonowe i obsługa w plenerze.</li></ul><h3>Co obejmuje naszą ofertę</h3><ul><li>przygotowanie dań i dowóz na wskazane miejsce,</li><li>obsługę kelnerską i kucharską, jeśli jej potrzebujesz,</li><li>nakrycie stołów, serwis podczas wydarzenia i sprzątanie po zakończeniu,</li><li>indywidualne dopasowanie menu do liczby gości i budżetu.</li></ul><h3>Obszar realizacji</h3><p>Działamy w Środzie Śląskiej, Miękini, Lutyni, Brzegu Dolnym, Malczycach, Kostomłotach, Udaninie oraz w okolicach Wrocławia.</p><p>Jeśli potrzebujesz cateringu, który jest lokalny, punktualny i dopasowany do wydarzenia — skontaktuj się z nami, a przygotujemy wycenę oraz propozycję menu.</p>",
     menuSections: [
       {
         title: "Przystawki",
@@ -180,8 +180,18 @@ export const DEFAULT_CONTENT = {
       },
     ],
     hallGalleries: {
-      "1": [],
-      "2": [],
+      "1": [
+        {
+          url: "/assets/img/sala.webp",
+          alt: "Sala bankietowa Duża — Średzka Korona",
+        },
+      ],
+      "2": [
+        {
+          url: "/assets/img/home-events.jpg",
+          alt: "Sala bankietowa Mała — Średzka Korona",
+        },
+      ],
     },
     packages: [
       "Kompleksowa obsluga wesel i przyjec rodzinnych",
@@ -394,6 +404,6 @@ export const DEFAULT_CONTENT = {
   cookies: {
     updatedAt: "2026-03-05",
     text:
-      "Strona korzysta z plikow cookies niezbednych do dzialania oraz opcjonalnych cookies analitycznych i marketingowych. Zgode mozna zmienic w dowolnym momencie.",
+      "Ta strona korzysta z plików cookies niezbędnych do prawidłowego działania oraz — za Twoją zgodą — z cookies analitycznych i marketingowych. Możesz zaakceptować wszystkie, odrzucić opcjonalne albo dostosować ustawienia.",
   },
 };

@@ -1311,6 +1311,15 @@ async function ensureSchema(env) {
       )`,
       `CREATE INDEX IF NOT EXISTS idx_site_notifications_window
         ON site_notifications(starts_at, ends_at)`,
+      `CREATE TABLE IF NOT EXISTS client_consent_emails (
+        email TEXT PRIMARY KEY,
+        first_name TEXT NOT NULL DEFAULT '',
+        last_name TEXT NOT NULL DEFAULT '',
+        accepted_at_dates_json TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_source TEXT NOT NULL DEFAULT ''
+      )`,
     ];
     for (const sql of stmts) {
       await env.DB.prepare(sql).run();
@@ -1324,6 +1333,64 @@ async function ensureSchema(env) {
     await migrateCateringSeriesSchema(env);
   })();
   return schemaReadyPromise;
+}
+
+function splitFullName(fullName) {
+  const normalized = cleanString(fullName, 200)
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) {
+    return { firstName: "", lastName: "" };
+  }
+  const parts = normalized.split(" ");
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: "" };
+  }
+  return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
+}
+
+export async function upsertConsentEmail(env, { fullName, email, acceptedAtIso, source }) {
+  await ensureSchema(env);
+  const normalizedEmail = cleanString(email, 320).toLowerCase();
+  if (!normalizedEmail || !normalizedEmail.includes("@")) {
+    return;
+  }
+  const acceptedAt = cleanString(acceptedAtIso, 64) || new Date().toISOString();
+  const { firstName, lastName } = splitFullName(fullName);
+  const normalizedSource = cleanString(source, 80);
+  const now = new Date().toISOString();
+
+  const current = await env.DB.prepare(
+    "SELECT email, first_name, last_name, accepted_at_dates_json FROM client_consent_emails WHERE email = ? LIMIT 1"
+  )
+    .bind(normalizedEmail)
+    .first();
+
+  if (!current) {
+    await env.DB.prepare(
+      "INSERT INTO client_consent_emails (email, first_name, last_name, accepted_at_dates_json, created_at, updated_at, last_source) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    )
+      .bind(normalizedEmail, firstName, lastName, JSON.stringify([acceptedAt]), now, now, normalizedSource)
+      .run();
+    return;
+  }
+
+  const acceptedDates = parseJson(current.accepted_at_dates_json, []);
+  if (Array.isArray(acceptedDates)) {
+    acceptedDates.push(acceptedAt);
+  }
+  await env.DB.prepare(
+    "UPDATE client_consent_emails SET first_name = ?, last_name = ?, accepted_at_dates_json = ?, updated_at = ?, last_source = ? WHERE email = ?"
+  )
+    .bind(
+      firstName || cleanString(current.first_name, 120),
+      lastName || cleanString(current.last_name, 120),
+      JSON.stringify(Array.isArray(acceptedDates) ? acceptedDates : [acceptedAt]),
+      now,
+      normalizedSource,
+      normalizedEmail
+    )
+    .run();
 }
 
 async function migrateCateringSeriesSchema(env) {
@@ -5065,6 +5132,12 @@ async function handleHotelPublic(env, op, request, verifyTurnstileToken) {
         withConfirmationToken: smtpAvailable,
         status: smtpAvailable ? "email_verification_pending" : "pending",
       });
+      await upsertConsentEmail(env, {
+        fullName: body.fullName,
+        email: body.email,
+        acceptedAtIso: new Date().toISOString(),
+        source: "hotel_booking",
+      });
       const row = await getHotelReservation(env, out.id);
       let requiresEmailConfirmation = smtpAvailable;
       if (smtpAvailable) {
@@ -5285,6 +5358,12 @@ async function handleHallPublic(env, op, request, verifyTurnstileToken) {
         withConfirmationToken: smtpAvailable,
         status: smtpAvailable ? "email_verification_pending" : "pending",
       });
+      await upsertConsentEmail(env, {
+        fullName: body.fullName,
+        email: body.email,
+        acceptedAtIso: new Date().toISOString(),
+        source: "hall_booking",
+      });
       const row = await getHallReservationRow(env, out.id);
       let requiresEmailConfirmation = smtpAvailable;
       if (smtpAvailable) {
@@ -5457,6 +5536,12 @@ async function handleHotelAdmin(env, op, request) {
         status,
         withConfirmationToken: false,
         skipAvailabilityCheck: status === "manual_block",
+      });
+      await upsertConsentEmail(env, {
+        fullName: body.fullName,
+        email: body.email,
+        acceptedAtIso: new Date().toISOString(),
+        source: "admin_hotel_booking",
       });
       return { status: 200, data: { ok: true, reservationId: out.id, humanNumber: out.humanNumber } };
     } catch (error) {
@@ -5816,6 +5901,12 @@ async function handleRestaurantAdmin(env, op, request) {
         );
         createdIds.push(out.id);
       }
+      await upsertConsentEmail(env, {
+        fullName: [recRowEarly.contact_first_name, recRowEarly.contact_last_name].filter(Boolean).join(" ") || recRowEarly.display_name,
+        email: recRowEarly.email,
+        acceptedAtIso: new Date().toISOString(),
+        source: "admin_catering_booking",
+      });
       const sendManualCreatedEmail = body.sendManualCreatedEmail !== false;
       const recRow = await getCateringRecipientRow(env, recipientId);
       const recipientEmail = cleanString(recRow?.email, 180).toLowerCase();
@@ -6155,6 +6246,12 @@ async function handleHallAdmin(env, op, request) {
         skipAvailabilityCheck: status === "manual_block",
         skipMinAdvance: true,
         skipPublicBookingRules: status !== "manual_block",
+      });
+      await upsertConsentEmail(env, {
+        fullName: body.fullName,
+        email: body.email,
+        acceptedAtIso: new Date().toISOString(),
+        source: "admin_hall_booking",
       });
       return { status: 200, data: { ok: true, reservationId: out.id, humanNumber: out.humanNumber } };
     } catch (error) {

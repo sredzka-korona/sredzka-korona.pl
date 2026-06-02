@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pl" data-sredzka-title="Pytania i odpowiedzi | Średzka Korona">
+<html lang="pl" data-sredzka-title="FAQ: przyjęcia, catering i noclegi | Średzka Korona">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -11,18 +11,25 @@
     <link rel="manifest" href="../site.webmanifest" />
     <meta name="theme-color" content="#f8f1e7" />
     <meta name="robots" content="index,follow" />
-    <title>Pytania i odpowiedzi | Średzka Korona</title>
-    <meta name="apple-mobile-web-app-title" content="FAQ | Średzka Korona" />
+    <title>FAQ: przyjęcia, catering i noclegi | Średzka Korona</title>
+    <meta name="apple-mobile-web-app-title" content="FAQ Średzka Korona" />
     <meta
       name="description"
       content="Najczęściej zadawane pytania (FAQ) o salę weselną, catering, noclegi i organizację przyjęć w Średzkiej Koronie (Środa Śląska)."
     />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pl_PL" />
+    <meta property="og:site_name" content="Średzka Korona" />
     <meta property="og:url" content="https://sredzka-korona.pl/f-and-q/" />
-    <meta property="og:title" content="Pytania i odpowiedzi | Średzka Korona" />
+    <meta property="og:title" content="FAQ: przyjęcia, catering i noclegi | Średzka Korona" />
     <meta property="og:description" content="FAQ o sali weselnej, cateringu, noclegach i przyjęciach w Środzie Śląskiej." />
     <meta property="og:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
+    <meta property="og:image:alt" content="Logo Średzka Korona" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="FAQ: przyjęcia, catering i noclegi | Średzka Korona" />
+    <meta name="twitter:description" content="Odpowiedzi na najczęstsze pytania o przyjęcia, catering i noclegi w Środzie Śląskiej." />
+    <meta name="twitter:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
+    <meta name="twitter:image:alt" content="Logo Średzka Korona" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -471,7 +478,7 @@
 
       .cookie-actions {
         display: flex;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         gap: 0.75rem;
         margin-top: 1.1rem;
       }
@@ -480,7 +487,7 @@
         margin-top: 0;
         margin-right: 0;
         margin-bottom: 0;
-        flex: 0 1 auto;
+        flex: 1 1 auto;
         white-space: nowrap;
       }
 
@@ -521,6 +528,15 @@
         }
         .collapsible-content {
           padding: 0 1rem 1rem;
+        }
+
+        .cookie-actions {
+          gap: 0.4rem;
+        }
+
+        .cookie-actions .button {
+          padding: 0.5rem 0.5rem;
+          font-size: 0.78rem;
         }
       }
 
@@ -1044,7 +1060,7 @@
     </div>
     <div class="wrap">
       <nav class="floating-nav" id="floating-nav" aria-label="Główna nawigacja — Średzka Korona">
-        <a href="../index.html" class="floating-nav-brand">
+        <a href="../" class="floating-nav-brand">
           <span class="floating-nav-brand-text">ŚREDZKA</span>
           <img class="brand-logo" src="../ikony/logo-korona-120.webp" width="50" height="33" alt="Logo Średzka Korona" decoding="async" fetchpriority="high" />
           <span class="floating-nav-brand-text">KORONA</span>
@@ -1189,29 +1205,124 @@
 
     <script>
       (() => {
-        const COOKIE_CHOICE_KEY = "sredzka-cookies-choice";
+        var ADS_GOOGLE_TAG_IDS = ['AW-18082369489'];
+        var ANALYTICS_GOOGLE_TAG_IDS = ['G-6ENY27XX0B'];
+        var PRIMARY_GOOGLE_TAG_ID = ANALYTICS_GOOGLE_TAG_IDS[0] || ADS_GOOGLE_TAG_IDS[0];
+        var googleScriptLoaded = false;
+        var configuredGoogleTagIds = {};
+
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = window.gtag || function(){window.dataLayer.push(arguments);};
+
+        function getConsentState(analytics, marketing) {
+          return {
+            'ad_storage': marketing ? 'granted' : 'denied',
+            'ad_user_data': marketing ? 'granted' : 'denied',
+            'ad_personalization': marketing ? 'granted' : 'denied',
+            'analytics_storage': analytics ? 'granted' : 'denied'
+          };
+        }
+
+        function applyConsentDefault() {
+          window.gtag('consent', 'default', getConsentState(false, false));
+        }
+
+        function applyConsentUpdate(analytics, marketing) {
+          window.gtag('consent', 'update', getConsentState(analytics, marketing));
+        }
+
+        function ensureGoogleTagsLoaded() {
+          if (googleScriptLoaded || !PRIMARY_GOOGLE_TAG_ID) {
+            return;
+          }
+          googleScriptLoaded = true;
+
+          var script = document.createElement('script');
+          script.async = true;
+          script.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(PRIMARY_GOOGLE_TAG_ID);
+          document.head.appendChild(script);
+
+          window.gtag('js', new Date());
+        }
+
+        function configureGoogleTags(tagIds) {
+          tagIds.forEach(function(id) {
+            if (configuredGoogleTagIds[id]) {
+              return;
+            }
+            configuredGoogleTagIds[id] = true;
+            window.gtag('config', id);
+          });
+        }
+
+        function loadConsentedGoogleTags(analytics, marketing) {
+          if (!analytics && !marketing) {
+            return;
+          }
+          ensureGoogleTagsLoaded();
+          if (analytics) {
+            configureGoogleTags(ANALYTICS_GOOGLE_TAG_IDS);
+          }
+          if (marketing) {
+            configureGoogleTags(ADS_GOOGLE_TAG_IDS);
+          }
+        }
+
+        window.sredzkaGoogleConsent = {
+          grant: function(analytics, marketing) {
+            if (typeof analytics === 'undefined' && typeof marketing === 'undefined') {
+              analytics = true;
+              marketing = true;
+            }
+            applyConsentUpdate(!!analytics, !!marketing);
+            loadConsentedGoogleTags(!!analytics, !!marketing);
+          },
+          deny: function() {
+            applyConsentUpdate(false, false);
+          }
+        };
+
+        applyConsentDefault();
+
+        try {
+          var c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
+          if (c) {
+            window.sredzkaGoogleConsent.grant(!!c.analytics, !!c.marketing);
+          }
+        } catch(e) {}
 
         function buildBanner() {
-          if (localStorage.getItem(COOKIE_CHOICE_KEY)) return;
+          if (localStorage.getItem('sredzka-cookies-choice')) return;
           const banner = document.createElement("div");
           banner.className = "cookie-banner";
-          banner.innerHTML =
-            '<p class="eyebrow">Cookies</p>' +
-            '<p>Ta strona używa plików cookies w celach analitycznych i do prawidłowego działania formularzy. Korzystając ze strony, zgadzasz się na ich użycie.</p>' +
-            '<div class="cookie-actions">' +
-            '<button class="button" type="button" data-cookie-action="accept-all">Akceptuj wszystko</button>' +
-            '<button class="button secondary" type="button" data-cookie-action="necessary-only">Tylko niezbędne</button>' +
-            '<a class="button secondary" href="../dokumenty/index.html#cookies-info">Zobacz szczegóły</a>' +
-            "</div>";
+          banner.innerHTML = `
+            <p class="eyebrow">Cookies</p>
+            <strong>Pliki cookie i prywatność</strong>
+            <p style="margin:0.35rem 0 0; line-height:1.3;">
+              Ta strona korzysta z plików cookies niezbędnych do prawidłowego działania oraz — za Twoją zgodą — z cookies analitycznych i marketingowych. Możesz zaakceptować wszystkie, odrzucić opcjonalne albo dostosować ustawienia.
+            </p>
+            <div class="cookie-actions">
+              <button class="button secondary" type="button" data-cookie-action="settings">Ustawienia</button>
+              <button class="button secondary" type="button" data-cookie-action="necessary-only">Odrzucam opcjonalne</button>
+              <button class="button primary" type="button" data-cookie-action="accept-all">Akceptuję wszystkie</button>
+            </div>
+          `;
           document.body.appendChild(banner);
-
           banner.querySelectorAll("[data-cookie-action]").forEach((button) => {
             button.addEventListener("click", () => {
-              const acceptAll = button.dataset.cookieAction === "accept-all";
-              const value = acceptAll
+              const action = button.dataset.cookieAction;
+              if (action === "settings") {
+                banner.remove();
+                openCookiePanel();
+                return;
+              }
+              const value = action === "accept-all"
                 ? { necessary: true, analytics: true, marketing: true }
                 : { necessary: true, analytics: false, marketing: false };
-              localStorage.setItem(COOKIE_CHOICE_KEY, JSON.stringify(value));
+              localStorage.setItem("sredzka-cookies-choice", JSON.stringify(value));
+              if (window.sredzkaGoogleConsent) {
+                window.sredzkaGoogleConsent.grant(!!value.analytics, !!value.marketing);
+              }
               banner.remove();
             });
           });
@@ -1275,11 +1386,7 @@
           localStorage.setItem('sredzka-cookies-choice', JSON.stringify(value));
 
           if (window.sredzkaGoogleConsent) {
-            if (acceptAll) {
-              window.sredzkaGoogleConsent.grant();
-            } else {
-              window.sredzkaGoogleConsent.deny();
-            }
+            window.sredzkaGoogleConsent.grant(!!value.analytics, !!value.marketing);
           }
 
           updateCookiePanelState();
@@ -1385,7 +1492,7 @@
         </div>
 
         <div class="cookie-docs-row">
-          <a class="cookie-doc-link" href="../dokumenty/index.html">Dokumenty: Polityka prywatności i cookies oraz informacja RODO</a>
+          <a class="cookie-doc-link" href="../dokumenty/">Dokumenty: Polityka prywatności i cookies oraz informacja RODO</a>
         </div>
 
         <div class="cookie-actions">

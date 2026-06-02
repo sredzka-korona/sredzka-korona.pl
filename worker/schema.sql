@@ -25,6 +25,16 @@ CREATE TABLE IF NOT EXISTS contact_submissions (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS client_consent_emails (
+  email TEXT PRIMARY KEY,
+  first_name TEXT NOT NULL DEFAULT '',
+  last_name TEXT NOT NULL DEFAULT '',
+  accepted_at_dates_json TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  last_source TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS site_notifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,

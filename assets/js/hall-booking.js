@@ -401,10 +401,10 @@
         <div class="hb-terms-card">
           <label class="hb-terms" style="margin:0">
             <input type="checkbox" id="hb-terms" required />
-            Zapoznałem/am się z <a href="../dokumenty/index.html#regulamin-rezerwacji-sali" target="_blank" rel="noopener">regulaminem rezerwacji sali</a>.
+            Zapoznałem/am się z <a href="/dokumenty/#regulamin-rezerwacji-sali" target="_blank" rel="noopener">regulaminem rezerwacji sali</a>.
             Przyjmuję do wiadomości, że wycena zostanie podana indywidualnie po kontakcie telefonicznym.
             Rezerwacja jest zgłoszeniem zobowiązującym i wymaga potwierdzenia przez obiekt.
-            <br>Wyrażam zgodę na przetwarzanie moich danych osobowych w celu obsługi i realizacji rezerwacji, zgodnie z <a href="../dokumenty/index.html#polityka-prywatnosci" target="_blank" rel="noopener">Polityką prywatności</a>. Wiem, że zgodę mogę wycofać w dowolnym momencie (e-mail: kontakt@sredzka-korona.pl). Pełny obowiązek informacyjny znajduje się w dziale <a href="../dokumenty/index.html" target="_blank" rel="noopener">Dokumenty</a>.
+            <br>Wyrażam zgodę na przetwarzanie moich danych osobowych w celu obsługi i realizacji rezerwacji, zgodnie z <a href="/dokumenty/#polityka-prywatnosci" target="_blank" rel="noopener">Polityką prywatności</a>. Wiem, że zgodę mogę wycofać w dowolnym momencie (e-mail: kontakt@sredzka-korona.pl). Pełny obowiązek informacyjny znajduje się w dziale <a href="/dokumenty/" target="_blank" rel="noopener">Dokumenty</a>.
           </label>
         </div>
         <div id="turnstile-slot-hall"></div>

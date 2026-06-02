@@ -629,7 +629,7 @@
     {
       key: "przyjecia",
       label: "Przyjęcia",
-      description: "Oferta, galeria, menu oraz konfiguracja rezerwacji i komunikacji.",
+      description: "Galeria, menu oraz konfiguracja rezerwacji i komunikacji.",
       tiles: [
         { key: "gallery", label: "Galeria", description: "Galerie sal i albumy wydarzeń." },
         { key: "menu", label: "Menu okolicznościowe", description: "Sekcje, pozycje i kolejność menu." },
@@ -4348,9 +4348,6 @@
     if (tabKey === "restauracja" && tileKey === "settings") {
       return `<section class="panel col-12" id="restaurant-booking-settings-panel"></section>`;
     }
-    if (tabKey === "przyjecia" && tileKey === "sale") {
-      return `<section class="panel col-12" id="events-halls-panel"></section>`;
-    }
     if (tabKey === "przyjecia" && tileKey === "gallery") {
       return `
         <section class="panel col-12" id="events-hall-galleries-panel"></section>
@@ -4609,9 +4606,7 @@
     }
 
     if (topTab === "przyjecia") {
-      if (tileKey === "sale") {
-        renderEventsHallsPanel(statusMessage);
-      } else if (tileKey === "gallery") {
+      if (tileKey === "gallery") {
         renderEventsHallGalleriesPanel(statusMessage);
         renderGalleryPanel(statusMessage);
       } else if (tileKey === "menu") {
@@ -4681,7 +4676,7 @@
             }
           </div>
           <div class="admin-topbar-center">
-            <a href="../index.html" class="admin-brand-link" aria-label="Przejdz do strony glownej Sredzka Korona">
+            <a href="/" class="admin-brand-link" aria-label="Przejdz do strony glownej Sredzka Korona">
               <span class="admin-brand-text">SREDZKA</span>
               <img class="admin-brand-logo" src="../ikony/logo-korona.png" alt="Logo Średzka Korona" aria-hidden="true" />
               <span class="admin-brand-text">KORONA</span>
@@ -4847,14 +4842,14 @@
             <label class="checkbox-field">
               <input type="checkbox" id="booking-enable-events" ${content.booking?.events !== false ? "checked" : ""} ${adminLegacyBookingsEnabled ? "" : "disabled"} />
               <span class="checkbox-copy">
-                <strong>Przyjecia / sale</strong>
-                <span>Włącza formularz zapytania o sale i rezerwacje.</span>
+                <strong>Przyjecia</strong>
+                <span>Włącza formularz zapytania o przyjęcia i rezerwacje.</span>
               </span>
             </label>
             <p class="helper" style="margin: 0.75rem 0 0.35rem;">Okresy przerw ustawisz nizej, osobno w panelach: Hotel / Catering / Przyjecia.</p>
           </div>
           <div class="panel-note">
-            <strong>Uwaga:</strong> część treści poniżej pochodzi ze starszej wersji panelu. Aktualny front korzysta głównie z blokad sekcji, rezerwacji online, godzin dowozów, menu, galerii, dokumentów, kalendarza i modala „Oferta”.
+            <strong>Uwaga:</strong> część treści poniżej pochodzi ze starszej wersji panelu. Aktualny front korzysta głównie z blokad sekcji, rezerwacji online, godzin dowozów, menu, galerii, dokumentów i kalendarza.
           </div>
           <div class="field-grid">
             <label class="field-full"><span>Naglowek bloku (np. modal Kontakt)</span><input id="home-about-title" value="${escapeAttribute(content.home.aboutTitle || "")}" /></label>
@@ -5783,7 +5778,7 @@
       enabledId: "booking-enable-events",
       toggleLabel: "Przyjecia",
       pauseRangesKey: "eventsPauseRanges",
-      pauseLabel: "Przyjecia / sale",
+      pauseLabel: "Przyjecia",
       statusMessage,
       disabled: !adminLegacyBookingsEnabled,
     });
@@ -5966,64 +5961,16 @@
   function renderRestaurantOrderPanel(statusMessage = "") {
     const panel = document.querySelector("#restaurant-order-panel");
     if (!panel) return;
-    const currentInfoText =
-      state.content.restaurant?.ordersInfoText ||
-      "<p>Ceny oraz zasady współpracy ustalane indywidualnie.</p><p>Prosimy o kontakt telefoniczny i mailowy lub poprzez formularz kontaktowy.</p>";
 
     panel.innerHTML = `
       <p class="pill">Catering</p>
       <h2>Zamówienia</h2>
-      <p class="section-intro">Edytuj tresc modala widocznego po kliknieciu kafelka "Zamówienia" na stronie cateringu.</p>
+      <p class="section-intro">Treść oferty cateringu jest teraz statyczna w HTML i nie jest edytowana w panelu.</p>
       <div class="stack">
-        <div class="field-full">
-          <span>Tresc modala</span>
-          <div class="admin-richtext">
-            <div class="admin-richtext-toolbar" id="restaurant-orders-editor-toolbar">
-              <button class="button secondary" type="button" data-richtext-command="bold" title="Pogrubienie"><strong>B</strong></button>
-              <button class="button secondary" type="button" data-richtext-command="italic" title="Kursywa"><em>I</em></button>
-              <button class="button secondary" type="button" data-richtext-command="underline" title="Podkreslenie"><span style="text-decoration: underline;">U</span></button>
-              <button class="button secondary" type="button" data-richtext-block="h2" title="Naglowek">H2</button>
-              <button class="button secondary" type="button" data-richtext-block="p" title="Akapit">Akapit</button>
-              <button class="button secondary" type="button" data-richtext-command="insertUnorderedList" title="Lista punktowana">Lista</button>
-              <button class="button secondary" type="button" data-richtext-command="justifyLeft" title="Do lewej">Lewo</button>
-              <button class="button secondary" type="button" data-richtext-command="justifyCenter" title="Wysrodkuj">Srodek</button>
-              <button class="button secondary" type="button" data-richtext-command="justifyRight" title="Do prawej">Prawo</button>
-              <button class="button secondary" type="button" data-richtext-command="createLink" title="Wstaw link">Link</button>
-              <label class="admin-richtext-size">
-                <span>Rozmiar</span>
-                <select data-richtext-font-size>
-                  <option value="">--</option>
-                  <option value="0.9rem">Maly</option>
-                  <option value="1rem">Normalny</option>
-                  <option value="1.1rem">Sredni</option>
-                  <option value="1.25rem">Duzy</option>
-                  <option value="1.5rem">XL</option>
-                </select>
-              </label>
-              <label class="admin-richtext-size">
-                <span>Czcionka</span>
-                <select data-richtext-font-family>
-                  <option value="">--</option>
-                  <option value="Manrope, sans-serif">Manrope</option>
-                  <option value="'Cormorant Garamond', serif">Cormorant Garamond</option>
-                  <option value="Arial, sans-serif">Arial</option>
-                  <option value="'Times New Roman', serif">Times New Roman</option>
-                </select>
-              </label>
-              <label class="admin-richtext-size">
-                <span>Kolor</span>
-                <input type="color" data-richtext-color value="#1f1712" />
-              </label>
-            </div>
-            <div class="admin-richtext-editor" id="restaurant-orders-editor" contenteditable="true"></div>
-            <textarea id="restaurant-orders-info-html" rows="10" hidden>${escapeHtml(currentInfoText)}</textarea>
-          </div>
-        </div>
-        <p class="helper">Edytor wizualny zapisuje wyglad tresci wyswietlanej w modalu "Zamowienia i catering".</p>
+        <p class="helper">Widok został wyłączony, aby nie dublować statycznej treści na stronie cateringu.</p>
         <p class="status">${escapeHtml(statusMessage)}</p>
       </div>
     `;
-    initRestaurantOrdersRichTextEditor();
   }
 
   function renderEventsOfferPanel(statusMessage = "") {
@@ -6033,62 +5980,12 @@
     panel.innerHTML = `
       <p class="pill">Przyjecia</p>
       <h2>Oferta</h2>
-      <p class="section-intro">Edytujesz tresc modala otwieranego z kafelka "Oferta" na stronie Przyjecia.</p>
+      <p class="section-intro">Treść oferty na stronie Przyjęcia jest teraz statyczna w HTML i nie jest edytowana w panelu.</p>
       <div class="stack">
-        <div class="field-full">
-          <span>Treść oferty</span>
-          <div class="admin-richtext">
-            <div class="admin-richtext-toolbar" id="events-oferta-editor-toolbar">
-              <button class="button secondary" type="button" data-richtext-command="bold" title="Pogrubienie"><strong>B</strong></button>
-              <button class="button secondary" type="button" data-richtext-command="italic" title="Kursywa"><em>I</em></button>
-              <button class="button secondary" type="button" data-richtext-command="underline" title="Podkreslenie"><span style="text-decoration: underline;">U</span></button>
-              <button class="button secondary" type="button" data-richtext-block="h2" title="Naglowek">H2</button>
-              <button class="button secondary" type="button" data-richtext-block="p" title="Akapit">Akapit</button>
-              <button class="button secondary" type="button" data-richtext-command="insertUnorderedList" title="Lista punktowana">Lista</button>
-              <button class="button secondary" type="button" data-richtext-command="justifyLeft" title="Do lewej">Lewo</button>
-              <button class="button secondary" type="button" data-richtext-command="justifyCenter" title="Wysrodkuj">Srodek</button>
-              <button class="button secondary" type="button" data-richtext-command="justifyRight" title="Do prawej">Prawo</button>
-              <button class="button secondary" type="button" data-richtext-command="createLink" title="Wstaw link">Link</button>
-              <label class="admin-richtext-size">
-                <span>Rozmiar</span>
-                <select data-richtext-font-size>
-                  <option value="">--</option>
-                  <option value="0.9rem">Maly</option>
-                  <option value="1rem">Normalny</option>
-                  <option value="1.1rem">Sredni</option>
-                  <option value="1.25rem">Duzy</option>
-                  <option value="1.5rem">XL</option>
-                </select>
-              </label>
-            </div>
-            <div class="admin-richtext-editor" id="events-oferta-modal-editor" contenteditable="true"></div>
-            <textarea id="events-oferta-modal-html" rows="18" hidden>${escapeHtml(state.content.events?.ofertaModalBodyHtml || "")}</textarea>
-          </div>
-        </div>
-        <p class="helper">Edytor wizualny zapisuje gotowy wyglad tresci modala "Oferta".</p>
-        <p class="status">${escapeHtml(statusMessage)}</p>
+        <p class="helper">Nie edytujemy już tego widoku — treść została przeniesiona do statycznego HTML na stronie Przyjęcia.</p>
+        <p class="status">${escapeHtml(statusMessage || "Widok wyłączony.")}</p>
       </div>
     `;
-    initOfertaRichTextEditor();
-  }
-
-  function renderEventsHallsPanel(statusMessage = "") {
-    const panel = document.querySelector("#events-halls-panel");
-    if (!panel) return;
-
-    panel.innerHTML = `
-      <p class="pill">Przyjecia</p>
-      <h2>Sale</h2>
-      <p class="section-intro">W obiekcie sa dwie sale: duza i mala. Tutaj edytujesz ich nazwy, pojemnosci i opisy.</p>
-      <div class="stack">
-        <div class="repeater-head"><strong>Lista sal</strong></div>
-        <div id="halls-list" class="repeater-list"></div>
-        <p class="status">${escapeHtml(statusMessage)}</p>
-      </div>
-    `;
-
-    bindRepeaterButtons();
-    renderHallsList();
   }
 
   function renderContactPanel(statusMessage = "") {

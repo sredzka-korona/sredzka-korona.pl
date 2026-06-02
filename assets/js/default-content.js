@@ -90,7 +90,7 @@ window.SREDZKA_DEFAULT_CONTENT = {
     heroText: "Smaczne jedzenie, profesjonalna obsługa i terminowy dowóz.",
     orderButtonText: "Zamów catering",
     ordersInfoText:
-      "<p>Ceny oraz zasady współpracy ustalane indywidualnie.</p><p>Prosimy o kontakt telefoniczny i mailowy lub poprzez formularz kontaktowy.</p>",
+      "<h3>Catering eventowy w Środzie Śląskiej i okolicach Wrocławia</h3><p>Organizujemy catering okolicznościowy i eventowy z dowozem lub obsługą na miejscu. Zajmujemy się całą stroną gastronomiczną wydarzenia, żebyś mógł skupić się na gościach, a nie na logistyce.</p><p>Dopasowujemy menu, sposób podania i zakres obsługi do charakteru wydarzenia — od kameralnych spotkań rodzinnych po większe realizacje firmowe i plenerowe.</p><h3>Dla kogo przygotowujemy catering</h3><ul><li>uroczystości rodzinne: chrzciny, komunie, jubileusze i rocznice,</li><li>wydarzenia firmowe: szkolenia, spotkania integracyjne, bankiety i konferencje,</li><li>przyjęcia w domu, ogrodzie, sali lub pod namiotem,</li><li>catering na zewnątrz: pikniki, wydarzenia sezonowe i obsługa w plenerze.</li></ul><h3>Co obejmuje nasza oferta</h3><ul><li>przygotowanie dań i dowóz na wskazane miejsce,</li><li>obsługę kelnerską i kucharską, jeśli jej potrzebujesz,</li><li>nakrycie stołów, serwis podczas wydarzenia i sprzątanie po zakończeniu,</li><li>indywidualne dopasowanie menu do liczby gości i budżetu.</li></ul><h3>Obszar realizacji</h3><p>Działamy w Środzie Śląskiej, Miękini, Lutyni, Brzegu Dolnym, Malczycach, Kostomłotach, Udaninie oraz w okolicach Wrocławia.</p><p>Jeśli potrzebujesz cateringu, który jest lokalny, punktualny i dopasowany do wydarzenia — skontaktuj się z nami, a przygotujemy wycenę oraz propozycję menu.</p>",
     menuSections: [
       {
         title: "Przystawki",
@@ -177,10 +177,6 @@ window.SREDZKA_DEFAULT_CONTENT = {
         description: "Elegancka przestrzen na komunie, chrzciny i jubileusze.",
       },
     ],
-    hallGalleries: {
-      "1": [],
-      "2": [],
-    },
     packages: [
       "Kompleksowa obsluga wesel i przyjec rodzinnych",
       "Konferencje i lunche biznesowe",
@@ -219,6 +215,21 @@ window.SREDZKA_DEFAULT_CONTENT = {
         ],
       },
     ],
+    /** Galerie awaryjne dla /przyjecia/ - panel admina może je nadpisać */
+    hallGalleries: {
+      "1": [
+        {
+          url: "/assets/img/sala.webp",
+          alt: "Sala bankietowa Duża — Średzka Korona",
+        },
+      ],
+      "2": [
+        {
+          url: "/assets/img/home-events.jpg",
+          alt: "Sala bankietowa Mała — Średzka Korona",
+        },
+      ],
+    },
     /** Tresc modala „Oferta” na stronie /przyjecia/ (wewnatrz .modal-content, dozwolony HTML) */
     ofertaModalBodyHtml: `<h3>Nowoczesna sala bankietowa – Środa Śląska, Miękinia, Lutynia i okolice Wrocławia</h3>
 <p>Organizujemy różnorodne przyjęcia okolicznościowe na Dolnym Śląsku, dostosowane do Twoich indywidualnych potrzeb i oczekiwań. Nasza elegancka sala na przyjęcia (sala do 120 osób) to idealne miejsce na każde wydarzenie. Oferujemy kompleksową obsługę i wynajem sali na następujące okazje:</p>
@@ -250,6 +261,7 @@ window.SREDZKA_DEFAULT_CONTENT = {
   <li>Dodatkowe atrakcje (DJ, zespół muzyczny, fotograf)</li>
   <li>Komfortowe noclegi dla gości</li>
 </ul>
+<p>Oferujemy również <a href="/catering/">catering</a> na przyjęcia w innych miejscach — w domu, ogrodzie, pod namiotem lub w wybranej przez Ciebie sali. Sprawdź naszą ofertę cateringową i zamów obsługę gastronomiczną w dowolnej lokalizacji.</p>
 <p>Zapraszamy do kontaktu! Z przyjemnością pomożemy zorganizować Twoje wymarzone przyjęcie w okolicach Wrocławia.</p>`,
   },
   booking: {
@@ -411,6 +423,6 @@ window.SREDZKA_DEFAULT_CONTENT = {
   cookies: {
     updatedAt: "2026-03-05",
     text:
-      "Strona korzysta z plikow cookies niezbednych do dzialania oraz opcjonalnych cookies analitycznych i marketingowych. Zgode mozna zmienic w dowolnym momencie.",
+      "Ta strona korzysta z plików cookies niezbędnych do prawidłowego działania oraz — za Twoją zgodą — z cookies analitycznych i marketingowych. Możesz zaakceptować wszystkie, odrzucić opcjonalne albo dostosować ustawienia.",
   },
 };

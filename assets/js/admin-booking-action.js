@@ -1,14 +1,14 @@
 (function () {
   const BRAND =
     '<div class="confirm-brand">' +
-    '<a href="../index.html" class="confirm-logo-link" aria-label="Średzka Korona — strona główna">' +
+    '<a href="/" class="confirm-logo-link" aria-label="Średzka Korona — strona główna">' +
     '<span class="confirm-logo-text">ŚREDZKA</span>' +
     '<img class="confirm-logo-img" src="../ikony/logo-korona.png" alt="Logo Średzka Korona" width="48" height="48" loading="lazy" decoding="async" />' +
     '<span class="confirm-logo-text">KORONA</span>' +
     "</a></div>";
   const CTA =
     '<div class="confirm-actions">' +
-    '<a class="confirm-cta" href="../index.html">Wróć na stronę główną <span class="confirm-domain">sredzka-korona.pl</span></a>' +
+    '<a class="confirm-cta" href="/">Wróć na stronę główną <span class="confirm-domain">sredzka-korona.pl</span></a>' +
     "</div>";
 
   const SERVICE_META = {

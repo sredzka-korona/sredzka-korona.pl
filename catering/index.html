@@ -1,39 +1,41 @@
 <!doctype html>
-<html lang="pl" data-sredzka-title="Catering | Średzka Korona">
+<html lang="pl" data-sredzka-title="Catering Środa Śląska i okolice Wrocławia | Średzka Korona">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (function() {
-        var GOOGLE_TAG_IDS = ['AW-18082369489', 'G-6ENY27XX0B'];
-        var PRIMARY_GOOGLE_TAG_ID = GOOGLE_TAG_IDS[0];
-        var googleTagsLoaded = false;
+        var ADS_GOOGLE_TAG_IDS = ['AW-18082369489'];
+        var ANALYTICS_GOOGLE_TAG_IDS = ['G-6ENY27XX0B'];
+        var PRIMARY_GOOGLE_TAG_ID = ANALYTICS_GOOGLE_TAG_IDS[0] || ADS_GOOGLE_TAG_IDS[0];
+        var googleScriptLoaded = false;
+        var configuredGoogleTagIds = {};
 
         window.dataLayer = window.dataLayer || [];
         window.gtag = window.gtag || function(){window.dataLayer.push(arguments);};
 
-        function getConsentState(granted) {
+        function getConsentState(analytics, marketing) {
           return {
-            'ad_storage': granted ? 'granted' : 'denied',
-            'ad_user_data': granted ? 'granted' : 'denied',
-            'ad_personalization': granted ? 'granted' : 'denied',
-            'analytics_storage': granted ? 'granted' : 'denied'
+            'ad_storage': marketing ? 'granted' : 'denied',
+            'ad_user_data': marketing ? 'granted' : 'denied',
+            'ad_personalization': marketing ? 'granted' : 'denied',
+            'analytics_storage': analytics ? 'granted' : 'denied'
           };
         }
 
         function applyConsentDefault() {
-          window.gtag('consent', 'default', getConsentState(false));
+          window.gtag('consent', 'default', getConsentState(false, false));
         }
 
-        function applyConsentUpdate(granted) {
-          window.gtag('consent', 'update', getConsentState(granted));
+        function applyConsentUpdate(analytics, marketing) {
+          window.gtag('consent', 'update', getConsentState(analytics, marketing));
         }
 
-        function loadGoogleTags() {
-          if (googleTagsLoaded) {
+        function ensureGoogleTagsLoaded() {
+          if (googleScriptLoaded || !PRIMARY_GOOGLE_TAG_ID) {
             return;
           }
-          googleTagsLoaded = true;
+          googleScriptLoaded = true;
 
           var script = document.createElement('script');
           script.async = true;
@@ -41,18 +43,42 @@
           document.head.appendChild(script);
 
           window.gtag('js', new Date());
-          GOOGLE_TAG_IDS.forEach(function(id) {
+        }
+
+        function configureGoogleTags(tagIds) {
+          tagIds.forEach(function(id) {
+            if (configuredGoogleTagIds[id]) {
+              return;
+            }
+            configuredGoogleTagIds[id] = true;
             window.gtag('config', id);
           });
         }
 
+        function loadConsentedGoogleTags(analytics, marketing) {
+          if (!analytics && !marketing) {
+            return;
+          }
+          ensureGoogleTagsLoaded();
+          if (analytics) {
+            configureGoogleTags(ANALYTICS_GOOGLE_TAG_IDS);
+          }
+          if (marketing) {
+            configureGoogleTags(ADS_GOOGLE_TAG_IDS);
+          }
+        }
+
         window.sredzkaGoogleConsent = {
-          grant: function() {
-            applyConsentUpdate(true);
-            loadGoogleTags();
+          grant: function(analytics, marketing) {
+            if (typeof analytics === 'undefined' && typeof marketing === 'undefined') {
+              analytics = true;
+              marketing = true;
+            }
+            applyConsentUpdate(!!analytics, !!marketing);
+            loadConsentedGoogleTags(!!analytics, !!marketing);
           },
           deny: function() {
-            applyConsentUpdate(false);
+            applyConsentUpdate(false, false);
           }
         };
 
@@ -60,8 +86,8 @@
 
         try {
           var c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
-          if (c && c.analytics && c.marketing) {
-            window.sredzkaGoogleConsent.grant();
+          if (c) {
+            window.sredzkaGoogleConsent.grant(!!c.analytics, !!c.marketing);
           }
         } catch(e) {}
       })();
@@ -76,24 +102,30 @@
     <meta name="robots" content="index,follow,max-image-preview:large" />
     <meta name="geo.region" content="PL-DS" />
     <meta name="geo.placename" content="Środa Śląska" />
-    <title>Catering | Średzka Korona</title>
-    <meta name="apple-mobile-web-app-title" content="Catering | Średzka Korona" />
+    <title>Catering Środa Śląska i okolice Wrocławia | Średzka Korona</title>
+    <meta name="apple-mobile-web-app-title" content="Catering Średzka Korona" />
     <meta
       name="description"
       content="Catering Środa Śląska, Lutynia, Brzeg Dolny, Miękinia i okolice Wrocławia. Profesjonalny catering wyjazdowy na imprezy okolicznościowe, śluby, chrzciny i komunie. Gotujemy u klienta, również pod namiotami, obsługujemy nawet ponad 100 osób."
     />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pl_PL" />
+    <meta property="og:site_name" content="Średzka Korona" />
     <meta property="og:url" content="https://sredzka-korona.pl/catering/" />
-    <meta property="og:title" content="Catering Środa Śląska | Średzka Korona" />
+    <meta property="og:title" content="Catering Środa Śląska i okolice Wrocławia | Średzka Korona" />
     <meta
       property="og:description"
       content="Catering Środa Śląska — profesjonalny catering wyjazdowy na imprezy okolicznościowe, śluby, chrzciny i komunie. Gotujemy u klienta w Lutyni, Brzegu Dolnym, Miękini i okolicach Wrocławia. Jesteśmy blisko Wrocławia!"
     />
     <meta property="og:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
+    <meta property="og:image:alt" content="Logo Średzka Korona" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Catering Środa Śląska, Lutynia, Brzeg Dolny, Miękinia — okolice Wrocławia | Średzka Korona" />
+    <meta name="twitter:title" content="Catering Środa Śląska i okolice Wrocławia | Średzka Korona" />
+    <meta name="twitter:description" content="Catering wyjazdowy w Środzie Śląskiej i okolicach Wrocławia — imprezy, śluby, chrzciny i komunie." />
     <meta name="twitter:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
+    <meta name="twitter:image:alt" content="Logo Średzka Korona" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -298,6 +330,7 @@
         color: rgba(255, 255, 255, 0.95);
         max-width: 600px;
         text-align: center;
+        font-weight: 400;
       }
 
       .action-buttons {
@@ -1132,6 +1165,7 @@
 
         .restaurant-description {
           font-size: clamp(1rem, 2vw, 1.2rem);
+          font-weight: 400;
         }
 
         .action-buttons {
@@ -1657,42 +1691,48 @@
     </style>
   </head>
   <body>
-    <!-- Statyczna treść oferty dla Google (widoczna dla robotów) -->
-    <div class="visually-hidden" aria-hidden="true">
-      <h2>Oferta cateringu eventowego – Środa Śląska, Miękinia i okolice Wrocławia</h2>
-      <h3>Profesjonalny catering eventowy – Środa Śląska, Miękinia i okolice Wrocławia</h3>
-      <p>Oferujemy wyjątkowy catering eventowy z pełną obsługą, który całkowicie różni się od standardowych dostaw. Nie tylko dowozimy gotowe potrawy, ale przede wszystkim dbamy o kompleksową oprawę gastronomiczną Twojego wydarzenia.</p>
-      <p>Działamy elastycznie: serwujemy dania bezpośrednio u klienta, a także gotujemy na miejscu wydarzenia – również podczas imprez plenerowych i wesel pod namiotami.</p>
-      <h3>Mobilna gastronomia i catering – Środa Śląska i okolice</h3>
-      <p>Nasz catering z obsługą kelnerską i kucharską dowozimy oraz realizujemy w godzinach 06:00–19:00 na terenie całego powiatu średzkiego oraz w okolicach Wrocławia. Zapewniamy pyszne menu na:</p>
-      <ul>
-        <li>Wesela w plenerze i pod namiotami (pełna kuchnia polowa i elegancki serwis),</li>
-        <li>Poprawiny, chrzciny, komunie i urodziny w Twoim domu lub ogrodzie,</li>
-        <li>Spotkania firmowe, bankiety i imprezy integracyjne,</li>
-        <li>Stypy i pożegnania wymagające spokojnej, profesjonalnej obsługi,</li>
-        <li>Przyjęcia okolicznościowe – urodziny, jubileusze, rocznice.</li>
-      </ul>
-      <h3>Menu cateringowe – różnorodność smaków na każdą okazję</h3>
-      <p>Nasze menu cateringowe obejmuje szeroki wybór dań, które przygotowujemy ze świeżych, lokalnych składników. Oferujemy:</p>
-      <ul>
-        <li><strong>Zupy:</strong> Rosół domowy, krem z pieczonych warzyw, zupa grzybowa, barszcz czerwony, zupa pomidorowa na wywarze mięsnym – idealne jako przystawka lub samodzielne danie.</li>
-        <li><strong>Dania główne:</strong> Schab pieczony z ziołami, rolada wołowa z kaszą i sosem, filet z kurczaka w sosie grzybowym, pieczeń wieprzowa na słodko, łosoś pieczony w koperku, kaczka pieczona z jabłkami – każde danie serwowane z sezonowymi dodatkami.</li>
-        <li><strong>Przystawki i przekąski:</strong> Deski serów i wędlin, tatar wołowy, śledź w oleju lub śmietanie, pasztet domowy z żurawiną, koreczki i mini tartaletki – idealne na przyjęcia w formie bufetu.</li>
-        <li><strong>Sałatki i dodatki:</strong> Sałatka grecka, sałatka z buraków z chrzanem, surówka z młodej kapusty, ziemniaki pieczone z rozmarynem, kopytka domowe, kasza gryczana z grzybami.</li>
-        <li><strong>Desery:</strong> Sernik domowy, szarlotka na kruchym cieście, panna cotta z sosem owocowym, ciasto marchewkowe, lody rzemieślnicze – słodkie zakończenie każdej uczty.</li>
-        <li><strong>Napoje:</strong> Kompot domowy, lemoniada, kawa i herbata – w cenach cateringu, a także możliwość zapewnienia napojów zimnych i gorących według życzenia.</li>
-      </ul>
-      <h3>Jak działa nasz catering? – proces zamówienia krok po kroku</h3>
-      <p>1. <strong>Kontakt i wycena:</strong> Zadzwoń lub napisz – omówimy termin, liczbę gości i charakter wydarzenia. Na tej podstawie przygotowujemy indywidualną wycenę.</p>
-      <p>2. <strong>Ustalenie menu:</strong> Wspólnie wybieramy dania z naszego menu cateringowego lub tworzymy autorskie menu dopasowane do Twoich preferencji. Uwzględniamy diety specjalne (wegetariańskie, bezglutenowe, bezlaktozowe).</p>
-      <p>3. <strong>Przygotowanie i dostawa:</strong> W dniu wydarzenia przygotowujemy wszystkie potrawy, pakujemy i dostarczamy we wskazane miejsce. W przypadku cateringu z obsługą – nasi kelnerzy i kucharze serwują dania na miejscu.</p>
-      <p>4. <strong>Obsługa na miejscu:</strong> Zajmujemy się nakryciem stołów, podaniem potraw, dokładaniem i sprzątaniem po uczcie. Ty i Twoi goście możecie w pełni cieszyć się wydarzeniem.</p>
-      <p>5. <strong>Sprzątanie:</strong> Po zakończeniu przyjęcia zbieramy naczynia, sprzątamy i pozostawiamy miejsce w nienagannym stanie.</p>
-      <h3>Dlaczego warto wybrać catering Średzka Korona?</h3>
-      <p>Jesteśmy lokalną firmą z wieloletnim doświadczeniem w organizacji przyjęć na Dolnym Śląsku. Naszym atutem jest elastyczność – dopasowujemy się do każdej lokalizacji i budżetu. Korzystamy wyłącznie ze świeżych produktów od regionalnych dostawców. Nasza kadra to doświadczeni kucharze i kelnerzy, którzy dbają o najwyższy standard obsługi.</p>
-      <p>Obsługujemy zarówno kameralne spotkania (od 10 osób), jak i duże wesela oraz eventy firmowe (nawet ponad 100 osób). Działamy na terenie gmin: Środa Śląska, Miękinia, Malczyce, Udanin, Kostomłoty oraz w okolicach Wrocławia (do 40 km od Środy Śląskiej).</p>
-      <p>Prosimy o kontakt telefoniczny, mailowy lub przez formularz kontaktowy w celu ustalenia szczegółów.</p>
+    <!-- Statyczna treść oferty cateringu -->
+    <div id="catering-offer-static" class="visually-hidden">
+      <div class="modal-body">
+        <div class="modal-header">
+          <h2>Oferta</h2>
+          <button class="modal-close" id="close-orders" aria-label="Zamknij">×</button>
+        </div>
+        <div class="opening-hours-list">
+          <div class="opening-hours-row" style="display: grid; gap: 0.85rem; text-align: left; line-height: 1.7;">
+            <h3>Catering eventowy w Środzie Śląskiej i okolicach Wrocławia</h3>
+            <p>Organizujemy catering okolicznościowy i eventowy z dowozem lub obsługą na miejscu. Zajmujemy się całą stroną gastronomiczną wydarzenia, żebyś mógł skupić się na gościach, a nie na logistyce.</p>
+            <p>Dopasowujemy menu, sposób podania i zakres obsługi do charakteru wydarzenia — od kameralnych spotkań rodzinnych po większe realizacje firmowe i plenerowe.</p>
+            <h3>Dla kogo przygotowujemy catering</h3>
+            <ul>
+              <li>uroczystości rodzinne: chrzciny, komunie, jubileusze i rocznice,</li>
+              <li>wydarzenia firmowe: szkolenia, spotkania integracyjne, bankiety i konferencje,</li>
+              <li>przyjęcia w domu, ogrodzie, sali lub pod namiotem,</li>
+              <li>catering na zewnątrz: pikniki, wydarzenia sezonowe i obsługa w plenerze.</li>
+            </ul>
+            <h3>Co obejmuje nasza oferta</h3>
+            <ul>
+              <li>przygotowanie dań i dowóz na wskazane miejsce,</li>
+              <li>obsługę kelnerską i kucharską, jeśli jej potrzebujesz,</li>
+              <li>nakrycie stołów, serwis podczas wydarzenia i sprzątanie po zakończeniu,</li>
+              <li>indywidualne dopasowanie menu do liczby gości i budżetu.</li>
+            </ul>
+            <h3>Obszar realizacji</h3>
+            <p>Działamy w Środzie Śląskiej, Miękini, Lutyni, Brzegu Dolnym, Malczycach, Kostomłotach, Udaninie oraz w okolicach Wrocławia.</p>
+            <p>Jeśli potrzebujesz cateringu, który jest lokalny, punktualny i dopasowany do wydarzenia — skontaktuj się z nami, a przygotujemy wycenę oraz propozycję menu.</p>
+          </div>
+        </div>
+      </div>
     </div>
+    <noscript>
+      <div style="padding: 2rem; max-width: 800px; margin: 0 auto; text-align: center;">
+        <h1>Catering Średzka Korona</h1>
+        <p style="font-size: 1.2rem; margin-bottom: 2rem;">Profesjonalny catering okolicznościowy i eventowy w Środzie Śląskiej i okolicach Wrocławia</p>
+        <p><a href="../">← Powrót do strony głównej</a></p>
+        <p style="margin-top: 2rem;">Aby w pełni korzystać z naszej strony, włącz obsługę JavaScript w przeglądarce.</p>
+        <p>Telefon: +48 600 700 800 | Email: kontakt@sredzkakorona.pl</p>
+      </div>
+    </noscript>
     <div id="app"></div>
     <script>
       (async () => {
@@ -1752,8 +1792,8 @@
         try {
           if (!(isLocalPreview && !fallbackApiBase)) {
             const payload = await loadBootstrapPayload();
-            if (payload.content?.home?.sectionBlocks?.restaurant) {
-              window.location.replace("../index.html");
+              if (payload.content?.home?.sectionBlocks?.restaurant) {
+              window.location.replace("../");
               return;
             }
           }
@@ -2289,26 +2329,15 @@
         }
 
         function renderOrdersInfo() {
-          return `
+          return offerStatic?.innerHTML || `
             <div class="modal-body">
               <div class="modal-header">
                 <h2>Oferta</h2>
                 <button class="modal-close" id="close-orders" aria-label="Zamknij">×</button>
               </div>
               <div class="opening-hours-list">
-                <div
-                  class="opening-hours-row"
-                  style="display: grid; gap: 0.85rem; text-align: left; line-height: 1.7;"
-                >
-                  <div class="restaurant-orders-richtext">${sanitizeRichTextHtml(restaurantOrdersInfoText)}</div>
-                  <p style="margin: 0;">
-                    Kontakt telefoniczny:
-                    <a href="tel:${encodeURIComponent(companyPhone)}" style="color: var(--text); font-weight: 700; text-decoration: underline;">${escapeHtml(companyPhone)}</a>.
-                  </p>
-                  <p style="margin: 0;">
-                    Kontakt mailowy:
-                    <a href="mailto:${encodeURIComponent(companyEmail)}" style="color: var(--text); font-weight: 700; text-decoration: underline;">${escapeHtml(companyEmail)}</a>.
-                  </p>
+                <div class="opening-hours-row" style="display: grid; gap: 0.85rem; text-align: left; line-height: 1.7;">
+                  <p>Catering eventowy w Środzie Śląskiej i okolicach Wrocławia.</p>
                 </div>
               </div>
             </div>
@@ -2319,7 +2348,7 @@
           <div class="restaurant-background"></div>
           <div class="shell">
             <nav class="floating-nav" id="floating-nav">
-              <a href="../index.html" class="floating-nav-brand">
+              <a href="../" class="floating-nav-brand">
                 <span class="floating-nav-brand-text">ŚREDZKA</span>
                 <img class="brand-logo" src="../ikony/logo-korona.png" alt="Logo Średzka Korona" loading="lazy" decoding="async" />
                 <span class="floating-nav-brand-text">KORONA</span>
@@ -2329,9 +2358,9 @@
             <div class="restaurant-content">
               <div class="restaurant-info">
                 <h1 class="restaurant-title">Catering <span class="visually-hidden">Środa Śląska, Lutynia, Brzeg Dolny, Miękinia — okolice Wrocławia</span></h1>
-                <p class="restaurant-description">
+                <h2 class="restaurant-description">
                   Profesjonalny catering okolicznościowy i eventowy. Działamy na terenie gminy Środa Śląska, Miękinia i okolicach.
-                </p>
+                </h2>
                 <div class="action-buttons">
                   <button class="action-button" id="orders-button">
                     <div class="action-button-title">OFERTA</div>
@@ -2346,7 +2375,7 @@
                 </div>
               </div>
               <a
-                href="../kontakt/index.html"
+                href="../kontakt/"
                 class="reservation-info"
                 id="rb-order-catering"
                 aria-label="Zamów catering — przejdź do strony kontaktu"
@@ -2357,6 +2386,7 @@
         `;
 
         const modal = document.querySelector("#restaurant-modal");
+        const offerStatic = document.querySelector("#catering-offer-static");
         const menuButton = document.querySelector("#menu-button");
         const galleryButton = document.querySelector("#gallery-button");
         const ordersButton = document.querySelector("#orders-button");
@@ -2460,7 +2490,7 @@
           let analyticsGranted = false;
           try {
             const c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
-            if (c && c.analytics && c.marketing) {
+            if (c && (c.analytics || c.marketing)) {
               analyticsGranted = true;
             }
           } catch(e) {}
@@ -2480,11 +2510,7 @@
           localStorage.setItem('sredzka-cookies-choice', JSON.stringify(value));
 
           if (window.sredzkaGoogleConsent) {
-            if (acceptAll) {
-              window.sredzkaGoogleConsent.grant();
-            } else {
-              window.sredzkaGoogleConsent.deny();
-            }
+            window.sredzkaGoogleConsent.grant(!!value.analytics, !!value.marketing);
           }
 
           updateCookiePanelState();
@@ -2522,7 +2548,7 @@
     </script>
     <script src="../assets/js/config.js"></script>
     <script src="../assets/js/sredzka-document-title.js"></script>
-    <a href="../kontakt/index.html" class="floating-contact-button" aria-label="Kontakt">
+    <a href="../kontakt/" class="floating-contact-button" aria-label="Kontakt">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
       </svg>
@@ -2563,7 +2589,7 @@
         </div>
 
         <div class="cookie-docs-row">
-          <a class="cookie-doc-link" href="../dokumenty/index.html">Dokumenty: Polityka prywatności i cookies oraz informacja RODO</a>
+          <a class="cookie-doc-link" href="../dokumenty/">Dokumenty: Polityka prywatności i cookies oraz informacja RODO</a>
         </div>
 
         <div class="cookie-actions">
@@ -2573,8 +2599,9 @@
       </div>
     </div>
 
-    <a class="faq-float-btn" href="../f-and-q/index.html" aria-label="FAQ — częste pytania" title="FAQ — częste pytania">F&amp;Q</a>
+    <a class="faq-float-btn" href="../f-and-q/" aria-label="FAQ — częste pytania" title="FAQ — częste pytania">F&amp;Q</a>
     <a class="watermark" href="https://i-janicki.pl">Design &amp; Development by Igor Janicki</a>
       <p class="footer-date">Data: 01.05.2026r.</p>
+    <script src="../assets/js/cookies-banner.js"></script>
 </body>
 </html>
