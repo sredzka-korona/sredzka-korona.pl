@@ -2895,6 +2895,8 @@
         white-space: nowrap;
       }
 
+    </style>
+
   </head>
   <body>
     <div id="app">
@@ -3621,6 +3623,11 @@
             nav.classList.remove("scrolled");
           }
         };
+
+        window.addEventListener("scroll", handleScroll, { passive: true });
+        handleScroll();
+      })();
+    </script>
 
     <script src="../assets/js/sredzka-document-title.js"></script>
     <a href="../kontakt/" class="floating-contact-button" aria-label="Kontakt">

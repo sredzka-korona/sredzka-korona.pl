@@ -1409,6 +1409,8 @@
         white-space: nowrap;
       }
 
+    </style>
+
   </head>
   <body>
     <!-- Statyczna treść oferty cateringu -->
@@ -2184,6 +2186,11 @@
             nav.classList.remove("scrolled");
           }
         };
+
+        window.addEventListener("scroll", handleScroll, { passive: true });
+        handleScroll();
+      })();
+    </script>
 
     <script src="../assets/js/config.js"></script>
     <script src="../assets/js/sredzka-document-title.js"></script>
