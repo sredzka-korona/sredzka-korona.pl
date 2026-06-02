@@ -3060,11 +3060,7 @@
 
         try {
           if (!(isLocalPreview && !fallbackApiBase)) {
-            const payload = await loadBootstrapPayload();
-              if (payload.content?.home?.sectionBlocks?.events) {
-              window.location.replace("../");
-              return;
-            }
+            await loadBootstrapPayload();
           }
         } catch (e) {}
 

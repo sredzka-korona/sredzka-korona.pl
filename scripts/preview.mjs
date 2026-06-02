@@ -65,7 +65,21 @@ createServer((request, response) => {
   }
 
   const safePath = normalize(pathname).replace(/^(\.\.[/\\])+/, "");
-  const filePath = join(root, safePath);
+  let filePath = join(root, safePath);
+
+  if (existsSync(filePath) && statSync(filePath).isDirectory()) {
+    const indexPath = join(filePath, "index.html");
+    if (existsSync(indexPath) && statSync(indexPath).isFile()) {
+      filePath = indexPath;
+    }
+  }
+
+  if (!existsSync(filePath) && !extname(filePath)) {
+    const htmlPath = `${filePath}.html`;
+    if (existsSync(htmlPath) && statSync(htmlPath).isFile()) {
+      filePath = htmlPath;
+    }
+  }
 
   if (!existsSync(filePath) || statSync(filePath).isDirectory()) {
     response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
