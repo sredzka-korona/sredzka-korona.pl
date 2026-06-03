@@ -2115,7 +2115,7 @@
           modal.classList.add("open");
           
           // Obsługa zamknięcia modala
-          document.querySelector("#close-menu")?.addEventListener("click", closeModal);
+          modal.querySelector("#close-menu")?.addEventListener("click", closeModal);
           modal.addEventListener("click", (e) => {
             if (e.target === modal) closeModal();
           });
@@ -2152,7 +2152,7 @@
         function openGallery() {
           modal.innerHTML = renderGallery();
           modal.classList.add("open");
-          document.querySelector("#close-gallery")?.addEventListener("click", closeModal);
+          modal.querySelector("#close-gallery")?.addEventListener("click", closeModal);
           modal.addEventListener("click", (e) => {
             if (e.target === modal) closeModal();
           });
@@ -2161,7 +2161,7 @@
         function openOrdersInfo() {
           modal.innerHTML = renderOrdersInfo();
           modal.classList.add("open");
-          document.querySelector("#close-orders")?.addEventListener("click", closeModal);
+          modal.querySelector("#close-orders")?.addEventListener("click", closeModal);
           modal.addEventListener("click", (e) => {
             if (e.target === modal) closeModal();
           });
