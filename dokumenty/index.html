@@ -575,6 +575,37 @@
         max-width: none;
         z-index: 1002;
         padding: 1rem 1.5rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        background: var(--bg-elevated);
+        box-shadow: var(--shadow);
+        font-family: "Manrope", sans-serif;
+        color: var(--text);
+        line-height: 1.5;
+      }
+
+      .cookie-banner .eyebrow {
+        margin: 0 0 1rem;
+        color: var(--gold);
+        font-size: 0.85rem;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        font-weight: 600;
+      }
+
+      .cookie-banner strong {
+        display: block;
+        font-size: inherit;
+        font-weight: 700;
+        color: #241b14;
+        margin-bottom: 0.5rem;
+      }
+
+      .cookie-banner p {
+        margin: 0;
+        line-height: 1.5;
+        color: var(--muted);
+        font-size: inherit;
       }
 
       .cookie-banner .cookie-actions {
@@ -590,6 +621,46 @@
         text-align: center;
         padding: 0.58rem 0.85rem;
         font-size: 0.95rem;
+      }
+
+      .cookie-banner .button {
+        display: block;
+        margin: 0;
+        border: 1px solid rgba(200, 170, 120, 0.5);
+        border-radius: 999px;
+        padding: 0.9rem 1.4rem;
+        background: linear-gradient(135deg, rgba(230, 222, 205, 0.95), rgba(225, 215, 195, 0.92));
+        color: #2a241c;
+        text-decoration: none;
+        cursor: pointer;
+        transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+      }
+
+      .cookie-banner .button:hover,
+      .cookie-banner .button:focus-visible {
+        transform: translateY(-2px);
+        border-color: rgba(232, 216, 184, 0.95);
+        background: linear-gradient(135deg, rgba(240, 235, 225, 0.98), rgba(230, 222, 205, 0.95));
+      }
+
+      .cookie-banner .button.secondary {
+        background: rgba(255, 252, 247, 0.82);
+        color: var(--text);
+      }
+
+      .cookie-banner .button.primary {
+        background: linear-gradient(135deg, #c9a96e, #b8924a);
+        color: #fff;
+        border-color: #b8924a;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(184, 146, 74, 0.35);
+      }
+
+      .cookie-banner .button.primary:hover,
+      .cookie-banner .button.primary:focus-visible {
+        background: linear-gradient(135deg, #d4b87a, #c9a96e);
+        border-color: #c9a96e;
+        box-shadow: 0 4px 14px rgba(184, 146, 74, 0.5);
       }
 
       .footer-links {
@@ -884,65 +955,59 @@
 
       .cookie-toggle {
         position: relative;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 44px;
+        display: inline-block;
+        width: 46px;
         height: 26px;
         flex-shrink: 0;
         cursor: pointer;
       }
 
       .cookie-toggle input {
-        position: absolute;
         opacity: 0;
-        width: 1px;
-        height: 1px;
-        pointer-events: none;
+        width: 0;
+        height: 0;
       }
 
       .cookie-toggle-slider {
-        position: relative;
-        width: 44px;
-        height: 24px;
-        border-radius: 999px;
-        background: rgba(107, 93, 79, 0.18);
-        border: 1px solid rgba(107, 93, 79, 0.2);
-        transition: all 0.2s ease;
-        box-sizing: border-box;
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(107, 93, 79, 0.15);
+        border-radius: 26px;
+        transition: background 0.25s ease;
       }
 
       .cookie-toggle-slider::before {
         content: "";
         position: absolute;
-        top: 50%;
-        left: 2px;
-        width: 18px;
-        height: 18px;
+        height: 20px;
+        width: 20px;
+        left: 3px;
+        bottom: 3px;
+        background: #fff;
         border-radius: 50%;
-        background: #fffaf4;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
-        transform: translateY(-50%);
-        transition: all 0.2s ease;
+        transition: transform 0.25s ease;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.12);
       }
 
       .cookie-toggle input:checked + .cookie-toggle-slider {
         background: var(--gold);
-        border-color: var(--gold);
       }
 
       .cookie-toggle input:checked + .cookie-toggle-slider::before {
-        transform: translateY(-50%) translateX(20px);
+        transform: translateX(20px);
       }
 
       .cookie-toggle.is-locked {
         cursor: default;
-        opacity: 0.9;
+        opacity: 0.75;
       }
 
       .cookie-toggle.is-locked .cookie-toggle-slider {
-        background: rgba(90, 125, 58, 0.12);
-        border-color: rgba(90, 125, 58, 0.2);
+        background: rgba(90, 125, 58, 0.18);
       }
 
       .cookie-toggle.is-locked .cookie-toggle-slider::before {
@@ -1000,14 +1065,14 @@
       }
 
       .cookie-btn-save {
-        border-color: var(--gold);
-        background: var(--gold);
-        color: #fff;
+        border-color: var(--line);
+        background: transparent;
+        color: var(--text);
       }
 
       .cookie-btn-save:hover {
-        background: #b8946a;
-        box-shadow: 0 2px 16px rgba(168, 137, 90, 0.35);
+        border-color: var(--gold);
+        background: rgba(200, 170, 120, 0.06);
       }
 
       .cookie-btn-all {
@@ -1019,6 +1084,18 @@
       .cookie-btn-all:hover {
         background: #b8946a;
         box-shadow: 0 2px 16px rgba(168, 137, 90, 0.35);
+      }
+
+      .cookie-btn-reject {
+        border-color: var(--line);
+        background: transparent;
+        color: var(--muted);
+      }
+
+      .cookie-btn-reject:hover {
+        border-color: var(--gold);
+        background: rgba(200, 170, 120, 0.06);
+        color: var(--text);
       }
 
       @media (max-width: 820px) {
@@ -2086,7 +2163,8 @@
             <p class="eyebrow">Cookies</p>
             <strong>Pliki cookie i prywatność</strong>
             <p style="margin:0.35rem 0 0; line-height:1.3;">
-              Ta strona korzysta z plików cookies niezbędnych do prawidłowego działania oraz — za Twoją zgodą — z cookies analitycznych i marketingowych. Możesz zaakceptować wszystkie, odrzucić opcjonalne albo dostosować ustawienia.
+              Ta strona korzysta z plików cookies niezbędnych do prawidłowego działania oraz — za Twoją zgodą — z cookies analitycznych i marketingowych. Możesz zaakceptować wszystkie, odrzucić opcjonalne albo dostosować ustawienia. Więcej informacji:
+              <a href="./" style="color:var(--gold); text-decoration:underline;">Dokumenty</a>
             </p>
             <div class="cookie-actions">
               <button class="button secondary" type="button" data-cookie-action="settings">Ustawienia</button>
@@ -2389,15 +2467,13 @@
 
     <!-- ═══════════ PANEL COOKIES ═══════════ -->
     <div class="cookie-overlay" id="cookieOverlay" role="dialog" aria-modal="true" aria-label="Ustawienia plików cookie" aria-hidden="true" hidden>
-      <div class="cookie-panel">
-        <div class="cookie-header">
-          <span class="cookie-icon" aria-hidden="true">🍪</span>
-          <h2>Pliki cookie i prywatność</h2>
-        </div>
+        <div class="cookie-panel">
+          <div class="cookie-header">
+            <span class="cookie-icon" aria-hidden="true">🍪</span>
+            <h2>Pliki cookie i prywatność</h2>
+          </div>
         <p class="cookie-desc">
-          Ta strona używa plików cookie i pamięci lokalnej. Część jest <strong>niezbędna</strong>
-          do działania strony i nie wymaga zgody. Pozostałe (Google Analytics, Google Ads)
-          pomagają ulepszać stronę i personalizować reklamy — wymagają Twojej zgody zgodnie z RODO.
+          Ta strona korzysta z plików cookies niezbędnych do prawidłowego działania oraz — za Twoją zgodą — z cookies analitycznych i marketingowych. Możesz zaakceptować wszystkie, odrzucić opcjonalne albo dostosować ustawienia.
         </p>
 
         <div class="cookie-options">
