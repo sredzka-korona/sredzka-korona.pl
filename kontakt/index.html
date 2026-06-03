@@ -11,6 +11,10 @@
         var DEFAULT_WAIT_FOR_UPDATE_MS = 500;
         var googleScriptLoaded = false;
         var configuredGoogleTagIds = {};
+        var currentConsentState = {
+          analytics: false,
+          marketing: false
+        };
 
         window.dataLayer = window.dataLayer || [];
         window.gtag = window.gtag || function(){window.dataLayer.push(arguments);};
@@ -48,9 +52,9 @@
           window.gtag('js', new Date());
         }
 
-        function configureGoogleTags(tagIds) {
+        function configureGoogleTags(tagIds, force) {
           tagIds.forEach(function(id) {
-            if (configuredGoogleTagIds[id]) {
+            if (configuredGoogleTagIds[id] && !force) {
               return;
             }
             configuredGoogleTagIds[id] = true;
@@ -63,19 +67,38 @@
           configureGoogleTags(ANALYTICS_GOOGLE_TAG_IDS.concat(ADS_GOOGLE_TAG_IDS));
         }
 
+        function refreshMeasurementAfterConsentGrant(previousConsent, nextConsent) {
+          if (!previousConsent.analytics && nextConsent.analytics) {
+            configureGoogleTags(ANALYTICS_GOOGLE_TAG_IDS, true);
+          }
+          if (!previousConsent.marketing && nextConsent.marketing) {
+            configureGoogleTags(ADS_GOOGLE_TAG_IDS, true);
+          }
+        }
+
         window.sredzkaGoogleConsent = {
           update: function(analytics, marketing) {
-            applyConsentUpdate(!!analytics, !!marketing);
+            var nextConsent = {
+              analytics: !!analytics,
+              marketing: !!marketing
+            };
+            var previousConsent = {
+              analytics: currentConsentState.analytics,
+              marketing: currentConsentState.marketing
+            };
+            applyConsentUpdate(nextConsent.analytics, nextConsent.marketing);
+            refreshMeasurementAfterConsentGrant(previousConsent, nextConsent);
+            currentConsentState = nextConsent;
           },
           grant: function(analytics, marketing) {
             if (typeof analytics === 'undefined' && typeof marketing === 'undefined') {
               analytics = true;
               marketing = true;
             }
-            applyConsentUpdate(!!analytics, !!marketing);
+            window.sredzkaGoogleConsent.update(!!analytics, !!marketing);
           },
           deny: function() {
-            applyConsentUpdate(false, false);
+            window.sredzkaGoogleConsent.update(false, false);
           }
         };
 
