@@ -3191,6 +3191,11 @@
           });
         }
 
+        function initCookieUi() {
+          initCookiePanel();
+          initCookieBanner();
+        }
+
         function initContactForm() {
           const form = document.querySelector("#contact-form");
           const status = document.querySelector("#contact-status");
@@ -3499,8 +3504,15 @@
             syncFloatingNavHeightCssVar();
           });
           initScrollSpy();
-          try { setTimeout(initCookiePanel, 0); } catch (e) { console.warn('Cookie panel init:', e); }
-          try { initCookieBanner(); } catch (e) { console.warn('Cookie banner init:', e); }
+          try {
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', initCookieUi, { once: true });
+            } else {
+              initCookieUi();
+            }
+          } catch (e) {
+            console.warn('Cookie UI init:', e);
+          }
 
           const activeNotifications = await loadRemoteData();
           state.homeMediaPending = false;

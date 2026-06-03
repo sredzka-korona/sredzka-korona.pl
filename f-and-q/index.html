@@ -1446,7 +1446,16 @@
           });
         }
 
-        setTimeout(initCookiePanel, 0);
+        function initCookieUi() {
+          initCookiePanel();
+          initCookieBanner();
+        }
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initCookieUi, { once: true });
+        } else {
+          initCookieUi();
+        }
 
         /* ═══════════ SCROLL SPY — floating nav shadow + hide/show ═══════════ */
         const floatNav = document.querySelector('#floating-nav');
