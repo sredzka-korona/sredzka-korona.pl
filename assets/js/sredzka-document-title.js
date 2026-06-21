@@ -55,10 +55,11 @@
 })();
 
 /**
- * Dev link loader overlay (1:1 behavior with ELMET):
+ * Dev link loader overlay:
  * - click on "Design & Development by i-JANICKI"
  * - show animated overlay
  * - redirect after 1000ms
+ * - restore a clean page when returning from browser history
  */
 (function () {
   "use strict";
@@ -300,13 +301,18 @@
   function isDevLink(link) {
     if (!link) return false;
 
+    if (link.dataset.devLoaderLink !== undefined || link.id === "dev-link") return true;
+
     var href = (link.getAttribute("href") || "").trim();
     if (!href) return false;
     var normalizedHref = href.replace(/\/+$/, "");
     if (normalizedHref !== DEV_LINK_TARGET) return false;
 
     var text = (link.textContent || "").toLowerCase();
-    return text.indexOf("design") !== -1 && text.indexOf("igor janicki") !== -1;
+    return (
+      text.indexOf("design") !== -1 &&
+      (text.indexOf("igor janicki") !== -1 || text.indexOf("i-janicki") !== -1)
+    );
   }
 
   function initDevLinkLoader() {
@@ -323,12 +329,20 @@
 
     resetLoader();
     window.addEventListener("pageshow", resetLoader);
+    window.addEventListener("pagehide", resetLoader);
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) resetLoader();
+    });
 
     links.forEach(function (link) {
       if (link.dataset.devLoaderBound === "1") return;
       link.dataset.devLoaderBound = "1";
 
       link.addEventListener("click", function (event) {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+          return;
+        }
+
         event.preventDefault();
         overlay.classList.add("active");
         setTimeout(function () {
