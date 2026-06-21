@@ -56,7 +56,7 @@
 
 /**
  * Dev link loader overlay (1:1 behavior with ELMET):
- * - click on "Design & Development by Igor Janicki"
+ * - click on "Design & Development by i-JANICKI"
  * - show animated overlay
  * - redirect after 1000ms
  */
