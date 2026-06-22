@@ -5,6 +5,7 @@ import { handleD1BookingApi, runBookingMaintenance, sendContactFormAdminEmail, u
 const MAX_MEDIA_FILE_BYTES = 1_700_000;
 const BOOTSTRAP_EDGE_CACHE_TTL_MS = 30 * 1000;
 const bootstrapPayloadCache = new Map();
+let firebaseAccessTokenCache = null;
 
 /** Końcowy slash w URL powodował pusty segment i 404 (np. .../restaurant/). */
 function stripTrailingSlashes(pathname) {
@@ -46,8 +47,8 @@ export default {
       if (url.pathname === "/api/public/contact" && request.method === "POST") {
         assertBrowserLikePublicRequest(request, url);
         const payload = await request.json();
-        await handleContactSubmission(payload, request, env);
-        return jsonResponse({ ok: true }, 201, request, env);
+        const result = await handleContactSubmission(payload, request, env);
+        return jsonResponse({ ok: true, ...result }, 201, request, env);
       }
 
       if (url.pathname.startsWith("/api/public/gallery-images/") && request.method === "GET") {
@@ -80,6 +81,10 @@ export default {
         const submissions = await env.DB.prepare(
           "SELECT id, full_name AS fullName, email, phone, event_type AS eventType, preferred_date AS preferredDate, message, status, created_at AS createdAt FROM contact_submissions ORDER BY created_at DESC LIMIT 100"
         ).all();
+        const submissionRows = (submissions.results || []).map((submission) => ({
+          ...submission,
+          ticketNumber: formatContactTicketNumber(submission.createdAt, submission.id),
+        }));
         const hallMap = new Map(content.events.halls.map((hall) => [hall.key, hall.name]));
         const calendarBlocks = (calendar.blocks || []).map((block) => ({
           ...block,
@@ -93,7 +98,7 @@ export default {
             documents,
             galleryAlbums,
             calendarBlocks,
-            submissions: submissions.results || [],
+            submissions: submissionRows,
             notifications,
             capabilities: {
               mediaStorageEnabled: true,
@@ -822,6 +827,7 @@ async function handleContactSubmission(payload, request, env) {
   const phone = String(payload.phone || "").trim();
   const eventType = String(payload.eventType || payload.topic || "").trim();
   const preferredDate = String(payload.preferredDate || "").trim();
+  const createdAt = nowIso();
 
   if (!fullName || !email || !message) {
     throw badRequest("Imie, e-mail i wiadomosc sa wymagane.");
@@ -833,15 +839,38 @@ async function handleContactSubmission(payload, request, env) {
   if (!turnstileOk) {
     throw badRequest("Nie udalo sie potwierdzic formularza.");
   }
-  await env.DB.prepare(
+  const insertResult = await env.DB.prepare(
     "INSERT INTO contact_submissions (full_name, email, phone, event_type, preferred_date, message, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'new', ?)"
   )
-    .bind(fullName, email, phone, eventType, preferredDate, message, nowIso())
+    .bind(fullName, email, phone, eventType, preferredDate, message, createdAt)
     .run();
+  const rawSubmissionId = insertResult?.meta?.last_row_id;
+  const submissionId = Number(rawSubmissionId === undefined || rawSubmissionId === null ? 0 : rawSubmissionId);
+  const ticketNumber = formatContactTicketNumber(createdAt, submissionId || Date.now());
+  const realtimeRecord = buildContactRealtimeRecord({
+    ticketNumber,
+    createdAt,
+    fullName,
+    email,
+    phone,
+    eventType,
+    preferredDate,
+    message,
+  });
+
+  try {
+    await saveContactSubmissionToRealtimeDatabase(env, realtimeRecord);
+  } catch (error) {
+    console.error("contact form: blad zapisu do Firebase Realtime Database", error?.message || error);
+    if (!isFirebaseRtdbOptional(env)) {
+      throw new Error("Nie udalo sie zapisac zgloszenia w Firebase Realtime Database.");
+    }
+  }
+
   await upsertConsentEmail(env, {
     fullName,
     email,
-    acceptedAtIso: nowIso(),
+    acceptedAtIso: createdAt,
     source: "contact_form",
   });
 
@@ -850,6 +879,8 @@ async function handleContactSubmission(payload, request, env) {
   } catch (error) {
     console.error("contact form: blad wysylki e-maila", error?.message || error);
   }
+
+  return { ticketNumber };
 }
 
 async function verifyTurnstile(token, request, env) {
@@ -1775,6 +1806,214 @@ function sanitizeHeaderValue(value) {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function localWarsawDateTimeParts(value) {
+  const date = value instanceof Date ? value : new Date(value || Date.now());
+  const parts = new Intl.DateTimeFormat("pl-PL", {
+    timeZone: "Europe/Warsaw",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  })
+    .formatToParts(date)
+    .reduce((acc, part) => {
+      if (part.type !== "literal") {
+        acc[part.type] = part.value;
+      }
+      return acc;
+    }, {});
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    time: `${parts.hour}:${parts.minute}:${parts.second}`,
+    dateKey: `${parts.year}${parts.month}${parts.day}`,
+  };
+}
+
+function formatContactTicketNumber(createdAt, id) {
+  const local = localWarsawDateTimeParts(createdAt);
+  const numericId = Math.max(0, Math.floor(Number(id) || 0));
+  return `SK-${local.dateKey}-${String(numericId).padStart(6, "0")}`;
+}
+
+function buildContactRealtimeRecord({ ticketNumber, createdAt, fullName, email, phone, eventType, preferredDate, message }) {
+  const local = localWarsawDateTimeParts(createdAt);
+  return {
+    ticketNumber,
+    submittedAt: createdAt,
+    submittedAtLocal: `${local.date} ${local.time}`,
+    submittedDate: local.date,
+    submittedTime: local.time,
+    timeZone: "Europe/Warsaw",
+    source: "contact_form",
+    status: "new",
+    form: {
+      fullName,
+      email,
+      phone,
+      eventType,
+      preferredDate,
+      message,
+    },
+  };
+}
+
+function normalizeFirebaseDatabaseUrl(env) {
+  return String(
+    env.FIREBASE_DATABASE_URL ||
+      env.FIREBASE_RTDB_URL ||
+      "https://sredzka-korona-default-rtdb.europe-west1.firebasedatabase.app/"
+  )
+    .trim()
+    .replace(/\/+$/, "");
+}
+
+function isFirebaseRtdbOptional(env) {
+  const value = String(env.FIREBASE_RTDB_OPTIONAL || "").trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes";
+}
+
+function safeFirebaseKey(value) {
+  return String(value || "")
+    .trim()
+    .replaceAll(/[.#$/[\]]/g, "-")
+    .replaceAll(/-+/g, "-")
+    .slice(0, 220);
+}
+
+function firebaseRealtimeDatabaseUrl(env, path) {
+  const baseUrl = normalizeFirebaseDatabaseUrl(env);
+  if (!baseUrl) {
+    throw new Error("Brak konfiguracji FIREBASE_DATABASE_URL.");
+  }
+  const url = new URL(`${baseUrl}/${path.replace(/^\/+/, "")}`);
+  const auth = String(env.FIREBASE_DATABASE_AUTH || env.FIREBASE_RTDB_AUTH || "").trim();
+  if (auth) {
+    url.searchParams.set("auth", auth);
+  }
+  return url;
+}
+
+async function saveContactSubmissionToRealtimeDatabase(env, record) {
+  const ticketKey = safeFirebaseKey(record.ticketNumber);
+  if (!ticketKey) {
+    throw new Error("Brak numeru ticketa do zapisu w Firebase.");
+  }
+  const url = firebaseRealtimeDatabaseUrl(env, `contactTickets/${ticketKey}.json`);
+  const headers = {
+    "Content-Type": "application/json; charset=utf-8",
+  };
+  const bearer = url.searchParams.has("auth") ? "" : await getFirebaseDatabaseBearerToken(env);
+  if (bearer) {
+    url.searchParams.set("access_token", bearer);
+    headers.Authorization = `Bearer ${bearer}`;
+  }
+  const response = await fetch(url, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(record),
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`Firebase RTDB ${response.status}: ${body.slice(0, 240)}`);
+  }
+}
+
+async function getFirebaseDatabaseBearerToken(env) {
+  const configuredBearer = String(env.FIREBASE_DATABASE_BEARER_TOKEN || env.FIREBASE_RTDB_BEARER_TOKEN || "").trim();
+  if (configuredBearer) {
+    return configuredBearer;
+  }
+  const clientEmail = String(env.FIREBASE_SERVICE_ACCOUNT_EMAIL || env.GOOGLE_CLIENT_EMAIL || "").trim();
+  const privateKey = String(env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY || env.GOOGLE_PRIVATE_KEY || "")
+    .trim()
+    .replaceAll("\\n", "\n");
+  if (!clientEmail || !privateKey) {
+    return "";
+  }
+  const now = Math.floor(Date.now() / 1000);
+  if (firebaseAccessTokenCache?.token && firebaseAccessTokenCache.expiresAt > now + 60) {
+    return firebaseAccessTokenCache.token;
+  }
+  const assertion = await createGoogleServiceAccountJwt({
+    clientEmail,
+    privateKey,
+    issuedAt: now,
+  });
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion,
+    }),
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`Google OAuth ${response.status}: ${body.slice(0, 240)}`);
+  }
+  const data = await response.json();
+  const token = String(data.access_token || "").trim();
+  if (!token) {
+    throw new Error("Google OAuth nie zwrocil access_token.");
+  }
+  firebaseAccessTokenCache = {
+    token,
+    expiresAt: now + Math.max(60, Number(data.expires_in) || 3600),
+  };
+  return token;
+}
+
+async function createGoogleServiceAccountJwt({ clientEmail, privateKey, issuedAt }) {
+  const header = { alg: "RS256", typ: "JWT" };
+  const payload = {
+    iss: clientEmail,
+    scope: "https://www.googleapis.com/auth/firebase.database",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: issuedAt,
+    exp: issuedAt + 3600,
+  };
+  const unsigned = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(payload))}`;
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    pemToArrayBuffer(privateKey),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", cryptoKey, new TextEncoder().encode(unsigned));
+  return `${unsigned}.${base64UrlEncode(signature)}`;
+}
+
+function pemToArrayBuffer(pem) {
+  const base64 = String(pem || "")
+    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
+    .replace(/-----END PRIVATE KEY-----/g, "")
+    .replace(/\s+/g, "");
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+function base64UrlEncode(value) {
+  const bytes =
+    typeof value === "string"
+      ? new TextEncoder().encode(value)
+      : value instanceof ArrayBuffer
+        ? new Uint8Array(value)
+        : new Uint8Array(value);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll(/=+$/g, "");
 }
 
 function sortIsoStamp(index, total) {

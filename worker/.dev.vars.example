@@ -3,6 +3,12 @@
 # TURNSTILE_SECRET — "Secret key" z Cloudflare Dashboard → Turnstile → Twoja witryna
 # (to NIE jest site key z assets/js/config.js).
 TURNSTILE_SECRET=
+FIREBASE_DATABASE_URL=https://sredzka-korona-default-rtdb.europe-west1.firebasedatabase.app/
+
+# Opcjonalnie, gdy reguly Realtime Database nie pozwalaja na zapis bez autoryzacji.
+# Najbezpieczniej ustawic jako sekrety Cloudflare, nie w repo:
+# FIREBASE_SERVICE_ACCOUNT_EMAIL=
+# FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 
 # Tylko lokalnie, gdy nie chcesz wklejać sekretu: TURNSTILE_SKIP_VERIFY=true
 # (na produkcji w Workerze TEGO NIE ustawiaj — otworzyłoby formularz dla botów).

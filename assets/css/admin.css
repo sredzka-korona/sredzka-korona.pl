@@ -23,7 +23,9 @@
 }
 
 html {
-  scrollbar-width: none;
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+  scrollbar-color: rgba(139, 101, 48, 0.55) rgba(200, 170, 120, 0.12);
 }
 
 body {
@@ -75,8 +77,21 @@ body::after {
 
 html::-webkit-scrollbar,
 body::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+  width: 14px;
+  height: 14px;
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  min-height: 44px;
+  border: 3px solid rgba(237, 241, 248, 0.96);
+  border-radius: 999px;
+  background: rgba(139, 101, 48, 0.56);
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: rgba(200, 170, 120, 0.12);
 }
 
 img {
@@ -1290,16 +1305,7 @@ body.admin-modal-open {
 }
 
 .scroll-indicator {
-  position: fixed;
-  top: 0.2rem;
-  right: 0.05rem;
-  bottom: 0.4rem;
-  width: 14px;
-  border-radius: 999px;
-  background: transparent;
-  box-shadow: none;
-  pointer-events: none;
-  z-index: 20;
+  display: none;
 }
 
 .scroll-indicator-thumb {

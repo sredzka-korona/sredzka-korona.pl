@@ -1761,6 +1761,7 @@
             } catch (_) {}
             throw new Error(msg);
           }
+          return response.json().catch(() => ({}));
         }
 
         // Obsługa wyboru tematu
@@ -1858,12 +1859,14 @@
 
         // ══════════════ WYSYŁANIE FORMULARZA (po akceptacji RODO) ══════════════
         async function startSubmission(payload) {
-          const finishSuccess = () => {
+          const finishSuccess = (result = {}) => {
             form.reset();
             topicButtons.forEach(btn => btn.classList.remove("selected"));
             topicInput.value = "";
             topicSelection.classList.remove("error");
-            status.textContent = "Dziękujemy! Wiadomość została wysłana.";
+            status.textContent = result.ticketNumber
+              ? `Dziękujemy! Wiadomość została wysłana. Numer zgłoszenia: ${result.ticketNumber}.`
+              : "Dziękujemy! Wiadomość została wysłana.";
             status.className = "form-status success";
             status.style.display = "block";
           };
@@ -1874,8 +1877,8 @@
             submitBtn.disabled = true;
             submitBtn.textContent = "Wysyłanie...";
             try {
-              await sendContactPayload(payload);
-              finishSuccess();
+              const result = await sendContactPayload(payload);
+              finishSuccess(result);
             } catch (error) {
               status.textContent =
                 error.message || "Wystąpił błąd podczas wysyłania formularza. Spróbuj ponownie.";
@@ -1919,8 +1922,8 @@
                 submitBtn.textContent = "Wysyłanie…";
                 void (async () => {
                   try {
-                    await sendContactPayload({ ...base, turnstileToken: token });
-                    finishSuccess();
+                    const result = await sendContactPayload({ ...base, turnstileToken: token });
+                    finishSuccess(result);
                   } catch (error) {
                     status.textContent =
                       error.message || "Wystąpił błąd podczas wysyłania formularza. Spróbuj ponownie.";

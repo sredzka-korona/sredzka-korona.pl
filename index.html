@@ -3271,8 +3271,11 @@
               if (!response.ok) {
                 throw new Error("Nie udalo sie wyslac formularza.");
               }
+              const result = await response.json().catch(() => ({}));
               form.reset();
-              status.textContent = "Dziekujemy. Wiadomosc zostala zapisana.";
+              status.textContent = result.ticketNumber
+                ? `Dziekujemy. Wiadomosc zostala zapisana. Numer zgloszenia: ${result.ticketNumber}.`
+                : "Dziekujemy. Wiadomosc zostala zapisana.";
             } catch (error) {
               status.textContent =
                 error.message === "local-preview"

@@ -6030,6 +6030,7 @@
                         <strong>${escapeHtml(submission.fullName)}</strong>
                         <span class="pill">${escapeHtml(submission.status)}</span>
                       </div>
+                      <p class="helper"><strong>Ticket:</strong> ${escapeHtml(submission.ticketNumber || "")}</p>
                       <div class="submission-meta">
                         <span>${escapeHtml(submission.email)}</span>
                         <span>${escapeHtml(submission.phone || "")}</span>
