@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="../assets/js/cookie-consent-core.js"></script>
     <script>
       (function() {
         var ADS_GOOGLE_TAG_IDS = [];
@@ -134,9 +135,10 @@
         };
 
         window.gtag('set', 'ads_data_redaction', true);
+        applyConsentDefault();
 
         try {
-          var c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
+          var c = window.sredzkaCookieConsent ? window.sredzkaCookieConsent.getValidChoice() : null;
           if (c) {
             window.sredzkaGoogleConsent.update(!!c.analytics, !!c.marketing);
           }
@@ -1825,7 +1827,10 @@
               <h4 style="margin: 1rem 0 0.5rem; color: #241b14; font-size: 1.05rem; font-weight: 600;">Cookies niezbędne</h4>
               <p>Cookies niezbędne są wykorzystywane bez konieczności uzyskiwania zgody użytkownika, ponieważ są wymagane do prawidłowego działania Serwisu.</p>
               <h4 style="margin: 1rem 0 0.5rem; color: #241b14; font-size: 1.05rem; font-weight: 600;">Cookies analityczne i marketingowe</h4>
-              <p>Cookies analityczne, funkcjonalne oraz marketingowe wykorzystywane są wyłącznie po uzyskaniu zgody użytkownika.</p>
+              <p>Cookies analityczne, funkcjonalne, marketingowe oraz związane z osadzaniem treści zewnętrznych wykorzystywane są wyłącznie po uzyskaniu zgody użytkownika. W przypadku korzystania z Google Consent Mode niektóre usługi Google mogą otrzymywać ograniczone sygnały techniczne niezwiązane z wykorzystaniem cookies, zgodnie z wyborem użytkownika.</p>
+              <h4 style="margin: 1rem 0 0.5rem; color: #241b14; font-size: 1.05rem; font-weight: 600;">Google Consent Mode</h4>
+              <p>Serwis może korzystać z technologii Google Consent Mode. W przypadku braku zgody na pliki cookies analityczne lub marketingowe usługi Google mogą działać w ograniczonym zakresie i przekazywać do Google sygnały techniczne niezwiązane z zapisywaniem lub odczytywaniem cookies, obejmujące m.in. informacje o stanie zgody użytkownika oraz podstawowe dane techniczne niezbędne do pomiaru i zapewnienia działania usług.</p>
+              <p>Pliki cookies wykorzystywane do celów analitycznych, reklamowych lub personalizacyjnych są zapisywane i odczytywane wyłącznie po wyrażeniu odpowiedniej zgody przez użytkownika. W przypadku odmowy zgody zakres przetwarzanych danych jest ograniczony zgodnie z ustawieniami wybranymi przez użytkownika.</p>
               <p>Użytkownik może w każdej chwili wycofać zgodę lub zmienić swoje preferencje.</p>
             </div>
             <div class="menu-section">
@@ -2177,18 +2182,16 @@
         }
 
         function getCookieChoice() {
-          try {
-            return JSON.parse(localStorage.getItem(COOKIE_CHOICE_KEY)) || null;
-          } catch (error) {
-            return null;
-          }
+          return window.sredzkaCookieConsent ? window.sredzkaCookieConsent.getValidChoice() : null;
         }
 
-        function applyCookieChoice(value) {
-          localStorage.setItem(COOKIE_CHOICE_KEY, JSON.stringify(value));
+        function applyCookieChoice(value, action) {
+          const record = window.sredzkaCookieConsent
+            ? window.sredzkaCookieConsent.saveChoice(value, action || "save_preferences")
+            : value;
 
           if (window.sredzkaGoogleConsent) {
-            window.sredzkaGoogleConsent.grant(!!(value && value.analytics), !!(value && value.marketing));
+            window.sredzkaGoogleConsent.grant(!!(record && record.analytics), !!(record && record.marketing));
           }
 
           markCookiesSeen();
@@ -2200,7 +2203,7 @@
         }
 
         function showCookieBanner(force = false) {
-          if (!force && localStorage.getItem(COOKIE_CHOICE_KEY)) {
+          if (!force && window.sredzkaCookieConsent && window.sredzkaCookieConsent.hasValidChoice()) {
             return;
           }
 
@@ -2239,7 +2242,7 @@
               const value = action === "accept-all"
                 ? { necessary: true, analytics: true, marketing: true, external: true }
                 : { necessary: true, analytics: false, marketing: false, external: false };
-              applyCookieChoice(value);
+              applyCookieChoice(value, action === "accept-all" ? "accept_all" : "reject_all");
             });
           });
 
@@ -2421,7 +2424,7 @@
           ['analytics','marketing','external'].forEach(function(cat) {
             var toggle = document.getElementById('cookieToggle_' + cat);
             if (toggle) {
-              toggle.checked = choice ? !!choice[cat] : false;
+              toggle.checked = choice ? !!(cat === 'external' ? choice.external_media : choice[cat]) : false;
             }
           });
         }
@@ -2432,14 +2435,14 @@
             var toggle = document.getElementById('cookieToggle_' + cat);
             value[cat] = toggle ? toggle.checked : false;
           });
-          applyCookieChoice(value);
+          applyCookieChoice(value, "save_preferences");
         }
 
         function cookieDecide(acceptAll) {
           const value = acceptAll
             ? { necessary: true, analytics: true, marketing: true, external: true }
             : { necessary: true, analytics: false, marketing: false, external: false };
-          applyCookieChoice(value);
+          applyCookieChoice(value, acceptAll ? "accept_all" : "reject_all");
         }
 
         function initCookiePanel() {

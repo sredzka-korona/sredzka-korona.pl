@@ -10,7 +10,6 @@
   }
   window.__sredzkaCookieWidgetMounted = true;
 
-  var STORAGE_KEY = 'sredzka-cookies-choice';
   var DOCS_HREF = new URL('../dokumenty/', window.location.href).href;
   var STYLE_ID = 'sredzka-cookie-widget-style';
   var floatBtn = null;
@@ -18,17 +17,16 @@
   var banner = null;
 
   function getChoice() {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null;
-    } catch (error) {
-      return null;
-    }
+    return window.sredzkaCookieConsent ? window.sredzkaCookieConsent.getValidChoice() : null;
   }
 
-  function persistChoice(value) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+  function persistChoice(value, action) {
+    var record = window.sredzkaCookieConsent
+      ? window.sredzkaCookieConsent.saveChoice(value, action)
+      : value;
+
     if (window.sredzkaGoogleConsent) {
-      window.sredzkaGoogleConsent.grant(!!value.analytics, !!value.marketing);
+      window.sredzkaGoogleConsent.grant(!!record.analytics, !!record.marketing);
     }
   }
 
@@ -551,7 +549,7 @@
   }
 
   function buildBanner() {
-    if (getChoice()) {
+    if (window.sredzkaCookieConsent ? window.sredzkaCookieConsent.hasValidChoice() : getChoice()) {
       return;
     }
 
@@ -595,7 +593,7 @@
     ['analytics', 'marketing', 'external'].forEach(function (cat) {
       var toggle = document.getElementById('cookieToggle_' + cat);
       if (toggle) {
-        toggle.checked = choice ? !!choice[cat] : false;
+        toggle.checked = choice ? !!(cat === 'external' ? choice.external_media : choice[cat]) : false;
       }
     });
   }
@@ -623,7 +621,7 @@
       var toggle = document.getElementById('cookieToggle_' + cat);
       value[cat] = toggle ? toggle.checked : false;
     });
-    persistChoice(value);
+    persistChoice(value, 'save_preferences');
     closeCookiePanel();
   }
 
@@ -631,7 +629,7 @@
     var value = acceptAll
       ? { necessary: true, analytics: true, marketing: true, external: true }
       : { necessary: true, analytics: false, marketing: false, external: false };
-    persistChoice(value);
+    persistChoice(value, acceptAll ? 'accept_all' : 'reject_all');
     closeCookiePanel();
   }
 

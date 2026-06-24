@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="../assets/js/cookie-consent-core.js"></script>
     <script>
       (function() {
         var ADS_GOOGLE_TAG_IDS = ['AW-18082369489'];
@@ -134,9 +135,10 @@
         };
 
         window.gtag('set', 'ads_data_redaction', true);
+        applyConsentDefault();
 
         try {
-          var c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
+          var c = window.sredzkaCookieConsent ? window.sredzkaCookieConsent.getValidChoice() : null;
           if (c) {
             window.sredzkaGoogleConsent.update(!!c.analytics, !!c.marketing);
           }

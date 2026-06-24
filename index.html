@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="./assets/js/cookie-consent-core.js"></script>
     <script>
       (function() {
         var ADS_GOOGLE_TAG_IDS = ['AW-18082369489'];
@@ -130,9 +131,10 @@
         };
 
         window.gtag('set', 'ads_data_redaction', true);
+        applyConsentDefault();
 
         try {
-          var c = JSON.parse(localStorage.getItem('sredzka-cookies-choice'));
+          var c = window.sredzkaCookieConsent ? window.sredzkaCookieConsent.getValidChoice() : null;
           if (c) {
             window.sredzkaGoogleConsent.update(!!c.analytics, !!c.marketing);
           }
@@ -3109,7 +3111,7 @@
         }
 
         function initCookieBanner() {
-          if (localStorage.getItem("sredzka-cookies-choice")) {
+          if (window.sredzkaCookieConsent && window.sredzkaCookieConsent.hasValidChoice()) {
             return;
           }
           const banner = document.createElement("div");
@@ -3141,7 +3143,7 @@
               const value = isAccepted
                   ? { necessary: true, analytics: true, marketing: true, external: true }
                   : { necessary: true, analytics: false, marketing: false, external: false };
-              applyCookieChoice(value);
+              applyCookieChoice(value, isAccepted ? "accept_all" : "reject_all");
               banner.remove();
               observeBottomStackLayout();
             });
@@ -3166,15 +3168,15 @@
         }
 
         function getCookieChoice() {
-          try {
-            return JSON.parse(localStorage.getItem('sredzka-cookies-choice')) || null;
-          } catch(e) { return null; }
+          return window.sredzkaCookieConsent ? window.sredzkaCookieConsent.getValidChoice() : null;
         }
 
-        function applyCookieChoice(value) {
-          localStorage.setItem('sredzka-cookies-choice', JSON.stringify(value));
+        function applyCookieChoice(value, action) {
+          const record = window.sredzkaCookieConsent
+            ? window.sredzkaCookieConsent.saveChoice(value, action || "save_preferences")
+            : value;
           if (window.sredzkaGoogleConsent) {
-            window.sredzkaGoogleConsent.grant(!!value.analytics, !!value.marketing);
+            window.sredzkaGoogleConsent.grant(!!record.analytics, !!record.marketing);
           }
 
           updateCookiePanelState();
@@ -3186,7 +3188,7 @@
           ['analytics','marketing','external'].forEach(function(cat) {
             var toggle = document.getElementById('cookieToggle_' + cat);
             if (toggle) {
-              toggle.checked = choice ? !!choice[cat] : false;
+              toggle.checked = choice ? !!(cat === 'external' ? choice.external_media : choice[cat]) : false;
             }
           });
         }
@@ -3197,14 +3199,14 @@
             var toggle = document.getElementById('cookieToggle_' + cat);
             value[cat] = toggle ? toggle.checked : false;
           });
-          applyCookieChoice(value);
+          applyCookieChoice(value, "save_preferences");
         }
 
         function cookieDecide(acceptAll) {
           const value = acceptAll
             ? { necessary: true, analytics: true, marketing: true, external: true }
             : { necessary: true, analytics: false, marketing: false, external: false };
-          applyCookieChoice(value);
+          applyCookieChoice(value, acceptAll ? "accept_all" : "reject_all");
         }
 
         function initCookiePanel() {

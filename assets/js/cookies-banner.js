@@ -2,14 +2,14 @@
  * Cookies Banner - samodzielny baner cookies
  * 
  * Działa niezależnie od CSS strony.
- * Sprawdza localStorage('sredzka-cookies-choice') i jeśli brak decyzji, pokazuje banner.
+ * Sprawdza aktualny rekord zgody i jeśli brak decyzji, pokazuje banner.
  * Po podjęciu decyzji zapisuje ją i wywołuje window.sredzkaGoogleConsent.
  */
 (function () {
   'use strict';
 
-  // Nie pokazuj banera jeśli decyzja już podjęta
-  if (localStorage.getItem('sredzka-cookies-choice')) {
+  // Nie pokazuj banera jeśli decyzja dla aktualnej wersji polityki już podjęta.
+  if (window.sredzkaCookieConsent && window.sredzkaCookieConsent.hasValidChoice()) {
     return;
   }
 
@@ -126,10 +126,12 @@
   document.body.appendChild(banner);
 
   // --- Funkcja zapisu decyzji ---
-  function saveChoice(value) {
-    localStorage.setItem('sredzka-cookies-choice', JSON.stringify(value));
+  function saveChoice(value, action) {
+    var record = window.sredzkaCookieConsent
+      ? window.sredzkaCookieConsent.saveChoice(value, action)
+      : value;
     if (window.sredzkaGoogleConsent) {
-      window.sredzkaGoogleConsent.grant(!!value.analytics, !!value.marketing);
+      window.sredzkaGoogleConsent.grant(!!record.analytics, !!record.marketing);
     }
   }
 
@@ -156,7 +158,7 @@
         value = { necessary: true, analytics: false, marketing: false, external: false };
       }
 
-      saveChoice(value);
+      saveChoice(value, action === 'accept-all' ? 'accept_all' : 'reject_all');
       banner.remove();
     });
   }
