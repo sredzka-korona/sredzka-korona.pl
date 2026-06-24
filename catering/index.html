@@ -35,14 +35,19 @@
           window.gtag('consent', 'update', getConsentState(analytics, marketing));
         }
 
-        function getPrimaryGoogleTagId(consentState) {
-          if (consentState.analytics && ANALYTICS_GOOGLE_TAG_IDS[0]) {
-            return ANALYTICS_GOOGLE_TAG_IDS[0];
-          }
-          if (consentState.marketing && ADS_GOOGLE_TAG_IDS[0]) {
-            return ADS_GOOGLE_TAG_IDS[0];
-          }
+        function getPrimaryGoogleTagId() {
           return ANALYTICS_GOOGLE_TAG_IDS[0] || ADS_GOOGLE_TAG_IDS[0] || null;
+        }
+
+        function getAllGoogleTagIds() {
+          var seen = {};
+          return ANALYTICS_GOOGLE_TAG_IDS.concat(ADS_GOOGLE_TAG_IDS).filter(function(id) {
+            if (!id || seen[id]) {
+              return false;
+            }
+            seen[id] = true;
+            return true;
+          });
         }
 
         function ensureGoogleTagsLoaded(primaryGoogleTagId) {
@@ -69,21 +74,9 @@
           });
         }
 
-        function hasGrantedConsent(consentState) {
-          return !!(consentState.analytics || consentState.marketing);
-        }
-
-        function activateGrantedGoogleTags(consentState, forceConfig) {
-          var primaryGoogleTagId = getPrimaryGoogleTagId(consentState);
-          applyConsentDefault();
-          applyConsentUpdate(consentState.analytics, consentState.marketing);
-          ensureGoogleTagsLoaded(primaryGoogleTagId);
-          if (consentState.analytics) {
-            configureGoogleTags(ANALYTICS_GOOGLE_TAG_IDS, !!forceConfig);
-          }
-          if (consentState.marketing) {
-            configureGoogleTags(ADS_GOOGLE_TAG_IDS, !!forceConfig);
-          }
+        function activateGoogleTags(forceConfig) {
+          ensureGoogleTagsLoaded(getPrimaryGoogleTagId());
+          configureGoogleTags(getAllGoogleTagIds(), !!forceConfig);
         }
 
         window.sredzkaGoogleConsent = {
@@ -98,29 +91,10 @@
             };
             currentConsentState = nextConsent;
 
-            var hadGrantedConsent = hasGrantedConsent(previousConsent);
-            var hasGrantedNow = hasGrantedConsent(nextConsent);
-            var revokedConsent = (previousConsent.analytics && !nextConsent.analytics) || (previousConsent.marketing && !nextConsent.marketing);
+            var enabledNewTagCategory = (!previousConsent.analytics && nextConsent.analytics) || (!previousConsent.marketing && nextConsent.marketing);
 
-            if (revokedConsent) {
-              window.location.reload();
-              return;
-            }
-
-            if (!hadGrantedConsent && hasGrantedNow) {
-              activateGrantedGoogleTags(nextConsent, false);
-              return;
-            }
-
-            if (hadGrantedConsent && hasGrantedNow) {
-              applyConsentUpdate(nextConsent.analytics, nextConsent.marketing);
-              if (!previousConsent.analytics && nextConsent.analytics) {
-                activateGrantedGoogleTags(nextConsent, true);
-              }
-              if (!previousConsent.marketing && nextConsent.marketing) {
-                activateGrantedGoogleTags(nextConsent, true);
-              }
-            }
+            applyConsentUpdate(nextConsent.analytics, nextConsent.marketing);
+            activateGoogleTags(enabledNewTagCategory);
           },
           grant: function(analytics, marketing) {
             if (typeof analytics === 'undefined' && typeof marketing === 'undefined') {
@@ -137,12 +111,18 @@
         window.gtag('set', 'ads_data_redaction', true);
         applyConsentDefault();
 
+        var storedConsentApplied = false;
         try {
           var c = window.sredzkaCookieConsent ? window.sredzkaCookieConsent.getValidChoice() : null;
           if (c) {
+            storedConsentApplied = true;
             window.sredzkaGoogleConsent.update(!!c.analytics, !!c.marketing);
           }
         } catch(e) {}
+
+        if (!storedConsentApplied) {
+          activateGoogleTags(false);
+        }
       })();
     </script>
     <link rel="canonical" href="https://sredzka-korona.pl/catering/" />
