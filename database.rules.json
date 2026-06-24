@@ -1,0 +1,43 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "cookie_consents": {
+      "$consent_id": {
+        ".read": false,
+        ".write": "newData.exists() && newData.child('consent_id').val() === $consent_id",
+        ".validate": "newData.hasChildren(['consent_id', 'created_at', 'updated_at', 'policy_version', 'analytics', 'marketing', 'external_media', 'action', 'anonymous_user_id'])",
+        "consent_id": {
+          ".validate": "newData.isString() && newData.val() === $consent_id && newData.val().matches(/^[A-Za-z0-9_-]{6,80}$/)"
+        },
+        "created_at": {
+          ".validate": "newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z$/)"
+        },
+        "updated_at": {
+          ".validate": "newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z$/)"
+        },
+        "policy_version": {
+          ".validate": "newData.isString() && newData.val().matches(/^[0-9]+(\\.[0-9]+){0,2}$/)"
+        },
+        "analytics": {
+          ".validate": "newData.isBoolean()"
+        },
+        "marketing": {
+          ".validate": "newData.isBoolean()"
+        },
+        "external_media": {
+          ".validate": "newData.isBoolean()"
+        },
+        "action": {
+          ".validate": "newData.val() === 'accept_all' || newData.val() === 'reject_all' || newData.val() === 'save_preferences'"
+        },
+        "anonymous_user_id": {
+          ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{6,80}$/)"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
+  }
+}
