@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://www.sredzka-korona.pl/</loc>
-    <lastmod>2026-08-01T21:11:27+02:00</lastmod>
-  </url>
-  <url>
-    <loc>https://www.sredzka-korona.pl/Hotel/</loc>
-    <lastmod>2026-08-01T21:11:27+02:00</lastmod>
-  </url>
+<url>
+<loc>https://www.sredzka-korona.pl/</loc>
+<lastmod>2026-08-01T21:11:27+02:00</lastmod>
+</url>
+<url>
+<loc>https://www.sredzka-korona.pl/Hotel/</loc>
+<lastmod>2026-08-01T21:11:27+02:00</lastmod>
 </url>
 <url>
 <loc>https://www.sredzka-korona.pl/_site/</loc>
@@ -15,24 +14,23 @@
 </url>
 <url>
 <loc>https://www.sredzka-korona.pl/catering/</loc>
-  <lastmod>2026-08-01T21:11:27+02:00</lastmod>
-  </url>
-  <url>
-    <loc>https://www.sredzka-korona.pl/dokumenty/</loc>
-    <lastmod>2026-08-01T21:11:27+02:00</lastmod>
-  </url>
-  <url>
-    <loc>https://www.sredzka-korona.pl/f-and-q/</loc>
-    <lastmod>2026-08-01T21:11:27+02:00</lastmod>
-  </url>
-  <url>
-    <loc>https://www.sredzka-korona.pl/kontakt/</loc>
-    <lastmod>2026-08-01T21:11:27+02:00</lastmod>
-  </url>
-  <url>
-    <loc>https://www.sredzka-korona.pl/przyjecia/</loc>
-    <lastmod>2026-08-01T21:11:27+02:00</lastmod>
-  </url>
+<lastmod>2026-08-01T21:11:27+02:00</lastmod>
+</url>
+<url>
+<loc>https://www.sredzka-korona.pl/dokumenty/</loc>
+<lastmod>2026-08-01T21:11:27+02:00</lastmod>
+</url>
+<url>
+<loc>https://www.sredzka-korona.pl/f-and-q/</loc>
+<lastmod>2026-08-01T21:11:27+02:00</lastmod>
+</url>
+<url>
+<loc>https://www.sredzka-korona.pl/kontakt/</loc>
+<lastmod>2026-08-01T21:11:27+02:00</lastmod>
+</url>
+<url>
+<loc>https://www.sredzka-korona.pl/przyjecia/</loc>
+<lastmod>2026-08-01T21:11:27+02:00</lastmod>
 </url>
 <url>
 <loc>https://www.sredzka-korona.pl/_site/Hotel/</loc>
@@ -66,8 +64,4 @@
 <loc>https://www.sredzka-korona.pl/_site/sitemap/</loc>
 <lastmod>2026-06-04T12:15:15+02:00</lastmod>
 </url>
-<<<<<<< HEAD
->>>>>>> e66927b78293703d11578b658f03f8fe03234e79
-=======
->>>>>>> fd6a0b72da3b26addc88bee2306f3c169eb71b6b
 </urlset>
