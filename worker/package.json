@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "secret:stats": "wrangler secret put STATS_ACCESS_PASSWORD",
     "secret:turnstile": "wrangler secret put TURNSTILE_SECRET"
   },
   "devDependencies": {

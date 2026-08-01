@@ -1,10 +1,11 @@
 // Turnstile: ustaw sekret po stronie Cloudflare (nie commituj wartości w tym pliku).
 //   cd worker && npm install && npm run secret:turnstile
-// Albo: Dashboard → Workers → sredzka-korona-api → Settings → Variables → Secrets → TURNSTILE_SECRET
+// Statystyki: npm run secret:stats (sekret STATS_ACCESS_PASSWORD).
+// Albo: Dashboard → Workers → sredzka-korona → Settings → Variables → Secrets.
 // Wartość: Dashboard → Turnstile → (witryna) → Secret key (para do turnstileSiteKey w assets/js/config.js).
 // Na produkcji NIE ustawiaj TURNSTILE_SKIP_VERIFY — to tylko jawne obejście captcha na lokalnym dev (.dev.vars).
 {
-  "name": "sredzka-korona-api",
+  "name": "sredzka-korona",
   "main": "src/index.js",
   "compatibility_date": "2026-03-30",
   "compatibility_flags": [
@@ -15,7 +16,12 @@
       "*/15 * * * *"
     ]
   },
-  "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "api.sredzka-korona.pl/api/*",
+      "zone_name": "sredzka-korona.pl"
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
