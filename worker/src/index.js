@@ -1,6 +1,7 @@
 import { DEFAULT_CONTENT } from "./default-content.js";
 import { parseAdminEmailAllowlist, verifyFirebaseIdToken } from "./firebase-verify.js";
 import { handleD1BookingApi, runBookingMaintenance, sendContactFormAdminEmail, upsertConsentEmail } from "./booking-d1.js";
+import { handleStatsApi } from "./stats.js";
 
 const MAX_MEDIA_FILE_BYTES = 1_700_000;
 const BOOTSTRAP_EDGE_CACHE_TTL_MS = 30 * 1000;
@@ -28,6 +29,19 @@ export default {
     }
 
     try {
+      const statsResponse = await handleStatsApi({
+        request,
+        env,
+        url,
+        respond: (data, status = 200, headers = {}) => jsonResponse(data, status, request, env, headers),
+        assertPublic: () => assertBrowserLikePublicRequest(request, url),
+        verifyCaptcha: (token) => verifyTurnstile(token, request, env),
+        allowedOrigins: () => allowedOrigins(env),
+      });
+      if (statsResponse) {
+        return statsResponse;
+      }
+
       if (url.pathname === "/api/public/bootstrap" && request.method === "GET") {
         assertBrowserLikePublicRequest(request, url);
         return jsonResponse(await getPublicBootstrap(env, url), 200, request, env, {
@@ -398,7 +412,18 @@ export default {
       return jsonResponse({ error: "Nie znaleziono zasobu." }, 404, request, env);
     } catch (error) {
       const status = error.status || 500;
-      return jsonResponse({ error: error.message || "Wystapil blad." }, status, request, env);
+      return jsonResponse(
+        {
+          error: error.message || "Wystapil blad.",
+          ...(error.code ? { code: error.code } : {}),
+          ...(error.retryAfterSeconds ? { retryAfterSeconds: error.retryAfterSeconds } : {}),
+          ...(error.failures ? { failures: error.failures } : {}),
+        },
+        status,
+        request,
+        env,
+        NO_STORE_JSON_HEADERS
+      );
     }
   },
 

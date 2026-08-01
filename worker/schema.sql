@@ -25,6 +25,21 @@ CREATE TABLE IF NOT EXISTS contact_submissions (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id TEXT PRIMARY KEY,
+  client_event_id TEXT UNIQUE,
+  type TEXT NOT NULL,
+  page TEXT NOT NULL DEFAULT 'home',
+  label TEXT NOT NULL DEFAULT '',
+  section TEXT NOT NULL DEFAULT 'other',
+  source TEXT NOT NULL DEFAULT 'main-site',
+  path TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_created_at ON analytics_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_type_created ON analytics_events(type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_page_created ON analytics_events(section, page, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS client_consent_emails (
   email TEXT PRIMARY KEY,
   first_name TEXT NOT NULL DEFAULT '',

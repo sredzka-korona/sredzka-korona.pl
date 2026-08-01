@@ -17,3 +17,5 @@ FIREBASE_DATABASE_URL=https://sredzka-korona-default-rtdb.europe-west1.firebased
 # Opcjonalnie przy lokalnym teście SMTP (jak w wrangler.jsonc):
 # SMTP_USER=
 # SMTP_PASS=
+# Haslo do chronionej podstrony /stats (produkcja: wrangler secret put STATS_ACCESS_PASSWORD).
+STATS_ACCESS_PASSWORD=ustaw-lokalne-haslo

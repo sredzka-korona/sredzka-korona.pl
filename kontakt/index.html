@@ -1842,6 +1842,7 @@
         // ══════════════ WYSYŁANIE FORMULARZA (po akceptacji RODO) ══════════════
         async function startSubmission(payload) {
           const finishSuccess = (result = {}) => {
+            window.sredzkaTrackContactForm?.("Formularz kontaktowy — kontakt");
             form.reset();
             topicButtons.forEach(btn => btn.classList.remove("selected"));
             topicInput.value = "";
@@ -1998,5 +1999,6 @@
 
       <p class="footer-date">Data: 01.05.2026r.</p>
     <script src="../assets/js/cookies-full.js"></script>
+    <script src="../assets/js/analytics.js"></script>
 </body>
 </html>

@@ -63,6 +63,7 @@ const robots = `User-agent: *
 Allow: /
 
 Disallow: /admin/
+Disallow: /stats/
 Disallow: /functions/
 Disallow: /worker/
 Disallow: /scripts/

@@ -130,6 +130,9 @@
     var record = createRecord(choice, action);
     writeJson(STORAGE_KEY, record);
     persistRemote(record);
+    try {
+      window.dispatchEvent(new CustomEvent('sredzka:consent-changed', { detail: record }));
+    } catch (error) {}
     return record;
   }
 

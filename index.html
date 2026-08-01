@@ -3254,6 +3254,7 @@
                 throw new Error("Nie udalo sie wyslac formularza.");
               }
               const result = await response.json().catch(() => ({}));
+              window.sredzkaTrackContactForm?.("Formularz kontaktowy — strona główna");
               form.reset();
               status.textContent = result.ticketNumber
                 ? `Dziekujemy. Wiadomosc zostala zapisana. Numer zgloszenia: ${result.ticketNumber}.`
@@ -3620,6 +3621,8 @@
       </div>
     </div>
 
+    <script src="./assets/js/config.js"></script>
+    <script src="./assets/js/analytics.js"></script>
     <script src="./assets/js/sredzka-document-title.js" defer></script>
 </body>
 </html>

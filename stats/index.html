@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="same-origin">
+  <title>Statystyki | Średzka Korona</title>
+  <link rel="icon" href="../favicon.ico">
+  <style>
+    :root {
+      --ink: #271d13;
+      --muted: #74695d;
+      --gold: #ad7a27;
+      --gold-dark: #775016;
+      --line: rgba(119,80,22,.18);
+      --paper: rgba(255,253,248,.92);
+      --green: #39755a;
+      --blue: #4e70a8;
+      --violet: #8259a3;
+      --orange: #c26038;
+      --shadow: 0 20px 60px rgba(55,37,16,.09);
+    }
+    * { box-sizing: border-box; }
+    html { min-height: 100%; background: #f2ecdf; }
+    body {
+      min-height: 100vh; margin: 0; color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 8% 0%, rgba(198,148,34,.16), transparent 28rem),
+        radial-gradient(circle at 92% 8%, rgba(132,102,58,.10), transparent 24rem),
+        linear-gradient(180deg, #faf7f0, #eee6d8);
+    }
+    button, input { font: inherit; }
+    button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid rgba(173,122,39,.28); outline-offset: 2px; }
+    .page { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+    .topbar, .card, .metric {
+      border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); backdrop-filter: blur(16px);
+    }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px 22px; border-radius: 22px; }
+    .brand { display: flex; align-items: center; gap: 13px; }
+    .brand img { width: 48px; height: 48px; object-fit: contain; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 3px; font-family: Georgia, serif; font-size: clamp(1.45rem, 3vw, 2.15rem); font-weight: 500; }
+    .topbar p, .muted { margin-bottom: 0; color: var(--muted); }
+    .actions, .ranges, .tabs, .series { display: flex; flex-wrap: wrap; gap: 8px; }
+    .button, .tab, .range, .series-button {
+      min-height: 42px; padding: 0 16px; border: 1px solid var(--line); border-radius: 999px;
+      color: var(--ink); background: #fff; text-decoration: none; cursor: pointer; transition: .18s ease;
+    }
+    .button:hover, .tab:hover, .range:hover, .series-button:hover { border-color: rgba(119,80,22,.42); transform: translateY(-1px); }
+    .button.primary { border-color: var(--gold); background: linear-gradient(135deg, #c49948, #a87320); color: #fff; font-weight: 700; }
+    .tab.is-active, .range.is-active, .series-button.is-active { border-color: rgba(173,122,39,.45); color: var(--gold-dark); background: rgba(198,148,34,.13); }
+    .login { min-height: calc(100vh - 130px); display: grid; place-items: center; }
+    .login[hidden], .dashboard[hidden] { display: none; }
+    .login-card { width: min(440px, 100%); padding: 34px; border-radius: 28px; }
+    .login-card h2 { font-family: Georgia, serif; font-size: 2rem; font-weight: 500; margin-bottom: 8px; }
+    .login-card form { margin-top: 24px; display: grid; gap: 12px; }
+    .login-card label { font-weight: 700; font-size: .9rem; }
+    .login-card input { min-height: 52px; width: 100%; padding: 0 15px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+    .error { min-height: 22px; color: #a33838; font-size: .9rem; line-height: 1.45; }
+    .captcha { display: none; padding: 12px; border-radius: 14px; background: rgba(173,122,39,.08); overflow: hidden; }
+    .captcha.is-visible { display: block; }
+    .dashboard { margin-top: 18px; display: grid; gap: 16px; }
+    .card { padding: 22px; border-radius: 22px; }
+    .tabs { padding: 8px; }
+    .tab-panel { display: none; }
+    .tab-panel.is-active { display: block; }
+    .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
+    .panel-head h2, .chart-card h2 { margin-bottom: 5px; font-size: 1.15rem; }
+    .panel-head p, .chart-card p { margin-bottom: 0; color: var(--muted); font-size: .9rem; }
+    .metrics { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 12px; }
+    .metric { padding: 17px; border-radius: 18px; box-shadow: 0 12px 30px rgba(55,37,16,.06); }
+    .metric span, .metric small { display: block; color: var(--muted); }
+    .metric span { font-size: .82rem; min-height: 2.2em; }
+    .metric strong { display: block; margin: 8px 0; font-size: clamp(1.55rem, 2.5vw, 2.15rem); }
+    .metric small { font-size: .76rem; }
+    .chart-grid { display: grid; grid-template-columns: minmax(0,1fr) 270px; gap: 16px; }
+    .chart-shell { position: relative; min-height: 330px; margin-top: 14px; overflow-x: auto; }
+    #chartHost { min-width: 660px; }
+    #chartHost svg { display: block; width: 100%; height: auto; overflow: visible; }
+    .legend-dot { width: 9px; height: 9px; display: inline-block; margin-right: 6px; border-radius: 50%; background: var(--series-color); }
+    .side-list { display: grid; gap: 10px; margin-top: 18px; }
+    .side-item { padding: 13px; border-radius: 14px; background: rgba(173,122,39,.08); }
+    .side-item span { display: block; color: var(--muted); font-size: .8rem; }
+    .side-item strong { display: block; margin-top: 4px; font-size: 1.3rem; }
+    .table-wrap { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; font-size: .88rem; }
+    th { color: var(--muted); font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; }
+    td:last-child, th:last-child { text-align: right; }
+    .pill { display: inline-flex; padding: 5px 9px; border-radius: 999px; color: var(--gold-dark); background: rgba(173,122,39,.12); font-size: .76rem; white-space: nowrap; }
+    .section-block + .section-block { margin-top: 22px; }
+    .section-block h3 { margin-bottom: 8px; font-size: 1rem; }
+    .empty { padding: 32px; border: 1px dashed var(--line); border-radius: 16px; color: var(--muted); text-align: center; }
+    .sitemap-summary { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+    .sitemap-stat { padding: 7px 10px; border-radius: 999px; background: rgba(173,122,39,.09); font-size: .82rem; }
+    .sitemap-tree, .sitemap-tree ul { margin: 0; padding-left: 22px; list-style: none; }
+    .sitemap-tree { padding-left: 0; }
+    .sitemap-tree ul { margin-left: 14px; border-left: 1px solid var(--line); }
+    .sitemap-row { display: flex; justify-content: space-between; gap: 15px; padding: 11px 12px; border-radius: 12px; }
+    .sitemap-row:hover { background: rgba(173,122,39,.07); }
+    .sitemap-title a { color: var(--ink); font-weight: 700; text-decoration: none; }
+    .sitemap-url { display: block; margin-top: 3px; color: var(--muted); font-size: .75rem; }
+    .badges { display: flex; align-items: center; gap: 5px; }
+    .badge { padding: 4px 7px; border-radius: 999px; color: #276448; background: #e2f2e9; font-size: .7rem; }
+    .badge.noindex { color: #913d36; background: #f7e5e2; }
+    .badge.out { color: #75531d; background: #f4ead6; }
+    .chart-tooltip { position: absolute; z-index: 3; display: none; pointer-events: none; padding: 10px 12px; border-radius: 12px; color: #fff; background: rgba(39,29,19,.94); font-size: .78rem; box-shadow: var(--shadow); }
+    .chart-tooltip.is-visible { display: block; }
+    @media (max-width: 900px) { .metrics { grid-template-columns: repeat(2, minmax(0,1fr)); } .chart-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 650px) {
+      .page { width: min(100% - 20px, 1180px); padding-top: 10px; }
+      .topbar, .panel-head { align-items: stretch; flex-direction: column; }
+      .actions > * { flex: 1; }
+      .card { padding: 16px; border-radius: 18px; }
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .metric:last-child { grid-column: 1 / -1; }
+      .ranges .range { flex: 1 1 calc(50% - 8px); }
+      .sitemap-row { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div class="brand">
+        <img src="../ikony/logo-korona-120.webp" alt="">
+        <div><h1>Statystyki serwisu</h1><p>Średzka Korona</p></div>
+      </div>
+      <div class="actions">
+        <a class="button" href="../">Wróć na stronę</a>
+        <button class="button" id="refreshButton" type="button" hidden>Odśwież</button>
+        <button class="button" id="logoutButton" type="button" hidden>Wyloguj</button>
+      </div>
+    </header>
+
+    <section class="login" id="loginWrap">
+      <article class="card login-card">
+        <h2>Dostęp chroniony</h2>
+        <p class="muted">Zaloguj się hasłem do statystyk, aby zobaczyć dane serwisu.</p>
+        <form id="loginForm">
+          <label for="statsPassword">Hasło</label>
+          <input id="statsPassword" name="password" type="password" autocomplete="current-password" required>
+          <div class="captcha" id="captchaWrap">
+            <p class="muted">Po kilku błędnych próbach wymagane jest potwierdzenie CAPTCHA.</p>
+            <div id="statsTurnstile"></div>
+            <div class="error" id="captchaStatus"></div>
+          </div>
+          <button class="button primary" id="loginButton" type="submit">Zaloguj się</button>
+          <div class="error" id="loginError" role="alert"></div>
+        </form>
+      </article>
+    </section>
+
+    <section class="dashboard" id="dashboard" hidden>
+      <nav class="card tabs" id="statsTabs" aria-label="Widoki statystyk">
+        <button class="tab is-active" data-tab="summary" type="button">Podsumowanie</button>
+        <button class="tab" data-tab="pages" type="button">Podstrony</button>
+        <button class="tab" data-tab="sitemap" type="button">Sitemap</button>
+      </nav>
+
+      <section class="card tab-panel is-active" id="summaryPanel">
+        <div class="panel-head">
+          <div><h2>Podsumowanie</h2><p id="summaryLine">Ładowanie danych…</p></div>
+          <div class="ranges" id="rangeButtons">
+            <button class="range is-active" data-range="7" type="button">7 dni</button>
+            <button class="range" data-range="miesiac" type="button">Miesiąc</button>
+            <button class="range" data-range="rok" type="button">Rok</button>
+            <button class="range" data-range="all" type="button">Zawsze</button>
+          </div>
+        </div>
+        <div class="metrics" id="metrics"></div>
+      </section>
+
+      <section class="chart-grid" id="summaryDetails">
+        <article class="card chart-card">
+          <h2>Trend dzienny</h2>
+          <p>Wybierz serie, aby porównać ruch z akcjami kontaktowymi.</p>
+          <div class="series" id="seriesButtons"></div>
+          <div class="chart-shell"><div class="chart-tooltip" id="chartTooltip"></div><div id="chartHost"></div></div>
+        </article>
+        <aside class="card chart-card">
+          <h2>Krótki skrót</h2>
+          <p>Najważniejsze wartości dla wybranego zakresu.</p>
+          <div class="side-list" id="sideSummary"></div>
+        </aside>
+      </section>
+
+      <section class="card" id="eventsCard">
+        <div class="panel-head"><div><h2>Ostatnie zdarzenia</h2><p>Najnowsze wejścia i akcje kontaktowe.</p></div></div>
+        <div id="eventsHost"></div>
+      </section>
+
+      <section class="card tab-panel" id="pagesPanel">
+        <div class="panel-head"><div><h2>Liczba wejść na podstrony</h2><p id="pagesSummaryLine"></p></div></div>
+        <div id="pagesHost"></div>
+      </section>
+
+      <section class="card tab-panel" id="sitemapPanel">
+        <div class="panel-head"><div><h2>Drzewo sitemap</h2><p id="sitemapSummaryLine">Mapa strony załaduje się po otwarciu zakładki.</p></div></div>
+        <div id="sitemapHost"><div class="empty">Otwórz zakładkę, aby pobrać sitemapę.</div></div>
+      </section>
+    </section>
+  </main>
+  <script src="../assets/js/config.js"></script>
+  <script defer src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"></script>
+  <script src="../assets/js/stats.js"></script>
+</body>
+</html>
