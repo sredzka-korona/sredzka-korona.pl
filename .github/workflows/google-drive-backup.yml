@@ -1,0 +1,100 @@
+name: Backup Sredzka-Korona do Google Drive
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    # Pierwszy dzień każdego miesiąca o 03:15 UTC
+    - cron: "15 3 1 * *"
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Pobierz pełne repozytorium
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Zainstaluj rclone
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rclone
+
+      - name: Odtwórz konfigurację rclone
+        env:
+          RCLONE_CONFIG_BASE64: ${{ secrets.RCLONE_CONFIG_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$HOME/.config/rclone"
+
+          printf '%s' "$RCLONE_CONFIG_BASE64" \
+            | base64 --decode \
+            > "$HOME/.config/rclone/rclone.conf"
+
+          chmod 600 "$HOME/.config/rclone/rclone.conf"
+
+      - name: Sprawdź połączenie z Google Drive
+        run: |
+          rclone lsd "BACKUPS:"
+
+      - name: Utwórz pełną kopię repozytorium
+        run: |
+          set -euo pipefail
+
+          BACKUP_DATE="$(date -u +'%Y-%m-%d_%H-%M-%S')"
+          BACKUP_NAME="Sredzka-Korona-${BACKUP_DATE}.bundle"
+
+          git fetch --all --tags --prune
+          git bundle create "$BACKUP_NAME" --all
+          git bundle verify "$BACKUP_NAME"
+
+          sha256sum "$BACKUP_NAME" > "${BACKUP_NAME}.sha256"
+
+          echo "BACKUP_NAME=$BACKUP_NAME" >> "$GITHUB_ENV"
+
+      - name: Utwórz folder docelowy
+        run: |
+          rclone mkdir "BACKUPS:Backups/Sredzka-Korona"
+
+      - name: Wyślij kopię na Google Drive
+        run: |
+          set -euo pipefail
+
+          rclone copyto \
+            "$BACKUP_NAME" \
+            "BACKUPS:Backups/Sredzka-Korona/$BACKUP_NAME" \
+            --retries 3 \
+            --low-level-retries 10
+
+          rclone copyto \
+            "${BACKUP_NAME}.sha256" \
+            "BACKUPS:Backups/Sredzka-Korona/${BACKUP_NAME}.sha256" \
+            --retries 3 \
+            --low-level-retries 10
+
+      - name: Sprawdź przesłane pliki
+        run: |
+          set -euo pipefail
+
+          rclone lsjson \
+            "BACKUPS:Backups/Sredzka-Korona/$BACKUP_NAME"
+
+          rclone lsjson \
+            "BACKUPS:Backups/Sredzka-Korona/${BACKUP_NAME}.sha256"
+
+      - name: Usuń kopie starsze niż 6 miesięcy
+        run: |
+          rclone delete \
+            "BACKUPS:Backups/Sredzka-Korona" \
+            --min-age 183d \
+            --include "Sredzka-Korona-*.bundle" \
+            --include "Sredzka-Korona-*.bundle.sha256" \
+            --verbose
