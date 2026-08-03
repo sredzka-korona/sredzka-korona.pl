@@ -521,6 +521,7 @@
       }
 
       .reservation-info {
+        --reservation-nav-offset: -4rem;
         margin: 2rem auto 0;
         padding: 1.5rem;
         background: rgba(255, 255, 255, 0.15);
@@ -534,12 +535,13 @@
         margin-top: auto;
         width: 100%;
         max-width: 600px;
+        transform: translateY(var(--reservation-nav-offset));
       }
 
       .reservation-info:hover {
         background: rgba(255, 255, 255, 0.25);
         border-color: rgba(255, 255, 255, 0.4);
-        transform: translateY(-4px);
+        transform: translateY(calc(var(--reservation-nav-offset) - 4px));
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
       }
 
@@ -2544,6 +2546,7 @@
         }
 
         .reservation-info {
+          --reservation-nav-offset: 0rem;
           margin-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
           padding: 1.2rem;
         }
@@ -3678,7 +3681,6 @@
 
     <a class="faq-float-btn" href="../f-and-q/" aria-label="FAQ — częste pytania" title="FAQ — częste pytania">F&amp;Q</a>
     <a class="watermark" href="https://i-janicki.pl">Design &amp; Development by i-JANICKI</a>
-      <p class="footer-date">Data: 01.05.2026r.</p>
     <script src="../assets/js/cookies-full.js"></script>
     <script src="../assets/js/analytics.js"></script>
 </body>
