@@ -5,6 +5,9 @@ on:
     branches:
       - main  # Zmień na master, jeśli takiego używasz
 
+permissions:
+  contents: write
+
 jobs:
   sitemap:
     runs-on: ubuntu-latest
@@ -15,16 +18,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 2. Generowanie sitemapy na podstawie plików HTML
+      # 2. Generowanie sitemapy z jawnej listy kanonicznych podstron
       - name: Generate Sitemap
-        uses: cicirello/generate-sitemap@v1
-        with:
-          base-url-path: https://www.sredzka-korona.pl/
+        run: npm run seo:generate
 
       # 3. Automatyczny commit i push zaktualizowanego pliku sitemap.xml
       - name: Commit and Push Sitemap
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add sitemap.xml
+          git add sitemap.xml robots.txt
           git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update sitemap.xml [skip ci]" && git push)

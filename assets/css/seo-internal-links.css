@@ -1,0 +1,55 @@
+.seo-service-nav {
+  position: fixed;
+  left: 50%;
+  bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: calc(100vw - 10rem);
+  padding: 0.35rem;
+  overflow-x: auto;
+  transform: translateX(-50%);
+  border: 1px solid rgba(200, 170, 120, 0.28);
+  border-radius: 999px;
+  background: rgba(254, 252, 249, 0.94);
+  box-shadow: 0 8px 28px rgba(31, 23, 18, 0.16);
+  backdrop-filter: blur(16px) saturate(150%);
+  scrollbar-width: none;
+}
+
+.seo-service-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.seo-service-nav a {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  color: #3a2d23;
+  font: 600 0.75rem/1.2 "Manrope", sans-serif;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.seo-service-nav a:hover,
+.seo-service-nav a:focus-visible {
+  color: #6d5128;
+  background: rgba(200, 170, 120, 0.18);
+  outline: none;
+}
+
+.seo-service-nav a[aria-current="page"] {
+  color: #fefcf9;
+  background: #8a682f;
+}
+
+@media (max-width: 780px) {
+  .seo-service-nav {
+    left: 60px;
+    right: 84px;
+    bottom: max(10px, env(safe-area-inset-bottom, 0px));
+    max-width: none;
+    transform: none;
+  }
+}

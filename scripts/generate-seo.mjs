@@ -33,26 +33,21 @@ if (!origin || !/^https:\/\//i.test(origin)) {
  * Tylko strony indeksowalne i z realną treścią.
  */
 const urls = [
-  { path: "/", changefreq: "weekly", priority: "1.0" },
-  { path: "/Hotel/", changefreq: "weekly", priority: "0.9" },
-  { path: "/catering/", changefreq: "weekly", priority: "0.9" },
-  { path: "/przyjecia/", changefreq: "weekly", priority: "0.9" },
-  { path: "/kontakt/", changefreq: "monthly", priority: "0.85" },
-  { path: "/dokumenty/", changefreq: "monthly", priority: "0.7" },
-  { path: "/f-and-q/", changefreq: "monthly", priority: "0.75" },
+  "/",
+  "/Hotel/",
+  "/catering/",
+  "/przyjecia/",
+  "/kontakt/",
+  "/dokumenty/",
+  "/f-and-q/",
 ];
-
-const lastmod = new Date().toISOString().slice(0, 10);
 
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls
   .map(
-    (item) => `  <url>
-    <loc>${origin}${item.path}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <changefreq>${item.changefreq}</changefreq>
-    <priority>${item.priority}</priority>
+    (path) => `  <url>
+    <loc>${origin}${path}</loc>
   </url>`
   )
   .join("\n")}

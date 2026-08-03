@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="../assets/js/canonical-redirect.js"></script>
     <script src="../assets/js/cookie-consent-core.js"></script>
     <script>
       (function() {
@@ -132,7 +133,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="../ikony/favicon-180x180.png" />
     <link rel="manifest" href="../site.webmanifest" />
     <meta name="theme-color" content="#fefcf9" />
-    <meta name="robots" content="index,follow" />
+    <meta name="robots" content="index,follow,max-image-preview:large" />
     <meta name="geo.region" content="PL-DS" />
     <meta name="geo.placename" content="Środa Śląska" />
     <title>Kontakt i rezerwacje | Średzka Korona</title>
@@ -150,15 +151,15 @@
       property="og:description"
       content="Adres, telefon i formularz kontaktowy — Średzka Korona, ul. Wrocławska 11, Środa Śląska."
     />
-    <meta property="og:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
-    <meta property="og:image:alt" content="Logo Średzka Korona" />
+    <meta property="og:image" content="https://sredzka-korona.pl/assets/img/og-contact.webp" />
+    <meta property="og:image:alt" content="Średzka Korona przy ul. Wrocławskiej 11 w Środzie Śląskiej" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Kontakt i rezerwacje | Średzka Korona" />
     <meta name="twitter:description" content="Adres, telefon i formularz kontaktowy Średzkiej Korony w Środzie Śląskiej." />
-    <meta name="twitter:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
-    <meta name="twitter:image:alt" content="Logo Średzka Korona" />
+    <meta name="twitter:image" content="https://sredzka-korona.pl/assets/img/og-contact.webp" />
+    <meta name="twitter:image:alt" content="Średzka Korona przy ul. Wrocławskiej 11 w Środzie Śląskiej" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -171,6 +172,35 @@
             "isPartOf": { "@id": "https://sredzka-korona.pl/#website" },
             "mainEntity": { "@id": "https://sredzka-korona.pl/#organization" },
             "inLanguage": "pl-PL"
+          },
+          {
+            "@type": "LocalBusiness",
+            "@id": "https://sredzka-korona.pl/#organization",
+            "name": "Średzka Korona",
+            "url": "https://sredzka-korona.pl/",
+            "logo": "https://sredzka-korona.pl/ikony/logo-korona.png",
+            "image": "https://sredzka-korona.pl/assets/img/og-home.webp",
+            "telephone": "+48-691-964-714",
+            "email": "kontakt@sredzka-korona.pl",
+            "taxID": "9131513928",
+            "identifier": {
+              "@type": "PropertyValue",
+              "name": "REGON",
+              "value": "522050940"
+            },
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "ul. Wrocławska 11",
+              "addressLocality": "Środa Śląska",
+              "postalCode": "55-300",
+              "addressRegion": "Dolnośląskie",
+              "addressCountry": "PL"
+            },
+            "hasMap": "https://www.google.com/maps/search/?api=1&query=%C5%9Aredzka%20Korona%2C%20Wroc%C5%82awska%2011%2C%2055-300%20%C5%9Aroda%20%C5%9Al%C4%85ska",
+            "sameAs": [
+              "https://www.facebook.com/SredzkaKorona/?locale=pl_PL",
+              "https://www.instagram.com/sredzka_korona/"
+            ]
           },
           {
             "@type": "BreadcrumbList",
@@ -285,10 +315,15 @@
         position: fixed;
         inset: 0;
         z-index: 0;
-        background-image: url("/assets/img/kontakt.webp");
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
+        background: #17120f;
+      }
+
+      .contact-background > img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
       }
 
       .contact-background::after {
@@ -296,6 +331,7 @@
         position: absolute;
         inset: 0;
         background: rgba(0, 0, 0, 0.4);
+        z-index: 1;
       }
 
       .contact-content {
@@ -1305,7 +1341,7 @@
 
   </head>
   <body>
-    <div class="contact-background"></div>
+    <div class="contact-background"><img src="../assets/img/kontakt-1600.webp" srcset="../assets/img/kontakt-960.webp 960w, ../assets/img/kontakt-1600.webp 1600w, ../assets/img/kontakt.webp 6000w" sizes="100vw" width="6000" height="4000" alt="Średzka Korona przy ul. Wrocławskiej 11 w Środzie Śląskiej" fetchpriority="high" decoding="async" /></div>
     <div class="shell">
       <nav class="floating-nav" id="floating-nav">
         <a href="../" class="floating-nav-brand">
@@ -1358,19 +1394,19 @@
           <div class="contact-info-section">
             <div class="contact-card">
               <div class="contact-header">
-                <h2 class="contact-company-name">Kontakt<br>Średzka Korona</h2>
-                <p class="contact-address">ul. Wrocławska 11<br>55-300 Sroda Śląska</p>
+                <h1 class="contact-company-name">Kontakt<br>Średzka Korona</h1>
+                <p class="contact-address">ul. Wrocławska 11<br>55-300 Środa Śląska</p>
               </div>
 
               <div class="contact-separator"></div>
 
               <div class="contact-icons-row">
-                <a href="tel:+48600700800" class="contact-icon-link" aria-label="Zadzwoń">
+                <a href="tel:+48691964714" class="contact-icon-link" aria-label="Zadzwoń pod numer +48 691 964 714">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                   </svg>
                 </a>
-                <a href="mailto:kontakt@sredzkakorona.pl" class="contact-icon-link" aria-label="Wyślij email">
+                <a href="mailto:kontakt@sredzka-korona.pl" class="contact-icon-link" aria-label="Napisz na kontakt@sredzka-korona.pl">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
                     <polyline points="22,6 12,13 2,6"></polyline>
@@ -1456,11 +1492,11 @@
             </div>
             <div class="info-row">
               <span class="info-label">Telefon:</span>
-              <span class="info-value" id="info-company-phone">+48 600 700 800</span>
+              <span class="info-value" id="info-company-phone">+48 691 964 714</span>
             </div>
             <div class="info-row">
               <span class="info-label">Email:</span>
-              <span class="info-value" id="info-company-email">kontakt@sredzkakorona.pl</span>
+              <span class="info-value" id="info-company-email">kontakt@sredzka-korona.pl</span>
             </div>
             <h3 id="info-owner-heading">O właścicielu</h3>
             <p id="info-owner-paragraph-1">Średzka Korona, to firma rodzinna, prowadzona przez polskiego przedsiębiorcę. Od 2 lat oferuje Państwu usługi cateringowe i hotelowe.</p>

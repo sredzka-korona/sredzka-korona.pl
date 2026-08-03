@@ -1,9 +1,9 @@
 window.SREDZKA_DEFAULT_CONTENT = {
   company: {
-    name: "Sredzka Korona",
-    tagline: "Catering, hotel i przyjecia w oprawie premium",
-    phone: "+48 600 700 800",
-    email: "kontakt@sredzkakorona.pl",
+    name: "Średzka Korona",
+    tagline: "Catering, hotel i przyjęcia w oprawie premium",
+    phone: "+48 691 964 714",
+    email: "kontakt@sredzka-korona.pl",
     address: "ul. Wrocławska 11, 55-300 Środa Śląska",
     mapEmbed:
       "https://www.google.com/maps?q=%C5%9Aredzka%20Korona%2C%20Wroc%C5%82awska%2011%2C%2055-300%20%C5%9Aroda%20%C5%9Al%C4%85ska&output=embed",
@@ -166,15 +166,15 @@ window.SREDZKA_DEFAULT_CONTENT = {
     halls: [
       {
         key: "duza",
-        name: "Sala Duza",
-        capacity: "do 160 osob",
-        description: "Najwieksza sala na wesela, gale i duze wydarzenia.",
+        name: "Sala Duża",
+        capacity: "do 120 osób",
+        description: "Największa sala na wesela, gale i duże wydarzenia.",
       },
       {
         key: "mala",
-        name: "Sala Mala",
-        capacity: "do 90 osob",
-        description: "Elegancka przestrzen na komunie, chrzciny i jubileusze.",
+        name: "Sala Mała",
+        capacity: "do 40 osób",
+        description: "Elegancka przestrzeń na komunie, chrzciny i jubileusze.",
       },
     ],
     packages: [

@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="../assets/js/canonical-redirect.js"></script>
     <script src="../assets/js/cookie-consent-core.js"></script>
     <script>
       (function() {
@@ -131,6 +132,7 @@
     <link rel="shortcut icon" href="../favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="../ikony/favicon-180x180.png" />
     <link rel="manifest" href="../site.webmanifest" />
+    <link rel="stylesheet" href="../assets/css/seo-internal-links.css" />
     <meta name="theme-color" content="#fefcf9" />
     <meta name="robots" content="index,follow,max-image-preview:large" />
     <meta name="geo.region" content="PL-DS" />
@@ -150,15 +152,15 @@
       property="og:description"
       content="Hotel i noclegi w Środzie Śląskiej — Średzka Korona. Wygodna baza na Dolny Śląsk i Wrocław."
     />
-    <meta property="og:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
-    <meta property="og:image:alt" content="Logo Średzka Korona" />
+    <meta property="og:image" content="https://sredzka-korona.pl/assets/img/og-hotel.webp" />
+    <meta property="og:image:alt" content="Hotel Średzka Korona w Środzie Śląskiej" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Hotel Środa Śląska | noclegi | Średzka Korona" />
     <meta name="twitter:description" content="Hotel i noclegi w Środzie Śląskiej — wygodna baza dla gości z Wrocławia i okolic." />
-    <meta name="twitter:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
-    <meta name="twitter:image:alt" content="Logo Średzka Korona" />
+    <meta name="twitter:image" content="https://sredzka-korona.pl/assets/img/og-hotel.webp" />
+    <meta name="twitter:image:alt" content="Hotel Średzka Korona w Środzie Śląskiej" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -168,6 +170,7 @@
             "@id": "https://sredzka-korona.pl/Hotel/#hotel",
             "name": "Hotel Średzka Korona",
             "url": "https://sredzka-korona.pl/Hotel/",
+            "image": "https://sredzka-korona.pl/assets/img/og-hotel.webp",
             "parentOrganization": { "@id": "https://sredzka-korona.pl/#organization" },
             "address": {
               "@type": "PostalAddress",
@@ -177,8 +180,20 @@
               "addressRegion": "Dolnośląskie",
               "addressCountry": "PL"
             },
-            "telephone": "+48-600-700-800",
-            "email": "kontakt@sredzkakorona.pl"
+            "telephone": "+48-691-964-714",
+            "email": "kontakt@sredzka-korona.pl",
+            "hasMap": "https://www.google.com/maps/search/?api=1&query=%C5%9Aredzka%20Korona%2C%20Wroc%C5%82awska%2011%2C%2055-300%20%C5%9Aroda%20%C5%9Al%C4%85ska",
+            "checkinTime": "14:00",
+            "checkoutTime": "11:00",
+            "amenityFeature": [
+              { "@type": "LocationFeatureSpecification", "name": "Bezpłatne Wi-Fi", "value": true },
+              { "@type": "LocationFeatureSpecification", "name": "Parking", "value": true },
+              { "@type": "LocationFeatureSpecification", "name": "Śniadanie", "value": true }
+            ],
+            "sameAs": [
+              "https://www.facebook.com/SredzkaKorona/?locale=pl_PL",
+              "https://www.instagram.com/sredzka_korona/"
+            ]
           },
           {
             "@type": "BreadcrumbList",
@@ -302,10 +317,15 @@
         position: fixed;
         inset: 0;
         z-index: 0;
-        background-image: url('./hotel.webp');
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
+        background: #17120f;
+      }
+
+      .hotel-background > img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
       }
 
       .hotel-background::after {
@@ -313,6 +333,7 @@
         position: absolute;
         inset: 0;
         background: rgba(0, 0, 0, 0.4);
+        z-index: 1;
       }
 
       .hotel-content {
@@ -1054,7 +1075,7 @@
         <p style="font-size: 1.2rem; margin-bottom: 2rem;">Noclegi w Środzie Śląskiej niedaleko Wrocławia</p>
         <p><a href="../">← Powrót do strony głównej</a></p>
         <p style="margin-top: 2rem;">Aby w pełni korzystać z naszej strony, włącz obsługę JavaScript w przeglądarce.</p>
-        <p>Telefon: +48 600 700 800 | Email: kontakt@sredzkakorona.pl</p>
+        <p>Telefon: +48 691 964 714 | Email: kontakt@sredzka-korona.pl</p>
       </div>
     </noscript>
     <div id="app"></div>
@@ -1161,6 +1182,16 @@
             "3-osobowe": "Pokoje 3-osobowe",
             "4-osobowe": "Pokoje 4-osobowe",
           };
+          const descriptiveAlt = (img, index) => {
+            const suppliedAlt = String(img?.alt || "").trim();
+            const normalizedAlt = suppliedAlt.toLocaleLowerCase("pl-PL");
+            const normalizedType = String(roomType || "").toLocaleLowerCase("pl-PL");
+            if (suppliedAlt && normalizedAlt !== normalizedType && normalizedAlt !== "pokój") {
+              return suppliedAlt;
+            }
+            const roomLabel = titles[roomType] || "Pokój hotelowy";
+            return `${roomLabel} w hotelu Średzka Korona w Środzie Śląskiej — zdjęcie ${index + 1}`;
+          };
           return `
             <div class="modal-body">
               <div class="modal-header">
@@ -1168,9 +1199,9 @@
                 <button class="modal-close" id="close-gallery" aria-label="Zamknij galerię">×</button>
               </div>
               <div class="gallery-grid">
-                ${(images || []).map(img => 
+                ${(images || []).map((img, index) =>
                   `<div class="gallery-item">
-                    <img src="${escapeHtml(img.url || img)}" alt="${escapeHtml(img.alt || titles[roomType] || "Pokój")}" loading="lazy" />
+                    <img src="${escapeHtml(img.url || img)}" alt="${escapeHtml(descriptiveAlt(img, index))}" loading="lazy" decoding="async" />
                   </div>`
                 ).join('')}
               </div>
@@ -1179,7 +1210,7 @@
         }
 
         app.innerHTML = `
-          <div class="hotel-background"></div>
+          <div class="hotel-background"><img src="./hotel-1600.webp" srcset="./hotel-960.webp 960w, ./hotel-1600.webp 1600w, ./hotel.webp 3542w" sizes="100vw" width="3542" height="2361" alt="Hotel Średzka Korona w Środzie Śląskiej" fetchpriority="high" decoding="async" /></div>
           <div class="shell">
             <nav class="floating-nav" id="floating-nav">
               <a href="../" class="floating-nav-brand">
@@ -1193,7 +1224,7 @@
               <div class="hotel-info">
                 <h1 class="hotel-title">Hotel <span class="visually-hidden">– komfortowe noclegi i pokoje w Środzie Śląskiej</span></h1>
                 <h2 class="hotel-description">
-                  Noclegi w Środzie Śląskiej niedaleko Wrocławia na 50 osób ze śniadaniem w cenie. Oferujemy pokoje w różnych kofniguracjach:
+                  Noclegi w Środzie Śląskiej niedaleko Wrocławia na 50 osób ze śniadaniem w cenie. Oferujemy pokoje w różnych konfiguracjach:
                 </h2>
                 <div class="rooms-info">
                   <div class="room-type" data-room-type="1-osobowe">
@@ -1271,6 +1302,13 @@
     <script src="../assets/js/booking-flags.js?v=20260411-3"></script>
     <script src="../assets/js/global-booking-modal.js?v=20260411-3"></script>
     <script src="../assets/js/sredzka-document-title.js"></script>
+    <nav class="seo-service-nav" aria-label="Pozostałe usługi Średzkiej Korony">
+      <a href="./" aria-current="page">Hotel i noclegi</a>
+      <a href="../catering/">Catering</a>
+      <a href="../przyjecia/">Przyjęcia</a>
+      <a href="../f-and-q/">FAQ</a>
+      <a href="../kontakt/">Kontakt</a>
+    </nav>
     <a href="../kontakt/" class="floating-contact-button" aria-label="Kontakt">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>

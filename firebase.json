@@ -79,6 +79,36 @@
         "type": 301
       },
       {
+        "source": "/Hotel/index.html",
+        "destination": "/Hotel/",
+        "type": 301
+      },
+      {
+        "source": "/catering/index.html",
+        "destination": "/catering/",
+        "type": 301
+      },
+      {
+        "source": "/przyjecia/index.html",
+        "destination": "/przyjecia/",
+        "type": 301
+      },
+      {
+        "source": "/kontakt/index.html",
+        "destination": "/kontakt/",
+        "type": 301
+      },
+      {
+        "source": "/dokumenty/index.html",
+        "destination": "/dokumenty/",
+        "type": 301
+      },
+      {
+        "source": "/f-and-q/index.html",
+        "destination": "/f-and-q/",
+        "type": 301
+      },
+      {
         "source": "/functions/node_modules/**",
         "destination": "/",
         "type": 301

@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="../assets/js/canonical-redirect.js"></script>
     <script src="../assets/js/cookie-consent-core.js"></script>
     <script>
       (function() {
@@ -131,6 +132,7 @@
     <link rel="shortcut icon" href="../favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="../ikony/favicon-180x180.png" />
     <link rel="manifest" href="../site.webmanifest" />
+    <link rel="stylesheet" href="../assets/css/seo-internal-links.css" />
     <meta name="theme-color" content="#fefcf9" />
     <meta name="robots" content="index,follow,max-image-preview:large" />
     <meta name="geo.region" content="PL-DS" />
@@ -150,25 +152,27 @@
       property="og:description"
       content="Catering Środa Śląska — profesjonalny catering wyjazdowy na imprezy okolicznościowe, śluby, chrzciny i komunie. Gotujemy u klienta w Lutyni, Brzegu Dolnym, Miękini i okolicach Wrocławia. Jesteśmy blisko Wrocławia!"
     />
-    <meta property="og:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
-    <meta property="og:image:alt" content="Logo Średzka Korona" />
+    <meta property="og:image" content="https://sredzka-korona.pl/assets/img/og-catering.webp" />
+    <meta property="og:image:alt" content="Catering Średzka Korona w Środzie Śląskiej" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Catering Środa Śląska i okolice Wrocławia | Średzka Korona" />
     <meta name="twitter:description" content="Catering wyjazdowy w Środzie Śląskiej i okolicach Wrocławia — imprezy, śluby, chrzciny i komunie." />
-    <meta name="twitter:image" content="https://sredzka-korona.pl/ikony/logo-korona.png" />
-    <meta name="twitter:image:alt" content="Logo Średzka Korona" />
+    <meta name="twitter:image" content="https://sredzka-korona.pl/assets/img/og-catering.webp" />
+    <meta name="twitter:image:alt" content="Catering Średzka Korona w Środzie Śląskiej" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@graph": [
           {
-            "@type": "Restaurant",
-            "@id": "https://sredzka-korona.pl/catering/#restaurant",
-            "name": "Catering Środa Śląska — Średzka Korona",
-            "url": "https://sredzka-korona.pl/catering/",
-            "parentOrganization": { "@id": "https://sredzka-korona.pl/#organization" },
+            "@type": "LocalBusiness",
+            "@id": "https://sredzka-korona.pl/#organization",
+            "name": "Średzka Korona",
+            "url": "https://sredzka-korona.pl/",
+            "logo": "https://sredzka-korona.pl/ikony/logo-korona.png",
+            "telephone": "+48-691-964-714",
+            "email": "kontakt@sredzka-korona.pl",
             "address": {
               "@type": "PostalAddress",
               "streetAddress": "ul. Wrocławska 11",
@@ -176,13 +180,18 @@
               "postalCode": "55-300",
               "addressRegion": "Dolnośląskie",
               "addressCountry": "PL"
-            },
-            "telephone": "+48-600-700-800",
-            "email": "kontakt@sredzkakorona.pl",
+            }
+          },
+          {
+            "@type": "Service",
+            "@id": "https://sredzka-korona.pl/catering/#service",
+            "name": "Catering Środa Śląska — Średzka Korona",
+            "url": "https://sredzka-korona.pl/catering/",
+            "image": "https://sredzka-korona.pl/assets/img/og-catering.webp",
+            "provider": { "@id": "https://sredzka-korona.pl/#organization" },
+            "serviceType": "Catering okolicznościowy, eventowy i firmowy",
             "description": "Profesjonalny catering na imprezy okolicznościowe — Gotujemy, Pakujemy, Przywozimy, Serwujemy - również w wersji plenerowej. Obsługujemy śluby, chrzciny, komunie i inne imprezy nawet na ponad 100 osób. Działamy na terenie gminy Środa Śląska, Miękinia i okolicach.",
-            "servesCuisine": "Polska",
-            "areaServed": ["Środa Śląska", "Lutynia", "Brzeg Dolny", "Miękinia", "Wrocław", "Dolny Śląsk"],
-            "acceptsReservations": false
+            "areaServed": ["Środa Śląska", "Lutynia", "Brzeg Dolny", "Miękinia", "Malczyce", "Kostomłoty", "Udanin", "okolice Wrocławia"]
           },
           {
             "@type": "BreadcrumbList",
@@ -207,7 +216,7 @@
             "url": "https://sredzka-korona.pl/catering/",
             "name": "Catering Środa Śląska, Lutynia, Brzeg Dolny, Miękinia, okolice Wrocławia | Średzka Korona",
             "isPartOf": { "@id": "https://sredzka-korona.pl/#website" },
-            "about": { "@id": "https://sredzka-korona.pl/catering/#restaurant" },
+            "about": { "@id": "https://sredzka-korona.pl/catering/#service" },
             "inLanguage": "pl-PL"
           }
         ]
@@ -310,10 +319,15 @@
         position: fixed;
         inset: 0;
         z-index: 0;
-        background-image: url('./catering.webp');
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
+        background: #17120f;
+      }
+
+      .restaurant-background > img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
       }
 
       .restaurant-background::after {
@@ -321,6 +335,7 @@
         position: absolute;
         inset: 0;
         background: rgba(0, 0, 0, 0.4);
+        z-index: 1;
       }
 
       .restaurant-content {
@@ -1485,7 +1500,7 @@
         <p style="font-size: 1.2rem; margin-bottom: 2rem;">Profesjonalny catering okolicznościowy i eventowy w Środzie Śląskiej i okolicach Wrocławia</p>
         <p><a href="../">← Powrót do strony głównej</a></p>
         <p style="margin-top: 2rem;">Aby w pełni korzystać z naszej strony, włącz obsługę JavaScript w przeglądarce.</p>
-        <p>Telefon: +48 600 700 800 | Email: kontakt@sredzkakorona.pl</p>
+        <p>Telefon: +48 691 964 714 | Email: kontakt@sredzka-korona.pl</p>
       </div>
     </noscript>
     <div id="app"></div>
@@ -1902,8 +1917,8 @@
         }
 
         let selectedCategoryIndex = 0;
-        let companyPhone = "+48 600 700 800";
-        let companyEmail = "kontakt@sredzkakorona.pl";
+        let companyPhone = "+48 691 964 714";
+        let companyEmail = "kontakt@sredzka-korona.pl";
         let restaurantOrderButtonText = "Zamów catering na imprezę";
         let restaurantOrdersInfoText =
           "<p>Profesjonalny catering na imprezy okolicznościowe &mdash; Gotujemy, Pakujemy, Przywozimy, Serwujemy - również w wersji plenerowej. Obsługujemy śluby, chrzciny, komunie i inne imprezy nawet na ponad 100 osób. Działamy na terenie gminy Środa Śląska, Miękinia i okolicach.</p>" +
@@ -2069,11 +2084,16 @@
                 <button class="modal-close" id="close-gallery" aria-label="Zamknij galerię">×</button>
               </div>
               <div class="gallery-grid">
-                ${(restaurantGallery || []).map(img => 
-                  `<div class="gallery-item">
-                    <img src="${escapeHtml(img.url || img)}" alt="${escapeHtml(img.alt || "Zdjęcie cateringu Średzka Korona")}" loading="lazy" />
-                  </div>`
-                ).join('')}
+                ${(restaurantGallery || []).map((img, index) => {
+                  const suppliedAlt = String(img?.alt || "").trim();
+                  const genericAlt = !suppliedAlt || suppliedAlt.toLocaleLowerCase("pl-PL") === "catering";
+                  const alt = genericAlt
+                    ? `Catering okolicznościowy Średzka Korona w Środzie Śląskiej — zdjęcie ${index + 1}`
+                    : suppliedAlt;
+                  return `<div class="gallery-item">
+                    <img src="${escapeHtml(img.url || img)}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async" />
+                  </div>`;
+                }).join('')}
               </div>
             </div>
           `;
@@ -2096,7 +2116,7 @@
         }
 
         app.innerHTML = `
-          <div class="restaurant-background"></div>
+          <div class="restaurant-background"><img src="./catering.webp" srcset="./catering-960.webp 960w, ./catering.webp 1602w" sizes="100vw" width="1602" height="982" alt="Catering Średzka Korona w Środzie Śląskiej" fetchpriority="high" decoding="async" /></div>
           <div class="shell">
             <nav class="floating-nav" id="floating-nav">
               <a href="../" class="floating-nav-brand">
@@ -2227,6 +2247,13 @@
 
     <script src="../assets/js/config.js"></script>
     <script src="../assets/js/sredzka-document-title.js"></script>
+    <nav class="seo-service-nav" aria-label="Pozostałe usługi Średzkiej Korony">
+      <a href="./" aria-current="page">Catering</a>
+      <a href="../Hotel/">Hotel i noclegi</a>
+      <a href="../przyjecia/">Przyjęcia</a>
+      <a href="../f-and-q/">FAQ</a>
+      <a href="../kontakt/">Kontakt</a>
+    </nav>
     <a href="../kontakt/" class="floating-contact-button" aria-label="Kontakt">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>

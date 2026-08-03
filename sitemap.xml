@@ -1,67 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-<url>
-<loc>https://www.sredzka-korona.pl/</loc>
-<lastmod>2026-08-01T21:11:27+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/Hotel/</loc>
-<lastmod>2026-08-01T21:11:27+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/_site/</loc>
-<lastmod>2026-06-16T15:14:16+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/catering/</loc>
-<lastmod>2026-08-01T21:11:27+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/dokumenty/</loc>
-<lastmod>2026-08-01T21:11:27+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/f-and-q/</loc>
-<lastmod>2026-08-01T21:11:27+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/kontakt/</loc>
-<lastmod>2026-08-01T21:11:27+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/przyjecia/</loc>
-<lastmod>2026-08-01T21:11:27+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/_site/Hotel/</loc>
-<lastmod>2026-06-21T10:02:28+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/_site/ROADMAP/</loc>
-<lastmod>2026-06-04T12:15:15+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/_site/catering/</loc>
-<lastmod>2026-06-21T10:02:28+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/_site/dokumenty/</loc>
-<lastmod>2026-06-21T10:02:28+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/_site/f-and-q/</loc>
-<lastmod>2026-06-21T10:02:28+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/_site/kontakt/</loc>
-<lastmod>2026-06-21T10:02:28+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/_site/przyjecia/</loc>
-<lastmod>2026-06-21T10:02:28+02:00</lastmod>
-</url>
-<url>
-<loc>https://www.sredzka-korona.pl/_site/sitemap/</loc>
-<lastmod>2026-06-04T12:15:15+02:00</lastmod>
-</url>
+  <url>
+    <loc>https://sredzka-korona.pl/</loc>
+  </url>
+  <url>
+    <loc>https://sredzka-korona.pl/Hotel/</loc>
+  </url>
+  <url>
+    <loc>https://sredzka-korona.pl/catering/</loc>
+  </url>
+  <url>
+    <loc>https://sredzka-korona.pl/przyjecia/</loc>
+  </url>
+  <url>
+    <loc>https://sredzka-korona.pl/kontakt/</loc>
+  </url>
+  <url>
+    <loc>https://sredzka-korona.pl/dokumenty/</loc>
+  </url>
+  <url>
+    <loc>https://sredzka-korona.pl/f-and-q/</loc>
+  </url>
 </urlset>
