@@ -10,6 +10,15 @@ window.SREDZKA_CONFIG = {
    */
   enableOnlineBookings: true,
   turnstileSiteKey: "0x4AAAAAACyIQzt5qiD-IVXQ",
+  /**
+   * Cele Google Ads tworzone dla witryny. Wklej pelne wartosci `send_to`
+   * z fragmentow zdarzen Google Ads, np. AW-123456789/AbCdEfGhIjK.
+   * Puste wartosci nie blokuja zdarzen GA4 i nie wysylaja blednej konwersji Ads.
+   */
+  googleAdsConversions: {
+    phoneClickSendTo: "",
+    contactFormSendTo: "",
+  },
   /** Konfiguracja Firebase Authentication (panel admina) — z konsoli Firebase: Project settings */
   firebaseApiKey: "AIzaSyDvKjj2Lu_aGBFIOId5KU4rONguQMj2sxc",
   firebaseAuthDomain: "sredzka-korona.firebaseapp.com",

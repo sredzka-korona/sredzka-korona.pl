@@ -9,10 +9,19 @@
   var isLocalPreview = ['localhost', '127.0.0.1'].includes(window.location.hostname);
   var apiBase = isLocalPreview ? window.location.origin : String(config.apiBase || '').replace(/\/$/, '');
 
-  function hasAnalyticsConsent() {
+  function getConsentChoice() {
     var consent = window.sredzkaCookieConsent;
-    var choice = consent && typeof consent.getValidChoice === 'function' ? consent.getValidChoice() : null;
+    return consent && typeof consent.getValidChoice === 'function' ? consent.getValidChoice() : null;
+  }
+
+  function hasAnalyticsConsent() {
+    var choice = getConsentChoice();
     return Boolean(choice && choice.analytics);
+  }
+
+  function hasMarketingConsent() {
+    var choice = getConsentChoice();
+    return Boolean(choice && choice.marketing);
   }
 
   function normalizePath(value) {
@@ -61,6 +70,42 @@
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
   }
 
+  function normalizeSendTo(value) {
+    var values = Array.isArray(value) ? value : [value];
+    return values.map(function (item) {
+      return String(item || '').trim();
+    }).filter(function (item) {
+      return /^AW-\d+\/[A-Za-z0-9_-]+$/.test(item);
+    });
+  }
+
+  function sendGoogleEvent(eventName, params, conversionConfigKey) {
+    if (typeof window.gtag !== 'function') return false;
+
+    var sent = false;
+    var eventParams = Object.assign({}, params || {});
+
+    if (hasAnalyticsConsent()) {
+      window.gtag('event', eventName, eventParams);
+      sent = true;
+    }
+
+    if (hasMarketingConsent()) {
+      var adsConfig = config.googleAdsConversions || {};
+      var destinations = normalizeSendTo(adsConfig[conversionConfigKey]);
+      if (destinations.length) {
+        window.gtag('event', 'conversion', Object.assign({}, eventParams, {
+          send_to: destinations.length === 1 ? destinations[0] : destinations,
+          value: 1.0,
+          currency: 'PLN'
+        }));
+        sent = true;
+      }
+    }
+
+    return sent;
+  }
+
   function send(type, meta) {
     if (!hasAnalyticsConsent() || !apiBase || typeof window.fetch !== 'function') return false;
     var path = normalizePath(window.location.pathname);
@@ -103,7 +148,14 @@
     return send(String(type || ''), meta || {});
   };
   window.sredzkaTrackContactForm = function (label) {
-    return send('contact_form_submit', { label: label || 'Formularz kontaktowy' });
+    var cleanFormLabel = cleanLabel(label || 'Formularz kontaktowy');
+    var internalSent = send('contact_form_submit', { label: cleanFormLabel });
+    var googleSent = sendGoogleEvent('generate_lead', {
+      method: 'contact_form',
+      form_name: cleanFormLabel,
+      page_location: window.location.href
+    }, 'contactFormSendTo');
+    return internalSent || googleSent;
   };
 
   document.addEventListener('click', function (event) {
@@ -111,7 +163,16 @@
     if (!link) return;
     var href = String(link.getAttribute('href') || '').trim();
     var label = cleanLabel(link.getAttribute('aria-label') || link.textContent || href);
-    if (/^tel:/i.test(href)) send('contact_phone_click', { label: label || 'Telefon' });
+    if (/^tel:/i.test(href)) {
+      var phoneLabel = label || 'Telefon';
+      send('contact_phone_click', { label: phoneLabel });
+      sendGoogleEvent('phone_call_click', {
+        method: 'phone',
+        link_url: href,
+        link_text: phoneLabel,
+        page_location: window.location.href
+      }, 'phoneClickSendTo');
+    }
     else if (/^mailto:/i.test(href)) send('contact_email_click', { label: label || 'E-mail' });
     else if (/google\.[^/]+\/maps|maps\.app\.goo\.gl|goo\.gl\/maps/i.test(href)) send('contact_map_click', { label: label || 'Mapa / adres' });
   }, true);
