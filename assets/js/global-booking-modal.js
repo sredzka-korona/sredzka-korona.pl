@@ -3115,6 +3115,13 @@
       state.pendingEmailSent = true;
       state.requiresEmailConfirmation = response?.requiresEmailConfirmation !== false;
       state.countdownUntil = state.requiresEmailConfirmation ? Date.now() + EMAIL_CONFIRM_MS : 0;
+      const bookingLabel =
+        service === "events"
+          ? `Rezerwacja przyjęcia — ${state.events.eventType || "przyjęcie"}`
+          : service === "hotel"
+            ? "Rezerwacja hotelu"
+            : "Rezerwacja restauracji";
+      window.sredzkaTrackContactForm?.(bookingLabel);
       state.step = "success";
       state.submitting = false;
       render();
@@ -3183,6 +3190,9 @@
       state.step = "service";
     }
     applyPreselectedGlobalBookingService(options.preselectService);
+    if (state.selectedService === "events" && options.eventType && !state.events.eventType) {
+      state.events.eventType = cleanString(options.eventType, 500);
+    }
     if (state.selectedService === "restaurant" && ["restaurantDateTime"].includes(state.step) && !state.restaurant.calendarDays.length) {
       await loadRestaurantCalendar({ render: false, reservationDate: state.restaurant.reservationDate });
     }
@@ -3257,4 +3267,32 @@
   }
 
   bindOpeners();
+
+  function openBookingFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const requestedBooking = String(params.get("rezerwacja") || "").trim().toLowerCase();
+    if (!requestedBooking) return;
+
+    const serviceMap = {
+      hotel: "hotel",
+      restauracja: "restaurant",
+      restaurant: "restaurant",
+      przyjecia: "events",
+      events: "events",
+      stypa: "events",
+    };
+    const preselectService = serviceMap[requestedBooking];
+    if (!preselectService) return;
+
+    void openModal({
+      preselectService,
+      eventType: requestedBooking === "stypa" ? "Stypa" : "",
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", openBookingFromUrl, { once: true });
+  } else {
+    openBookingFromUrl();
+  }
 })();

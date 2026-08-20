@@ -1,0 +1,1119 @@
+<!doctype html>
+<html lang="pl" data-sredzka-title="Stypy w Środzie Śląskiej od 59 zł | Średzka Korona">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="../../assets/js/canonical-redirect.js"></script>
+    <script src="../../assets/js/cookie-consent-core.js"></script>
+    <script>
+      (function () {
+        var ADS_GOOGLE_TAG_IDS = ["AW-18082369489"];
+        var ANALYTICS_GOOGLE_TAG_IDS = ["G-6ENY27XX0B"];
+        var googleScriptLoaded = false;
+        var configuredGoogleTagIds = {};
+        var currentConsentState = { analytics: false, marketing: false };
+
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
+
+        function getConsentState(analytics, marketing) {
+          return {
+            ad_storage: marketing ? "granted" : "denied",
+            ad_user_data: marketing ? "granted" : "denied",
+            ad_personalization: marketing ? "granted" : "denied",
+            analytics_storage: analytics ? "granted" : "denied",
+          };
+        }
+
+        function activateGoogleTags(forceConfig) {
+          var allIds = ANALYTICS_GOOGLE_TAG_IDS.concat(ADS_GOOGLE_TAG_IDS);
+          var primaryId = ANALYTICS_GOOGLE_TAG_IDS[0] || ADS_GOOGLE_TAG_IDS[0];
+          if (!googleScriptLoaded && primaryId) {
+            googleScriptLoaded = true;
+            var script = document.createElement("script");
+            script.async = true;
+            script.src = "https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(primaryId);
+            document.head.appendChild(script);
+            window.gtag("js", new Date());
+          }
+          allIds.forEach(function (id) {
+            if (!id || (configuredGoogleTagIds[id] && !forceConfig)) return;
+            configuredGoogleTagIds[id] = true;
+            window.gtag("config", id);
+          });
+        }
+
+        window.sredzkaGoogleConsent = {
+          update: function (analytics, marketing) {
+            var next = { analytics: !!analytics, marketing: !!marketing };
+            var enabledNewCategory =
+              (!currentConsentState.analytics && next.analytics) ||
+              (!currentConsentState.marketing && next.marketing);
+            currentConsentState = next;
+            window.gtag("consent", "update", getConsentState(next.analytics, next.marketing));
+            activateGoogleTags(enabledNewCategory);
+          },
+          grant: function (analytics, marketing) {
+            window.sredzkaGoogleConsent.update(!!analytics, !!marketing);
+          },
+          deny: function () {
+            window.sredzkaGoogleConsent.update(false, false);
+          },
+        };
+
+        window.gtag("set", "ads_data_redaction", true);
+        window.gtag("consent", "default", getConsentState(false, false));
+
+        var storedConsentApplied = false;
+        try {
+          var choice = window.sredzkaCookieConsent
+            ? window.sredzkaCookieConsent.getValidChoice()
+            : null;
+          if (choice) {
+            storedConsentApplied = true;
+            window.sredzkaGoogleConsent.update(!!choice.analytics, !!choice.marketing);
+          }
+        } catch (error) {}
+        if (!storedConsentApplied) activateGoogleTags(false);
+      })();
+    </script>
+
+    <link rel="canonical" href="https://sredzka-korona.pl/przyjecia/stypy/" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../../ikony/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../../ikony/favicon-16x16.png" />
+    <link rel="shortcut icon" href="../../favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../../ikony/favicon-180x180.png" />
+    <link rel="manifest" href="../../site.webmanifest" />
+    <link rel="stylesheet" href="../../assets/css/seo-internal-links.css" />
+    <meta name="theme-color" content="#f8f4ed" />
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <meta name="geo.region" content="PL-DS" />
+    <meta name="geo.placename" content="Środa Śląska" />
+    <title>Stypy w Środzie Śląskiej od 59 zł | Średzka Korona</title>
+    <meta
+      name="description"
+      content="Organizacja stypy w Środzie Śląskiej od 59 zł za osobę. Spokojna sala, ustalane indywidualnie menu i obsługa przyjęć do 120 osób. Dogodny dojazd z Miękini i Lutyni."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pl_PL" />
+    <meta property="og:site_name" content="Średzka Korona" />
+    <meta property="og:url" content="https://sredzka-korona.pl/przyjecia/stypy/" />
+    <meta property="og:title" content="Stypy w Środzie Śląskiej od 59 zł | Średzka Korona" />
+    <meta
+      property="og:description"
+      content="Godna i spokojna organizacja przyjęcia po pożegnaniu bliskiej osoby. Sale do 120 osób, oferta od 59 zł za osobę."
+    />
+    <meta property="og:image" content="https://sredzka-korona.pl/assets/img/og-events.webp" />
+    <meta property="og:image:alt" content="Sala na stypę w Średzkiej Koronie w Środzie Śląskiej" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Stypy w Środzie Śląskiej od 59 zł | Średzka Korona" />
+    <meta
+      name="twitter:description"
+      content="Spokojna sala, indywidualnie ustalane menu i obsługa przyjęć stypowych do 120 osób."
+    />
+    <meta name="twitter:image" content="https://sredzka-korona.pl/assets/img/og-events.webp" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "LocalBusiness",
+            "@id": "https://sredzka-korona.pl/#organization",
+            "name": "Średzka Korona",
+            "url": "https://sredzka-korona.pl/",
+            "logo": "https://sredzka-korona.pl/ikony/logo-korona.png",
+            "image": "https://sredzka-korona.pl/assets/img/og-events.webp",
+            "telephone": "+48-691-964-714",
+            "email": "kontakt@sredzka-korona.pl",
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "ul. Wrocławska 11",
+              "addressLocality": "Środa Śląska",
+              "postalCode": "55-300",
+              "addressRegion": "Dolnośląskie",
+              "addressCountry": "PL"
+            }
+          },
+          {
+            "@type": "Service",
+            "@id": "https://sredzka-korona.pl/przyjecia/stypy/#service",
+            "name": "Organizacja styp w Środzie Śląskiej",
+            "url": "https://sredzka-korona.pl/przyjecia/stypy/",
+            "description": "Organizacja przyjęć stypowych w spokojnej atmosferze, w salach mieszczących do 120 osób.",
+            "provider": { "@id": "https://sredzka-korona.pl/#organization" },
+            "areaServed": ["Środa Śląska", "Miękinia", "Lutynia"],
+            "offers": {
+              "@type": "Offer",
+              "price": "59",
+              "priceCurrency": "PLN",
+              "description": "Oferta od 59 zł za osobę; ostateczna cena zależy od ustalonego zakresu menu i obsługi."
+            }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Strona główna",
+                "item": "https://sredzka-korona.pl/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Przyjęcia",
+                "item": "https://sredzka-korona.pl/przyjecia/"
+              },
+              {
+                "@type": "ListItem",
+                "position": 3,
+                "name": "Stypy",
+                "item": "https://sredzka-korona.pl/przyjecia/stypy/"
+              }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Ile kosztuje organizacja stypy w Średzkiej Koronie?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Oferta zaczyna się od 59 zł za osobę. Ostateczna cena zależy od liczby gości oraz wybranego zakresu menu i obsługi."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Dla ilu osób można zorganizować stypę?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Organizujemy kameralne spotkania oraz większe przyjęcia do 120 osób. Wielkość sali dobieramy do liczby gości."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Czy można szybko sprawdzić wolny termin?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Tak. Jesteśmy dostępni telefonicznie codziennie od 8:00 do 20:00, a dostępność można również sprawdzić w formularzu rezerwacji przyjęcia."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        --cream: #f8f4ed;
+        --paper: #fffdf9;
+        --ink: #241b15;
+        --muted: #6d6258;
+        --gold: #b9955a;
+        --gold-dark: #7a5a2d;
+        --line: rgba(143, 108, 55, 0.2);
+        --shadow: 0 20px 60px rgba(35, 26, 19, 0.12);
+        --content: min(1180px, calc(100vw - 3rem));
+        --nav-height: 80px;
+      }
+
+      * { box-sizing: border-box; }
+
+      html {
+        scroll-behavior: smooth;
+        overflow-x: hidden;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        overflow-x: hidden;
+        color: var(--ink);
+        background: var(--cream);
+        font-family: "Manrope", sans-serif;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(65, 48, 36, 0.025) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(65, 48, 36, 0.025) 1px, transparent 1px);
+        background-size: 64px 64px;
+      }
+
+      a { color: inherit; }
+      img { display: block; max-width: 100%; }
+
+      .skip-link {
+        position: fixed;
+        top: 0.5rem;
+        left: 0.5rem;
+        z-index: 999;
+        padding: 0.7rem 1rem;
+        color: white;
+        background: var(--gold-dark);
+        border-radius: 10px;
+        transform: translateY(-140%);
+      }
+
+      .skip-link:focus { transform: none; }
+
+      .site-header {
+        position: fixed;
+        inset: 0 0 auto;
+        z-index: 100;
+        min-height: var(--nav-height);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.75rem 2rem;
+        color: var(--ink);
+        background: rgba(255, 253, 249, 0.96);
+        border-bottom: 1px solid var(--line);
+        backdrop-filter: blur(18px) saturate(150%);
+        transition: box-shadow 0.25s ease;
+      }
+
+      .site-header.is-scrolled { box-shadow: 0 8px 30px rgba(31, 23, 18, 0.09); }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: clamp(0.65rem, 2vw, 1.35rem);
+        color: #a8895a;
+        font-family: "Cormorant Garamond", serif;
+        font-size: clamp(0.9rem, 2vw, 1.35rem);
+        font-weight: 600;
+        letter-spacing: 0.18em;
+        text-decoration: none;
+      }
+
+      .brand::before,
+      .brand::after {
+        content: "";
+        width: clamp(28px, 7vw, 92px);
+        height: 1px;
+        background: var(--gold);
+      }
+
+      .brand img {
+        width: 48px;
+        height: 48px;
+        object-fit: contain;
+      }
+
+      .hero {
+        position: relative;
+        min-height: min(860px, 100svh);
+        display: grid;
+        align-items: center;
+        isolation: isolate;
+        padding: calc(var(--nav-height) + 4rem) 0 4rem;
+        color: white;
+        background: #1b1714;
+      }
+
+      .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -2;
+        background:
+          linear-gradient(90deg, rgba(18, 14, 12, 0.88) 0%, rgba(18, 14, 12, 0.66) 48%, rgba(18, 14, 12, 0.42) 100%),
+          url("../tlo-przyjecia-1600.webp") center 48% / cover no-repeat;
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background: linear-gradient(180deg, transparent 65%, rgba(18, 14, 12, 0.42));
+      }
+
+      .hero-inner {
+        width: var(--content);
+        margin: 0 auto;
+      }
+
+      .breadcrumbs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        margin-bottom: 2rem;
+        font-size: 0.84rem;
+        color: rgba(255, 255, 255, 0.76);
+      }
+
+      .breadcrumbs a { text-underline-offset: 0.22em; }
+
+      .hero-copy { max-width: 760px; }
+
+      .eyebrow {
+        margin: 0 0 1rem;
+        color: #ead6b4;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.19em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        font-family: "Cormorant Garamond", serif;
+        text-wrap: balance;
+      }
+
+      h1 {
+        max-width: 720px;
+        margin: 0;
+        font-size: clamp(3.3rem, 7.5vw, 6.8rem);
+        font-weight: 600;
+        line-height: 0.94;
+        letter-spacing: -0.035em;
+      }
+
+      .hero-lead {
+        max-width: 680px;
+        margin: 1.7rem 0 0;
+        color: rgba(255, 255, 255, 0.92);
+        font-size: clamp(1.05rem, 2vw, 1.3rem);
+        line-height: 1.7;
+      }
+
+      .facts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.7rem;
+        margin: 2rem 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .facts li {
+        padding: 0.65rem 0.9rem;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 999px;
+        color: rgba(255, 255, 255, 0.94);
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        font-size: 0.86rem;
+      }
+
+      .hero-actions,
+      .cta-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.8rem;
+        margin-top: 2.2rem;
+      }
+
+      .button {
+        min-height: 52px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.85rem 1.25rem;
+        border: 1px solid transparent;
+        border-radius: 12px;
+        font-weight: 700;
+        line-height: 1.2;
+        text-align: center;
+        text-decoration: none;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      }
+
+      .button:hover { transform: translateY(-2px); }
+
+      .button-primary {
+        color: #241b15;
+        background: #e7cc9f;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+      }
+
+      .button-primary:hover { background: #f0d9b3; }
+
+      .button-secondary {
+        color: white;
+        border-color: rgba(255, 255, 255, 0.4);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .button-secondary:hover { background: rgba(255, 255, 255, 0.16); }
+
+      .button-dark {
+        color: white;
+        background: var(--gold-dark);
+      }
+
+      .button-outline {
+        color: var(--gold-dark);
+        border-color: rgba(122, 90, 45, 0.4);
+        background: transparent;
+      }
+
+      .section {
+        width: var(--content);
+        margin: 0 auto;
+        padding: clamp(4.5rem, 8vw, 7.5rem) 0;
+      }
+
+      .section-heading {
+        max-width: 760px;
+        margin-bottom: clamp(2rem, 4vw, 3.5rem);
+      }
+
+      .section-heading h2,
+      .story-copy h2,
+      .price-copy h2,
+      .cta-panel h2 {
+        margin: 0;
+        font-size: clamp(2.5rem, 5vw, 4.4rem);
+        font-weight: 600;
+        line-height: 1;
+        letter-spacing: -0.025em;
+      }
+
+      .section-heading p,
+      .story-copy > p,
+      .price-copy > p {
+        margin: 1.1rem 0 0;
+        color: var(--muted);
+        font-size: 1.03rem;
+        line-height: 1.75;
+      }
+
+      .story {
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+        gap: clamp(2rem, 6vw, 5rem);
+        align-items: center;
+      }
+
+      .story-image {
+        position: relative;
+        min-height: 520px;
+        overflow: hidden;
+        border-radius: 30px;
+        box-shadow: var(--shadow);
+      }
+
+      .story-image img {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        inset: 0;
+        object-fit: cover;
+      }
+
+      .story-note {
+        margin: 1.8rem 0 0;
+        padding: 1.2rem 1.25rem;
+        border-left: 3px solid var(--gold);
+        color: #4d4036;
+        background: rgba(255, 255, 255, 0.7);
+        line-height: 1.65;
+      }
+
+      .offer-section {
+        width: 100%;
+        background: #efe8dd;
+        border-block: 1px solid var(--line);
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+      }
+
+      .card {
+        min-height: 260px;
+        padding: clamp(1.4rem, 3vw, 2.2rem);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: rgba(255, 253, 249, 0.76);
+      }
+
+      .card-number {
+        display: block;
+        margin-bottom: 1.8rem;
+        color: var(--gold-dark);
+        font-family: "Cormorant Garamond", serif;
+        font-size: 1.2rem;
+      }
+
+      .card h3 {
+        margin: 0;
+        font-size: 2rem;
+        font-weight: 600;
+      }
+
+      .card p {
+        margin: 0.8rem 0 0;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .price-panel {
+        display: grid;
+        grid-template-columns: 0.85fr 1.15fr;
+        gap: clamp(2rem, 6vw, 5rem);
+        align-items: center;
+        padding: clamp(2rem, 5vw, 4.5rem);
+        color: white;
+        border-radius: 32px;
+        background:
+          linear-gradient(120deg, rgba(34, 25, 19, 0.96), rgba(75, 57, 40, 0.91)),
+          url("../../assets/img/catering.webp") center / cover;
+        box-shadow: var(--shadow);
+      }
+
+      .price-display {
+        padding-right: clamp(0rem, 3vw, 2rem);
+        border-right: 1px solid rgba(255, 255, 255, 0.22);
+      }
+
+      .price-kicker {
+        display: block;
+        margin-bottom: 0.4rem;
+        color: #dcc29b;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      .price-value {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+        font-family: "Cormorant Garamond", serif;
+        font-size: clamp(4.2rem, 9vw, 7.5rem);
+        font-weight: 600;
+        line-height: 0.9;
+      }
+
+      .price-value small {
+        font-family: "Manrope", sans-serif;
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+
+      .price-copy > p { color: rgba(255, 255, 255, 0.78); }
+
+      .price-list {
+        display: grid;
+        gap: 0.7rem;
+        margin: 1.4rem 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .price-list li {
+        position: relative;
+        padding-left: 1.4rem;
+        color: rgba(255, 255, 255, 0.9);
+        line-height: 1.55;
+      }
+
+      .price-list li::before {
+        content: "";
+        position: absolute;
+        top: 0.65em;
+        left: 0;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #ddbf8d;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+        counter-reset: steps;
+      }
+
+      .step {
+        counter-increment: steps;
+        padding: 1.8rem 1.6rem;
+        border-top: 1px solid var(--gold);
+      }
+
+      .step::before {
+        content: "0" counter(steps);
+        display: block;
+        margin-bottom: 1.2rem;
+        color: var(--gold-dark);
+        font-family: "Cormorant Garamond", serif;
+        font-size: 1.35rem;
+      }
+
+      .step h3 {
+        margin: 0;
+        font-size: 1.8rem;
+      }
+
+      .step p {
+        margin: 0.65rem 0 0;
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .area-strip {
+        padding: 2rem;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: var(--paper);
+        text-align: center;
+      }
+
+      .area-strip strong {
+        display: block;
+        font-family: "Cormorant Garamond", serif;
+        font-size: clamp(1.8rem, 3vw, 2.7rem);
+      }
+
+      .area-strip p {
+        margin: 0.65rem auto 0;
+        max-width: 760px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .faq-list {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .faq-list details {
+        padding: 1.25rem 1.4rem;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(255, 253, 249, 0.82);
+      }
+
+      .faq-list summary {
+        cursor: pointer;
+        font-weight: 700;
+        line-height: 1.45;
+      }
+
+      .faq-list p {
+        margin: 0.85rem 0 0;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .cta-panel {
+        padding: clamp(2.2rem, 6vw, 5rem);
+        color: white;
+        border-radius: 32px;
+        background: #2b211b;
+        text-align: center;
+        box-shadow: var(--shadow);
+      }
+
+      .cta-panel p {
+        max-width: 690px;
+        margin: 1rem auto 0;
+        color: rgba(255, 255, 255, 0.78);
+        line-height: 1.7;
+      }
+
+      .cta-panel .cta-actions { justify-content: center; }
+
+      .site-footer {
+        padding: 3rem max(1.5rem, calc((100vw - 1180px) / 2));
+        color: #d9cfc5;
+        background: #1c1714;
+      }
+
+      .footer-inner {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+
+      .site-footer a { text-underline-offset: 0.25em; }
+
+      .floating-contact-button {
+        position: fixed;
+        right: 1.3rem;
+        bottom: calc(1.3rem + env(safe-area-inset-bottom, 0px));
+        z-index: 99;
+        width: 60px;
+        height: 60px;
+        display: grid;
+        place-items: center;
+        color: white;
+        background: var(--gold-dark);
+        border-radius: 50%;
+        box-shadow: 0 10px 30px rgba(31, 23, 18, 0.28);
+        font-size: 1.35rem;
+        text-decoration: none;
+        transition: transform 0.2s ease;
+      }
+
+      .floating-contact-button:hover { transform: translateY(-3px) scale(1.04); }
+
+      :focus-visible {
+        outline: 3px solid #e5bf7c;
+        outline-offset: 3px;
+      }
+
+      @media (max-width: 900px) {
+        .story,
+        .price-panel {
+          grid-template-columns: 1fr;
+        }
+
+        .story-image { min-height: 420px; }
+        .cards,
+        .steps { grid-template-columns: 1fr; }
+
+        .price-display {
+          padding: 0 0 1.8rem;
+          border-right: 0;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+        }
+      }
+
+      @media (max-width: 680px) {
+        :root {
+          --content: min(100% - 2rem, 1180px);
+          --nav-height: 68px;
+        }
+
+        .site-header { padding-inline: 0.7rem; }
+        .brand { gap: 0.55rem; letter-spacing: 0.12em; }
+        .brand::before,
+        .brand::after { width: 18px; }
+        .brand img { width: 38px; height: 38px; }
+
+        .hero {
+          min-height: auto;
+          padding: calc(var(--nav-height) + 2.5rem) 0 4rem;
+        }
+
+        .hero::before {
+          background:
+            linear-gradient(180deg, rgba(18, 14, 12, 0.78), rgba(18, 14, 12, 0.73)),
+            url("../tlo-przyjecia-960.webp") 56% center / cover no-repeat;
+        }
+
+        h1 { font-size: clamp(3rem, 16vw, 4.5rem); }
+
+        .hero-actions,
+        .cta-actions { display: grid; grid-template-columns: 1fr; }
+
+        .button { width: 100%; }
+        .story-image { min-height: 330px; }
+        .section { padding: 4rem 0; }
+        .price-panel,
+        .cta-panel { border-radius: 24px; }
+
+        .floating-contact-button {
+          right: 0.8rem;
+          bottom: calc(0.7rem + env(safe-area-inset-bottom, 0px));
+          width: 54px;
+          height: 54px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        *, *::before, *::after { transition-duration: 0.01ms !important; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <a class="skip-link" href="#main">Przejdź do treści</a>
+
+    <header class="site-header" id="site-header">
+      <a class="brand" href="../../" aria-label="Średzka Korona — strona główna">
+        <span>ŚREDZKA</span>
+        <img src="../../ikony/logo-korona.png" alt="" width="48" height="48" />
+        <span>KORONA</span>
+      </a>
+    </header>
+
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-inner">
+          <nav class="breadcrumbs" aria-label="Okruszki">
+            <a href="../../">Strona główna</a>
+            <span aria-hidden="true">/</span>
+            <a href="../">Przyjęcia</a>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">Stypy</span>
+          </nav>
+
+          <div class="hero-copy">
+            <p class="eyebrow">Środa Śląska · spokojnie i z szacunkiem</p>
+            <h1 id="hero-title">Stypy w Środzie Śląskiej</h1>
+            <p class="hero-lead">
+              Zapewniamy godne miejsce na spotkanie po pożegnaniu bliskiej osoby.
+              Zajmiemy się salą, ustaleniem menu i sprawną obsługą, aby Państwo mogli
+              skupić się na rodzinie i najbliższych.
+            </p>
+
+            <ul class="facts" aria-label="Najważniejsze informacje">
+              <li>od 59 zł za osobę</li>
+              <li>przyjęcia do 120 osób</li>
+              <li>telefon dostępny codziennie 8:00–20:00</li>
+            </ul>
+
+            <div class="hero-actions">
+              <a class="button button-primary" href="tel:+48691964714">Zadzwoń: 691 964 714</a>
+              <a class="button button-secondary" href="../?rezerwacja=stypa">Sprawdź termin i zarezerwuj</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section story" aria-labelledby="spokojna-organizacja">
+        <div class="story-copy">
+          <p class="eyebrow">Wsparcie w organizacji</p>
+          <h2 id="spokojna-organizacja">Spokojna organizacja w trudnym momencie</h2>
+          <p>
+            Każde przyjęcie ustalamy indywidualnie — od liczby miejsc i układu sali,
+            przez zakres menu, po godzinę rozpoczęcia. Możemy przygotować kameralne
+            spotkanie dla najbliższej rodziny albo większe przyjęcie do 120 osób.
+          </p>
+          <p class="story-note">
+            Jeśli termin jest bliski, najlepiej zadzwonić. Jesteśmy dostępni codziennie
+            od 8:00 do 20:00 i od razu sprawdzimy możliwości organizacji przyjęcia.
+          </p>
+        </div>
+        <figure class="story-image">
+          <img
+            src="../../assets/img/sala.webp"
+            alt="Sala na przyjęcie stypowe w Średzkiej Koronie"
+            width="5400"
+            height="3600"
+            loading="lazy"
+            decoding="async"
+          />
+        </figure>
+      </section>
+
+      <div class="offer-section">
+        <section class="section" aria-labelledby="oferta-stypy">
+          <div class="section-heading">
+            <p class="eyebrow">Co możemy przygotować</p>
+            <h2 id="oferta-stypy">Przyjęcie dopasowane do liczby gości</h2>
+            <p>
+              Bez zbędnych formalności i gotowych pakietów narzucających zakres usługi.
+              Ustalamy rozwiązanie odpowiednie do sytuacji i potrzeb rodziny.
+            </p>
+          </div>
+
+          <div class="cards">
+            <article class="card">
+              <span class="card-number">01</span>
+              <h3>Spokojna sala</h3>
+              <p>
+                Dobieramy przestrzeń do liczby uczestników, tak aby spotkanie pozostało
+                kameralne, wygodne i odpowiednio przygotowane.
+              </p>
+            </article>
+            <article class="card">
+              <span class="card-number">02</span>
+              <h3>Indywidualne menu</h3>
+              <p>
+                Zakres posiłków i sposób podania ustalamy podczas rozmowy. Ostateczna
+                wycena zależy od wybranego menu oraz liczby osób.
+              </p>
+            </article>
+            <article class="card">
+              <span class="card-number">03</span>
+              <h3>Sprawna obsługa</h3>
+              <p>
+                Dbamy o przygotowanie sali i przebieg przyjęcia, aby odciążyć rodzinę
+                od spraw organizacyjnych w dniu spotkania.
+              </p>
+            </article>
+          </div>
+        </section>
+      </div>
+
+      <section class="section" aria-labelledby="cena-stypy">
+        <div class="price-panel">
+          <div class="price-display" aria-label="Cena od 59 zł za osobę">
+            <span class="price-kicker">Oferta od</span>
+            <div class="price-value">59 zł <small>/ osoba</small></div>
+          </div>
+          <div class="price-copy">
+            <h2 id="cena-stypy">Jasne ustalenia przed przyjęciem</h2>
+            <p>
+              Podana cena jest ceną początkową. Dokładną propozycję przedstawimy po
+              poznaniu liczby gości i oczekiwanego zakresu menu.
+            </p>
+            <ul class="price-list">
+              <li>organizacja spotkań do 120 osób,</li>
+              <li>dobór sali do wielkości przyjęcia,</li>
+              <li>zakres menu ustalany indywidualnie,</li>
+              <li>szybkie potwierdzenie dostępności terminu.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="jak-zarezerwowac">
+        <div class="section-heading">
+          <p class="eyebrow">Trzy proste kroki</p>
+          <h2 id="jak-zarezerwowac">Jak ustalić termin?</h2>
+        </div>
+        <div class="steps">
+          <article class="step">
+            <h3>Zadzwoń lub napisz</h3>
+            <p>Podaj planowany termin i przybliżoną liczbę uczestników.</p>
+          </article>
+          <article class="step">
+            <h3>Ustalmy szczegóły</h3>
+            <p>Dobierzemy salę, zakres menu i sposób organizacji przyjęcia.</p>
+          </article>
+          <article class="step">
+            <h3>Potwierdź rezerwację</h3>
+            <p>Skorzystaj z formularza rezerwacji przyjęć, aby przekazać wszystkie dane.</p>
+          </article>
+        </div>
+
+        <div class="hero-actions">
+          <a class="button button-dark" href="../?rezerwacja=stypa">Przejdź do rezerwacji przyjęcia</a>
+          <a
+            class="button button-outline"
+            href="../../kontakt/?topic=Stypa&amp;message=Prosz%C4%99%20o%20kontakt%20w%20sprawie%20organizacji%20stypy."
+          >Napisz przez formularz kontaktowy</a>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="lokalizacja">
+        <div class="area-strip">
+          <strong id="lokalizacja">Środa Śląska, Miękinia, Lutynia i okolice</strong>
+          <p>
+            Średzka Korona znajduje się przy ul. Wrocławskiej 11 w Środzie Śląskiej.
+            To dogodna lokalizacja dla rodzin ze Środy Śląskiej, Miękini, Lutyni oraz
+            miejscowości położonych w promieniu około 20 km.
+          </p>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="faq-title">
+        <div class="section-heading">
+          <p class="eyebrow">Najczęstsze pytania</p>
+          <h2 id="faq-title">Organizacja stypy — informacje</h2>
+        </div>
+        <div class="faq-list">
+          <details>
+            <summary>Ile kosztuje organizacja stypy?</summary>
+            <p>
+              Oferta zaczyna się od 59 zł za osobę. Końcowa cena zależy od liczby
+              uczestników oraz ustalonego zakresu menu i obsługi.
+            </p>
+          </details>
+          <details>
+            <summary>Dla ilu osób można przygotować przyjęcie?</summary>
+            <p>
+              Organizujemy kameralne spotkania oraz większe przyjęcia do 120 osób.
+              Wielkość sali dobieramy do liczby gości.
+            </p>
+          </details>
+          <details>
+            <summary>Czy można szybko sprawdzić wolny termin?</summary>
+            <p>
+              Tak. Jesteśmy pod telefonem codziennie od 8:00 do 20:00. Można również
+              przejść do formularza rezerwacji i sprawdzić dostępne terminy przyjęć.
+            </p>
+          </details>
+          <details>
+            <summary>Czy menu można ustalić indywidualnie?</summary>
+            <p>
+              Tak. Zakres menu omawiamy podczas rozmowy, uwzględniając liczbę gości,
+              oczekiwany przebieg spotkania i budżet.
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="kontakt-cta">
+        <div class="cta-panel">
+          <p class="eyebrow">Jesteśmy dostępni codziennie 8:00–20:00</p>
+          <h2 id="kontakt-cta">Sprawdź termin przyjęcia</h2>
+          <p>
+            Zadzwoń, aby od razu zapytać o dostępność, albo przejdź do formularza
+            rezerwacji przyjęć. Odpowiemy spokojnie i konkretnie.
+          </p>
+          <div class="cta-actions">
+            <a class="button button-primary" href="tel:+48691964714">Zadzwoń: 691 964 714</a>
+            <a class="button button-secondary" href="../?rezerwacja=stypa">Rezerwacja przyjęcia</a>
+            <a
+              class="button button-secondary"
+              href="../../kontakt/?topic=Stypa&amp;message=Prosz%C4%99%20o%20kontakt%20w%20sprawie%20organizacji%20stypy."
+            >Kontakt</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <span>Średzka Korona · ul. Wrocławska 11, 55-300 Środa Śląska</span>
+        <span><a href="tel:+48691964714">+48 691 964 714</a> · <a href="mailto:kontakt@sredzka-korona.pl">kontakt@sredzka-korona.pl</a></span>
+      </div>
+    </footer>
+
+    <nav class="seo-service-nav" aria-label="Pozostałe usługi Średzkiej Korony">
+      <a href="../">Przyjęcia</a>
+      <a href="./" aria-current="page">Stypy</a>
+      <a href="../../Hotel/">Hotel</a>
+      <a href="../../catering/">Catering</a>
+      <a href="../../kontakt/">Kontakt</a>
+    </nav>
+
+    <a
+      href="tel:+48691964714"
+      class="floating-contact-button"
+      aria-label="Zadzwoń do Średzkiej Korony: +48 691 964 714"
+      title="Zadzwoń: +48 691 964 714"
+    >☎</a>
+
+    <script src="../../assets/js/config.js"></script>
+    <script src="../../assets/js/cookies-full.js"></script>
+    <script src="../../assets/js/analytics.js"></script>
+    <script src="../../assets/js/sredzka-document-title.js"></script>
+    <script>
+      (function () {
+        var header = document.getElementById("site-header");
+        function updateHeader() {
+          if (header) header.classList.toggle("is-scrolled", window.scrollY > 20);
+        }
+        window.addEventListener("scroll", updateHeader, { passive: true });
+        updateHeader();
+      })();
+    </script>
+  </body>
+</html>

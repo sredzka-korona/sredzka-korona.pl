@@ -79,7 +79,7 @@
     });
   }
 
-  function sendGoogleEvent(eventName, params, conversionConfigKey) {
+  function sendGoogleEvent(eventName, params, conversionConfigKey, conversionParams) {
     if (typeof window.gtag !== 'function') return false;
 
     var sent = false;
@@ -94,7 +94,7 @@
       var adsConfig = config.googleAdsConversions || {};
       var destinations = normalizeSendTo(adsConfig[conversionConfigKey]);
       if (destinations.length) {
-        window.gtag('event', 'conversion', Object.assign({}, eventParams, {
+        window.gtag('event', 'conversion', Object.assign({}, eventParams, conversionParams || {}, {
           send_to: destinations.length === 1 ? destinations[0] : destinations,
           value: 1.0,
           currency: 'PLN'
@@ -165,13 +165,37 @@
     var label = cleanLabel(link.getAttribute('aria-label') || link.textContent || href);
     if (/^tel:/i.test(href)) {
       var phoneLabel = label || 'Telefon';
+      var phoneDestinations = normalizeSendTo((config.googleAdsConversions || {}).phoneClickSendTo);
+      var shouldWaitForAds = hasMarketingConsent() && phoneDestinations.length > 0 && typeof event.preventDefault === 'function';
+      var continueToPhone = null;
+
+      if (shouldWaitForAds) {
+        event.preventDefault();
+        var navigationStarted = false;
+        var fallbackTimer = null;
+        continueToPhone = function () {
+          if (navigationStarted) return;
+          navigationStarted = true;
+          if (fallbackTimer != null && typeof window.clearTimeout === 'function') {
+            window.clearTimeout(fallbackTimer);
+          }
+          window.location.href = href;
+        };
+        if (typeof window.setTimeout === 'function') {
+          fallbackTimer = window.setTimeout(continueToPhone, 1000);
+        }
+      }
+
       send('contact_phone_click', { label: phoneLabel });
       sendGoogleEvent('phone_call_click', {
         method: 'phone',
         link_url: href,
         link_text: phoneLabel,
         page_location: window.location.href
-      }, 'phoneClickSendTo');
+      }, 'phoneClickSendTo', continueToPhone ? {
+        event_callback: continueToPhone,
+        event_timeout: 1000
+      } : null);
     }
     else if (/^mailto:/i.test(href)) send('contact_email_click', { label: label || 'E-mail' });
     else if (/google\.[^/]+\/maps|maps\.app\.goo\.gl|goo\.gl\/maps/i.test(href)) send('contact_map_click', { label: label || 'Mapa / adres' });

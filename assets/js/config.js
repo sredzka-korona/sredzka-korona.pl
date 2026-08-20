@@ -16,8 +16,8 @@ window.SREDZKA_CONFIG = {
    * Puste wartosci nie blokuja zdarzen GA4 i nie wysylaja blednej konwersji Ads.
    */
   googleAdsConversions: {
-    phoneClickSendTo: "",
-    contactFormSendTo: "",
+    phoneClickSendTo: "AW-18082369489/XJOoCIns8-QcENGfrK5D",
+    contactFormSendTo: "AW-18082369489/DXE0CI7r8-QcENGfrK5D",
   },
   /** Konfiguracja Firebase Authentication (panel admina) — z konsoli Firebase: Project settings */
   firebaseApiKey: "AIzaSyDvKjj2Lu_aGBFIOId5KU4rONguQMj2sxc",

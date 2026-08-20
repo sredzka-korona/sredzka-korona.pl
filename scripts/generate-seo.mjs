@@ -37,6 +37,7 @@ const urls = [
   "/Hotel/",
   "/catering/",
   "/przyjecia/",
+  "/przyjecia/stypy/",
   "/kontakt/",
   "/dokumenty/",
   "/f-and-q/",
