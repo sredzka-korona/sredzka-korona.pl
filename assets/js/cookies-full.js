@@ -10,7 +10,7 @@
   }
   window.__sredzkaCookieWidgetMounted = true;
 
-  var DOCS_HREF = new URL('../dokumenty/', window.location.href).href;
+  var DOCS_HREF = new URL('/dokumenty/', window.location.origin).href;
   var STYLE_ID = 'sredzka-cookie-widget-style';
   var floatBtn = null;
   var overlay = null;
