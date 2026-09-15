@@ -90,17 +90,18 @@
       sent = true;
     }
 
-    if (hasMarketingConsent()) {
-      var adsConfig = config.googleAdsConversions || {};
-      var destinations = normalizeSendTo(adsConfig[conversionConfigKey]);
-      if (destinations.length) {
-        window.gtag('event', 'conversion', Object.assign({}, eventParams, conversionParams || {}, {
-          send_to: destinations.length === 1 ? destinations[0] : destinations,
-          value: 1.0,
-          currency: 'PLN'
-        }));
-        sent = true;
-      }
+    var adsConfig = config.googleAdsConversions || {};
+    var destinations = normalizeSendTo(adsConfig[conversionConfigKey]);
+    if (destinations.length) {
+      // Google Ads has built-in Consent Mode checks. With ad_storage denied it
+      // sends a cookieless conversion ping instead of storing advertising data.
+      // Gating the event here would prevent both direct and modeled measurement.
+      window.gtag('event', 'conversion', Object.assign({}, eventParams, conversionParams || {}, {
+        send_to: destinations.length === 1 ? destinations[0] : destinations,
+        value: 1.0,
+        currency: 'PLN'
+      }));
+      sent = true;
     }
 
     return sent;
