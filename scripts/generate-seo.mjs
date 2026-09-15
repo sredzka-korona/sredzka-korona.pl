@@ -58,17 +58,9 @@ ${urls
 const robots = `User-agent: *
 Allow: /
 
-Disallow: /admin/
-Disallow: /stats/
 Disallow: /functions/
 Disallow: /worker/
 Disallow: /scripts/
-Disallow: /Hotel/potwierdzenie.html
-Disallow: /Hotel/akceptacja.html
-Disallow: /catering/potwierdzenie.html
-Disallow: /catering/akceptacja.html
-Disallow: /przyjecia/potwierdzenie.html
-Disallow: /przyjecia/akceptacja.html
 
 Sitemap: ${origin}/sitemap.xml
 `;

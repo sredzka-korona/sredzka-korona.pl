@@ -520,6 +520,20 @@
         line-height: 1.4;
       }
 
+      .tile-context-link {
+        margin-top: 0.35rem;
+        color: rgba(255, 255, 255, 0.92);
+        font-size: 0.72rem;
+        line-height: 1.25;
+        text-decoration: underline;
+        text-underline-offset: 0.18em;
+      }
+
+      .tile-context-link:hover,
+      .tile-context-link:focus-visible {
+        color: #ffffff;
+      }
+
       .reservation-info {
         --reservation-nav-offset: -4rem;
         margin: 2rem auto 0;
@@ -2934,7 +2948,7 @@
         <nav class="floating-nav" id="floating-nav">
           <a href="../" class="floating-nav-brand">
             <span class="floating-nav-brand-text">ŚREDZKA</span>
-            <img class="brand-logo" src="../ikony/logo-korona.png" alt="Logo Średzka Korona" loading="lazy" decoding="async" />
+            <img class="brand-logo" src="../ikony/logo-korona-120.webp" width="50" height="50" alt="Logo Średzka Korona" decoding="async" fetchpriority="high" />
             <span class="floating-nav-brand-text">KORONA</span>
           </a>
         </nav>
@@ -2971,6 +2985,7 @@
             <div class="tiles-grid">
               <div class="tile" data-modal="oferta">
                 <div class="tile-label">Oferta</div>
+                <a class="tile-context-link" href="./stypy/">Oferta styp</a>
               </div>
               <div class="tile" data-modal="sale">
                 <div class="tile-label">Sale</div>
@@ -3515,7 +3530,7 @@
             <nav class="floating-nav" id="floating-nav">
               <a href="../" class="floating-nav-brand">
                 <span class="floating-nav-brand-text">ŚREDZKA</span>
-                <img class="brand-logo" src="../ikony/logo-korona.png" alt="Logo Średzka Korona" loading="lazy" decoding="async" />
+                <img class="brand-logo" src="../ikony/logo-korona-120.webp" width="50" height="50" alt="Logo Średzka Korona" decoding="async" fetchpriority="high" />
                 <span class="floating-nav-brand-text">KORONA</span>
               </a>
 
@@ -3529,6 +3544,7 @@
                 <div class="tiles-grid">
                   <div class="tile" data-modal="oferta">
                     <div class="tile-label">Oferta</div>
+                    <a class="tile-context-link" href="./stypy/">Oferta styp</a>
                   </div>
                   <div class="tile" data-modal="sale">
                     <div class="tile-label">Sale</div>
@@ -3638,7 +3654,8 @@
         loadHallGalleries().then(() => {
           // Obsługa kliknięć w kafelki
           document.querySelectorAll(".tile").forEach(tile => {
-            tile.addEventListener("click", () => {
+            tile.addEventListener("click", (event) => {
+              if (event.target.closest("a")) return;
               const modalType = tile.dataset.modal;
               const link = tile.dataset.link;
               if (modalType) {

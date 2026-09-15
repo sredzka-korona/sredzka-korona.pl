@@ -2218,7 +2218,7 @@
               if (action === "settings") {
                 cookieBanner.remove();
                 cookieBanner = null;
-                observeBottomStackLayout();
+                scheduleScrollIndicatorUpdate();
                 openCookiePanel();
                 return;
               }
@@ -2229,7 +2229,7 @@
             });
           });
 
-          observeBottomStackLayout();
+          scheduleScrollIndicatorUpdate();
         }
 
         function renderDocuments(documents) {
