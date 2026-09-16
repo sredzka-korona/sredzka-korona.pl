@@ -10,6 +10,12 @@
   "lang": "pl",
   "icons": [
     {
+      "src": "/ikony/favicon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/ikony/favicon-180x180.png",
       "sizes": "180x180",
       "type": "image/png",

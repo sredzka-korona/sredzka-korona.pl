@@ -1,0 +1,39 @@
+[debug] [2026-09-15T10:10:49.819Z] ----------------------------------------------------------------------
+[debug] [2026-09-15T10:10:49.823Z] Command:       /usr/local/bin/node /usr/local/bin/firebase deploy --only hosting --project sredzka-korona
+[debug] [2026-09-15T10:10:49.823Z] CLI Version:   15.11.0
+[debug] [2026-09-15T10:10:49.823Z] Platform:      darwin
+[debug] [2026-09-15T10:10:49.823Z] Node Version:  v24.12.0
+[debug] [2026-09-15T10:10:49.823Z] Time:          Tue Sep 15 2026 12:10:49 GMT+0200 (Central European Summer Time)
+[debug] [2026-09-15T10:10:49.823Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-09-15T10:10:49.824Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-09-15T10:10:50.524Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-09-15T10:10:50.524Z] > authorizing via signed-in user (igor.janicki27@gmail.com)
+[debug] [2026-09-15T10:10:50.524Z] [iam] checking project sredzka-korona for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-09-15T10:10:50.524Z] Checked if tokens are valid: false, expires at: 1788589798881
+[debug] [2026-09-15T10:10:50.524Z] Checked if tokens are valid: false, expires at: 1788589798881
+[debug] [2026-09-15T10:10:50.524Z] > refreshing access token with scopes: []
+[debug] [2026-09-15T10:10:50.524Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-09-15T10:10:50.525Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-09-15T10:10:50.773Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-09-15T10:10:50.773Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-09-15T10:10:50.787Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/sredzka-korona:testIamPermissions [none]
+[debug] [2026-09-15T10:10:50.788Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/sredzka-korona:testIamPermissions  x-goog-user-project=sredzka-korona
+[debug] [2026-09-15T10:10:50.788Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/sredzka-korona:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-09-15T10:10:50.919Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2026-09-15T10:10:50.919Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2026-09-15T10:10:51.228Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/sredzka-korona:testIamPermissions 403
+[debug] [2026-09-15T10:10:51.229Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/sredzka-korona:testIamPermissions {"error":{"code":403,"message":"Caller does not have required permission to use project sredzka-korona. Grant the caller the roles/serviceusage.serviceUsageConsumer role, or a custom role with the serviceusage.services.use permission, by visiting https://console.developers.google.com/iam-admin/iam?project=sredzka-korona and then retry. Propagation of the new permission may take a few minutes.","status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"USER_PROJECT_DENIED","domain":"googleapis.com","metadata":{"consoleUrl":"https://console.developers.google.com/iam-admin/iam?project=sredzka-korona","service":"cloudresourcemanager.googleapis.com","consumer":"projects/sredzka-korona","containerInfo":"sredzka-korona"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"Caller does not have required permission to use project sredzka-korona. Grant the caller the roles/serviceusage.serviceUsageConsumer role, or a custom role with the serviceusage.services.use permission, by visiting https://console.developers.google.com/iam-admin/iam?project=sredzka-korona and then retry. Propagation of the new permission may take a few minutes."},{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Google developer console IAM admin","url":"https://console.developers.google.com/iam-admin/iam?project=sredzka-korona"}]}]}}
+[debug] [2026-09-15T10:10:51.229Z] [iam] error while checking permissions, command may fail: Request to https://cloudresourcemanager.googleapis.com/v1/projects/sredzka-korona:testIamPermissions had HTTP Error: 403, Caller does not have required permission to use project sredzka-korona. Grant the caller the roles/serviceusage.serviceUsageConsumer role, or a custom role with the serviceusage.services.use permission, by visiting https://console.developers.google.com/iam-admin/iam?project=sredzka-korona and then retry. Propagation of the new permission may take a few minutes.
+[debug] [2026-09-15T10:10:51.230Z] Checked if tokens are valid: true, expires at: 1789470649773
+[debug] [2026-09-15T10:10:51.230Z] Checked if tokens are valid: true, expires at: 1789470649773
+[debug] [2026-09-15T10:10:51.230Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/sredzka-korona [none]
+[debug] [2026-09-15T10:10:51.738Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/sredzka-korona 403
+[debug] [2026-09-15T10:10:51.738Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/sredzka-korona {"error":{"code":403,"message":"The caller does not have permission","status":"PERMISSION_DENIED"}}
+[debug] [2026-09-15T10:10:51.738Z] Request to https://firebase.googleapis.com/v1beta1/projects/sredzka-korona had HTTP Error: 403, The caller does not have permission
+[debug] [2026-09-15T10:10:51.904Z] FirebaseError: Request to https://firebase.googleapis.com/v1beta1/projects/sredzka-korona had HTTP Error: 403, The caller does not have permission
+    at responseToError (/usr/local/lib/node_modules/firebase-tools/lib/responseToError.js:53:12)
+    at RetryOperation._fn (/usr/local/lib/node_modules/firebase-tools/lib/apiv2.js:333:77)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[error] 
+[error] Error: Failed to get Firebase project sredzka-korona. Please make sure the project exists and your account has permission to access it.
