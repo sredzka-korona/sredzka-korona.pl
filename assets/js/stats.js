@@ -6,9 +6,8 @@
   var apiBase = isLocalPreview ? window.location.origin : String(config.apiBase || '').replace(/\/$/, '');
   var dom = {
     loginWrap: document.getElementById('loginWrap'), loginForm: document.getElementById('loginForm'),
-    password: document.getElementById('statsPassword'), loginButton: document.getElementById('loginButton'),
-    loginError: document.getElementById('loginError'), captchaWrap: document.getElementById('captchaWrap'),
-    captchaHost: document.getElementById('statsTurnstile'), captchaStatus: document.getElementById('captchaStatus'),
+    email: document.getElementById('statsEmail'), password: document.getElementById('statsPassword'),
+    loginButton: document.getElementById('loginButton'), loginError: document.getElementById('loginError'),
     dashboard: document.getElementById('dashboard'), refresh: document.getElementById('refreshButton'),
     logout: document.getElementById('logoutButton'), tabs: document.getElementById('statsTabs'),
     ranges: document.getElementById('rangeButtons'), summaryLine: document.getElementById('summaryLine'),
@@ -36,8 +35,7 @@
     contact_form_submit: 'Wysłanie formularza'
   };
   var state = {
-    range: '7', data: null, activeTab: 'summary', sitemap: null, captchaRequired: false,
-    captchaToken: '', captchaWidget: null, blockedUntil: 0, blockTimer: null,
+    range: '7', data: null, activeTab: 'summary', sitemap: null,
     visible: { visit: true, phone: true, address: true, email: true, form: true }
   };
 
@@ -55,13 +53,31 @@
   function rangeLabel() {
     return state.range === '7' ? 'ostatnie 7 dni' : state.range === 'miesiac' ? 'ostatnie 30 dni' : state.range === 'rok' ? 'ostatni rok' : 'cała historia';
   }
+  function mapFirebaseError(error) {
+    var code = error && error.code || '';
+    if (code === 'auth/invalid-email') return 'Nieprawidłowy adres e-mail.';
+    if (code === 'auth/user-disabled') return 'To konto zostało wyłączone.';
+    if (['auth/user-not-found', 'auth/wrong-password', 'auth/invalid-credential'].includes(code)) return 'Nieprawidłowy e-mail lub hasło.';
+    if (code === 'auth/too-many-requests') return 'Zbyt wiele prób logowania. Spróbuj później.';
+    if (code === 'auth/network-request-failed') return 'Brak połączenia z Firebase. Sprawdź sieć.';
+    return error && error.message || 'Logowanie nie powiodło się.';
+  }
   async function fetchJson(path, options) {
-    var response = await fetch(apiBase + path, Object.assign({ credentials: 'include' }, options || {}));
+    var user = firebase.auth().currentUser;
+    if (!user) {
+      var authError = new Error('Brak autoryzacji.');
+      authError.status = 401;
+      throw authError;
+    }
+    var token = await user.getIdToken();
+    var requestOptions = Object.assign({ credentials: 'include', cache: 'no-store' }, options || {});
+    requestOptions.headers = Object.assign({ Authorization: 'Bearer ' + token }, requestOptions.headers || {});
+    var response = await fetch(apiBase + path, requestOptions);
     var payload = await response.json().catch(function () { return {}; });
     if (!response.ok) {
       var error = new Error(payload.error || 'Żądanie nie powiodło się.');
+      error.status = response.status;
       error.code = payload.code || '';
-      error.retryAfterSeconds = Number(payload.retryAfterSeconds) || 0;
       throw error;
     }
     return payload;
@@ -73,49 +89,9 @@
     dom.logout.hidden = !value;
   }
   function setError(message) { dom.loginError.textContent = message || ''; }
-  function setCaptcha(required) {
-    state.captchaRequired = Boolean(required);
-    dom.captchaWrap.classList.toggle('is-visible', state.captchaRequired);
-    if (required) ensureCaptcha();
-    else { state.captchaToken = ''; dom.captchaStatus.textContent = ''; }
-  }
-  function ensureCaptcha(attempt) {
-    if (!state.captchaRequired) return;
-    if (!window.turnstile || typeof window.turnstile.render !== 'function') {
-      if ((attempt || 0) < 30) window.setTimeout(function () { ensureCaptcha((attempt || 0) + 1); }, 200);
-      else dom.captchaStatus.textContent = 'Nie udało się załadować CAPTCHA. Odśwież stronę.';
-      return;
-    }
-    if (state.captchaWidget !== null) return;
-    var siteKey = String(config.turnstileSiteKey || '');
-    if (!siteKey) { dom.captchaStatus.textContent = 'Brak konfiguracji CAPTCHA.'; return; }
-    state.captchaWidget = window.turnstile.render(dom.captchaHost, {
-      sitekey: siteKey,
-      callback: function (token) { state.captchaToken = token; dom.captchaStatus.textContent = ''; },
-      'expired-callback': function () { state.captchaToken = ''; dom.captchaStatus.textContent = 'CAPTCHA wygasła.'; },
-      'error-callback': function () { state.captchaToken = ''; dom.captchaStatus.textContent = 'Błąd CAPTCHA. Spróbuj ponownie.'; }
-    });
-  }
-  function resetCaptcha() {
-    state.captchaToken = '';
-    if (state.captchaWidget !== null && window.turnstile) {
-      try { window.turnstile.reset(state.captchaWidget); } catch (error) {}
-    }
-  }
-  function startBlock(seconds) {
-    state.blockedUntil = Date.now() + Math.max(1, Number(seconds) || 600) * 1000;
-    if (state.blockTimer) window.clearInterval(state.blockTimer);
-    function update() {
-      var left = Math.ceil((state.blockedUntil - Date.now()) / 1000);
-      if (left <= 0) { window.clearInterval(state.blockTimer); state.blockTimer = null; state.blockedUntil = 0; setError(''); return; }
-      setError('Zbyt wiele błędnych prób. Kolejna próba za ' + left + ' s.');
-    }
-    update();
-    state.blockTimer = window.setInterval(update, 1000);
-  }
   async function loadStats() {
     state.data = await fetchJson('/api/stats/data?range=' + encodeURIComponent(state.range));
-    setLoggedIn(true); setCaptcha(false); setError(''); render();
+    setLoggedIn(true); setError(''); render();
   }
 
   function renderMetrics() {
@@ -247,25 +223,22 @@
   function render() { renderMetrics(); renderSeriesButtons(); renderChart(); renderEvents(); renderPages(); selectTab(state.activeTab); }
 
   dom.loginForm.addEventListener('submit', async function (event) {
-    event.preventDefault(); if (state.blockedUntil > Date.now()) return;
-    if (state.captchaRequired && !state.captchaToken) { dom.captchaStatus.textContent = 'Potwierdź CAPTCHA.'; return; }
+    event.preventDefault();
     dom.loginButton.disabled = true; setError('');
     try {
-      await fetchJson('/api/stats/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: dom.password.value, turnstileToken: state.captchaToken }) });
-      dom.password.value = ''; await loadStats();
+      await firebase.auth().signInWithEmailAndPassword(String(dom.email.value || '').trim(), dom.password.value);
+      dom.password.value = '';
     } catch (error) {
-      if (['captcha_required','captcha_invalid'].includes(error.code)) { setCaptcha(true); resetCaptcha(); dom.captchaStatus.textContent = error.message; }
-      else if (error.code === 'blocked') { setCaptcha(true); resetCaptcha(); startBlock(error.retryAfterSeconds || 600); }
-      else setError(error.message);
+      setError(mapFirebaseError(error));
     } finally { dom.loginButton.disabled = false; }
   });
-  dom.logout.addEventListener('click', async function () { await fetchJson('/api/stats/auth', { method: 'DELETE' }).catch(function () {}); state.data = null; state.sitemap = null; setLoggedIn(false); setError(''); });
-  dom.refresh.addEventListener('click', async function () { dom.refresh.disabled = true; try { await loadStats(); } catch (error) { setError(error.message); if (error.message === 'Brak autoryzacji.') setLoggedIn(false); } finally { dom.refresh.disabled = false; } });
+  dom.logout.addEventListener('click', async function () { await firebase.auth().signOut().catch(function () {}); });
+  dom.refresh.addEventListener('click', async function () { dom.refresh.disabled = true; try { await loadStats(); } catch (error) { setError(error.message); if (error.status === 401) await firebase.auth().signOut(); } finally { dom.refresh.disabled = false; } });
   dom.tabs.addEventListener('click', function (event) { var button = event.target.closest('[data-tab]'); if (button) selectTab(button.dataset.tab); });
   dom.ranges.addEventListener('click', async function (event) {
     var button = event.target.closest('[data-range]'); if (!button || button.dataset.range === state.range) return;
     state.range = button.dataset.range; dom.ranges.querySelectorAll('[data-range]').forEach(function (item) { item.classList.toggle('is-active', item === button); });
-    try { await loadStats(); } catch (error) { setError(error.message); setLoggedIn(false); }
+    try { await loadStats(); } catch (error) { setError(error.message); if (error.status === 401) await firebase.auth().signOut(); }
   });
   dom.seriesButtons.addEventListener('click', function (event) {
     var button = event.target.closest('[data-series]'); if (!button) return;
@@ -274,8 +247,34 @@
     renderSeriesButtons(); renderChart();
   });
 
-  loadStats().catch(function (error) {
-    setLoggedIn(false);
-    if (error.message !== 'Brak autoryzacji.') setError(error.message);
-  });
+  function bootstrapAuth() {
+    if (typeof firebase === 'undefined' || !config.firebaseApiKey || !config.firebaseProjectId) {
+      setLoggedIn(false);
+      setError('Brak konfiguracji Firebase Authentication.');
+      dom.loginButton.disabled = true;
+      return;
+    }
+    if (!firebase.apps.length) {
+      firebase.initializeApp({
+        apiKey: config.firebaseApiKey,
+        authDomain: config.firebaseAuthDomain || config.firebaseProjectId + '.firebaseapp.com',
+        projectId: config.firebaseProjectId
+      });
+    }
+    firebase.auth().onAuthStateChanged(async function (user) {
+      if (!user) {
+        state.data = null; state.sitemap = null; setLoggedIn(false);
+        return;
+      }
+      try {
+        await loadStats();
+      } catch (error) {
+        await firebase.auth().signOut().catch(function () {});
+        setLoggedIn(false);
+        setError(error.message || 'To konto nie ma dostępu do statystyk.');
+      }
+    });
+  }
+
+  bootstrapAuth();
 })();

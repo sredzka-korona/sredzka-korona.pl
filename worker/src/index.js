@@ -35,7 +35,7 @@ export default {
         url,
         respond: (data, status = 200, headers = {}) => jsonResponse(data, status, request, env, headers),
         assertPublic: () => assertBrowserLikePublicRequest(request, url),
-        verifyCaptcha: (token) => verifyTurnstile(token, request, env),
+        requireAdmin: () => requireFirebaseAdmin(request, env),
         allowedOrigins: () => allowedOrigins(env),
       });
       if (statsResponse) {

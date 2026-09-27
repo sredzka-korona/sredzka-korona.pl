@@ -19,7 +19,7 @@ window.SREDZKA_CONFIG = {
     phoneClickSendTo: "AW-18082369489/XJOoCIns8-QcENGfrK5D",
     contactFormSendTo: "AW-18082369489/DXE0CI7r8-QcENGfrK5D",
   },
-  /** Konfiguracja Firebase Authentication (panel admina) — z konsoli Firebase: Project settings */
+  /** Konfiguracja Firebase Authentication (panel admina i statystyki) — z konsoli Firebase: Project settings */
   firebaseApiKey: "AIzaSyDvKjj2Lu_aGBFIOId5KU4rONguQMj2sxc",
   firebaseAuthDomain: "sredzka-korona.firebaseapp.com",
   firebaseProjectId: "sredzka-korona",

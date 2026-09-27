@@ -1,9 +1,3 @@
-const STATS_COOKIE_NAME = "sredzka_stats_session";
-const STATS_SESSION_SECONDS = 12 * 60 * 60;
-const CAPTCHA_AFTER_FAILURES = 3;
-const BLOCK_AFTER_FAILURES = 6;
-const BLOCK_DURATION_MS = 10 * 60 * 1000;
-const ATTEMPT_TTL_MS = 24 * 60 * 60 * 1000;
 const ALL_RANGE_DAYS = -1;
 
 const ALLOWED_EVENT_TYPES = new Set([
@@ -43,10 +37,9 @@ const SITEMAP_ITEMS = [
   { url: "/przyjecia/akceptacja/", label: "Akceptacja rezerwacji przyjęcia", robots: "noindex, nofollow", indexed: false, inSitemap: false },
 ];
 
-const loginAttempts = new Map();
 let statsSchemaPromise = null;
 
-export async function handleStatsApi({ request, env, url, respond, assertPublic, verifyCaptcha, allowedOrigins }) {
+export async function handleStatsApi({ request, env, url, respond, assertPublic, requireAdmin, allowedOrigins }) {
   const pathname = url.pathname.replace(/\/+$/, "") || "/";
 
   if (pathname === "/api/public/track" && request.method === "POST") {
@@ -76,71 +69,15 @@ export async function handleStatsApi({ request, env, url, respond, assertPublic,
     return respond({ ok: true, id: event.id, deduplicated: Number(result.meta?.changes || 0) === 0 }, 200, noStore());
   }
 
-  if (pathname === "/api/stats/auth" && request.method === "POST") {
-    assertAllowedOrigin(request, allowedOrigins());
-    requireStatsPassword(env);
-    const status = getLoginStatus(request);
-    if (status.isBlocked) {
-      throw httpError(429, `Za dużo błędnych prób. Spróbuj ponownie za ${status.retryAfterSeconds} s.`, {
-        code: "blocked",
-        retryAfterSeconds: status.retryAfterSeconds,
-      });
-    }
-
-    const payload = await readJson(request);
-    if (status.requiresCaptcha) {
-      const captchaOk = await verifyCaptcha(String(payload.turnstileToken || ""));
-      if (!captchaOk) {
-        throw httpError(403, "Potwierdź CAPTCHA przed kolejną próbą.", { code: "captcha_required" });
-      }
-    }
-
-    const provided = String(payload.password || "");
-    const expected = getStatsPassword(env);
-    if (!provided || !(await secureStringEqual(provided, expected))) {
-      const next = registerLoginFailure(request);
-      if (next.isBlocked) {
-        throw httpError(429, "Za dużo błędnych prób. Logowanie z tego adresu zostało zablokowane na 10 minut.", {
-          code: "blocked",
-          retryAfterSeconds: next.retryAfterSeconds,
-        });
-      }
-      if (next.requiresCaptcha) {
-        throw httpError(401, "Nieprawidłowe hasło. Przed kolejną próbą potwierdź CAPTCHA.", {
-          code: "captcha_required",
-          failures: next.failures,
-        });
-      }
-      throw httpError(401, "Nieprawidłowe hasło.", { code: "invalid_password", failures: next.failures });
-    }
-
-    resetLoginState(request);
-    const token = await createSessionToken(env);
-    return respond({ ok: true }, 200, {
-      ...noStore(),
-      "Set-Cookie": buildSessionCookie(token, STATS_SESSION_SECONDS, url),
-    });
-  }
-
-  if (pathname === "/api/stats/auth" && request.method === "DELETE") {
-    assertAllowedOrigin(request, allowedOrigins());
-    return respond({ ok: true }, 200, {
-      ...noStore(),
-      "Set-Cookie": buildSessionCookie("", 0, url),
-    });
-  }
-
   if (pathname === "/api/stats/data" && request.method === "GET") {
-    requireStatsPassword(env);
-    if (!(await isAuthorized(request, env))) throw httpError(401, "Brak autoryzacji.");
+    await requireAdmin();
     await ensureStatsSchema(env);
     const rangeDays = parseRangeDays(url.searchParams.get("range"));
     return respond(await buildStatsPayload(env, rangeDays), 200, noStore());
   }
 
   if (pathname === "/api/stats/sitemap" && request.method === "GET") {
-    requireStatsPassword(env);
-    if (!(await isAuthorized(request, env))) throw httpError(401, "Brak autoryzacji.");
+    await requireAdmin();
     return respond(SITEMAP_ITEMS, 200, noStore());
   }
 
@@ -319,134 +256,6 @@ function parseRangeDays(value) {
   if (["365", "rok", "year"].includes(normalized)) return 365;
   if (["all", "zawsze", "alltime"].includes(normalized)) return ALL_RANGE_DAYS;
   return 7;
-}
-
-function getStatsPassword(env) {
-  return String(env.STATS_ACCESS_PASSWORD || "").trim();
-}
-
-function requireStatsPassword(env) {
-  if (!getStatsPassword(env)) throw httpError(500, "Brak konfiguracji hasła statystyk.");
-}
-
-function getRequestIp(request) {
-  return request.headers.get("CF-Connecting-IP") || request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() || "unknown";
-}
-
-function getLoginState(request) {
-  const now = Date.now();
-  for (const [key, state] of loginAttempts) {
-    if (now - state.updatedAt > ATTEMPT_TTL_MS) loginAttempts.delete(key);
-  }
-  const ip = getRequestIp(request);
-  let state = loginAttempts.get(ip);
-  if (!state) {
-    state = { failures: 0, blockedUntil: 0, updatedAt: now };
-    loginAttempts.set(ip, state);
-  }
-  if (state.blockedUntil && state.blockedUntil <= now) {
-    state.failures = 0;
-    state.blockedUntil = 0;
-  }
-  state.updatedAt = now;
-  return state;
-}
-
-function getLoginStatus(request) {
-  const state = getLoginState(request);
-  const retryAfterSeconds = state.blockedUntil > Date.now() ? Math.max(1, Math.ceil((state.blockedUntil - Date.now()) / 1000)) : 0;
-  return {
-    failures: state.failures,
-    isBlocked: retryAfterSeconds > 0,
-    requiresCaptcha: state.failures >= CAPTCHA_AFTER_FAILURES,
-    retryAfterSeconds,
-  };
-}
-
-function registerLoginFailure(request) {
-  const state = getLoginState(request);
-  state.failures += 1;
-  if (state.failures >= BLOCK_AFTER_FAILURES) state.blockedUntil = Date.now() + BLOCK_DURATION_MS;
-  return getLoginStatus(request);
-}
-
-function resetLoginState(request) {
-  const state = getLoginState(request);
-  state.failures = 0;
-  state.blockedUntil = 0;
-}
-
-async function createSessionToken(env) {
-  const payload = base64UrlEncode(new TextEncoder().encode(JSON.stringify({ exp: Date.now() + STATS_SESSION_SECONDS * 1000 })));
-  return `${payload}.${await sign(payload, sessionSecret(env))}`;
-}
-
-async function isAuthorized(request, env) {
-  const token = parseCookies(request.headers.get("Cookie") || "")[STATS_COOKIE_NAME] || "";
-  const [payload, signature] = token.split(".");
-  if (!payload || !signature) return false;
-  const expected = await sign(payload, sessionSecret(env));
-  if (!(await secureStringEqual(signature, expected))) return false;
-  try {
-    const parsed = JSON.parse(new TextDecoder().decode(base64UrlDecode(payload)));
-    return Number(parsed.exp) > Date.now();
-  } catch {
-    return false;
-  }
-}
-
-function sessionSecret(env) {
-  return String(env.STATS_SESSION_SECRET || getStatsPassword(env));
-}
-
-async function sign(value, secret) {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
-  return base64UrlEncode(new Uint8Array(signature));
-}
-
-async function secureStringEqual(left, right) {
-  const [leftHash, rightHash] = await Promise.all([
-    crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(left))),
-    crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(right))),
-  ]);
-  const a = new Uint8Array(leftHash);
-  const b = new Uint8Array(rightHash);
-  let diff = a.length ^ b.length;
-  for (let index = 0; index < Math.min(a.length, b.length); index += 1) diff |= a[index] ^ b[index];
-  return diff === 0;
-}
-
-function base64UrlEncode(bytes) {
-  let binary = "";
-  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
-}
-
-function base64UrlDecode(value) {
-  const base64 = value.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
-  const binary = atob(base64);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-}
-
-function buildSessionCookie(value, maxAge, url) {
-  const parts = [
-    `${STATS_COOKIE_NAME}=${encodeURIComponent(value)}`,
-    "Path=/api/stats",
-    "HttpOnly",
-    `Max-Age=${Math.max(0, Number(maxAge) || 0)}`,
-  ];
-  if (url.protocol === "https:") parts.push("SameSite=None", "Secure");
-  else parts.push("SameSite=Lax");
-  return parts.join("; ");
-}
-
-function parseCookies(header) {
-  return String(header || "").split(";").reduce((result, part) => {
-    const [key, ...rest] = part.trim().split("=");
-    if (key) result[key] = decodeURIComponent(rest.join("=") || "");
-    return result;
-  }, {});
 }
 
 function assertAllowedOrigin(request, origins) {
