@@ -1262,10 +1262,6 @@
         var ANALYTICS_GOOGLE_TAG_IDS = ['G-6ENY27XX0B'];
         var googleScriptLoaded = false;
         var configuredGoogleTagIds = {};
-        var currentConsentState = {
-          analytics: false,
-          marketing: false
-        };
 
         window.dataLayer = window.dataLayer || [];
         window.gtag = window.gtag || function(){window.dataLayer.push(arguments);};
@@ -1316,9 +1312,9 @@
           window.gtag('js', new Date());
         }
 
-        function configureGoogleTags(tagIds, force) {
+        function configureGoogleTags(tagIds) {
           tagIds.forEach(function(id) {
-            if (configuredGoogleTagIds[id] && !force) {
+            if (configuredGoogleTagIds[id]) {
               return;
             }
             configuredGoogleTagIds[id] = true;
@@ -1326,9 +1322,9 @@
           });
         }
 
-        function activateGoogleTags(forceConfig) {
+        function activateGoogleTags() {
           ensureGoogleTagsLoaded(getPrimaryGoogleTagId());
-          configureGoogleTags(getAllGoogleTagIds(), !!forceConfig);
+          configureGoogleTags(getAllGoogleTagIds());
         }
 
         window.sredzkaGoogleConsent = {
@@ -1337,16 +1333,8 @@
               analytics: !!analytics,
               marketing: !!marketing
             };
-            var previousConsent = {
-              analytics: currentConsentState.analytics,
-              marketing: currentConsentState.marketing
-            };
-            currentConsentState = nextConsent;
-
-            var enabledNewTagCategory = (!previousConsent.analytics && nextConsent.analytics) || (!previousConsent.marketing && nextConsent.marketing);
-
             applyConsentUpdate(nextConsent.analytics, nextConsent.marketing);
-            activateGoogleTags(enabledNewTagCategory);
+            activateGoogleTags();
           },
           grant: function(analytics, marketing) {
             if (typeof analytics === 'undefined' && typeof marketing === 'undefined') {
@@ -1373,7 +1361,7 @@
         } catch(e) {}
 
         if (!storedConsentApplied) {
-          activateGoogleTags(false);
+          activateGoogleTags();
         }
 
         function buildBanner() {
