@@ -10,6 +10,7 @@ window.SREDZKA_CONFIG = {
    */
   enableOnlineBookings: true,
   turnstileSiteKey: "0x4AAAAAACyIQzt5qiD-IVXQ",
+  googleAnalyticsMeasurementId: "G-6ENY27XX0B",
   /**
    * Cele Google Ads tworzone dla witryny. Wklej pelne wartosci `send_to`
    * z fragmentow zdarzen Google Ads, np. AW-123456789/AbCdEfGhIjK.

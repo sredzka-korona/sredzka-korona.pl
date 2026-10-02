@@ -85,8 +85,11 @@
     var sent = false;
     var eventParams = Object.assign({}, params || {});
 
-    if (hasAnalyticsConsent()) {
-      window.gtag('event', eventName, eventParams);
+    var analyticsDestination = String(config.googleAnalyticsMeasurementId || '').trim();
+    if (hasAnalyticsConsent() && /^G-[A-Z0-9]+$/.test(analyticsDestination)) {
+      window.gtag('event', eventName, Object.assign({}, eventParams, {
+        send_to: analyticsDestination
+      }));
       sent = true;
     }
 
@@ -198,7 +201,16 @@
         event_timeout: 1000
       } : null);
     }
-    else if (/^mailto:/i.test(href)) send('contact_email_click', { label: label || 'E-mail' });
+    else if (/^mailto:/i.test(href)) {
+      var emailLabel = label || 'E-mail';
+      send('contact_email_click', { label: emailLabel });
+      sendGoogleEvent('email_click', {
+        method: 'email',
+        link_url: href,
+        link_text: emailLabel,
+        page_location: window.location.href
+      });
+    }
     else if (/google\.[^/]+\/maps|maps\.app\.goo\.gl|goo\.gl\/maps/i.test(href)) send('contact_map_click', { label: label || 'Mapa / adres' });
   }, true);
 
