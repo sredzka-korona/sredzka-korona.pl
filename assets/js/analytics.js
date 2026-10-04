@@ -100,9 +100,7 @@
       // sends a cookieless conversion ping instead of storing advertising data.
       // Gating the event here would prevent both direct and modeled measurement.
       window.gtag('event', 'conversion', Object.assign({}, eventParams, conversionParams || {}, {
-        send_to: destinations.length === 1 ? destinations[0] : destinations,
-        value: 1.0,
-        currency: 'PLN'
+        send_to: destinations.length === 1 ? destinations[0] : destinations
       }));
       sent = true;
     }
@@ -203,13 +201,40 @@
     }
     else if (/^mailto:/i.test(href)) {
       var emailLabel = label || 'E-mail';
+      var emailDestinations = normalizeSendTo((config.googleAdsConversions || {}).emailClickSendTo);
+      var shouldWaitForEmailAds = emailDestinations.length > 0 && typeof window.gtag === 'function' && typeof event.preventDefault === 'function';
+      var continueToEmail = null;
+
+      if (shouldWaitForEmailAds) {
+        event.preventDefault();
+        var emailNavigationStarted = false;
+        var emailFallbackTimer = null;
+        continueToEmail = function () {
+          if (emailNavigationStarted) return;
+          emailNavigationStarted = true;
+          if (emailFallbackTimer != null && typeof window.clearTimeout === 'function') {
+            window.clearTimeout(emailFallbackTimer);
+          }
+          window.location.href = href;
+        };
+        if (typeof window.setTimeout === 'function') {
+          emailFallbackTimer = window.setTimeout(continueToEmail, 1000);
+        }
+      }
+
       send('contact_email_click', { label: emailLabel });
       sendGoogleEvent('email_click', {
         method: 'email',
         link_url: href,
         link_text: emailLabel,
         page_location: window.location.href
-      });
+      }, 'emailClickSendTo', Object.assign({
+        value: 1.0,
+        currency: 'PLN'
+      }, continueToEmail ? {
+        event_callback: continueToEmail,
+        event_timeout: 1000
+      } : {}));
     }
     else if (/google\.[^/]+\/maps|maps\.app\.goo\.gl|goo\.gl\/maps/i.test(href)) send('contact_map_click', { label: label || 'Mapa / adres' });
   }, true);

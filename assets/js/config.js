@@ -18,6 +18,7 @@ window.SREDZKA_CONFIG = {
    */
   googleAdsConversions: {
     phoneClickSendTo: "AW-18082369489/XJOoCIns8-QcENGfrK5D",
+    emailClickSendTo: "AW-18082369489/5SiACOjLgZEdENGfrK5D",
     contactFormSendTo: "AW-18082369489/DXE0CI7r8-QcENGfrK5D",
   },
   /** Konfiguracja Firebase Authentication (panel admina i statystyki) — z konsoli Firebase: Project settings */
