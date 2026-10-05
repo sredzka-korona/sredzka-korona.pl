@@ -38,6 +38,64 @@
           ".validate": false
         }
       }
+    },
+    "contactTickets": {
+      "$ticket_id": {
+        ".read": false,
+        ".write": "!data.exists() && newData.exists()",
+        ".validate": "$ticket_id.matches(/^SK-[0-9]{8}-[0-9]{6,20}$/) && newData.hasChildren(['ticketNumber', 'submittedAt', 'submittedAtLocal', 'submittedDate', 'submittedTime', 'timeZone', 'source', 'status', 'form']) && newData.child('ticketNumber').val() === $ticket_id",
+        "ticketNumber": {
+          ".validate": "newData.isString() && newData.val() === $ticket_id"
+        },
+        "submittedAt": {
+          ".validate": "newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z$/)"
+        },
+        "submittedAtLocal": {
+          ".validate": "newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/)"
+        },
+        "submittedDate": {
+          ".validate": "newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2}$/)"
+        },
+        "submittedTime": {
+          ".validate": "newData.isString() && newData.val().matches(/^\\d{2}:\\d{2}:\\d{2}$/)"
+        },
+        "timeZone": {
+          ".validate": "newData.isString() && newData.val() === 'Europe/Warsaw'"
+        },
+        "source": {
+          ".validate": "newData.isString() && newData.val() === 'contact_form'"
+        },
+        "status": {
+          ".validate": "newData.isString() && newData.val() === 'new'"
+        },
+        "form": {
+          ".validate": "newData.hasChildren(['fullName', 'email', 'phone', 'eventType', 'preferredDate', 'message'])",
+          "fullName": {
+            ".validate": "newData.isString() && newData.val().length >= 2 && newData.val().length <= 120"
+          },
+          "email": {
+            ".validate": "newData.isString() && newData.val().length <= 254 && newData.val().matches(/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/)"
+          },
+          "phone": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "eventType": {
+            ".validate": "newData.isString() && newData.val().length <= 120"
+          },
+          "preferredDate": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "message": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 5000"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
     }
   }
 }
