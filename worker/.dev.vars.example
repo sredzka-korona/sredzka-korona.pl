@@ -5,7 +5,8 @@
 TURNSTILE_SECRET=
 FIREBASE_DATABASE_URL=https://sredzka-korona-default-rtdb.europe-west1.firebasedatabase.app/
 
-# Opcjonalnie, gdy reguly Realtime Database nie pozwalaja na zapis bez autoryzacji.
+# Wymagane do automatycznej retencji (odczyt i usuwanie starych rekordow RTDB).
+# Nie udzielaj publicznego odczytu ani usuwania w regulach.
 # Najbezpieczniej ustawic jako sekrety Cloudflare, nie w repo:
 # FIREBASE_SERVICE_ACCOUNT_EMAIL=
 # FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"

@@ -76,6 +76,8 @@ async function appendVenueAudit(db, payload) {
   });
 }
 
+const { pruneAuditLogs } = require('./lib/dataRetention');
+
 exports.hallExpireCron = onSchedule(
   {
     schedule: "every 15 minutes",
@@ -148,6 +150,7 @@ exports.hallExpireCron = onSchedule(
       }
     }
 
+    await pruneAuditLogs(db, 'venueAuditLog', now.toMillis());
     return null;
   }
 );

@@ -23,6 +23,7 @@ const {
 const { ensureFormattedReservationNumber, formatHumanReservationNumber } = require("./lib/humanNumber");
 
 const { checkRateLimit } = require("./lib/rateLimit");
+const { pruneAuditLogs } = require("./lib/dataRetention");
 const { checkSpamBlock, setSpamBlock } = require("./lib/bookingSpamBlock");
 const {
   SESSION_MS,
@@ -1128,6 +1129,7 @@ exports.hotelExpireCron = onSchedule(
       }
     }
 
+    await pruneAuditLogs(db, 'hotelAuditLog', now.toMillis());
     return null;
   }
 );

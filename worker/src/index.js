@@ -2,6 +2,7 @@ import { DEFAULT_CONTENT } from "./default-content.js";
 import { parseAdminEmailAllowlist, verifyFirebaseIdToken } from "./firebase-verify.js";
 import { handleD1BookingApi, runBookingMaintenance, sendContactFormAdminEmail, upsertConsentEmail } from "./booking-d1.js";
 import { handleStatsApi } from "./stats.js";
+import { runDataRetention } from "./retention.js";
 
 const MAX_MEDIA_FILE_BYTES = 1_700_000;
 const BOOTSTRAP_EDGE_CACHE_TTL_MS = 30 * 1000;
@@ -430,6 +431,26 @@ export default {
   async scheduled(controller, env, ctx) {
     ctx.waitUntil(
       (async () => {
+        if (controller.cron === '7 * * * *') {
+          const result = await runDataRetention(env, async (path, options = {}) => {
+            const url = firebaseRealtimeDatabaseUrl(env, path);
+            const token = url.searchParams.has('auth') ? '' : await getFirebaseDatabaseBearerToken(env);
+            if (!url.searchParams.has('auth') && !token) {
+              throw new Error('Retencja Firebase wymaga konta uslugowego lub tokenu administracyjnego RTDB.');
+            }
+            for (const [key, value] of Object.entries(options.query || {})) url.searchParams.set(key, value);
+            const response = await fetch(url, {
+              method: options.method || 'GET',
+              headers: { ...options.headers, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            });
+            if (!response.ok && !(options.method === 'DELETE' && response.status === 412)) {
+              throw new Error(`Firebase retention HTTP ${response.status}`);
+            }
+            return response;
+          });
+          console.log('Data retention completed', result);
+          return;
+        }
         const result = await runBookingMaintenance(env);
         console.log("Booking maintenance completed", {
           cron: controller.cron || "",
@@ -1997,7 +2018,7 @@ async function createGoogleServiceAccountJwt({ clientEmail, privateKey, issuedAt
   const header = { alg: "RS256", typ: "JWT" };
   const payload = {
     iss: clientEmail,
-    scope: "https://www.googleapis.com/auth/firebase.database",
+    scope: "https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email",
     aud: "https://oauth2.googleapis.com/token",
     iat: issuedAt,
     exp: issuedAt + 3600,

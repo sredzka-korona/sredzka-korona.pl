@@ -38,6 +38,7 @@
           allIds.forEach(function (id) {
             if (!id || configuredGoogleTagIds[id]) return;
             configuredGoogleTagIds[id] = true;
+            window.gtag("set", window.sredzkaCookieConsent.googleCookieOptions());
             window.gtag("config", id);
           });
         }

@@ -40,6 +40,19 @@ CREATE INDEX IF NOT EXISTS idx_analytics_events_created_at ON analytics_events(c
 CREATE INDEX IF NOT EXISTS idx_analytics_events_type_created ON analytics_events(type, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_analytics_events_page_created ON analytics_events(section, page, created_at DESC);
 
+-- Anonymous daily counts kept for /stats after raw events expire (90 days).
+CREATE TABLE IF NOT EXISTS analytics_daily (
+  day TEXT NOT NULL,
+  type TEXT NOT NULL,
+  page TEXT NOT NULL,
+  label TEXT NOT NULL,
+  section TEXT NOT NULL,
+  path TEXT NOT NULL,
+  count INTEGER NOT NULL,
+  PRIMARY KEY (day, type, page, label, section, path)
+);
+CREATE INDEX IF NOT EXISTS idx_contact_submissions_created_at ON contact_submissions(created_at);
+
 CREATE TABLE IF NOT EXISTS client_consent_emails (
   email TEXT PRIMARY KEY,
   first_name TEXT NOT NULL DEFAULT '',

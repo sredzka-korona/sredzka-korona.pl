@@ -39,6 +39,32 @@ const SITEMAP_ITEMS = [
 
 let statsSchemaPromise = null;
 
+export const STATS_DAILY_SCHEMA = `CREATE TABLE IF NOT EXISTS analytics_daily (
+  day TEXT NOT NULL,
+  type TEXT NOT NULL,
+  page TEXT NOT NULL,
+  label TEXT NOT NULL,
+  section TEXT NOT NULL,
+  path TEXT NOT NULL,
+  count INTEGER NOT NULL,
+  PRIMARY KEY (day, type, page, label, section, path)
+)`;
+
+// Both statements run in one D1 transaction. A retry cannot count events twice.
+export async function archiveStatsEvents(env, cutoff) {
+  await ensureStatsSchema(env);
+  const results = await env.DB.batch([
+    env.DB.prepare(`INSERT INTO analytics_daily (day, type, page, label, section, path, count)
+      SELECT substr(created_at, 1, 10), type, page, label, section, path, COUNT(*)
+      FROM analytics_events WHERE created_at <= ?
+      GROUP BY substr(created_at, 1, 10), type, page, label, section, path
+      ON CONFLICT (day, type, page, label, section, path)
+      DO UPDATE SET count = analytics_daily.count + excluded.count`).bind(cutoff),
+    env.DB.prepare('DELETE FROM analytics_events WHERE created_at <= ?').bind(cutoff),
+  ]);
+  return Number(results[1].meta?.changes || 0);
+}
+
 export async function handleStatsApi({ request, env, url, respond, assertPublic, requireAdmin, allowedOrigins }) {
   const pathname = url.pathname.replace(/\/+$/, "") || "/";
 
@@ -103,6 +129,7 @@ async function ensureStatsSchema(env) {
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_analytics_events_created_at ON analytics_events(created_at DESC)").run();
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_analytics_events_type_created ON analytics_events(type, created_at DESC)").run();
       await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_analytics_events_page_created ON analytics_events(section, page, created_at DESC)").run();
+      await env.DB.prepare(STATS_DAILY_SCHEMA).run();
     })().catch((error) => {
       statsSchemaPromise = null;
       throw error;
@@ -132,31 +159,34 @@ async function buildStatsPayload(env, rangeDays) {
   const startIso = rangeDays === ALL_RANGE_DAYS ? "" : new Date(Date.now() - (Math.max(rangeDays - 1, 0) * 86400000)).toISOString().slice(0, 10) + "T00:00:00.000Z";
   const where = startIso ? "WHERE created_at >= ?" : "";
   const bind = (sql) => (startIso ? env.DB.prepare(sql).bind(startIso) : env.DB.prepare(sql));
+  // Only date, page and counters survive the retention period.
+  const combined = `(SELECT type, page, label, section, path, created_at, 1 AS count FROM analytics_events
+    UNION ALL SELECT type, page, label, section, path, day || 'T00:00:00.000Z', count FROM analytics_daily)`;
 
   const [availableResult, filteredResult, dailyResult, pagesResult, recentResult] = await env.DB.batch([
-    env.DB.prepare("SELECT COUNT(*) AS count FROM analytics_events"),
+    env.DB.prepare(`SELECT SUM(count) AS count FROM ${combined}`),
     bind(
-      `SELECT COUNT(*) AS count,
-        SUM(CASE WHEN type = 'visit' THEN 1 ELSE 0 END) AS visits,
-        SUM(CASE WHEN type = 'contact_phone_click' THEN 1 ELSE 0 END) AS phone,
-        SUM(CASE WHEN type = 'contact_map_click' THEN 1 ELSE 0 END) AS address,
-        SUM(CASE WHEN type = 'contact_email_click' THEN 1 ELSE 0 END) AS email,
-        SUM(CASE WHEN type = 'contact_form_submit' THEN 1 ELSE 0 END) AS form
-       FROM analytics_events ${where}`
+      `SELECT SUM(count) AS count,
+        SUM(CASE WHEN type = 'visit' THEN count ELSE 0 END) AS visits,
+        SUM(CASE WHEN type = 'contact_phone_click' THEN count ELSE 0 END) AS phone,
+        SUM(CASE WHEN type = 'contact_map_click' THEN count ELSE 0 END) AS address,
+        SUM(CASE WHEN type = 'contact_email_click' THEN count ELSE 0 END) AS email,
+        SUM(CASE WHEN type = 'contact_form_submit' THEN count ELSE 0 END) AS form
+       FROM ${combined} ${where}`
     ),
     bind(
       `SELECT substr(created_at, 1, 10) AS day,
-        SUM(CASE WHEN type = 'visit' THEN 1 ELSE 0 END) AS visit,
-        SUM(CASE WHEN type = 'contact_phone_click' THEN 1 ELSE 0 END) AS phone,
-        SUM(CASE WHEN type = 'contact_map_click' THEN 1 ELSE 0 END) AS address,
-        SUM(CASE WHEN type = 'contact_email_click' THEN 1 ELSE 0 END) AS email,
-        SUM(CASE WHEN type = 'contact_form_submit' THEN 1 ELSE 0 END) AS form
-       FROM analytics_events ${where}
+        SUM(CASE WHEN type = 'visit' THEN count ELSE 0 END) AS visit,
+        SUM(CASE WHEN type = 'contact_phone_click' THEN count ELSE 0 END) AS phone,
+        SUM(CASE WHEN type = 'contact_map_click' THEN count ELSE 0 END) AS address,
+        SUM(CASE WHEN type = 'contact_email_click' THEN count ELSE 0 END) AS email,
+        SUM(CASE WHEN type = 'contact_form_submit' THEN count ELSE 0 END) AS form
+       FROM ${combined} ${where}
        GROUP BY substr(created_at, 1, 10) ORDER BY day ASC`
     ),
     bind(
-      `SELECT section, page, label, path, COUNT(*) AS visits
-       FROM analytics_events ${where}${where ? " AND" : " WHERE"} type = 'visit'
+      `SELECT section, page, label, path, SUM(count) AS visits
+       FROM ${combined} ${where}${where ? " AND" : " WHERE"} type = 'visit'
        GROUP BY section, page, label, path ORDER BY visits DESC, label ASC`
     ),
     bind(

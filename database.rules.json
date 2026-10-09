@@ -3,6 +3,7 @@
     ".read": false,
     ".write": false,
     "cookie_consents": {
+      ".indexOn": ["updated_at"],
       "$consent_id": {
         ".read": false,
         ".write": "newData.exists() && newData.child('consent_id').val() === $consent_id",
@@ -40,6 +41,7 @@
       }
     },
     "contactTickets": {
+      ".indexOn": ["submittedAt"],
       "$ticket_id": {
         ".read": false,
         ".write": "!data.exists() && newData.exists()",

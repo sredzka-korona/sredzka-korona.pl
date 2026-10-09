@@ -94,6 +94,8 @@ async function sendTemplated(dbConn, key, to, vars) {
   await sendMail(key, { to, subject, html: email.html });
 }
 
+const { pruneAuditLogs } = require('./lib/dataRetention');
+
 exports.restaurantExpireCron = onSchedule(
   {
     schedule: "every 15 minutes",
@@ -168,6 +170,7 @@ exports.restaurantExpireCron = onSchedule(
       }
     }
 
+    await pruneAuditLogs(db, 'restaurantAuditLog', now.toMillis());
     return null;
   }
 );

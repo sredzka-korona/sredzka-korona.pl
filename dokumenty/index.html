@@ -67,6 +67,7 @@
               return;
             }
             configuredGoogleTagIds[id] = true;
+            window.gtag('set', window.sredzkaCookieConsent.googleCookieOptions());
             window.gtag('config', id);
           });
         }
@@ -1729,13 +1730,13 @@
               <h4 style="margin: 1rem 0 0.5rem; color: #241b14; font-size: 1.05rem; font-weight: 600;">Dane związane z zamówieniami lub rezerwacjami</h4>
               <p>Przechowywane przez okres wymagany przepisami podatkowymi i rachunkowymi, co do zasady przez 5 lat od końca roku podatkowego.</p>
               <h4 style="margin: 1rem 0 0.5rem; color: #241b14; font-size: 1.05rem; font-weight: 600;">Dane z formularzy kontaktowych</h4>
-              <p>Przechowywane przez okres niezbędny do obsługi sprawy oraz przez okres przedawnienia ewentualnych roszczeń.</p>
+              <p>Dane przesłane przez formularz kontaktowy są przechowywane w bazach Serwisu przez 12 miesięcy od wysłania, a następnie automatycznie usuwane. Dotyczy to zapisu w bazie D1 oraz jego kopii w Firebase. Korespondencja e-mail jest przechowywana odrębnie od tych baz.</p>
               <h4 style="margin: 1rem 0 0.5rem; color: #241b14; font-size: 1.05rem; font-weight: 600;">Dane przetwarzane na podstawie zgody</h4>
-              <p>Przechowywane do momentu wycofania zgody.</p>
+              <p>Decyzja dotycząca cookies oraz rejestry zgód są przechowywane przez 12 miesięcy od ostatniej decyzji użytkownika. Zmiana decyzji rozpoczyna nowy okres 12 miesięcy; samo odwiedzanie strony nie przedłuża go. Po wygaśnięciu decyzji Serwis ponownie prosi o wybór ustawień. Zgodę można wycofać wcześniej w panelu cookies.</p>
               <h4 style="margin: 1rem 0 0.5rem; color: #241b14; font-size: 1.05rem; font-weight: 600;">Dane statystyczne i techniczne</h4>
-              <p>Przechowywane przez okres niezbędny do realizacji celów analitycznych, bezpieczeństwa i administracji Serwisem.</p>
+              <p>Szczegółowe logi aplikacji, historia wysyłki wiadomości oraz pojedyncze zdarzenia statystyczne są przechowywane maksymalnie przez 90 dni. Starsze zdarzenia są zastępowane zbiorczymi dziennymi licznikami używanymi w panelu /stats. Logi infrastruktury dostawców mogą mieć krótsze okresy przechowywania.</p>
               <h4 style="margin: 1rem 0 0.5rem; color: #241b14; font-size: 1.05rem; font-weight: 600;">Dane anonimowe</h4>
-              <p>Mogą być przechowywane bezterminowo, ponieważ nie pozwalają na identyfikację osoby fizycznej.</p>
+              <p>Bezterminowo pozostają wyłącznie zbiorcze statystyki potrzebne do panelu /stats: dzienne liczby wejść i akcji kontaktowych oraz zestawienia podstron. Nie zawierają danych z formularzy, identyfikatorów zdarzeń ani dokładnych godzin poszczególnych wizyt.</p>
             </div>
             <div class="menu-section">
               <h3>§6. Odbiorcy danych</h3>
@@ -1849,7 +1850,7 @@
               <p>Zmiany wchodzą w życie z dniem ich opublikowania w Serwisie.</p>
             </div>
           </div>
-          <p class="footer-date">Data: 01.05.2026r.</p>
+          <p class="footer-date">Data: 09.10.2026r.</p>
         </div>
       </details><details class="card collapsible-card" id="cookies-info">
         <summary class="collapsible-summary">
@@ -1858,7 +1859,7 @@
         <div class="collapsible-content">
           <p>
             Strona korzysta z plików cookies niezbędnych do prawidłowego działania oraz
-            opcjonalnych cookies analitycznych i marketingowych. Zgodę można zmienić w dowolnym momencie.
+            opcjonalnych cookies analitycznych i marketingowych. Zgodę można zmienić w dowolnym momencie. Decyzja i jej rejestr wygasają po 12 miesiącach od ostatniej decyzji; kolejne wizyty nie przedłużają tego okresu.
           </p>
           <ul class="crown-list">
             <li>Cookies niezbędne obsługują podstawowe funkcje strony, bezpieczeństwo oraz panel administratora.</li>
@@ -1882,8 +1883,8 @@
               <p>e-mail: kontakt@sredzka-korona.pl</p>
             </div>
           </div>
-          <p class="muted">Aktualizacja polityki: 2026-03-05.</p>
-          <p class="footer-date">Data: 01.05.2026r.</p>
+          <p class="muted">Aktualizacja polityki: 2026-10-09.</p>
+          <p class="footer-date">Data: 09.10.2026r.</p>
         </div>
       </details>
             <details class="card collapsible-card" id="obowiazek-informacyjny-rodo" data-static-document>
@@ -1943,8 +1944,8 @@
             <div class="menu-section">
               <h3>Przez jaki okres przetwarzamy dane osobowe?</h3>
               <p><strong>Dane transakcyjne (zamówienia):</strong> Przechowywane przez 5 lat licząc od końca roku kalendarzowego, w którym upłynął termin płatności podatku.</p>
-              <p><strong>Zapytania z formularza:</strong> Przechowywane przez okres niezbędny do udzielenia odpowiedzi lub do 3 lat (przedawnienie roszczeń).</p>
-              <p><strong>Dane anonimowe:</strong> Przechowywane przez czas nieoznaczony w celu prowadzenia statystyk.</p>
+              <p><strong>Zapytania z formularza:</strong> Przechowywane w bazach Serwisu przez 12 miesięcy od wysłania, następnie automatycznie usuwane. Retencja baz nie obejmuje odrębnej korespondencji e-mail.</p>
+              <p><strong>Dane anonimowe:</strong> Bezterminowo pozostają wyłącznie zbiorcze dzienne statystyki potrzebne do panelu /stats. Szczegółowe logi i pojedyncze zdarzenia są usuwane po 90 dniach.</p>
             </div>
             <div class="menu-section">
               <h3>Kto jest odbiorcą danych, w tym danych osobowych?</h3>
@@ -1971,7 +1972,7 @@
               </ul>
             </div>
           </div>
-          <p class="footer-date">Data: 01.05.2026r.</p>
+          <p class="footer-date">Data: 09.10.2026r.</p>
         </div>
       </details>
       <div id="documents-page-dynamic-list"><div id="documents-page-dynamic-list"></div>

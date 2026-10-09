@@ -55,12 +55,52 @@
   }
 
   function getStoredChoice() {
-    return readJson(STORAGE_KEY);
+    var choice = readJson(STORAGE_KEY);
+    if (choice && isExpired(choice)) {
+      try {
+        window.localStorage.removeItem(STORAGE_KEY);
+        window.localStorage.removeItem(ANONYMOUS_USER_KEY);
+        window.localStorage.removeItem('sredzka-cookies-seen');
+      } catch (error) {}
+      clearOptionalCookies();
+      return null;
+    }
+    return choice;
+  }
+
+  function expiresAt(choice) {
+    var date = new Date(choice && choice.updated_at);
+    if (!Number.isFinite(date.getTime())) return 0;
+    var day = date.getUTCDate();
+    date.setUTCDate(1);
+    date.setUTCFullYear(date.getUTCFullYear() + 1);
+    var lastDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+    date.setUTCDate(Math.min(day, lastDay));
+    return date.getTime();
+  }
+
+  function isExpired(choice) {
+    var deadline = expiresAt(choice);
+    return !deadline || deadline <= Date.now();
+  }
+
+  function clearOptionalCookies() {
+    var host = window.location.hostname;
+    var domains = ['', host, '.' + host];
+    if (host.indexOf('www.') === 0) domains.push(host.slice(4), '.' + host.slice(4));
+    String(document.cookie || '').split(';').forEach(function (cookie) {
+      var name = cookie.split('=')[0].trim();
+      if (!/^(_ga(?:_|$)|_gid$|_gat|_gcl_|_gac_)/.test(name)) return;
+      domains.forEach(function (domain) {
+        document.cookie = name + '=; Max-Age=0; Path=/; SameSite=Lax' + (domain ? '; Domain=' + domain : '');
+      });
+    });
   }
 
   function isCurrentPolicyChoice(choice) {
     return !!(
       choice &&
+      !isExpired(choice) &&
       choice.policy_version === POLICY_VERSION &&
       choice.consent_id &&
       choice.anonymous_user_id
@@ -129,6 +169,10 @@
   function saveChoice(choice, action) {
     var record = createRecord(choice, action);
     writeJson(STORAGE_KEY, record);
+    if (!record.analytics && !record.marketing) clearOptionalCookies();
+    if (typeof window.gtag === 'function') {
+      window.gtag('set', { cookie_expires: Math.max(0, Math.floor((expiresAt(record) - Date.now()) / 1000)), cookie_update: true });
+    }
     persistRemote(record);
     try {
       window.dispatchEvent(new CustomEvent('sredzka:consent-changed', { detail: record }));
@@ -148,5 +192,9 @@
     getAnonymousUserId: getAnonymousUserId,
     getGoogleConsentState: getGoogleConsentState,
     saveChoice: saveChoice,
+    googleCookieOptions: function () {
+      var choice = getValidChoice();
+      return { cookie_expires: choice ? Math.max(0, Math.floor((expiresAt(choice) - Date.now()) / 1000)) : 0, cookie_update: true };
+    },
   };
 })();

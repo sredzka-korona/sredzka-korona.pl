@@ -1318,6 +1318,7 @@
               return;
             }
             configuredGoogleTagIds[id] = true;
+            window.gtag('set', window.sredzkaCookieConsent.googleCookieOptions());
             window.gtag('config', id);
           });
         }

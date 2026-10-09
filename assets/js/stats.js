@@ -106,7 +106,7 @@
     dom.metrics.innerHTML = items.map(function (item) {
       return '<article class="metric"><span>' + escapeHtml(item[0]) + '</span><strong>' + fmtInt(item[1]) + '</strong><small>' + escapeHtml(item[2]) + '</small></article>';
     }).join('');
-    dom.summaryLine.textContent = 'Zakres: ' + rangeLabel() + ' • rekordów w bazie: ' + fmtInt(state.data.availableEvents) + ' • odświeżono: ' + fmtDate(state.data.lastUpdatedAt);
+    dom.summaryLine.textContent = 'Zakres: ' + rangeLabel() + ' • zdarzeń w historii: ' + fmtInt(state.data.availableEvents) + ' • odświeżono: ' + fmtDate(state.data.lastUpdatedAt);
     var days = Math.max((state.data.series || []).length, 1);
     dom.sideSummary.innerHTML = [
       ['Łączne akcje kontaktowe', state.data.totalContacts],
