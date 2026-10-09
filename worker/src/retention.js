@@ -1,10 +1,10 @@
 import { archiveStatsEvents } from './stats.js';
 
-export function retentionCutoffs(now = new Date()) {
+function calendarCutoff(now, years) {
   const annual = new Date(now);
   const day = annual.getUTCDate();
   annual.setUTCDate(1);
-  annual.setUTCFullYear(annual.getUTCFullYear() - 1);
+  annual.setUTCFullYear(annual.getUTCFullYear() - years);
   const lastDay = new Date(Date.UTC(annual.getUTCFullYear(), annual.getUTCMonth() + 1, 0)).getUTCDate();
   const currentLastDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
   annual.setUTCDate(Math.min(day, lastDay));
@@ -16,12 +16,18 @@ export function retentionCutoffs(now = new Date()) {
     annual.setUTCDate(lastDay);
     annualLeapIso = annual.toISOString();
   }
+  return { iso: annualIso, leapIso: annualLeapIso, queryIso: annualLeapIso || annualIso };
+}
+
+export function retentionCutoffs(now = new Date()) {
+  const annual = calendarCutoff(now, 1);
   return {
     logsMs: now.getTime() - 90 * 86400000,
     logsIso: new Date(now.getTime() - 90 * 86400000).toISOString(),
-    annualIso,
-    annualLeapIso,
-    annualQueryIso: annualLeapIso || annualIso,
+    annualIso: annual.iso,
+    annualLeapIso: annual.leapIso,
+    annualQueryIso: annual.queryIso,
+    consentEvidence: calendarCutoff(now, 3),
   };
 }
 
@@ -52,22 +58,26 @@ export async function pruneRealtimeData(requestFirebase, cutoffs) {
   const counts = {};
   // At most 42 Firebase requests per run, within the free Worker subrequest budget.
   // Indexes avoid downloading entire consent/contact collections.
-  for (const [collection, field] of [['cookie_consents', 'updated_at'], ['contactTickets', 'submittedAt']]) {
+  const annual = { iso: cutoffs.annualIso, leapIso: cutoffs.annualLeapIso, queryIso: cutoffs.annualQueryIso };
+  for (const [collection, field, period] of [
+    ['cookie_consents', 'updated_at', cutoffs.consentEvidence],
+    ['contactTickets', 'submittedAt', annual],
+  ]) {
     const response = await requestFirebase(`${collection}.json`, {
-      query: { orderBy: JSON.stringify(field), startAt: JSON.stringify(''), endAt: JSON.stringify(cutoffs.annualQueryIso), limitToFirst: '10' },
+      query: { orderBy: JSON.stringify(field), startAt: JSON.stringify(''), endAt: JSON.stringify(period.queryIso), limitToFirst: '10' },
     });
     const records = await response.json();
     counts[collection] = 0;
     for (const key of Object.keys(records || {})) {
       const path = `${collection}/${encodeURIComponent(key)}.json`;
-      // A user may renew a consent after it appears in the cleanup query.
+      // Recheck legacy mutable records and protect against concurrent writes.
       const current = await requestFirebase(path, { headers: { 'X-Firebase-ETag': 'true' } });
       const record = await current.json();
       const timestamp = Date.parse(record?.[field]);
       if (!Number.isFinite(timestamp)) continue;
       const iso = new Date(timestamp).toISOString();
-      const expired = iso <= cutoffs.annualIso || (cutoffs.annualLeapIso &&
-        iso.slice(0, 10) === cutoffs.annualLeapIso.slice(0, 10) && iso.slice(11) <= cutoffs.annualLeapIso.slice(11));
+      const expired = iso <= period.iso || (period.leapIso &&
+        iso.slice(0, 10) === period.leapIso.slice(0, 10) && iso.slice(11) <= period.leapIso.slice(11));
       if (!expired) continue;
       const etag = current.headers.get('etag');
       if (!etag) throw new Error('Firebase retention: missing ETag');

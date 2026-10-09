@@ -7,7 +7,7 @@
 
   var STORAGE_KEY = 'sredzka-cookies-choice';
   var ANONYMOUS_USER_KEY = 'sredzka-cookies-anonymous-user-id';
-  var POLICY_VERSION = '1.0';
+  var POLICY_VERSION = '1.1';
   var REALTIME_DATABASE_URL = 'https://sredzka-korona-default-rtdb.europe-west1.firebasedatabase.app';
   var CONSENTS_PATH = 'cookie_consents';
 
@@ -129,8 +129,9 @@
     var now = new Date().toISOString();
 
     return {
-      consent_id: existing ? existing.consent_id : createUuid(),
-      created_at: existing ? existing.created_at : now,
+      // Each decision is a separate proof; changing preferences must not replace it.
+      consent_id: createUuid(),
+      created_at: now,
       updated_at: now,
       policy_version: POLICY_VERSION,
       analytics: !!(choice && choice.analytics),

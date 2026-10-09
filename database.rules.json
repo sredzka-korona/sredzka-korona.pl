@@ -6,8 +6,8 @@
       ".indexOn": ["updated_at"],
       "$consent_id": {
         ".read": false,
-        ".write": "newData.exists() && newData.child('consent_id').val() === $consent_id",
-        ".validate": "newData.hasChildren(['consent_id', 'created_at', 'updated_at', 'policy_version', 'analytics', 'marketing', 'external_media', 'action', 'anonymous_user_id'])",
+        ".write": "!data.exists() && newData.exists() && newData.child('consent_id').val() === $consent_id",
+        ".validate": "newData.hasChildren(['consent_id', 'created_at', 'updated_at', 'policy_version', 'analytics', 'marketing', 'external_media', 'action', 'anonymous_user_id']) && newData.child('created_at').val() === newData.child('updated_at').val()",
         "consent_id": {
           ".validate": "newData.isString() && newData.val() === $consent_id && newData.val().matches(/^[A-Za-z0-9_-]{6,80}$/)"
         },

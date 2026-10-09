@@ -102,12 +102,16 @@ test('D1 removes expired contacts, consents and mail logs while keeping current 
   sqlite.close();
 });
 
-test('Firebase cleanup uses last decision and conditional deletion protects renewed consents', async () => {
+test('Firebase retains proofs for three years, contacts for one year, and protects concurrent changes', async () => {
   const deleted = [];
   const request = async (path, options = {}) => {
     if (options.query) {
       assert.equal(options.query.limitToFirst, '10');
-      if (path === 'cookie_consents.json') return Response.json({ expired: {}, renewed: {}, raced: {} });
+      if (path === 'cookie_consents.json') {
+        assert.equal(JSON.parse(options.query.endAt), cutoffs.consentEvidence.queryIso);
+        return Response.json({ expired: {}, retained: {}, renewed: {}, raced: {} });
+      }
+      assert.equal(JSON.parse(options.query.endAt), cutoffs.annualQueryIso);
       return Response.json({ contact: {} });
     }
     if (options.method === 'DELETE') {
@@ -117,7 +121,9 @@ test('Firebase cleanup uses last decision and conditional deletion protects rene
       return Response.json(null);
     }
     const field = path.startsWith('cookie_consents') ? 'updated_at' : 'submittedAt';
-    return Response.json({ [field]: path.includes('renewed') ? NOW.toISOString() : cutoffs.annualIso }, { headers: { etag: '"v1"' } });
+    const cutoff = field === 'updated_at' ? cutoffs.consentEvidence.iso : cutoffs.annualIso;
+    const timestamp = path.includes('renewed') ? NOW.toISOString() : path.includes('retained') ? '2024-10-09T12:00:00.000Z' : cutoff;
+    return Response.json({ [field]: timestamp }, { headers: { etag: '"v1"' } });
   };
   assert.deepEqual(await pruneRealtimeData(request, cutoffs), { cookie_consents: 1, contactTickets: 1 });
   assert.deepEqual(deleted, ['cookie_consents/expired.json', 'contactTickets/contact.json']);
@@ -134,7 +140,7 @@ function browser(choice, initialNow = NOW.getTime()) {
   return { consent: window.sredzkaCookieConsent, storage, calls, advance: ms => { now += ms; } };
 }
 
-const choice = updated_at => ({ consent_id: 'consent-id', anonymous_user_id: 'anonymous-id', policy_version: '1.0', created_at: '2020-01-01T00:00:00.000Z', updated_at, analytics: true, marketing: true });
+const choice = updated_at => ({ consent_id: 'consent-id', anonymous_user_id: 'anonymous-id', policy_version: '1.1', created_at: '2020-01-01T00:00:00.000Z', updated_at, analytics: true, marketing: true });
 
 test('cookie decisions expire after 12 calendar months and visiting does not renew them', () => {
   const expired = browser(choice(cutoffs.annualIso));
@@ -148,7 +154,9 @@ test('cookie decisions expire after 12 calendar months and visiting does not ren
   assert.equal(current.consent.googleCookieOptions().cookie_expires, seconds - 86400);
   assert.equal(current.calls.length, 0);
   const record = current.consent.saveChoice({ analytics: false }, 'reject_all');
-  assert.equal(record.consent_id, 'consent-id');
+  assert.notEqual(record.consent_id, 'consent-id');
+  assert.equal(record.anonymous_user_id, 'anonymous-id');
+  assert.equal(record.created_at, record.updated_at);
   assert.equal(record.updated_at, '2026-10-10T12:00:00.000Z');
   assert.equal(current.calls.length, 1);
 });
@@ -158,6 +166,42 @@ test('12-month expiry clamps leap day to the end of February', () => {
   assert.equal(leap.consent.getValidChoice(), null);
   assert.equal(retentionCutoffs(new Date('2024-02-29T12:00:00.000Z')).annualIso, '2023-02-28T12:00:00.000Z');
   assert.equal(retentionCutoffs(new Date('2025-02-28T12:00:00.000Z')).annualQueryIso, '2024-02-29T12:00:00.000Z');
+  assert.equal(retentionCutoffs(new Date('2027-02-28T12:00:00.000Z')).consentEvidence.queryIso, '2024-02-29T12:00:00.000Z');
+});
+
+test('acceptance and withdrawal create separate minimal proofs without replacing earlier decisions', () => {
+  const current = browser(choice('2026-09-01T12:00:00.000Z'));
+  const accepted = current.consent.saveChoice({ analytics: true, marketing: true }, 'accept_all');
+  current.advance(3600000);
+  const withdrawn = current.consent.saveChoice({ analytics: false, marketing: false }, 'reject_all');
+  assert.notEqual(accepted.consent_id, withdrawn.consent_id);
+  assert.equal(accepted.anonymous_user_id, withdrawn.anonymous_user_id);
+  const history = new Map(current.calls.map(([url, options]) => [url, JSON.parse(options.body)]));
+  assert.equal(history.size, 2);
+  const records = [...history.values()];
+  assert.equal(records[0].analytics, true);
+  assert.equal(records[0].action, 'accept_all');
+  assert.equal(records[1].analytics, false);
+  assert.equal(records[1].action, 'reject_all');
+  assert.equal(records[1].policy_version, '1.1');
+  assert.equal(current.consent.getValidChoice().consent_id, withdrawn.consent_id);
+  const allowedFields = ['action','analytics','anonymous_user_id','consent_id','created_at','external_media','marketing','policy_version','updated_at'];
+  for (const record of records) assert.deepEqual(Object.keys(record).sort(), allowedFields);
+  current.advance(366 * 86400000);
+  assert.equal(current.consent.getValidChoice(), null);
+  // Expiring the local preference does not remove its independent remote proof.
+  assert.equal(current.calls.length, 2);
+  assert.equal(history.size, 2);
+});
+
+test('the revised policy requests a new decision without treating the old version as current consent', () => {
+  const previous = { ...choice('2026-09-01T12:00:00.000Z'), policy_version: '1.0' };
+  const current = browser(previous);
+  assert.equal(current.consent.getValidChoice(), null);
+  const record = current.consent.saveChoice({ analytics: false }, 'reject_all');
+  assert.equal(record.policy_version, '1.1');
+  assert.notEqual(record.consent_id, previous.consent_id);
+  assert.equal(record.anonymous_user_id, previous.anonymous_user_id);
 });
 
 test('leap anniversaries delete both eligible days without deleting later decisions early', async () => {
